@@ -1,3 +1,5 @@
 """API包"""
 
-__all__ = []
+from .rest.training import router as training_router
+
+__all__ = ["training_router"]

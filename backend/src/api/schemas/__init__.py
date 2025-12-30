@@ -1,3 +1,21 @@
 """API模式包"""
 
-__all__ = []
+from .training import (
+    TrainingJobConfigCreate,
+    TrainingJobConfigResponse,
+    TrainingJobCreate,
+    TrainingJobListResponse,
+    TrainingJobResponse,
+    TrainingJobStatusResponse,
+    TrainingJobUpdate,
+)
+
+__all__ = [
+    "TrainingJobConfigCreate",
+    "TrainingJobConfigResponse",
+    "TrainingJobCreate",
+    "TrainingJobListResponse",
+    "TrainingJobResponse",
+    "TrainingJobStatusResponse",
+    "TrainingJobUpdate",
+]
