@@ -9,6 +9,19 @@ from .training import (
     TrainingJobStatusResponse,
     TrainingJobUpdate,
 )
+from .model import (
+    ModelCreate,
+    ModelUpdate,
+    ModelResponse,
+    ModelListResponse,
+    ModelVersionCreate,
+    ModelVersionUpdate,
+    ModelVersionResponse,
+    ModelVersionListResponse,
+    ModelFileInfo,
+    ModelFilesResponse,
+    ModelStorageStats,
+)
 
 __all__ = [
     "TrainingJobConfigCreate",
@@ -18,4 +31,15 @@ __all__ = [
     "TrainingJobResponse",
     "TrainingJobStatusResponse",
     "TrainingJobUpdate",
+    "ModelCreate",
+    "ModelUpdate",
+    "ModelResponse",
+    "ModelListResponse",
+    "ModelVersionCreate",
+    "ModelVersionUpdate",
+    "ModelVersionResponse",
+    "ModelVersionListResponse",
+    "ModelFileInfo",
+    "ModelFilesResponse",
+    "ModelStorageStats",
 ]
