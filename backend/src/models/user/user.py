@@ -15,6 +15,7 @@ if TYPE_CHECKING:
     from models.user.team import Team
     from models.user.project import Project
     from models.training import TrainingJob
+    from models.model import Model
 
 
 class UserRole(str, Enum):
@@ -98,6 +99,10 @@ class User(Base, SoftDeleteMixin):
 
     training_jobs: Mapped[list["TrainingJob"]] = relationship(
         "TrainingJob", back_populates="creator", foreign_keys="TrainingJob.creator_id"
+    )
+
+    models: Mapped[list["Model"]] = relationship(
+        "Model", back_populates="creator", foreign_keys="Model.creator_id"
     )
 
     def __repr__(self) -> str:

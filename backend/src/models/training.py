@@ -14,6 +14,7 @@ from .base import Base, SoftDeleteMixin, TimestampMixin
 
 if TYPE_CHECKING:
     from .user import Project, User
+    from .model import Model
 
 
 class TrainingJobStatus(str, enum.Enum):
@@ -110,6 +111,9 @@ class TrainingJob(Base, TimestampMixin, SoftDeleteMixin):
     )
     metrics: Mapped[list["TrainingJobMetrics"]] = relationship(
         "TrainingJobMetrics", back_populates="job", cascade="all, delete-orphan"
+    )
+    generated_models: Mapped[list["Model"]] = relationship(
+        "Model", back_populates="source_training_job"
     )
 
     def __repr__(self) -> str:

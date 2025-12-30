@@ -15,6 +15,7 @@ if TYPE_CHECKING:
     from models.user.user import User
     from models.user.team import Team
     from models.training import TrainingJob
+    from models.model import Model
 
 
 class ProjectStatus(str, Enum):
@@ -80,6 +81,10 @@ class Project(Base, SoftDeleteMixin):
 
     training_jobs: Mapped[list["TrainingJob"]] = relationship(
         "TrainingJob", back_populates="project"
+    )
+
+    models: Mapped[list["Model"]] = relationship(
+        "Model", back_populates="project"
     )
 
     # datasets: Mapped[list["Dataset"]] = relationship(

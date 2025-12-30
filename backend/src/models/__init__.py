@@ -10,6 +10,13 @@ from .training import (
     TrainingJobType,
     FrameworkType,
 )
+from .model import (
+    Model,
+    ModelVersion,
+    ModelDeployment,
+    ModelStatus,
+    ModelFramework,
+)
 
 __all__ = [
     "Base",
@@ -27,4 +34,9 @@ __all__ = [
     "TrainingJobStatus",
     "TrainingJobType",
     "FrameworkType",
+    "Model",
+    "ModelVersion",
+    "ModelDeployment",
+    "ModelStatus",
+    "ModelFramework",
 ]
