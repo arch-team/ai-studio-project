@@ -2,6 +2,14 @@
 
 from .base import Base, TimestampMixin, SoftDeleteMixin
 from .user import User, UserRole, UserStatus, Team, Project, ProjectStatus
+from .training import (
+    TrainingJob,
+    TrainingJobConfig,
+    TrainingJobMetrics,
+    TrainingJobStatus,
+    TrainingJobType,
+    FrameworkType,
+)
 
 __all__ = [
     "Base",
@@ -13,4 +21,10 @@ __all__ = [
     "Team",
     "Project",
     "ProjectStatus",
+    "TrainingJob",
+    "TrainingJobConfig",
+    "TrainingJobMetrics",
+    "TrainingJobStatus",
+    "TrainingJobType",
+    "FrameworkType",
 ]

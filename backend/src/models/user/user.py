@@ -14,6 +14,7 @@ from models.base import Base, SoftDeleteMixin
 if TYPE_CHECKING:
     from models.user.team import Team
     from models.user.project import Project
+    from models.training import TrainingJob
 
 
 class UserRole(str, Enum):
@@ -94,6 +95,10 @@ class User(Base, SoftDeleteMixin):
     # owned_projects: Mapped[list["Project"]] = relationship(
     #     "Project", back_populates="owner", foreign_keys="Project.owner_id"
     # )
+
+    training_jobs: Mapped[list["TrainingJob"]] = relationship(
+        "TrainingJob", back_populates="creator", foreign_keys="TrainingJob.creator_id"
+    )
 
     def __repr__(self) -> str:
         return f"User(id={self.id}, username={self.username!r}, email={self.email!r}, role={self.role.value})"
