@@ -21,26 +21,7 @@ depends_on: Union[str, Sequence[str], None] = None
 
 def upgrade() -> None:
     """创建训练任务相关表"""
-
-    # 创建枚举类型
-    op.execute("""
-        CREATE TYPE trainingjobstatus AS ENUM (
-            'PENDING', 'QUEUED', 'RUNNING', 'COMPLETED', 'FAILED', 'CANCELLED', 'TIMEOUT'
-        )
-    """)
-
-    op.execute("""
-        CREATE TYPE trainingjobtype AS ENUM (
-            'SINGLE_NODE', 'DISTRIBUTED_DATA_PARALLEL',
-            'DISTRIBUTED_MODEL_PARALLEL', 'HYBRID_PARALLEL'
-        )
-    """)
-
-    op.execute("""
-        CREATE TYPE frameworktype AS ENUM (
-            'PYTORCH', 'TENSORFLOW', 'JFLUX', 'DEEPSPEED', 'MEGATRON'
-        )
-    """)
+    # 注意: 枚举类型会由SQLAlchemy自动创建
 
     # 创建training_jobs表
     op.create_table(
@@ -119,9 +100,37 @@ def upgrade() -> None:
     op.create_index(op.f('ix_training_job_metrics_id'), 'training_job_metrics', ['id'], unique=False)
     op.create_index(op.f('ix_training_job_metrics_job_id'), 'training_job_metrics', ['job_id'], unique=False)
 
+    # checkpointstoragetype枚举会由SQLAlchemy自动创建
+
+    # 创建checkpoints表
+    op.create_table(
+        'checkpoints',
+        sa.Column('id', sa.Integer(), autoincrement=True, nullable=False),
+        sa.Column('job_id', sa.Integer(), nullable=False, comment='训练任务ID'),
+        sa.Column('step', sa.Integer(), nullable=False, comment='训练步数'),
+        sa.Column('epoch', sa.Integer(), nullable=True, comment='训练轮次'),
+        sa.Column('storage_path', sa.String(length=500), nullable=False, comment='存储路径'),
+        sa.Column('storage_type', postgresql.ENUM('LOCAL', 'FSX', 'S3', name='checkpointstoragetype'), nullable=False, comment='存储类型'),
+        sa.Column('size_bytes', sa.Integer(), nullable=False, comment='文件大小(字节)'),
+        sa.Column('checkpoint_metadata', sa.JSON(), nullable=True, comment='检查点元数据'),
+        sa.Column('checkpoint_metrics', sa.JSON(), nullable=True, comment='训练指标快照'),
+        sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False, comment='创建时间'),
+        sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False, comment='更新时间'),
+        sa.ForeignKeyConstraint(['job_id'], ['training_jobs.id'], ondelete='CASCADE'),
+        sa.PrimaryKeyConstraint('id')
+    )
+    op.create_index(op.f('ix_checkpoints_id'), 'checkpoints', ['id'], unique=False)
+    op.create_index(op.f('ix_checkpoints_job_id'), 'checkpoints', ['job_id'], unique=False)
+
 
 def downgrade() -> None:
     """删除训练任务相关表"""
+
+    # 删除checkpoints表
+    op.drop_index(op.f('ix_checkpoints_job_id'), table_name='checkpoints')
+    op.drop_index(op.f('ix_checkpoints_id'), table_name='checkpoints')
+    op.drop_table('checkpoints')
+    op.execute('DROP TYPE IF EXISTS checkpointstoragetype')
 
     op.drop_index(op.f('ix_training_job_metrics_job_id'), table_name='training_job_metrics')
     op.drop_index(op.f('ix_training_job_metrics_id'), table_name='training_job_metrics')

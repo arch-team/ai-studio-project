@@ -24,8 +24,7 @@ export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElemen
 const getButtonClasses = (
   variant: ButtonVariant,
   size: ButtonSize,
-  fullWidth: boolean,
-  disabled: boolean
+  fullWidth: boolean
 ): string => {
   const baseClasses = 'inline-flex items-center justify-center font-medium rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed';
 
@@ -58,7 +57,7 @@ export const Button: React.FC<ButtonProps> = ({
   className = '',
   ...props
 }) => {
-  const buttonClasses = getButtonClasses(variant, size, fullWidth, disabled || loading);
+  const buttonClasses = getButtonClasses(variant, size, fullWidth);
 
   return (
     <button

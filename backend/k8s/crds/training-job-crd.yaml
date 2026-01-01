@@ -1,0 +1,225 @@
+# TrainingJob CRD - 自定义资源定义
+# 扩展K8s API以支持AI训练平台特定功能
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: trainingjobs.ai-platform.anker.com
+  labels:
+    app: ai-training-platform
+spec:
+  group: ai-platform.anker.com
+  names:
+    kind: TrainingJob
+    listKind: TrainingJobList
+    plural: trainingjobs
+    singular: trainingjob
+    shortNames:
+      - tj
+  scope: Namespaced
+  versions:
+    - name: v1alpha1
+      served: true
+      storage: true
+      schema:
+        openAPIV3Schema:
+          type: object
+          properties:
+            spec:
+              type: object
+              required:
+                - jobType
+                - framework
+                - config
+              properties:
+                # 任务类型
+                jobType:
+                  type: string
+                  enum:
+                    - SINGLE_NODE
+                    - DISTRIBUTED_DATA_PARALLEL
+                    - DISTRIBUTED_MODEL_PARALLEL
+                    - HYBRID_PARALLEL
+
+                # 训练框架
+                framework:
+                  type: string
+                  enum:
+                    - PYTORCH
+                    - TENSORFLOW
+                    - JFLUX
+                    - DEEPSPEED
+                    - MEGATRON
+
+                # 平台任务ID(关联数据库记录)
+                platformJobId:
+                  type: integer
+                  format: int64
+
+                # 训练配置
+                config:
+                  type: object
+                  required:
+                    - nodeCount
+                    - gpuPerNode
+                    - dockerImage
+                    - command
+                    - outputPath
+                  properties:
+                    # 资源配置
+                    nodeCount:
+                      type: integer
+                      minimum: 1
+                      maximum: 100
+                    gpuPerNode:
+                      type: integer
+                      minimum: 0
+                      maximum: 8
+                    cpuPerNode:
+                      type: integer
+                      minimum: 1
+                      maximum: 64
+                    memoryPerNodeGb:
+                      type: integer
+                      minimum: 1
+                      maximum: 512
+                    gpuType:
+                      type: string
+
+                    # 容器配置
+                    dockerImage:
+                      type: string
+                    command:
+                      type: array
+                      items:
+                        type: string
+                    args:
+                      type: array
+                      items:
+                        type: string
+                    envVars:
+                      type: object
+                      additionalProperties:
+                        type: string
+
+                    # 数据配置
+                    datasetPath:
+                      type: string
+                    checkpointPath:
+                      type: string
+                    outputPath:
+                      type: string
+
+                    # 训练配置
+                    hyperparameters:
+                      type: object
+                      x-kubernetes-preserve-unknown-fields: true
+                    distributedConfig:
+                      type: object
+                      x-kubernetes-preserve-unknown-fields: true
+
+                    # 执行配置
+                    timeoutSeconds:
+                      type: integer
+                      minimum: 60
+                      maximum: 604800
+                    maxRetries:
+                      type: integer
+                      minimum: 0
+                      maximum: 5
+
+            status:
+              type: object
+              properties:
+                # 任务状态
+                phase:
+                  type: string
+                  enum:
+                    - Pending
+                    - Queued
+                    - Running
+                    - Completed
+                    - Failed
+                    - Cancelled
+
+                # 时间戳
+                startTime:
+                  type: string
+                  format: date-time
+                completionTime:
+                  type: string
+                  format: date-time
+
+                # 底层Job引用
+                underlyingJobRef:
+                  type: object
+                  properties:
+                    apiVersion:
+                      type: string
+                    kind:
+                      type: string
+                    name:
+                      type: string
+                    namespace:
+                      type: string
+
+                # 运行统计
+                succeeded:
+                  type: integer
+                failed:
+                  type: integer
+                active:
+                  type: integer
+
+                # 条件
+                conditions:
+                  type: array
+                  items:
+                    type: object
+                    required:
+                      - type
+                      - status
+                    properties:
+                      type:
+                        type: string
+                      status:
+                        type: string
+                        enum: ["True", "False", "Unknown"]
+                      reason:
+                        type: string
+                      message:
+                        type: string
+                      lastTransitionTime:
+                        type: string
+                        format: date-time
+                      lastUpdateTime:
+                        type: string
+                        format: date-time
+
+                # 错误信息
+                errorMessage:
+                  type: string
+
+      # 子资源
+      subresources:
+        status: {}
+
+      # 打印列
+      additionalPrinterColumns:
+        - name: Job-Type
+          type: string
+          jsonPath: .spec.jobType
+        - name: Framework
+          type: string
+          jsonPath: .spec.framework
+        - name: Status
+          type: string
+          jsonPath: .status.phase
+        - name: Nodes
+          type: integer
+          jsonPath: .spec.config.nodeCount
+        - name: GPUs
+          type: integer
+          jsonPath: .spec.config.gpuPerNode
+        - name: Age
+          type: date
+          jsonPath: .metadata.creationTimestamp

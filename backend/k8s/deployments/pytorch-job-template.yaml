@@ -1,0 +1,229 @@
+# PyTorchJob模板 - 用于分布式PyTorch训练
+# 参考: https://github.com/kubeflow/training-operator
+apiVersion: kubeflow.org/v1
+kind: PyTorchJob
+metadata:
+  name: "{{ job_name }}"
+  namespace: "{{ namespace }}"
+  labels:
+    app: ai-training-platform
+    training-job-id: "{{ job_id }}"
+    framework: pytorch
+    job-type: "{{ job_type }}"
+spec:
+  # PyTorch分布式训练配置
+  pytorchReplicaSpecs:
+    # Master节点(Rank 0)
+    Master:
+      replicas: 1
+      restartPolicy: OnFailure
+      template:
+        metadata:
+          labels:
+            app: ai-training-platform
+            training-job-id: "{{ job_id }}"
+            role: master
+        spec:
+          containers:
+            - name: pytorch
+              image: "{{ docker_image }}"
+              imagePullPolicy: IfNotPresent
+
+              # 训练命令
+              command: {{ command }}
+              {% if args %}
+              args: {{ args }}
+              {% endif %}
+
+              # 环境变量
+              env:
+                - name: RANK
+                  value: "0"
+                - name: WORLD_SIZE
+                  value: "{{ world_size }}"
+                - name: MASTER_ADDR
+                  value: "{{ job_name }}-master-0"
+                - name: MASTER_PORT
+                  value: "23456"
+                - name: NCCL_DEBUG
+                  value: "INFO"
+                {% for key, value in env_vars.items() %}
+                - name: "{{ key }}"
+                  value: "{{ value }}"
+                {% endfor %}
+
+              # 资源配置
+              resources:
+                limits:
+                  nvidia.com/gpu: {{ gpu_per_node }}
+                  memory: "{{ memory_per_node_gb }}Gi"
+                  cpu: "{{ cpu_per_node }}"
+                requests:
+                  nvidia.com/gpu: {{ gpu_per_node }}
+                  memory: "{{ memory_per_node_gb }}Gi"
+                  cpu: "{{ cpu_per_node }}"
+
+              # 存储挂载
+              volumeMounts:
+                {% if dataset_path %}
+                - name: dataset
+                  mountPath: /mnt/dataset
+                  readOnly: true
+                {% endif %}
+                - name: output
+                  mountPath: /mnt/output
+                - name: checkpoint-local
+                  mountPath: /mnt/nvme/checkpoints
+                - name: checkpoint-fsx
+                  mountPath: /mnt/fsx/checkpoints
+                - name: shm
+                  mountPath: /dev/shm
+
+          # 存储卷
+          volumes:
+            {% if dataset_path %}
+            - name: dataset
+              persistentVolumeClaim:
+                claimName: "{{ dataset_pvc }}"
+            {% endif %}
+            - name: output
+              persistentVolumeClaim:
+                claimName: "{{ output_pvc }}"
+            - name: checkpoint-local
+              hostPath:
+                path: /mnt/nvme/checkpoints
+                type: DirectoryOrCreate
+            - name: checkpoint-fsx
+              persistentVolumeClaim:
+                claimName: fsx-checkpoints
+            - name: shm
+              emptyDir:
+                medium: Memory
+                sizeLimit: 10Gi
+
+          # 节点选择器
+          {% if gpu_type %}
+          nodeSelector:
+            node.kubernetes.io/instance-type: "{{ gpu_type }}"
+          {% endif %}
+
+          # 容忍度配置(用于专用训练节点)
+          tolerations:
+            - key: "training"
+              operator: "Equal"
+              value: "true"
+              effect: "NoSchedule"
+
+    # Worker节点(Rank > 0)
+    {% if node_count > 1 %}
+    Worker:
+      replicas: {{ node_count - 1 }}
+      restartPolicy: OnFailure
+      template:
+        metadata:
+          labels:
+            app: ai-training-platform
+            training-job-id: "{{ job_id }}"
+            role: worker
+        spec:
+          containers:
+            - name: pytorch
+              image: "{{ docker_image }}"
+              imagePullPolicy: IfNotPresent
+
+              # 训练命令
+              command: {{ command }}
+              {% if args %}
+              args: {{ args }}
+              {% endif %}
+
+              # 环境变量
+              env:
+                - name: WORLD_SIZE
+                  value: "{{ world_size }}"
+                - name: MASTER_ADDR
+                  value: "{{ job_name }}-master-0"
+                - name: MASTER_PORT
+                  value: "23456"
+                - name: NCCL_DEBUG
+                  value: "INFO"
+                {% for key, value in env_vars.items() %}
+                - name: "{{ key }}"
+                  value: "{{ value }}"
+                {% endfor %}
+
+              # 资源配置
+              resources:
+                limits:
+                  nvidia.com/gpu: {{ gpu_per_node }}
+                  memory: "{{ memory_per_node_gb }}Gi"
+                  cpu: "{{ cpu_per_node }}"
+                requests:
+                  nvidia.com/gpu: {{ gpu_per_node }}
+                  memory: "{{ memory_per_node_gb }}Gi"
+                  cpu: "{{ cpu_per_node }}"
+
+              # 存储挂载
+              volumeMounts:
+                {% if dataset_path %}
+                - name: dataset
+                  mountPath: /mnt/dataset
+                  readOnly: true
+                {% endif %}
+                - name: output
+                  mountPath: /mnt/output
+                - name: checkpoint-local
+                  mountPath: /mnt/nvme/checkpoints
+                - name: checkpoint-fsx
+                  mountPath: /mnt/fsx/checkpoints
+                - name: shm
+                  mountPath: /dev/shm
+
+          # 存储卷
+          volumes:
+            {% if dataset_path %}
+            - name: dataset
+              persistentVolumeClaim:
+                claimName: "{{ dataset_pvc }}"
+            {% endif %}
+            - name: output
+              persistentVolumeClaim:
+                claimName: "{{ output_pvc }}"
+            - name: checkpoint-local
+              hostPath:
+                path: /mnt/nvme/checkpoints
+                type: DirectoryOrCreate
+            - name: checkpoint-fsx
+              persistentVolumeClaim:
+                claimName: fsx-checkpoints
+            - name: shm
+              emptyDir:
+                medium: Memory
+                sizeLimit: 10Gi
+
+          # 节点选择器
+          {% if gpu_type %}
+          nodeSelector:
+            node.kubernetes.io/instance-type: "{{ gpu_type }}"
+          {% endif %}
+
+          # 容忍度配置
+          tolerations:
+            - key: "training"
+              operator: "Equal"
+              value: "true"
+              effect: "NoSchedule"
+    {% endif %}
+
+  # 任务完成策略
+  runPolicy:
+    # 清理策略
+    cleanPodPolicy: None
+
+    # 超时配置
+    {% if timeout_seconds %}
+    activeDeadlineSeconds: {{ timeout_seconds }}
+    {% endif %}
+
+    # 重试策略
+    backoffLimit: {{ max_retries }}

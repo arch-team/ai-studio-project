@@ -2,7 +2,7 @@
  * 训练任务详情和监控组件
  */
 
-import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Play, Square, Trash2, RefreshCw, Activity } from 'lucide-react';
 import {
   useTrainingJob,

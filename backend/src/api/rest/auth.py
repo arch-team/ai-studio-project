@@ -16,6 +16,7 @@ from services.auth.security import (
     verify_password,
     verify_token,
 )
+from api.middleware.auth import get_current_user
 
 router = APIRouter(prefix="/auth", tags=["认证"])
 
@@ -190,7 +191,6 @@ async def get_current_user_info(
     return UserInfo.model_validate(current_user)
 
 
-# 为了避免循环导入,在这里导入get_current_user
-from api.middleware.auth import get_current_user  # noqa: E402
+# get_current_user已在文件开头导入
 
 __all__ = ["router"]

@@ -18,20 +18,8 @@ depends_on = None
 
 
 def upgrade() -> None:
-    # 创建枚举类型
-    op.execute("""
-        CREATE TYPE modelstatus AS ENUM (
-            'UPLOADING', 'PROCESSING', 'AVAILABLE', 'FAILED', 'ARCHIVED'
-        )
-    """)
-
-    op.execute("""
-        CREATE TYPE modelframework AS ENUM (
-            'PYTORCH', 'TENSORFLOW', 'ONNX', 'JFLUX', 'HUGGINGFACE', 'CUSTOM'
-        )
-    """)
-
     # 创建models表
+    # 注意: 枚举类型会由SQLAlchemy自动创建
     op.create_table(
         "models",
         sa.Column("id", sa.Integer(), autoincrement=True, nullable=False),
@@ -106,24 +94,10 @@ def upgrade() -> None:
         sa.PrimaryKeyConstraint("id"),
     )
 
-    # 创建索引
-    op.create_index("ix_models_name", "models", ["name"])
-    op.create_index("ix_models_framework", "models", ["framework"])
-    op.create_index("ix_models_project_id", "models", ["project_id"])
-    op.create_index("ix_model_versions_model_id", "model_versions", ["model_id"])
-    op.create_index("ix_model_versions_status", "model_versions", ["status"])
-    op.create_index("ix_model_deployments_model_version_id", "model_deployments", ["model_version_id"])
+    # 索引已通过 index=True 参数自动创建
 
 
 def downgrade() -> None:
-    # 删除索引
-    op.drop_index("ix_model_deployments_model_version_id", table_name="model_deployments")
-    op.drop_index("ix_model_versions_status", table_name="model_versions")
-    op.drop_index("ix_model_versions_model_id", table_name="model_versions")
-    op.drop_index("ix_models_project_id", table_name="models")
-    op.drop_index("ix_models_framework", table_name="models")
-    op.drop_index("ix_models_name", table_name="models")
-
     # 删除表
     op.drop_table("model_deployments")
     op.drop_table("model_versions")

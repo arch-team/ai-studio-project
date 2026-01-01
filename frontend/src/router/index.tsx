@@ -17,6 +17,11 @@ const LoginPage = React.lazy(() => import('../pages/auth/LoginPage'));
 const DashboardPage = React.lazy(() => import('../pages/dashboard/DashboardPage'));
 const NotFoundPage = React.lazy(() => import('../pages/error/NotFoundPage'));
 
+// 训练任务页面
+const TrainingJobsPage = React.lazy(() => import('../pages/training/TrainingJobsPage'));
+const CreateTrainingJobPage = React.lazy(() => import('../pages/training/CreateTrainingJobPage'));
+const TrainingJobDetailPage = React.lazy(() => import('../pages/training/TrainingJobDetailPage'));
+
 /**
  * 加载组件
  */
@@ -97,9 +102,13 @@ const AppRouter: React.FC = () => {
             {/* 首页/仪表盘 */}
             <Route index element={<DashboardPage />} />
 
+            {/* 训练任务路由 */}
+            <Route path="training-jobs" element={<TrainingJobsPage />} />
+            <Route path="training-jobs/create" element={<CreateTrainingJobPage />} />
+            <Route path="training-jobs/:id" element={<TrainingJobDetailPage />} />
+
             {/* 这里后续会添加更多路由 */}
             {/* <Route path="projects" element={<ProjectsPage />} /> */}
-            {/* <Route path="training-jobs" element={<TrainingJobsPage />} /> */}
             {/* <Route path="datasets" element={<DatasetsPage />} /> */}
           </Route>
 

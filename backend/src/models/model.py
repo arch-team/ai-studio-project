@@ -10,8 +10,7 @@ from typing import TYPE_CHECKING
 from sqlalchemy import JSON, Enum, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from core.database import Base
-from models.mixins import SoftDeleteMixin, TimestampMixin
+from .base import Base, SoftDeleteMixin, TimestampMixin
 
 if TYPE_CHECKING:
     from models.training import TrainingJob
@@ -79,7 +78,7 @@ class Model(Base, TimestampMixin, SoftDeleteMixin):
     tags: Mapped[list[str] | None] = mapped_column(
         JSON, nullable=True, comment="模型标签"
     )
-    metadata: Mapped[dict | None] = mapped_column(
+    model_metadata: Mapped[dict | None] = mapped_column(
         JSON, nullable=True, comment="自定义元数据"
     )
 

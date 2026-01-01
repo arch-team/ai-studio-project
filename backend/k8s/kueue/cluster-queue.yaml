@@ -1,0 +1,65 @@
+# ClusterQueue: 集群级别GPU资源池
+# 定义整个HyperPod集群的GPU配额和调度策略
+apiVersion: kueue.x-k8s.io/v1beta1
+kind: ClusterQueue
+metadata:
+  name: ml-gpu-cluster-queue
+spec:
+  # 命名空间选择器(可选,限制哪些命名空间可使用此ClusterQueue)
+  namespaceSelector: {}  # 允许所有命名空间
+
+  # 资源组定义
+  resourceGroups:
+  - coveredResources:
+    - nvidia.com/gpu  # GPU资源
+    - cpu            # CPU资源
+    - memory         # 内存资源
+
+    # ResourceFlavor列表(按优先级排序)
+    flavors:
+    - name: default-flavor
+      resources:
+      # GPU配额
+      - name: nvidia.com/gpu
+        nominalQuota: 512      # 名义配额:512个GPU
+        borrowingLimit: 128    # 可借用上限:额外128个GPU
+
+      # CPU配额
+      - name: cpu
+        nominalQuota: 2048     # 2048核CPU
+        borrowingLimit: 512
+
+      # 内存配额
+      - name: memory
+        nominalQuota: 8Ti      # 8TB内存
+        borrowingLimit: 2Ti
+
+  # 抢占策略(当资源不足时如何抢占低优先级任务)
+  preemption:
+    reclaimWithinCohort: Any           # 可以抢占同一cohort内的任务
+    withinClusterQueue: LowerPriority  # 只抢占更低优先级的任务
+    borrowWithinCohort:
+      policy: Never                    # 不抢占借用的资源
+
+  # 公平调度权重(多个LocalQueue之间的公平性)
+  fairSharing:
+    enable: true
+    weight: 1  # 权重(与其他ClusterQueue相比)
+
+---
+# ResourceFlavor: 定义资源类型和节点选择器
+apiVersion: kueue.x-k8s.io/v1beta1
+kind: ResourceFlavor
+metadata:
+  name: default-flavor
+spec:
+  # 节点选择器(可选,指定使用哪些节点)
+  nodeLabels:
+    workload-type: training  # 示例:只使用带有training标签的节点
+
+  # 节点污点容忍(可选,允许调度到带有特定污点的节点)
+  # tolerations:
+  # - key: "gpu"
+  #   operator: "Equal"
+  #   value: "true"
+  #   effect: "NoSchedule"

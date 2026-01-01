@@ -1,0 +1,146 @@
+# 单节点训练模板
+# 适用场景: 小模型训练,单GPU或多GPU单机训练(无分布式)
+# 特点: 简化配置,无需分布式协调
+apiVersion: kubeflow.org/v1
+kind: PyTorchJob
+metadata:
+  name: "{{ job_name }}"
+  namespace: "{{ namespace }}"
+  labels:
+    app: ai-training-platform
+    training-job-id: "{{ job_id }}"
+    sagemaker.ai/project-id: "{{ project_id }}"
+    framework: pytorch
+    job-type: "{{ job_type }}"
+    distributed-strategy: single-node
+    # Kueue优先级标签
+    kueue.x-k8s.io/priority-class: "{{ priority | default('normal') }}"
+  annotations:
+    # Kueue Gang Scheduling队列
+    kueue.x-k8s.io/queue-name: "{{ queue_name | default('default-queue') }}"
+spec:
+  # Gang Scheduling: 初始suspended,等待Kueue调度所有Pod
+  runPolicy:
+    suspend: {{ suspend | default(true) }}
+    cleanPodPolicy: Running
+  pytorchReplicaSpecs:
+    # Master节点(唯一节点)
+    Master:
+      replicas: 1
+      restartPolicy: OnFailure
+      template:
+        metadata:
+          labels:
+            app: ai-training-platform
+            training-job-id: "{{ job_id }}"
+            role: master
+            distributed-strategy: single-node
+        spec:
+          containers:
+            - name: pytorch
+              image: "{{ docker_image }}"
+              imagePullPolicy: IfNotPresent
+
+              # 直接执行训练脚本(无需torchrun)
+              command: {{ command }}
+              {% if args %}
+              args: {{ args }}
+              {% endif %}
+
+              # 基础环境变量
+              env:
+                # GPU配置
+                - name: CUDA_VISIBLE_DEVICES
+                  value: "{% if gpu_per_node > 1 %}0,1,2,3,4,5,6,7{% else %}0{% endif %}"
+                - name: NVIDIA_VISIBLE_DEVICES
+                  value: "all"
+
+                # PyTorch配置
+                - name: PYTORCH_CUDA_ALLOC_CONF
+                  value: "max_split_size_mb:512"
+
+                # 用户自定义环境变量
+                {% for key, value in env_vars.items() %}
+                - name: "{{ key }}"
+                  value: "{{ value }}"
+                {% endfor %}
+
+              # 资源配置
+              resources:
+                limits:
+                  nvidia.com/gpu: {{ gpu_per_node }}
+                  memory: "{{ memory_per_node_gb }}Gi"
+                  cpu: "{{ cpu_per_node }}"
+                requests:
+                  nvidia.com/gpu: {{ gpu_per_node }}
+                  memory: "{{ memory_per_node_gb }}Gi"
+                  cpu: "{{ cpu_per_node }}"
+
+              # 存储挂载
+              volumeMounts:
+                {% if dataset_path %}
+                - name: dataset
+                  mountPath: /mnt/dataset
+                  readOnly: true
+                {% endif %}
+                - name: output
+                  mountPath: /mnt/output
+                - name: checkpoint-local
+                  mountPath: /mnt/nvme/checkpoints
+                - name: checkpoint-fsx
+                  mountPath: /mnt/fsx/checkpoints
+                - name: shm
+                  mountPath: /dev/shm
+
+              # 健康检查
+              livenessProbe:
+                exec:
+                  command:
+                    - nvidia-smi
+                initialDelaySeconds: 30
+                periodSeconds: 60
+                timeoutSeconds: 10
+                failureThreshold: 3
+
+          # 存储卷
+          volumes:
+            {% if dataset_path %}
+            - name: dataset
+              persistentVolumeClaim:
+                claimName: "{{ dataset_pvc }}"
+            {% endif %}
+            - name: output
+              persistentVolumeClaim:
+                claimName: "{{ output_pvc }}"
+            - name: checkpoint-local
+              hostPath:
+                path: /mnt/nvme/checkpoints
+                type: DirectoryOrCreate
+            - name: checkpoint-fsx
+              persistentVolumeClaim:
+                claimName: fsx-checkpoints
+            - name: shm
+              emptyDir:
+                medium: Memory
+                sizeLimit: 16Gi  # 单节点较小内存需求
+
+          # 节点选择器
+          {% if gpu_type %}
+          nodeSelector:
+            node.kubernetes.io/instance-type: "{{ gpu_type }}"
+          {% endif %}
+
+          # 容忍度配置
+          tolerations:
+            - key: "training"
+              operator: "Equal"
+              value: "true"
+              effect: "NoSchedule"
+
+  # 任务完成策略
+  runPolicy:
+    cleanPodPolicy: None
+    {% if timeout_seconds %}
+    activeDeadlineSeconds: {{ timeout_seconds }}
+    {% endif %}
+    backoffLimit: {{ max_retries }}

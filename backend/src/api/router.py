@@ -2,13 +2,19 @@
 
 from fastapi import APIRouter
 
-from api.rest import auth
+from api.rest import auth, checkpoint, training
 
 # 创建API路由器
 api_router = APIRouter()
 
 # 注册认证路由
 api_router.include_router(auth.router)
+
+# 注册训练任务路由
+api_router.include_router(training.router)
+
+# 注册Checkpoint路由
+api_router.include_router(checkpoint.router)
 
 # 健康检查端点
 @api_router.get("/health", tags=["健康检查"])

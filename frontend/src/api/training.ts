@@ -4,9 +4,11 @@
 
 import axios from 'axios';
 import type {
+  Checkpoint,
   TrainingJob,
   TrainingJobCreateRequest,
   TrainingJobListResponse,
+  TrainingJobMetrics,
   TrainingJobQueryParams,
   TrainingJobStatusResponse,
   TrainingJobUpdateRequest,
@@ -128,6 +130,45 @@ export const trainingApi = {
    */
   async syncJobStatus(jobId: number): Promise<TrainingJob> {
     const response = await apiClient.post<TrainingJob>(`/training/jobs/${jobId}/sync`);
+    return response.data;
+  },
+
+  /**
+   * 查询训练任务指标
+   */
+  async getJobMetrics(
+    jobId: number,
+    params?: { limit?: number; offset?: number }
+  ): Promise<TrainingJobMetrics[]> {
+    const response = await apiClient.get<TrainingJobMetrics[]>(
+      `/training/jobs/${jobId}/metrics`,
+      { params }
+    );
+    return response.data;
+  },
+
+  /**
+   * 查询训练任务日志
+   */
+  async getJobLogs(
+    jobId: number,
+    params?: { tail_lines?: number; pod_name?: string }
+  ): Promise<{ job_id: number; pod_name: string | null; tail_lines: number; logs: Record<string, string> }> {
+    const response = await apiClient.get(`/training/jobs/${jobId}/logs`, { params });
+    return response.data;
+  },
+
+  /**
+   * 查询训练任务检查点
+   */
+  async getJobCheckpoints(
+    jobId: number,
+    params?: { limit?: number; offset?: number }
+  ): Promise<Checkpoint[]> {
+    const response = await apiClient.get<Checkpoint[]>(
+      `/training/jobs/${jobId}/checkpoints`,
+      { params }
+    );
     return response.data;
   },
 };

@@ -1,0 +1,60 @@
+# WorkloadPriorityClass: 定义训练任务优先级
+# 平台支持三个优先级:low, normal, high
+
+---
+# 低优先级: 实验性训练,资源不足时优先被抢占
+apiVersion: kueue.x-k8s.io/v1beta1
+kind: WorkloadPriorityClass
+metadata:
+  name: low-priority
+spec:
+  value: 100  # 优先级权重(越大越高)
+  description: "Low priority for experimental training jobs. Can be preempted when resources are scarce."
+
+---
+# 普通优先级: 默认优先级,适用于常规训练任务
+apiVersion: kueue.x-k8s.io/v1beta1
+kind: WorkloadPriorityClass
+metadata:
+  name: normal
+spec:
+  value: 1000
+  description: "Normal priority for regular training jobs. Default priority level."
+
+---
+# 高优先级: 生产模型训练,紧急任务,不易被抢占
+apiVersion: kueue.x-k8s.io/v1beta1
+kind: WorkloadPriorityClass
+metadata:
+  name: high-priority
+spec:
+  value: 10000
+  description: "High priority for production model training and urgent jobs. Rarely preempted."
+
+---
+# 可选: 超高优先级(预留给SRE和关键系统任务)
+apiVersion: kueue.x-k8s.io/v1beta1
+kind: WorkloadPriorityClass
+metadata:
+  name: critical
+spec:
+  value: 100000
+  description: "Critical priority for system-level operations and emergency tasks. Reserved for SRE team."
+  # 可选: 设置preemptionPolicy
+  # preemptionPolicy: Never  # 此优先级的任务永不被抢占
+
+---
+# 使用说明:
+# 1. 在PyTorchJob的metadata.labels中指定:
+#    kueue.x-k8s.io/priority-class: "high-priority"
+#
+# 2. 平台API映射:
+#    priority="low"    -> low-priority (100)
+#    priority="normal" -> normal (1000)
+#    priority="high"   -> high-priority (10000)
+#
+# 3. 优先级选择建议:
+#    - 探索性实验,参数调优: low
+#    - 日常模型训练: normal
+#    - 生产模型,紧急修复: high
+#    - 关键系统任务: critical (需审批)

@@ -88,6 +88,14 @@ class TrainingJob(Base, TimestampMixin, SoftDeleteMixin):
         JSON, nullable=True, comment="K8S Pod名称列表"
     )
 
+    # Kueue Gang Scheduling支持
+    priority: Mapped[str | None] = mapped_column(
+        String(50), nullable=True, default="normal", comment="Kueue优先级: low, normal, high"
+    )
+    queue_name: Mapped[str | None] = mapped_column(
+        String(100), nullable=True, comment="Kueue LocalQueue名称,默认使用项目队列"
+    )
+
     # 时间信息
     queued_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True, comment="排队时间"
@@ -103,6 +111,14 @@ class TrainingJob(Base, TimestampMixin, SoftDeleteMixin):
     error_message: Mapped[str | None] = mapped_column(Text, nullable=True, comment="错误信息")
     exit_code: Mapped[int | None] = mapped_column(Integer, nullable=True, comment="退出码")
 
+    # 重试机制
+    retry_count: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=0, comment="重试次数"
+    )
+    last_retry_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True, comment="最后重试时间"
+    )
+
     # 关系
     project: Mapped["Project"] = relationship("Project", back_populates="training_jobs")
     creator: Mapped["User"] = relationship("User", back_populates="training_jobs")
@@ -111,6 +127,9 @@ class TrainingJob(Base, TimestampMixin, SoftDeleteMixin):
     )
     metrics: Mapped[list["TrainingJobMetrics"]] = relationship(
         "TrainingJobMetrics", back_populates="job", cascade="all, delete-orphan"
+    )
+    checkpoints: Mapped[list["Checkpoint"]] = relationship(
+        "Checkpoint", back_populates="job", cascade="all, delete-orphan"
     )
     generated_models: Mapped[list["Model"]] = relationship(
         "Model", back_populates="source_training_job"
@@ -121,9 +140,12 @@ class TrainingJob(Base, TimestampMixin, SoftDeleteMixin):
 
     @property
     def is_active(self) -> bool:
-        """任务是否处于活跃状态"""
+        """任务是否处于活跃状态（可停止的状态）
+
+        PENDING状态任务还未调度，应直接删除而非停止
+        只有QUEUED和RUNNING状态才需要停止操作
+        """
         return self.status in {
-            TrainingJobStatus.PENDING,
             TrainingJobStatus.QUEUED,
             TrainingJobStatus.RUNNING,
         }
@@ -241,11 +263,57 @@ class TrainingJobMetrics(Base, TimestampMixin):
         return f"<TrainingJobMetrics(job_id={self.job_id}, step={self.step}, loss={self.loss})>"
 
 
+class CheckpointStorageType(str, enum.Enum):
+    """检查点存储类型"""
+
+    LOCAL = "LOCAL"  # 本地NVMe存储
+    FSX = "FSX"  # FSx for Lustre
+    S3 = "S3"  # S3长期存储
+
+
+class Checkpoint(Base, TimestampMixin):
+    """检查点模型
+
+    记录训练过程中保存的模型检查点
+    支持分层存储策略: Local NVMe -> FSx -> S3
+    """
+
+    __tablename__ = "checkpoints"
+
+    # 关联训练任务
+    job_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("training_jobs.id", ondelete="CASCADE"), nullable=False, comment="训练任务ID"
+    )
+
+    # 检查点信息
+    step: Mapped[int] = mapped_column(Integer, nullable=False, comment="训练步数")
+    epoch: Mapped[int | None] = mapped_column(Integer, nullable=True, comment="训练轮次")
+
+    # 存储信息
+    storage_path: Mapped[str] = mapped_column(String(500), nullable=False, comment="存储路径")
+    storage_type: Mapped[CheckpointStorageType] = mapped_column(
+        Enum(CheckpointStorageType), nullable=False, comment="存储类型"
+    )
+    size_bytes: Mapped[int] = mapped_column(Integer, nullable=False, default=0, comment="文件大小(字节)")
+
+    # 元数据
+    checkpoint_metadata: Mapped[dict | None] = mapped_column(JSON, nullable=True, comment="检查点元数据")
+    checkpoint_metrics: Mapped[dict | None] = mapped_column(JSON, nullable=True, comment="训练指标快照")
+
+    # 关系
+    job: Mapped["TrainingJob"] = relationship("TrainingJob", back_populates="checkpoints")
+
+    def __repr__(self) -> str:
+        return f"<Checkpoint(id={self.id}, job_id={self.job_id}, step={self.step}, storage={self.storage_type.value})>"
+
+
 __all__ = [
     "TrainingJob",
     "TrainingJobConfig",
     "TrainingJobMetrics",
+    "Checkpoint",
     "TrainingJobStatus",
     "TrainingJobType",
     "FrameworkType",
+    "CheckpointStorageType",
 ]

@@ -4,7 +4,7 @@
 """
 
 import logging
-from typing import Annotated
+from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import func, select
@@ -12,15 +12,18 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from api.schemas.training import (
+    CheckpointResponse,
     TrainingJobCreate,
     TrainingJobListResponse,
+    TrainingMetricsResponse,
     TrainingJobResponse,
     TrainingJobStatusResponse,
     TrainingJobUpdate,
 )
-from core.database import get_db
-from models.training import TrainingJob
+from config.database import get_db
+from models.training import Checkpoint, TrainingJob, TrainingJobMetrics
 from models.user import User
+from services.checkpoint.checkpoint_service import CheckpointService
 from services.training.job_service import TrainingJobService
 
 logger = logging.getLogger(__name__)
@@ -31,9 +34,18 @@ router = APIRouter(prefix="/training", tags=["training"])
 # ==================== 依赖项 ====================
 
 
-def get_training_job_service() -> TrainingJobService:
+async def get_training_job_service(
+    db: Annotated[AsyncSession, Depends(get_db)]
+) -> TrainingJobService:
     """获取训练任务服务实例"""
-    return TrainingJobService()
+    return TrainingJobService(session=db)
+
+
+async def get_checkpoint_service(
+    db: Annotated[AsyncSession, Depends(get_db)]
+) -> CheckpointService:
+    """获取检查点服务实例"""
+    return CheckpointService(session=db)
 
 
 async def get_current_user() -> User:
@@ -54,34 +66,16 @@ async def get_current_user() -> User:
 )
 async def create_training_job(
     job_data: TrainingJobCreate,
-    db: Annotated[AsyncSession, Depends(get_db)],
     service: Annotated[TrainingJobService, Depends(get_training_job_service)],
     current_user: Annotated[User, Depends(get_current_user)],
 ) -> TrainingJobResponse:
     """创建训练任务"""
     try:
-        # 转换配置为字典
-        config_dict = job_data.config.model_dump()
-
         # 创建训练任务
         job = await service.create_training_job(
-            db=db,
-            project_id=job_data.project_id,
-            creator_id=current_user.id,
-            name=job_data.name,
-            job_type=job_data.job_type,
-            framework=job_data.framework,
-            config=config_dict,
-            description=job_data.description,
+            job_data=job_data,
+            creator=current_user,
         )
-
-        # 重新查询以加载关联数据
-        result = await db.execute(
-            select(TrainingJob)
-            .where(TrainingJob.id == job.id)
-            .options(selectinload(TrainingJob.config))
-        )
-        job = result.scalar_one()
 
         return TrainingJobResponse.model_validate(job)
 
@@ -104,7 +98,7 @@ async def create_training_job(
     description="分页查询训练任务列表,支持按项目、状态过滤",
 )
 async def list_training_jobs(
-    db: Annotated[AsyncSession, Depends(get_db)],
+    service: Annotated[TrainingJobService, Depends(get_training_job_service)],
     current_user: Annotated[User, Depends(get_current_user)],
     project_id: int | None = Query(default=None, description="项目ID过滤"),
     status_filter: str | None = Query(default=None, description="状态过滤"),
@@ -113,38 +107,23 @@ async def list_training_jobs(
 ) -> TrainingJobListResponse:
     """查询训练任务列表"""
     try:
-        # 构建基础查询
-        query = select(TrainingJob).where(TrainingJob.deleted_at.is_(None))
-
-        # 项目过滤
-        if project_id is not None:
-            query = query.where(TrainingJob.project_id == project_id)
-
-        # 状态过滤
-        if status_filter:
-            query = query.where(TrainingJob.status == status_filter)
-
-        # 统计总数
-        count_query = select(func.count()).select_from(query.subquery())
-        total_result = await db.execute(count_query)
-        total = total_result.scalar_one()
-
-        # 分页查询
-        query = (
-            query.options(selectinload(TrainingJob.config))
-            .order_by(TrainingJob.created_at.desc())
-            .offset((page - 1) * page_size)
-            .limit(page_size)
+        # 使用service层查询
+        jobs, total = await service.list_training_jobs(
+            project_id=project_id,
+            status=status_filter,
+            page=page,
+            size=page_size,
         )
 
-        result = await db.execute(query)
-        jobs = result.scalars().all()
+        # 计算总页数
+        pages = (total + page_size - 1) // page_size
 
         return TrainingJobListResponse(
             total=total,
             items=[TrainingJobResponse.model_validate(job) for job in jobs],
             page=page,
-            page_size=page_size,
+            size=page_size,
+            pages=pages,
         )
 
     except Exception as e:
@@ -163,17 +142,13 @@ async def list_training_jobs(
 )
 async def get_training_job(
     job_id: int,
-    db: Annotated[AsyncSession, Depends(get_db)],
+    service: Annotated[TrainingJobService, Depends(get_training_job_service)],
     current_user: Annotated[User, Depends(get_current_user)],
 ) -> TrainingJobResponse:
     """查询训练任务详情"""
     try:
-        result = await db.execute(
-            select(TrainingJob)
-            .where(TrainingJob.id == job_id, TrainingJob.deleted_at.is_(None))
-            .options(selectinload(TrainingJob.config))
-        )
-        job = result.scalar_one_or_none()
+        # 使用service层查询(包含配置信息)
+        job = await service.get_training_job(job_id, include_config=True)
 
         if not job:
             raise HTTPException(
@@ -201,31 +176,18 @@ async def get_training_job(
 async def update_training_job(
     job_id: int,
     job_data: TrainingJobUpdate,
-    db: Annotated[AsyncSession, Depends(get_db)],
+    service: Annotated[TrainingJobService, Depends(get_training_job_service)],
     current_user: Annotated[User, Depends(get_current_user)],
 ) -> TrainingJobResponse:
     """更新训练任务"""
     try:
-        result = await db.execute(
-            select(TrainingJob)
-            .where(TrainingJob.id == job_id, TrainingJob.deleted_at.is_(None))
-            .options(selectinload(TrainingJob.config))
-        )
-        job = result.scalar_one_or_none()
+        # 使用service层更新
+        job = await service.update_training_job(job_id, job_data)
 
         if not job:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND, detail="训练任务不存在"
             )
-
-        # 更新字段
-        if job_data.name is not None:
-            job.name = job_data.name
-        if job_data.description is not None:
-            job.description = job_data.description
-
-        await db.commit()
-        await db.refresh(job)
 
         return TrainingJobResponse.model_validate(job)
 
@@ -247,21 +209,13 @@ async def update_training_job(
 )
 async def start_training_job(
     job_id: int,
-    db: Annotated[AsyncSession, Depends(get_db)],
     service: Annotated[TrainingJobService, Depends(get_training_job_service)],
     current_user: Annotated[User, Depends(get_current_user)],
 ) -> TrainingJobResponse:
     """启动训练任务"""
     try:
-        job = await service.start_training_job(db=db, job_id=job_id)
-
-        # 重新查询以加载关联数据
-        result = await db.execute(
-            select(TrainingJob)
-            .where(TrainingJob.id == job.id)
-            .options(selectinload(TrainingJob.config))
-        )
-        job = result.scalar_one()
+        # 使用service层启动
+        job = await service.start_training_job(job_id)
 
         return TrainingJobResponse.model_validate(job)
 
@@ -285,21 +239,14 @@ async def start_training_job(
 )
 async def stop_training_job(
     job_id: int,
-    db: Annotated[AsyncSession, Depends(get_db)],
     service: Annotated[TrainingJobService, Depends(get_training_job_service)],
     current_user: Annotated[User, Depends(get_current_user)],
+    save_checkpoint: bool = Query(default=True, description="是否保存检查点"),
 ) -> TrainingJobResponse:
     """停止训练任务"""
     try:
-        job = await service.stop_training_job(db=db, job_id=job_id)
-
-        # 重新查询以加载关联数据
-        result = await db.execute(
-            select(TrainingJob)
-            .where(TrainingJob.id == job.id)
-            .options(selectinload(TrainingJob.config))
-        )
-        job = result.scalar_one()
+        # 使用service层停止
+        job = await service.stop_training_job(job_id, save_checkpoint=save_checkpoint)
 
         return TrainingJobResponse.model_validate(job)
 
@@ -323,14 +270,13 @@ async def stop_training_job(
 )
 async def delete_training_job(
     job_id: int,
-    db: Annotated[AsyncSession, Depends(get_db)],
     service: Annotated[TrainingJobService, Depends(get_training_job_service)],
     current_user: Annotated[User, Depends(get_current_user)],
-    force: bool = Query(default=False, description="强制删除活跃任务"),
 ) -> None:
     """删除训练任务"""
     try:
-        success = await service.delete_training_job(db=db, job_id=job_id, force=force)
+        # 使用service层删除
+        success = await service.delete_training_job(job_id)
 
         if not success:
             raise HTTPException(
@@ -411,6 +357,154 @@ async def sync_training_job_status(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="同步训练任务状态失败",
+        ) from e
+
+
+@router.get(
+    "/jobs/{job_id}/metrics",
+    response_model=list[TrainingMetricsResponse],
+    summary="查询训练任务指标",
+    description="查询训练任务的历史指标数据",
+)
+async def get_training_job_metrics(
+    job_id: int,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
+    limit: int = Query(default=100, ge=1, le=1000, description="返回数量限制"),
+    offset: int = Query(default=0, ge=0, description="偏移量"),
+) -> list[TrainingMetricsResponse]:
+    """查询训练任务指标"""
+    try:
+        # 验证任务存在
+        result = await db.execute(
+            select(TrainingJob).where(
+                TrainingJob.id == job_id, TrainingJob.deleted_at.is_(None)
+            )
+        )
+        job = result.scalar_one_or_none()
+        if not job:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="训练任务不存在"
+            )
+
+        # 查询指标数据
+        result = await db.execute(
+            select(TrainingJobMetrics)
+            .where(TrainingJobMetrics.job_id == job_id)
+            .order_by(TrainingJobMetrics.step.desc())
+            .limit(limit)
+            .offset(offset)
+        )
+        metrics = result.scalars().all()
+
+        return [TrainingMetricsResponse.model_validate(m) for m in metrics]
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"查询训练任务指标失败: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="查询训练任务指标失败",
+        ) from e
+
+
+@router.get(
+    "/jobs/{job_id}/logs",
+    response_model=dict[str, Any],
+    summary="查询训练任务日志",
+    description="查询训练任务的Pod日志",
+)
+async def get_training_job_logs(
+    job_id: int,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    service: Annotated[TrainingJobService, Depends(get_training_job_service)],
+    current_user: Annotated[User, Depends(get_current_user)],
+    tail_lines: int = Query(default=100, ge=1, le=10000, description="尾部行数"),
+    pod_name: str | None = Query(default=None, description="指定Pod名称"),
+) -> dict[str, Any]:
+    """查询训练任务日志"""
+    try:
+        # 验证任务存在
+        result = await db.execute(
+            select(TrainingJob).where(
+                TrainingJob.id == job_id, TrainingJob.deleted_at.is_(None)
+            )
+        )
+        job = result.scalar_one_or_none()
+        if not job:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="训练任务不存在"
+            )
+
+        # 获取日志
+        logs = await service.get_job_logs(
+            job_id=job_id, tail_lines=tail_lines, pod_name=pod_name
+        )
+
+        return {
+            "job_id": job_id,
+            "pod_name": pod_name,
+            "tail_lines": tail_lines,
+            "logs": logs,
+        }
+
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail=str(e)
+        ) from e
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"查询训练任务日志失败: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="查询训练任务日志失败",
+        ) from e
+
+
+@router.get(
+    "/jobs/{job_id}/checkpoints",
+    response_model=list[CheckpointResponse],
+    summary="查询训练任务检查点",
+    description="查询训练任务的检查点列表",
+)
+async def get_training_job_checkpoints(
+    job_id: int,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    checkpoint_service: Annotated[CheckpointService, Depends(get_checkpoint_service)],
+    current_user: Annotated[User, Depends(get_current_user)],
+    limit: int = Query(default=10, ge=1, le=100, description="返回数量限制"),
+    offset: int = Query(default=0, ge=0, description="偏移量"),
+) -> list[CheckpointResponse]:
+    """查询训练任务检查点"""
+    try:
+        # 验证任务存在
+        result = await db.execute(
+            select(TrainingJob).where(
+                TrainingJob.id == job_id, TrainingJob.deleted_at.is_(None)
+            )
+        )
+        job = result.scalar_one_or_none()
+        if not job:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="训练任务不存在"
+            )
+
+        # 查询检查点
+        checkpoints = await checkpoint_service.list_checkpoints(
+            db=db, job_id=job_id, limit=limit, offset=offset
+        )
+
+        return [CheckpointResponse.model_validate(cp) for cp in checkpoints]
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"查询训练任务检查点失败: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="查询训练任务检查点失败",
         ) from e
 
 

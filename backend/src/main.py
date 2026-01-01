@@ -50,9 +50,9 @@ def create_app() -> FastAPI:
         title="AI Training Platform API",
         description="基于AWS SageMaker HyperPod的企业级AI训练平台",
         version="1.0.0",
-        docs_url="/api/docs" if settings.environment == "development" else None,
-        redoc_url="/api/redoc" if settings.environment == "development" else None,
-        openapi_url="/api/openapi.json" if settings.environment == "development" else None,
+        docs_url="/api/docs" if settings.env == "development" else None,
+        redoc_url="/api/redoc" if settings.env == "development" else None,
+        openapi_url="/api/openapi.json" if settings.env == "development" else None,
         lifespan=lifespan,
     )
 
@@ -74,7 +74,7 @@ def create_app() -> FastAPI:
     # 注册API路由
     app.include_router(api_router, prefix="/api/v1")
 
-    logger.info(f"FastAPI应用创建成功 (环境: {settings.environment})")
+    logger.info(f"FastAPI应用创建成功 (环境: {settings.env})")
 
     return app
 
@@ -89,7 +89,7 @@ def main():
         "main:app",
         host=settings.api_host,
         port=settings.api_port,
-        reload=settings.environment == "development",
+        reload=settings.env == "development",
         log_config=None,  # 使用自定义日志配置
     )
 

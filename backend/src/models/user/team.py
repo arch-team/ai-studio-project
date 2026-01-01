@@ -53,7 +53,7 @@ class Team(Base, SoftDeleteMixin):
     owner: Mapped["User"] = relationship("User", foreign_keys=[owner_id])
 
     members: Mapped[list["User"]] = relationship(
-        "User", secondary=team_members, back_populates="teams"
+        "User", secondary=team_members
     )
 
     projects: Mapped[list["Project"]] = relationship("Project", back_populates="team")

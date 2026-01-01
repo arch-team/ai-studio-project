@@ -5,6 +5,7 @@
 
 from typing import AsyncGenerator
 
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
     AsyncSession,
@@ -47,14 +48,24 @@ def get_engine() -> AsyncEngine:
                 f"max_overflow={settings.database_max_overflow})"
             )
 
+        # 构建引擎参数
+        engine_kwargs = {
+            "echo": settings.database_echo,
+            "poolclass": poolclass,
+        }
+
+        # NullPool不需要pool_size和max_overflow参数
+        if not settings.is_development:
+            engine_kwargs.update({
+                "pool_size": settings.database_pool_size,
+                "max_overflow": settings.database_max_overflow,
+                "pool_pre_ping": True,  # 连接前测试
+                "pool_recycle": 3600,  # 1小时回收连接
+            })
+
         _async_engine = create_async_engine(
             str(settings.database_url),
-            echo=settings.database_echo,
-            poolclass=poolclass,
-            pool_size=settings.database_pool_size if not settings.is_development else 0,
-            max_overflow=settings.database_max_overflow if not settings.is_development else 0,
-            pool_pre_ping=True,  # 连接前测试
-            pool_recycle=3600,  # 1小时回收连接
+            **engine_kwargs
         )
 
     return _async_engine
@@ -117,7 +128,7 @@ async def init_db() -> None:
         engine = get_engine()
         async with engine.begin() as conn:
             # 测试连接
-            await conn.execute("SELECT 1")
+            await conn.execute(text("SELECT 1"))
         logger.info("数据库连接成功")
     except Exception as e:
         logger.error(f"数据库连接失败: {e}")

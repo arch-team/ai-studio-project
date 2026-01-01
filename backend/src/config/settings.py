@@ -112,6 +112,34 @@ class Settings(BaseSettings):
     rate_limit_requests: int = Field(default=100, description="限流请求数")
     rate_limit_period: int = Field(default=60, description="限流时间窗口(秒)")
 
+    # Checkpoint存储配置
+    checkpoint_s3_bucket: str = Field(
+        default="ai-training-checkpoints",
+        description="Checkpoint S3存储桶名称",
+    )
+    checkpoint_fsx_mount: str = Field(
+        default="/mnt/fsx/checkpoints",
+        description="FSx挂载点路径(用于checkpoint存储)",
+    )
+    checkpoint_nvme_path: str = Field(
+        default="/mnt/nvme/checkpoints",
+        description="NVMe本地存储路径(用于checkpoint存储)",
+    )
+
+    # Checkpoint分层迁移策略配置
+    checkpoint_migration_nvme_to_fsx_days: int = Field(
+        default=7,
+        description="NVMe → FSx 迁移阈值(天数)",
+    )
+    checkpoint_migration_fsx_to_s3_days: int = Field(
+        default=30,
+        description="FSx → S3 迁移阈值(天数)",
+    )
+    checkpoint_migration_enabled: bool = Field(
+        default=True,
+        description="是否启用自动分层迁移",
+    )
+
     @field_validator("log_level")
     @classmethod
     def validate_log_level(cls, v: str) -> str:

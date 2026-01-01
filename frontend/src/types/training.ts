@@ -187,3 +187,37 @@ export interface TrainingJobQueryParams {
   page?: number;
   page_size?: number;
 }
+
+// 训练任务指标
+export interface TrainingJobMetrics {
+  id: number;
+  job_id: number;
+  epoch: number | null;
+  step: number;
+  timestamp: string;
+  metrics: Record<string, any>;
+  loss: number | null;
+  accuracy: number | null;
+  learning_rate: number | null;
+}
+
+// 检查点存储类型
+export enum CheckpointStorageType {
+  LOCAL = 'LOCAL',
+  FSX = 'FSX',
+  S3 = 'S3',
+}
+
+// 检查点
+export interface Checkpoint {
+  id: number;
+  job_id: number;
+  step: number;
+  epoch: number | null;
+  storage_path: string;
+  storage_type: CheckpointStorageType;
+  size_bytes: number;
+  metadata: Record<string, any> | null;
+  metrics: Record<string, any> | null;
+  created_at: string;
+}

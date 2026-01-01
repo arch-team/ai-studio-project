@@ -1,0 +1,52 @@
+# LocalQueue模板: 项目/团队级别队列
+# 每个AI训练平台的Project需要创建一个LocalQueue
+# 命名规范: project-{PROJECT_ID}-queue
+
+---
+# 示例: Project 1的LocalQueue
+apiVersion: kueue.x-k8s.io/v1beta1
+kind: LocalQueue
+metadata:
+  name: project-1-queue
+  namespace: ai-training-1  # 对应Project 1的命名空间
+  labels:
+    sagemaker.ai/project-id: "1"
+    app: ai-training-platform
+spec:
+  # 引用ClusterQueue
+  clusterQueue: ml-gpu-cluster-queue
+
+---
+# 示例: Project 2的LocalQueue(带配额限制)
+apiVersion: kueue.x-k8s.io/v1beta1
+kind: LocalQueue
+metadata:
+  name: project-2-queue
+  namespace: ai-training-2
+  labels:
+    sagemaker.ai/project-id: "2"
+    app: ai-training-platform
+spec:
+  clusterQueue: ml-gpu-cluster-queue
+
+  # 可选: 限制此队列的最大资源使用(防止单一项目耗尽配额)
+  # maxResources:
+  #   nvidia.com/gpu: 128  # 最多使用128个GPU
+  #   cpu: 512
+  #   memory: 2Ti
+
+---
+# 批量创建脚本(替换PROJECT_ID和NAMESPACE)
+# for project_id in {1..10}; do
+#   cat <<EOF | kubectl apply -f -
+# apiVersion: kueue.x-k8s.io/v1beta1
+# kind: LocalQueue
+# metadata:
+#   name: project-${project_id}-queue
+#   namespace: ai-training-${project_id}
+#   labels:
+#     sagemaker.ai/project-id: "${project_id}"
+# spec:
+#   clusterQueue: ml-gpu-cluster-queue
+# EOF
+# done

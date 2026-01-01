@@ -31,7 +31,75 @@
 
 *GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*
 
-[Gates determined based on constitution file]
+### HyperPod Native-First (Principle I)
+- [ ] All HyperPod interactions use `sagemaker-hyperpod` Python SDK
+- [ ] Training tasks submitted via SDK training API, not raw K8S
+- [ ] Inference deployment via SDK inference API, not custom operators
+- [ ] Development spaces managed via SDK Spaces API
+- [ ] Cluster management via SDK cluster API
+
+**If using raw K8S API directly**: Document justification and get governance approval
+
+### SDK-First Development (Principle XI)
+- [ ] Verified `sagemaker-hyperpod` SDK supports required functionality
+- [ ] SDK documentation reviewed for target features
+- [ ] Any SDK bypasses documented with clear technical rationale
+- [ ] Platform API design aligns with SDK abstraction levels
+
+**If SDK does not support needed functionality**: Document specific gaps and alternative approach
+
+### HyperPod-Enhanced Capabilities First (Principle II)
+- [ ] Component selection prioritizes HyperPod扩展能力:
+  - **首选**: HyperPod托管组件和扩展能力 (Training/Inference Operators, Task Governance, Observability, Spaces)
+  - **次选**: 开源 K8S 组件 (仅在 HyperPod 不提供对应功能时)
+  - **避免**: 自行实现 HyperPod 已提供的功能
+- [ ] 充分利用 HyperPod 特有扩展 (Checkpointless Training, Elastic Agent, Deep Health Checks)
+- [ ] 不要求工作负载可在标准 K8S 集群运行 (HyperPod 锁定策略)
+- [ ] MAY 使用 kubectl/Helm 工具 (但主要通过 HyperPod SDK 和控制台管理)
+
+**If not using HyperPod components**: Justify why HyperPod扩展能力不足以满足需求
+
+### Code Quality and Design Excellence (Principle XII)
+- [ ] Architecture follows SOLID principles (SRP, OCP, LSP, ISP, DIP)
+- [ ] Design adheres to DRY, KISS, YAGNI principles
+- [ ] Component selection prioritizes mature SDKs and libraries:
+  - **Python**: FastAPI, SQLAlchemy, Pydantic, pytest over custom implementations
+  - **Frontend**: React, TypeScript, Zustand, TanStack Query over custom frameworks
+  - **HyperPod**: `sagemaker-hyperpod` SDK over raw K8S API (per Principle XI)
+- [ ] Clean Code practices planned:
+  - Clear naming conventions
+  - Functions <50 lines, parameters ≤3
+  - Self-documenting code with minimal comments
+  - Exception-based error handling
+- [ ] Code review standards defined (SOLID compliance, test coverage per Principle X)
+- [ ] Technical debt management strategy established
+
+**If implementing custom solutions**: Document why existing mature libraries are insufficient
+
+### UI/UX Consistency (Principle XIII)
+- [ ] UI design aligns with AWS Console design language and patterns
+- [ ] MUST use AWS Cloudscape Design System (`@cloudscape-design/components`)
+- [ ] Visual consistency verified:
+  - Cloudscape color system, Amazon Ember font
+  - Official Cloudscape icons only
+  - Cloudscape spacing and grid system
+- [ ] Interaction consistency planned:
+  - AWS Console standard operation patterns
+  - Cloudscape feedback components (Flash, StatusIndicator)
+  - AWS Console navigation patterns (AppLayout, BreadcrumbGroup)
+- [ ] Terminology consistency:
+  - Use AWS official terms (e.g., "Training Job" not "Job/Task")
+  - Follow AWS naming conventions
+  - Create terminology dictionary mapping to AWS terms
+- [ ] Accessibility requirements:
+  - WCAG 2.1 AA compliance
+  - Keyboard navigation support
+  - Proper ARIA labels
+- [ ] Reference AWS SageMaker Console and AWS EKS Console for design patterns
+
+**If not using Cloudscape**: NOT ALLOWED - UI component library has no exceptions
+
+[Additional gates determined based on constitution file]
 
 ## Project Structure
 

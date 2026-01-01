@@ -5,7 +5,10 @@
  */
 
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { clearAuthTokens, get, isAuthenticated, post, setAuthTokens } from '../api/client';
+import axios from 'axios';
+import { clearAuthTokens, get, isAuthenticated, setAuthTokens } from '../api/client';
+
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1';
 
 /**
  * 用户信息接口
@@ -71,8 +74,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
 
     try {
-      const userData = await get<User>('/auth/me');
-      setUser(userData);
+      // 直接使用axios调用，因为返回格式不是标准的包装格式
+      const token = localStorage.getItem('access_token');
+      const response = await axios.get<User>(`${API_BASE_URL}/auth/me`, {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
+      setUser(response.data);
     } catch (error) {
       console.error('加载用户信息失败:', error);
       clearAuthTokens();
@@ -87,16 +96,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
    */
   const login = async (credentials: LoginRequest) => {
     try {
-      const response = await post<LoginResponse>('/auth/login', credentials);
+      // 直接使用axios调用登录API，因为返回格式不是标准的包装格式
+      const response = await axios.post<LoginResponse>(
+        `${API_BASE_URL}/auth/login`,
+        credentials
+      );
 
       // 保存令牌
-      setAuthTokens(response.access_token, response.refresh_token);
+      setAuthTokens(response.data.access_token, response.data.refresh_token);
 
       // 加载用户信息
       await loadUser();
-    } catch (error) {
+    } catch (error: any) {
       console.error('登录失败:', error);
-      throw error;
+      const message = error.response?.data?.error?.message || error.message || '登录失败';
+      throw new Error(message);
     }
   };
 
@@ -105,7 +119,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
    */
   const logout = async () => {
     try {
-      await post('/auth/logout');
+      await axios.post(`${API_BASE_URL}/auth/logout`);
     } catch (error) {
       console.error('登出失败:', error);
     } finally {

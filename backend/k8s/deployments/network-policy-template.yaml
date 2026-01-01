@@ -1,0 +1,244 @@
+# NetworkPolicy模板 - 训练任务网络隔离 (T058A)
+#
+# 功能:
+# 1. 训练任务Pod间通信(允许同job的worker互联)
+# 2. 访问存储服务(FSx, S3 endpoint, EFS)
+# 3. 访问监控服务(Prometheus, CloudWatch agent)
+# 4. 拒绝访问其他项目的训练任务
+#
+# 使用场景:
+# - 多租户隔离(不同项目的训练任务不能互访)
+# - 安全合规(限制出站流量)
+# - 性能优化(减少无关流量)
+#
+# 部署方式:
+# 1. PyTorchJob创建时自动生成NetworkPolicy
+# 2. 使用项目命名空间隔离(ai-training-{project_id})
+# 3. 标签选择器匹配job-name
+
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ job_name }}-network-policy
+  namespace: {{ namespace }}
+  labels:
+    app.kubernetes.io/name: training-job
+    app.kubernetes.io/instance: {{ job_name }}
+    app.kubernetes.io/component: network-policy
+    training.ai-platform.io/job-id: "{{ job_id }}"
+    training.ai-platform.io/project-id: "{{ project_id }}"
+spec:
+  # 应用到同一训练任务的所有Pods
+  podSelector:
+    matchLabels:
+      job-name: {{ job_name }}
+      training.kubeflow.org/job-name: {{ job_name }}
+
+  policyTypes:
+    - Ingress  # 入站规则
+    - Egress   # 出站规则
+
+  # ==================== Ingress规则 ====================
+  ingress:
+    # 规则1: 允许同一训练任务的Pods互相通信(分布式训练需要)
+    - from:
+        - podSelector:
+            matchLabels:
+              job-name: {{ job_name }}
+      ports:
+        - protocol: TCP
+          port: 23456  # NCCL默认端口
+        - protocol: TCP
+          port: 29400  # PyTorch DDP端口
+        - protocol: TCP
+          port: 29500  # PyTorch DistributedDataParallel端口
+        - protocol: TCP
+          port: 6379   # Redis(如果用于分布式协调)
+
+    # 规则2: 允许Prometheus抓取指标
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: monitoring
+        - podSelector:
+            matchLabels:
+              app: prometheus
+      ports:
+        - protocol: TCP
+          port: 8080   # 训练脚本暴露的metrics端口
+
+    # 规则3: 允许kubectl exec/logs访问(调试用)
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: kube-system
+      ports:
+        - protocol: TCP
+          port: 10250  # Kubelet API
+
+  # ==================== Egress规则 ====================
+  egress:
+    # 规则1: 允许访问同一训练任务的其他Pods
+    - to:
+        - podSelector:
+            matchLabels:
+              job-name: {{ job_name }}
+      ports:
+        - protocol: TCP
+          port: 23456  # NCCL
+        - protocol: TCP
+          port: 29400  # PyTorch DDP
+        - protocol: TCP
+          port: 29500  # PyTorch DDP
+        - protocol: TCP
+          port: 6379   # Redis
+
+    # 规则2: 允许访问DNS服务(域名解析)
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              name: kube-system
+        - podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+
+    # 规则3: 允许访问FSx for Lustre(通过CSI driver)
+    - to:
+        - podSelector:
+            matchLabels:
+              app: fsx-lustre-csi-controller
+      ports:
+        - protocol: TCP
+          port: 988   # Lustre MGS端口
+        - protocol: TCP
+          port: 1021  # Lustre default port
+
+    # 规则4: 允许访问S3 VPC Endpoint(checkpoint上传)
+    # 注意: 需要根据实际VPC endpoint的CIDR配置
+    - to:
+        - ipBlock:
+            cidr: 10.0.0.0/16  # 替换为实际的VPC CIDR
+      ports:
+        - protocol: TCP
+          port: 443  # HTTPS
+
+    # 规则5: 允许访问Amazon ECR拉取镜像
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except:
+              - 169.254.169.254/32  # 阻止访问metadata服务(安全)
+      ports:
+        - protocol: TCP
+          port: 443  # HTTPS
+
+    # 规则6: 允许访问Kubernetes API Server(Job status更新)
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              name: default
+      ports:
+        - protocol: TCP
+          port: 443
+
+    # 规则7: 允许访问CloudWatch agent(日志和指标上传)
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              name: amazon-cloudwatch
+        - podSelector:
+            matchLabels:
+              app: cloudwatch-agent
+      ports:
+        - protocol: TCP
+          port: 25888  # CloudWatch agent receiver
+
+---
+# NetworkPolicy补充策略 - 项目级隔离
+# 拒绝跨项目的训练任务Pod通信
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ namespace }}-isolation-policy
+  namespace: {{ namespace }}
+  labels:
+    app.kubernetes.io/name: project-isolation
+    training.ai-platform.io/project-id: "{{ project_id }}"
+spec:
+  # 应用到整个命名空间的所有训练Pods
+  podSelector:
+    matchLabels:
+      training.kubeflow.org/job-type: pytorchjob
+
+  policyTypes:
+    - Ingress
+    - Egress
+
+  ingress:
+    # 只允许同一命名空间(同一项目)的Pods通信
+    - from:
+        - podSelector: {}  # 同一namespace的所有pods
+
+  egress:
+    # 只允许访问同一命名空间的Pods和基础服务
+    - to:
+        - podSelector: {}  # 同一namespace
+    - to:  # DNS
+        - namespaceSelector:
+            matchLabels:
+              name: kube-system
+      ports:
+        - protocol: UDP
+          port: 53
+    - to:  # 外部服务(S3, ECR等)
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except:
+              - 10.0.0.0/8  # 拒绝访问其他项目的内部网络
+      ports:
+        - protocol: TCP
+          port: 443
+
+---
+# NetworkPolicy模板使用说明
+#
+# Jinja2变量:
+# - job_name: 训练任务的K8s Job名称 (例: pytorch-job-12345)
+# - namespace: 命名空间 (例: ai-training-1)
+# - job_id: 训练任务数据库ID
+# - project_id: 项目ID
+#
+# 部署流程:
+# 1. HyperPodOperator.create_pytorch_job()时渲染此模板
+# 2. 与PyTorchJob一起apply到K8s集群
+# 3. Job结束后NetworkPolicy自动删除(ownerReferences)
+#
+# 安全最佳实践:
+# - 最小权限原则: 只开放必要的端口和目标
+# - 默认拒绝: 未明确允许的流量全部拒绝
+# - 分层防御: NetworkPolicy + Security Groups + IAM Roles
+# - 定期审计: 检查NetworkPolicy是否符合安全要求
+#
+# 性能优化:
+# - NetworkPolicy在节点上通过iptables实现,对性能影响<1%
+# - 使用ipBlock而不是podSelector减少规则数量
+# - 合并相似规则减少iptables链长度
+#
+# 故障排查:
+# 1. 检查NetworkPolicy是否生效:
+#    kubectl get networkpolicy -n ai-training-1
+#
+# 2. 查看Pod连接问题:
+#    kubectl exec -it <pod-name> -n ai-training-1 -- nc -zv <target-pod-ip> 29500
+#
+# 3. 查看iptables规则(节点上):
+#    sudo iptables-save | grep <pod-ip>
+#
+# 4. 临时禁用NetworkPolicy测试:
+#    kubectl delete networkpolicy <policy-name> -n ai-training-1
