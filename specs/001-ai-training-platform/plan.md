@@ -220,7 +220,7 @@
 - ✅ 审计日志: 100%关键操作记录,90天保留期 (CloudWatch Logs + 平台数据库)
 
 ### Infrastructure as Code Excellence (Principle VIII)
-- ✅ AWS CDK (TypeScript/Python): 基础设施配置
+- ✅ AWS CDK (TypeScript/Python): 基础设施配置：使用Python
 - ✅ GitOps (ArgoCD): EKS 集群配置和应用部署
 - ✅ Helm Charts: 应用部署标准化
 - ✅ 版本控制: 所有 IaC 代码存储在 Git 仓库

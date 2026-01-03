@@ -327,6 +327,9 @@ CREATE TABLE training_jobs (
     use_spot_instances BOOLEAN DEFAULT FALSE COMMENT '是否使用 Spot 实例',
     spot_interruption_behavior ENUM('stop', 'terminate', 'hibernate') DEFAULT 'stop' COMMENT 'Spot 中断行为',
 
+    -- 调度优先级 (对应 FR-004 抢占式调度)
+    priority ENUM('high', 'medium', 'low') NOT NULL DEFAULT 'medium' COMMENT '任务优先级 (用于抢占式调度)',
+
     -- 任务状态 (对应 spec.md 状态机)
     status ENUM('submitted', 'running', 'paused', 'preempted', 'completed', 'failed') NOT NULL DEFAULT 'submitted' COMMENT '任务状态',
 
@@ -339,6 +342,9 @@ CREATE TABLE training_jobs (
     total_pods INT UNSIGNED COMMENT '总 Pod 数量',
     running_pods INT UNSIGNED DEFAULT 0 COMMENT '运行中 Pod 数量',
     failed_pods INT UNSIGNED DEFAULT 0 COMMENT '失败 Pod 数量',
+
+    -- 抢占统计 (用于连续抢占失败检测)
+    preemption_count INT UNSIGNED DEFAULT 0 COMMENT '累计被抢占次数 (用于判断是否超过阈值)',
 
     -- 训练指标 (最新值)
     current_epoch INT UNSIGNED COMMENT '当前训练轮次',
@@ -367,11 +373,13 @@ CREATE TABLE training_jobs (
     -- 索引
     INDEX idx_owner_id (owner_id),
     INDEX idx_status (status),
+    INDEX idx_priority (priority),
     INDEX idx_dataset_id (dataset_id),
     INDEX idx_submitted_at (submitted_at),
     INDEX idx_completed_at (completed_at),
     INDEX idx_hyperpod_status (hyperpod_status),
     INDEX idx_kueue_workload_name (kueue_workload_name),
+    INDEX idx_status_priority (status, priority),
     FULLTEXT INDEX ft_job_name_desc (job_name, description),
 
     -- 外键
@@ -385,6 +393,7 @@ CREATE TABLE training_jobs (
 - `entrypoint_command`: 训练启动命令 (JSON 数组,例如: `["torchrun", "train.py"]`)
 - `environment_variables`: 环境变量 (JSON 对象,例如: `{"NCCL_DEBUG": "INFO"}`)
 - `distribution_strategy`: 分布式训练策略 (ddp=DDP, fsdp=FSDP, deepspeed=DeepSpeed, horovod=Horovod)
+- `priority`: 任务优先级 (high=高优先级, medium=中优先级, low=低优先级),用于 FR-004 抢占式调度,高优先级任务可抢占低优先级任务资源
 - `status`: 平台标准化状态 (对应 spec.md 的 6 种状态)
 - `hyperpod_status`: HyperPod SDK 返回的原始状态 (Pending, Running, Succeeded, Failed)
 - `kueue_workload_name`: Kueue Workload 资源名称 (用于资源配额管理)
@@ -411,6 +420,8 @@ KUEUE_STATUS_MAPPING = {
 **索引策略**:
 - `owner_id`: 用户任务查询
 - `status`: 按状态筛选 (运行中、已完成等)
+- `priority`: 按优先级筛选和排序
+- `status_priority`: 复合索引,优化按状态和优先级的联合查询 (如查找所有 submitted 状态的 high 优先级任务)
 - `submitted_at`, `completed_at`: 时间范围查询
 - `hyperpod_status`, `kueue_workload_name`: HyperPod/Kueue 集成查询
 - `ft_job_name_desc`: 全文搜索
@@ -741,6 +752,11 @@ class JobStatus(enum.Enum):
     completed = "completed"
     failed = "failed"
 
+class JobPriority(enum.Enum):
+    high = "high"
+    medium = "medium"
+    low = "low"
+
 class DistributionStrategy(enum.Enum):
     ddp = "ddp"
     fsdp = "fsdp"
@@ -770,6 +786,7 @@ class TrainingJob(Base):
     hyperparameters = Column(JSON, comment="超参数")
     distribution_strategy = Column(Enum(DistributionStrategy), nullable=False, default=DistributionStrategy.ddp, comment="分布式策略")
 
+    priority = Column(Enum(JobPriority), nullable=False, default=JobPriority.medium, index=True, comment="任务优先级")
     status = Column(Enum(JobStatus), nullable=False, default=JobStatus.submitted, index=True, comment="任务状态")
     hyperpod_status = Column(String(64), index=True, comment="HyperPod Job 状态")
     kueue_workload_name = Column(String(128), index=True, comment="Kueue Workload 名称")

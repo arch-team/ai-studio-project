@@ -76,6 +76,16 @@ paths:
               - preempted
               - completed
               - failed
+        - name: priority
+          in: query
+          description: 任务优先级筛选
+          required: false
+          schema:
+            type: string
+            enum:
+              - high
+              - medium
+              - low
         - name: owner_id
           in: query
           description: 所有者用户ID (仅管理员可用)
@@ -170,6 +180,126 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/CreateTrainingJobRequest'
+            examples:
+              single_node_ddp:
+                summary: 单节点多GPU DDP训练
+                description: 在单个节点上使用8个A100 GPU进行数据并行训练
+                value:
+                  job_name: "llama3-8b-finetune-ddp"
+                  display_name: "LLaMA 3 8B 微调 (DDP)"
+                  description: "使用LoRA微调LLaMA 3 8B模型,单节点8卡DDP训练"
+                  image_uri: "123456.dkr.ecr.us-west-2.amazonaws.com/pytorch:2.1-gpu"
+                  instance_type: "ml.p4d.24xlarge"
+                  node_count: 1
+                  tasks_per_node: 8
+                  entrypoint_command:
+                    - "torchrun"
+                    - "--nproc_per_node=8"
+                    - "train.py"
+                    - "--config=configs/llama3_lora.yaml"
+                  environment_variables:
+                    NCCL_DEBUG: "INFO"
+                    CUDA_VISIBLE_DEVICES: "0,1,2,3,4,5,6,7"
+                  dataset_id: 1001
+                  data_mount_path: "/data"
+                  checkpoint_mount_path: "/checkpoints"
+                  checkpoint_interval: 10
+                  hyperparameters:
+                    learning_rate: 0.0001
+                    weight_decay: 0.01
+                    warmup_steps: 1000
+                    lora_rank: 8
+                    lora_alpha: 16
+                  max_epochs: 100
+                  batch_size: 4
+                  learning_rate: 0.0001
+                  distribution_strategy: "ddp"
+                  priority: "medium"
+                  mixed_precision: true
+                  use_spot_instances: false
+
+              multi_node_fsdp:
+                summary: 多节点FSDP训练
+                description: 使用16个节点128个GPU进行全分片数据并行训练大模型
+                value:
+                  job_name: "llama3-70b-pretrain-fsdp-20260103"
+                  display_name: "LLaMA 3 70B 预训练 (FSDP)"
+                  description: "使用FSDP训练LLaMA 3 70B模型,16节点128卡"
+                  image_uri: "123456.dkr.ecr.us-west-2.amazonaws.com/pytorch:2.1-fsdp"
+                  instance_type: "ml.p4d.24xlarge"
+                  node_count: 16
+                  tasks_per_node: 8
+                  entrypoint_command:
+                    - "torchrun"
+                    - "--nproc_per_node=8"
+                    - "--nnodes=16"
+                    - "--rdzv_backend=c10d"
+                    - "--rdzv_endpoint=$MASTER_ADDR:$MASTER_PORT"
+                    - "train.py"
+                    - "--config=configs/llama3_70b_fsdp.yaml"
+                  environment_variables:
+                    NCCL_DEBUG: "WARN"
+                    NCCL_SOCKET_IFNAME: "eth0"
+                    TORCH_DISTRIBUTED_DEBUG: "DETAIL"
+                  dataset_id: 2001
+                  data_mount_path: "/fsx/datasets/pile"
+                  checkpoint_mount_path: "/fsx/checkpoints/llama3-70b"
+                  checkpoint_interval: 5
+                  hyperparameters:
+                    learning_rate: 0.00015
+                    weight_decay: 0.1
+                    warmup_steps: 2000
+                    gradient_accumulation_steps: 4
+                    fsdp_sharding_strategy: "FULL_SHARD"
+                    fsdp_cpu_offload: false
+                  max_epochs: 200
+                  batch_size: 2
+                  learning_rate: 0.00015
+                  distribution_strategy: "fsdp"
+                  priority: "high"
+                  mixed_precision: true
+                  use_spot_instances: false
+
+              deepspeed_zero3_spot:
+                summary: DeepSpeed ZeRO-3大模型训练(Spot实例)
+                description: 使用DeepSpeed ZeRO-3在Spot实例上训练超大模型,启用混合精度和CPU卸载
+                value:
+                  job_name: "gpt-neox-20b-deepspeed-spot"
+                  display_name: "GPT-NeoX 20B 训练 (DeepSpeed ZeRO-3 + Spot)"
+                  description: "使用DeepSpeed ZeRO-3训练GPT-NeoX 20B模型,启用Spot实例和CPU卸载优化内存"
+                  image_uri: "123456.dkr.ecr.us-west-2.amazonaws.com/deepspeed:0.12-cuda11.8"
+                  instance_type: "ml.p4d.24xlarge"
+                  node_count: 8
+                  tasks_per_node: 8
+                  entrypoint_command:
+                    - "deepspeed"
+                    - "--num_gpus=8"
+                    - "--num_nodes=8"
+                    - "--hostfile=/opt/ml/input/config/hosts"
+                    - "train.py"
+                    - "--deepspeed_config=configs/ds_zero3_config.json"
+                  environment_variables:
+                    NCCL_DEBUG: "INFO"
+                    CUDA_LAUNCH_BLOCKING: "0"
+                  dataset_id: 3001
+                  data_mount_path: "/data/openwebtext"
+                  checkpoint_mount_path: "/checkpoints"
+                  checkpoint_interval: 20
+                  hyperparameters:
+                    learning_rate: 0.0001
+                    weight_decay: 0.01
+                    warmup_steps: 500
+                    gradient_accumulation_steps: 8
+                    zero_stage: 3
+                    offload_optimizer: true
+                    offload_param: false
+                  max_epochs: 50
+                  batch_size: 1
+                  learning_rate: 0.0001
+                  distribution_strategy: "deepspeed"
+                  priority: "low"
+                  mixed_precision: true
+                  use_spot_instances: true
       responses:
         '201':
           description: 训练任务创建成功
@@ -227,6 +357,189 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/TrainingJobDetail'
+              examples:
+                running_job:
+                  summary: 运行中的训练任务
+                  description: 正常训练中的任务,显示实时训练指标和Pod状态
+                  value:
+                    id: 12345
+                    job_name: "llama3-70b-pretrain-fsdp-20260103"
+                    display_name: "LLaMA 3 70B 预训练 (FSDP)"
+                    description: "使用FSDP训练LLaMA 3 70B模型,16节点128卡"
+                    owner_id: 101
+                    owner_username: "alice"
+                    status: "running"
+                    hyperpod_status: "Running"
+                    kueue_workload_name: "job-12345-workload"
+                    kueue_status: "Admitted"
+                    image_uri: "123456.dkr.ecr.us-west-2.amazonaws.com/pytorch:2.1-fsdp"
+                    instance_type: "ml.p4d.24xlarge"
+                    node_count: 16
+                    tasks_per_node: 8
+                    entrypoint_command:
+                      - "torchrun"
+                      - "--nproc_per_node=8"
+                      - "--nnodes=16"
+                      - "train.py"
+                    environment_variables:
+                      NCCL_DEBUG: "WARN"
+                      NCCL_SOCKET_IFNAME: "eth0"
+                    dataset_id: 2001
+                    dataset_name: "ThePile-100B"
+                    data_mount_path: "/fsx/datasets/pile"
+                    checkpoint_mount_path: "/fsx/checkpoints/llama3-70b"
+                    hyperparameters:
+                      learning_rate: 0.00015
+                      weight_decay: 0.1
+                      warmup_steps: 2000
+                      fsdp_sharding_strategy: "FULL_SHARD"
+                    max_epochs: 200
+                    batch_size: 2
+                    learning_rate: 0.00015
+                    distribution_strategy: "fsdp"
+                    priority: "high"
+                    mixed_precision: true
+                    use_spot_instances: false
+                    total_pods: 16
+                    running_pods: 16
+                    failed_pods: 0
+                    preemption_count: 0
+                    current_epoch: 45
+                    current_step: 125000
+                    latest_loss: 2.35
+                    latest_accuracy: 0.68
+                    submitted_at: "2026-01-03T08:00:00.000Z"
+                    started_at: "2026-01-03T08:05:30.000Z"
+                    completed_at: null
+                    duration_seconds: 14400
+                    total_gpu_hours: 2048.0
+                    estimated_cost_usd: 8192.00
+                    error_message: null
+                    failure_reason: null
+                    hyperpod_job_arn: "arn:aws:sagemaker:us-west-2:123456789012:training-job/llama3-70b-pretrain-fsdp-20260103"
+                    checkpoints_count: 4
+                    created_at: "2026-01-03T08:00:00.000Z"
+                    updated_at: "2026-01-03T12:05:30.000Z"
+
+                preempted_job:
+                  summary: 被抢占的训练任务
+                  description: 由于高优先级任务需要资源而被暂停,等待资源重新分配后自动恢复
+                  value:
+                    id: 12346
+                    job_name: "bert-large-finetune-squad"
+                    display_name: "BERT Large SQuAD 微调"
+                    description: "在SQuAD 2.0数据集上微调BERT Large模型"
+                    owner_id: 102
+                    owner_username: "bob"
+                    status: "preempted"
+                    hyperpod_status: "Stopped"
+                    kueue_workload_name: "job-12346-workload"
+                    kueue_status: "Evicted"
+                    image_uri: "123456.dkr.ecr.us-west-2.amazonaws.com/transformers:4.35-gpu"
+                    instance_type: "ml.p4d.24xlarge"
+                    node_count: 2
+                    tasks_per_node: 8
+                    entrypoint_command:
+                      - "python"
+                      - "train.py"
+                      - "--model=bert-large"
+                      - "--dataset=squad_v2"
+                    environment_variables:
+                      CUDA_VISIBLE_DEVICES: "0,1,2,3,4,5,6,7"
+                    dataset_id: 1005
+                    dataset_name: "SQuAD-v2"
+                    data_mount_path: "/data"
+                    checkpoint_mount_path: "/checkpoints"
+                    hyperparameters:
+                      learning_rate: 0.00003
+                      weight_decay: 0.01
+                      warmup_ratio: 0.1
+                    max_epochs: 5
+                    batch_size: 16
+                    learning_rate: 0.00003
+                    distribution_strategy: "ddp"
+                    priority: "medium"
+                    mixed_precision: true
+                    use_spot_instances: true
+                    total_pods: 2
+                    running_pods: 0
+                    failed_pods: 0
+                    preemption_count: 1
+                    current_epoch: 2
+                    current_step: 5000
+                    latest_loss: 1.45
+                    latest_accuracy: 0.82
+                    submitted_at: "2026-01-03T09:30:00.000Z"
+                    started_at: "2026-01-03T09:35:00.000Z"
+                    completed_at: null
+                    duration_seconds: 3600
+                    total_gpu_hours: 32.0
+                    estimated_cost_usd: 64.00
+                    error_message: "Job preempted by higher priority workload: job-12345-workload"
+                    failure_reason: null
+                    hyperpod_job_arn: "arn:aws:sagemaker:us-west-2:123456789012:training-job/bert-large-finetune-squad"
+                    checkpoints_count: 2
+                    created_at: "2026-01-03T09:30:00.000Z"
+                    updated_at: "2026-01-03T11:05:00.000Z"
+
+                failed_preemption_exhausted:
+                  summary: 连续抢占失败的任务
+                  description: 低优先级任务连续3次被抢占后自动转为失败状态,避免无限重试
+                  value:
+                    id: 12347
+                    job_name: "gpt2-small-finetune-test"
+                    display_name: "GPT-2 Small 测试微调"
+                    description: "GPT-2 Small模型微调测试任务"
+                    owner_id: 103
+                    owner_username: "charlie"
+                    status: "failed"
+                    hyperpod_status: "Failed"
+                    kueue_workload_name: "job-12347-workload"
+                    kueue_status: "Finished"
+                    image_uri: "123456.dkr.ecr.us-west-2.amazonaws.com/pytorch:2.1-gpu"
+                    instance_type: "ml.g5.xlarge"
+                    node_count: 1
+                    tasks_per_node: 1
+                    entrypoint_command:
+                      - "python"
+                      - "train.py"
+                      - "--model=gpt2"
+                    environment_variables:
+                      CUDA_VISIBLE_DEVICES: "0"
+                    dataset_id: 1010
+                    dataset_name: "WikiText-103"
+                    data_mount_path: "/data"
+                    checkpoint_mount_path: "/checkpoints"
+                    hyperparameters:
+                      learning_rate: 0.0001
+                      weight_decay: 0.01
+                    max_epochs: 10
+                    batch_size: 8
+                    learning_rate: 0.0001
+                    distribution_strategy: "ddp"
+                    priority: "low"
+                    mixed_precision: false
+                    use_spot_instances: true
+                    total_pods: 1
+                    running_pods: 0
+                    failed_pods: 0
+                    preemption_count: 3
+                    current_epoch: 1
+                    current_step: 500
+                    latest_loss: 3.21
+                    latest_accuracy: null
+                    submitted_at: "2026-01-03T10:00:00.000Z"
+                    started_at: "2026-01-03T10:02:00.000Z"
+                    completed_at: "2026-01-03T13:45:00.000Z"
+                    duration_seconds: 1800
+                    total_gpu_hours: 0.5
+                    estimated_cost_usd: 1.25
+                    error_message: "任务优先级过低,资源持续不足,已连续被抢占3次"
+                    failure_reason: "PreemptionExhausted: 连续抢占失败,建议提高任务优先级或在资源空闲时段重新提交"
+                    hyperpod_job_arn: "arn:aws:sagemaker:us-west-2:123456789012:training-job/gpt2-small-finetune-test"
+                    checkpoints_count: 1
+                    created_at: "2026-01-03T10:00:00.000Z"
+                    updated_at: "2026-01-03T13:45:00.000Z"
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -311,6 +624,220 @@ paths:
       responses:
         '204':
           description: 删除成功 (无返回内容)
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /training-jobs/{job_id}/debug/kueue:
+    get:
+      tags:
+        - Training Jobs
+      summary: 查询 Kueue Workload 调试信息
+      description: |
+        查询训练任务底层 Kueue Workload 的详细状态信息，用于高级调试和问题排查。
+
+        **用途**:
+        - 调试任务调度问题（为什么任务一直 Pending？）
+        - 排查资源配额问题（为什么无法获取 GPU？）
+        - 分析抢占行为（为什么任务被抢占？）
+        - 查看原始 Kueue Conditions 用于问题报告
+
+        **权限**: 仅任务所有者或 `admin` 角色可访问
+
+        **使用场景示例**:
+        - 任务提交后长时间处于 Submitted 状态 → 查看 QuotaReserved/Admitted 状态
+        - 任务被抢占后无法恢复 → 查看 Eviction 原因和配额竞争情况
+        - 多租户环境排查资源分配问题 → 查看 ClusterQueue 配额使用情况
+      operationId: getTrainingJobKueueStatus
+      parameters:
+        - name: job_id
+          in: path
+          description: 训练任务 ID
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: 成功返回 Kueue Workload 调试信息
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  workload_name:
+                    type: string
+                    description: Kueue Workload 资源名称
+                    example: "job-12345-workload"
+                  namespace:
+                    type: string
+                    description: Kubernetes 命名空间
+                    example: "training-jobs"
+                  status:
+                    type: object
+                    description: Kueue Workload 状态详情
+                    properties:
+                      admitted:
+                        type: boolean
+                        description: 是否已被接纳到 ClusterQueue
+                      quota_reserved:
+                        type: boolean
+                        description: 配额是否已预留
+                      pods_ready:
+                        type: boolean
+                        description: 所有 Pod 是否就绪
+                      evicted:
+                        type: boolean
+                        description: 是否被驱逐
+                      finished:
+                        type: boolean
+                        description: 是否已完成
+                  admission:
+                    type: object
+                    nullable: true
+                    description: 接纳信息（仅在 admitted=true 时存在）
+                    properties:
+                      cluster_queue:
+                        type: string
+                        description: 所属 ClusterQueue 名称
+                        example: "team-a-cluster-queue"
+                      pod_set_assignments:
+                        type: array
+                        description: Pod 集合资源分配
+                        items:
+                          type: object
+                          properties:
+                            name:
+                              type: string
+                              example: "worker"
+                            flavors:
+                              type: object
+                              additionalProperties:
+                                type: string
+                              example:
+                                gpu: "default-flavor"
+                            resource_usage:
+                              type: object
+                              additionalProperties:
+                                type: string
+                              example:
+                                cpu: "96"
+                                memory: "768Gi"
+                                nvidia.com/gpu: "8"
+                            count:
+                              type: integer
+                              example: 16
+                  conditions:
+                    type: array
+                    description: Kueue Workload Conditions 数组（原始 Kubernetes Conditions）
+                    items:
+                      type: object
+                      properties:
+                        type:
+                          type: string
+                          description: Condition 类型
+                          example: "QuotaReserved"
+                        status:
+                          type: string
+                          enum: ["True", "False", "Unknown"]
+                          example: "True"
+                        last_transition_time:
+                          type: string
+                          format: date-time
+                          description: 最后状态转换时间
+                        reason:
+                          type: string
+                          description: 状态原因
+                          example: "AdmittedByClusterQueue"
+                        message:
+                          type: string
+                          description: 详细消息
+                          example: "Quota reserved in ClusterQueue team-a-cluster-queue"
+                  queue_info:
+                    type: object
+                    description: 队列信息
+                    properties:
+                      local_queue:
+                        type: string
+                        description: LocalQueue 名称
+                        example: "team-a-local-queue"
+                      cluster_queue:
+                        type: string
+                        description: ClusterQueue 名称
+                        example: "team-a-cluster-queue"
+                      queue_position:
+                        type: integer
+                        nullable: true
+                        description: 队列位置（仅在排队时有效）
+                        example: 3
+                  quota_usage:
+                    type: object
+                    description: 配额使用情况
+                    properties:
+                      cpu:
+                        type: object
+                        properties:
+                          used:
+                            type: string
+                            example: "96"
+                          total:
+                            type: string
+                            example: "256"
+                      memory:
+                        type: object
+                        properties:
+                          used:
+                            type: string
+                            example: "768Gi"
+                          total:
+                            type: string
+                            example: "2048Gi"
+                      gpu:
+                        type: object
+                        properties:
+                          used:
+                            type: integer
+                            example: 8
+                          total:
+                            type: integer
+                            example: 64
+                  preemption_history:
+                    type: array
+                    description: 抢占历史记录
+                    items:
+                      type: object
+                      properties:
+                        preempted_at:
+                          type: string
+                          format: date-time
+                          description: 被抢占时间
+                        preempting_workload:
+                          type: string
+                          nullable: true
+                          description: 抢占方 Workload 名称
+                          example: "high-priority-job-789-workload"
+                        reason:
+                          type: string
+                          description: 抢占原因
+                          example: "Preempted to accommodate workload UID:5c023c28 due to prioritization"
+                  raw_yaml:
+                    type: string
+                    description: |-
+                      Kueue Workload 原始 YAML（仅 admin 可见）
+
+                      **用途**: 完整的 Kubernetes 资源定义，用于深度问题排查
+                      **格式**: YAML 文本
+                    example: |
+                      apiVersion: kueue.x-k8s.io/v1beta1
+                      kind: Workload
+                      metadata:
+                        name: job-12345-workload
+                      spec:
+                        ...
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -590,6 +1117,13 @@ components:
             - completed
             - failed
           description: 任务状态
+        priority:
+          type: string
+          enum:
+            - high
+            - medium
+            - low
+          description: 任务优先级
         instance_type:
           type: string
           description: 实例类型
@@ -605,6 +1139,10 @@ components:
           format: float
           nullable: true
           description: 最新损失值
+        checkpoints_count:
+          type: integer
+          description: 检查点数量
+          example: 5
         submitted_at:
           type: string
           format: date-time
@@ -738,6 +1276,13 @@ components:
             - deepspeed
             - horovod
           description: 分布式策略
+        priority:
+          type: string
+          enum:
+            - high
+            - medium
+            - low
+          description: 任务优先级
         mixed_precision:
           type: boolean
           description: 是否使用混合精度训练
@@ -754,6 +1299,15 @@ components:
         failed_pods:
           type: integer
           description: 失败 Pod 数量
+        preemption_count:
+          type: integer
+          description: |-
+            累计被抢占次数
+
+            **用途**: 用于连续抢占失败检测 (FR-004 抢占式调度)
+            **阈值**: 当 preemption_count >= 3 时,任务自动转为 Failed 状态
+            **告警**: 接近阈值时 (preemption_count = 2) 前端应显示警告提示
+          example: 1
         current_epoch:
           type: integer
           nullable: true
@@ -809,6 +1363,19 @@ components:
           type: string
           nullable: true
           description: 失败原因
+        hyperpod_job_arn:
+          type: string
+          nullable: true
+          description: |
+            HyperPod Job ARN (仅管理员可见)
+
+            **访问权限**: 仅具有 `admin` 角色的用户可查看此字段
+            **用途**: 用于 AWS 控制台跳转和问题排查
+          example: "arn:aws:sagemaker:us-west-2:123456789012:training-job/llama3-70b-training-20260103"
+        checkpoints_count:
+          type: integer
+          description: 检查点数量
+          example: 5
         created_at:
           type: string
           format: date-time
@@ -974,6 +1541,23 @@ components:
             - `fsdp`: 全分片数据并行 (用户脚本实现)
             - `deepspeed`: DeepSpeed ZeRO (用户脚本 + 容器)
             - `horovod`: Horovod (用户脚本)
+        priority:
+          type: string
+          enum:
+            - high
+            - medium
+            - low
+          default: medium
+          description: |
+            任务优先级 (用于 FR-004 抢占式调度)
+
+            **优先级说明**:
+            - `high`: 高优先级任务,可抢占中低优先级任务资源
+            - `medium`: 中优先级任务 (默认)
+            - `low`: 低优先级任务,资源紧张时可能被抢占
+
+            **抢占行为**: 当集群资源不足时,高优先级任务可以抢占低优先级任务的资源。被抢占的任务会自动创建检查点并重新排队。
+          example: "medium"
         mixed_precision:
           type: boolean
           default: false
@@ -1062,6 +1646,24 @@ components:
             - archived
             - deleted
           description: 检查点状态
+        metadata:
+          type: object
+          nullable: true
+          description: |
+            检查点元数据 (训练指标快照)
+
+            **包含内容**:
+            - 优化器状态摘要
+            - 学习率调度器状态
+            - 随机数生成器状态哈希
+            - 自定义训练指标快照
+          example:
+            optimizer_type: "AdamW"
+            lr_scheduler_step: 5000
+            global_step: 50000
+            custom_metrics:
+              perplexity: 12.5
+              bleu_score: 0.85
         created_at:
           type: string
           format: date-time

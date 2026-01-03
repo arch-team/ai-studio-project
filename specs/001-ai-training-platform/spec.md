@@ -238,8 +238,40 @@ TrainingJob状态: Running → Failed
 ```
 场景: Preempted状态的任务连续3次恢复都被再次抢占
 TrainingJob状态: Preempted → Failed
-失败原因: "任务优先级过低,资源持续不足,已连续被抢占3次"
-用户建议: "请提高任务优先级或在资源空闲时段提交"
+
+系统行为:
+1. 检测逻辑:
+   - TrainingJob 维护 preemption_count 计数器
+   - 每次进入 Preempted 状态时 preemption_count += 1
+   - 当 preemption_count >= 3 时触发失败转换
+
+2. 状态转换执行:
+   - 自动停止重新排队,防止无限循环
+   - TrainingJob 状态变更为 Failed (终态)
+   - 保留最后一个有效检查点 (statusDetails.lastCheckpoint)
+
+3. 失败信息记录:
+   - failureCategory: "PreemptionExhausted"
+   - statusReason: "任务优先级过低,资源持续不足,已连续被抢占3次"
+   - suggestion: "请提高任务优先级或在资源空闲时段重新提交"
+
+4. 告警通知:
+   - 发送邮件/消息通知给任务提交者 (owner_id)
+   - 通知平台管理员 (admin 角色用户)
+   - 告警内容包含: job_id, job_name, priority, preemption_count, lastCheckpoint
+
+5. 监控指标记录 (Prometheus):
+   - training_job_preemption_exhausted_total{priority="low|medium|high"}
+   - training_job_preemption_count_histogram (连续抢占次数分布)
+
+6. 审计日志:
+   - 记录完整抢占历史: 每次抢占的时间、抢占原因 (preemptingJobId)
+   - 记录失败决策依据: preemption_count, 最后3次抢占的时间间隔
+
+用户恢复路径:
+- 方案1: 提高任务优先级 (medium → high) 后重新提交
+- 方案2: 在资源空闲时段 (如凌晨) 重新提交
+- 方案3: 联系管理员临时增加配额或暂停其他低优先级任务
 ```
 
 ### 状态转换规则与触发条件
@@ -533,6 +565,33 @@ training_job_failures_total{failure_category="..."}
     3. **自定义训练指标**（Loss/Accuracy等）：由训练代码通过 MLflow 或 Prometheus Client 上报，使用 boto3 查询 CloudWatch 或直接查询 Prometheus API
     4. **日志流**：使用 boto3 调用 CloudWatch Logs API 获取实时日志
     如需统一监控查询接口，MAY 使用 prometheus-client 或 grafana-api 等开源 SDK
+  - 📝 **自定义指标集成步骤**：
+
+    **方式一：Prometheus Client 集成（推荐用于实时指标）**
+    1. **安装依赖**：在训练容器镜像中添加 `prometheus-client` 包
+    2. **初始化 Pushgateway**：训练脚本中配置 Prometheus Pushgateway 地址（HyperPod 集群默认端点：`http://prometheus-pushgateway.monitoring.svc.cluster.local:9091`）
+    3. **定义指标**：使用 `Gauge` 类型定义训练指标（如 `training_loss`, `training_accuracy`, `learning_rate`）
+    4. **周期性上报**：每个训练 step/epoch 结束后调用 `push_to_gateway()` 推送指标到 Pushgateway
+    5. **指标命名规范**：格式为 `{namespace}_{metric_name}`，例如 `training_loss`, `training_gpu_utilization`
+
+    **方式二：MLflow 集成（推荐用于实验跟踪）**
+    1. **安装依赖**：在训练容器镜像中添加 `mlflow` 包
+    2. **配置 Tracking URI**：设置环境变量 `MLFLOW_TRACKING_URI` 指向 MLflow Tracking Server（需提前部署）
+    3. **创建实验**：训练脚本开始时调用 `mlflow.start_run()` 创建实验运行
+    4. **记录指标**：每个 step/epoch 使用 `mlflow.log_metric()` 记录 Loss、Accuracy 等指标
+    5. **记录参数**：使用 `mlflow.log_params()` 记录超参数（learning_rate, batch_size 等）
+    6. **记录模型**：训练完成后使用 `mlflow.pytorch.log_model()` 保存模型
+
+    **环境变量配置（训练任务提交时指定）**：
+    - `PROMETHEUS_PUSHGATEWAY_URL`: Pushgateway 地址（Prometheus Client）
+    - `MLFLOW_TRACKING_URI`: MLflow Tracking Server 地址（MLflow）
+    - `TRAINING_JOB_ID`: 训练任务唯一标识（用于指标标签，由平台自动注入）
+    - `TRAINING_JOB_NAME`: 训练任务名称（用于指标分组，由平台自动注入）
+
+    **性能要求**：
+    - 指标上报频率：建议每 10-30 秒上报一次，避免过于频繁导致性能下降
+    - 批量上报：建议使用批量 API（如 MLflow 的 `log_metrics()` 而非多次 `log_metric()`）
+    - 异步上报：推荐使用独立线程或异步方式上报指标，避免阻塞训练主循环
 - **FR-008**: 系统必须实现多租户隔离，支持按部门/项目分配资源配额
 - **FR-009**: 系统必须提供资源使用统计和成本分析功能，支持按时间、项目和用户维度的数据查询，采用按分钟计费粒度进行成本核算，确保精确的资源使用成本追踪
 - **FR-010**: 系统必须实现自动检查点创建和断点续训功能，在以下场景自动触发检查点创建：(1)训练中断 (2)节点故障 (3)资源抢占 (4)用户手动触发 (5)定期自动创建(默认间隔10-15分钟)，确保训练状态可恢复且故障时平均损失训练进度不超过7.5分钟。系统依赖 HyperPod 的 Auto-Resume 机制和 Health Check Agent 实现节点故障自动检测和训练任务自动恢复
