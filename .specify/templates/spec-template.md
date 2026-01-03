@@ -102,12 +102,12 @@
 
 ### Technical Constraints
 
-**SDK Usage** (per Constitution Principle XI):
+**SDK Usage** (per Constitution Principle I.B):
 - MUST use `sagemaker-hyperpod` Python SDK for all HyperPod interactions
 - Verify SDK supports required functionality before design
 - Document any SDK limitations requiring alternative approach
 
-**HyperPod Native Components** (per Constitution Principle I):
+**HyperPod Native Components** (per Constitution Principle I.A):
 - Use HyperPod Training Operator for distributed training
 - Use HyperPod Inference Operator for model deployment
 - Use HyperPod Task Governance for resource management
@@ -120,19 +120,19 @@
 - MAY 充分利用 HyperPod 特有扩展 (Checkpointless Training, Elastic Agent)
 - 不要求工作负载在标准 K8S 集群运行 (聚焦 HyperPod 独特价值)
 
-**Code Quality Standards** (per Constitution Principle XII):
+**Code Quality Standards** (per Constitution Principle X):
 - Architecture MUST follow SOLID principles (SRP, OCP, LSP, ISP, DIP)
 - Design MUST adhere to DRY, KISS, YAGNI principles
 - MUST prioritize mature SDKs and libraries over custom implementations:
   - Python: FastAPI, SQLAlchemy, Pydantic, pytest
   - Frontend: React, TypeScript, Zustand, TanStack Query
-  - HyperPod: `sagemaker-hyperpod` SDK (per Principle XI)
+  - HyperPod: `sagemaker-hyperpod` SDK (per Principle I.B)
 - MUST follow Clean Code practices:
   - Clear naming, functions <50 lines, parameters ≤3
   - Self-documenting code, exception-based error handling
-- Code reviews MUST verify SOLID compliance and test coverage (Principle X)
+- Code reviews MUST verify SOLID compliance and test coverage (Principle IX)
 
-**UI/UX Consistency** (per Constitution Principle XIII):
+**UI/UX Consistency** (per Constitution Principle XI):
 - MUST use AWS Cloudscape Design System as the only UI component library
 - MUST align with AWS Console design language, visual style, and interaction patterns
 - Visual consistency requirements:

@@ -8,7 +8,7 @@ description: "Task list template for feature implementation"
 **Input**: Design documents from `/specs/[###-feature-name]/`
 **Prerequisites**: plan.md (required), spec.md (required for user stories), research.md, data-model.md, contracts/
 
-**Tests**: The examples below include test tasks. Tests are MANDATORY for production features (per Constitution Principle X: Test Quality Assurance). Only skip tests for proof-of-concept or experimental features explicitly marked as non-production.
+**Tests**: The examples below include test tasks. Tests are MANDATORY for production features (per Constitution Principle IX: Test Strategy and Quality Assurance). Only skip tests for proof-of-concept or experimental features explicitly marked as non-production.
 
 **Organization**: Tasks are grouped by user story to enable independent implementation and testing of each story.
 
@@ -60,7 +60,7 @@ description: "Task list template for feature implementation"
 
 **⚠️ CRITICAL**: No user story work can begin until this phase is complete
 
-### SDK Integration Tasks (per Constitution Principle XI)
+### SDK Integration Tasks (per Constitution Principle I.B)
 
 - [ ] T004 Install and configure `sagemaker-hyperpod` Python SDK
 - [ ] T005 Establish cluster connection via SDK cluster API
@@ -93,7 +93,7 @@ Examples of foundational tasks (adjust based on your project):
 
 ### Tests for User Story 1 (MANDATORY for production features) ✅
 
-> **NOTE: Write these tests FIRST, ensure they FAIL before implementation (TDD approach per Constitution Principle X)**
+> **NOTE: Write these tests FIRST, ensure they FAIL before implementation (TDD approach per Constitution Principle IX)**
 
 - [ ] T010 [P] [US1] Contract test for [endpoint] in tests/contract/test_[name].py
 - [ ] T011 [P] [US1] Integration test for [user journey] in tests/integration/test_[name].py

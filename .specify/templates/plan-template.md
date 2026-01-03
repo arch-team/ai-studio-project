@@ -40,7 +40,7 @@
 
 **If using raw K8S API directly**: Document justification and get governance approval
 
-### SDK-First Development (Principle XI)
+### SDK-First Development (Principle I.B)
 - [ ] Verified `sagemaker-hyperpod` SDK supports required functionality
 - [ ] SDK documentation reviewed for target features
 - [ ] Any SDK bypasses documented with clear technical rationale
@@ -59,24 +59,24 @@
 
 **If not using HyperPod components**: Justify why HyperPod扩展能力不足以满足需求
 
-### Code Quality and Design Excellence (Principle XII)
+### Code Design and Implementation Quality (Principle X)
 - [ ] Architecture follows SOLID principles (SRP, OCP, LSP, ISP, DIP)
 - [ ] Design adheres to DRY, KISS, YAGNI principles
 - [ ] Component selection prioritizes mature SDKs and libraries:
   - **Python**: FastAPI, SQLAlchemy, Pydantic, pytest over custom implementations
   - **Frontend**: React, TypeScript, Zustand, TanStack Query over custom frameworks
-  - **HyperPod**: `sagemaker-hyperpod` SDK over raw K8S API (per Principle XI)
+  - **HyperPod**: `sagemaker-hyperpod` SDK over raw K8S API (per Principle I.B)
 - [ ] Clean Code practices planned:
   - Clear naming conventions
   - Functions <50 lines, parameters ≤3
   - Self-documenting code with minimal comments
   - Exception-based error handling
-- [ ] Code review standards defined (SOLID compliance, test coverage per Principle X)
+- [ ] Code review standards defined (SOLID compliance, test coverage per Principle IX)
 - [ ] Technical debt management strategy established
 
 **If implementing custom solutions**: Document why existing mature libraries are insufficient
 
-### UI/UX Consistency (Principle XIII)
+### UI/UX Consistency (Principle XI)
 - [ ] UI design aligns with AWS Console design language and patterns
 - [ ] MUST use AWS Cloudscape Design System (`@cloudscape-design/components`)
 - [ ] Visual consistency verified:
