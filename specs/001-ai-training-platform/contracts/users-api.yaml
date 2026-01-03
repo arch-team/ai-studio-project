@@ -1,0 +1,123 @@
+openapi: 3.0.3
+info:
+  title: Users API
+  version: 1.0.0
+  description: 用户管理 API,集成 AWS IAM Identity Center (SSO)
+
+servers:
+  - url: https://api.ai-training-platform.example.com/v1
+  - url: http://localhost:8000/v1
+
+tags:
+  - name: Users
+  - name: Authentication
+
+security:
+  - BearerAuth: []
+
+paths:
+  /auth/login:
+    post:
+      tags:
+        - Authentication
+      summary: 用户登录 (SSO)
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - id_token
+              properties:
+                id_token:
+                  type: string
+                  description: AWS IAM Identity Center ID Token
+      responses:
+        '200':
+          description: 登录成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  access_token:
+                    type: string
+                  refresh_token:
+                    type: string
+                  expires_in:
+                    type: integer
+
+  /users/me:
+    get:
+      tags:
+        - Users
+      summary: 查询当前用户信息
+      responses:
+        '200':
+          description: 成功返回用户信息
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserProfile'
+
+  /users:
+    get:
+      tags:
+        - Users
+      summary: 查询用户列表 (仅管理员)
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [active, inactive, suspended]
+      responses:
+        '200':
+          description: 成功返回用户列表
+
+  /users/{user_id}:
+    get:
+      tags:
+        - Users
+      summary: 查询用户详情
+      parameters:
+        - name: user_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: 成功返回用户详情
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+
+  schemas:
+    UserProfile:
+      type: object
+      properties:
+        id:
+          type: integer
+        username:
+          type: string
+        email:
+          type: string
+        display_name:
+          type: string
+        role:
+          type: string
+          enum: [admin, user, viewer]
+        status:
+          type: string
+          enum: [active, inactive, suspended]
+        resource_quota_id:
+          type: integer
+        created_at:
+          type: string
+          format: date-time

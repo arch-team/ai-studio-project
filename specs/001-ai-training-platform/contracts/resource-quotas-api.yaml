@@ -1,0 +1,223 @@
+openapi: 3.0.3
+info:
+  title: Resource Quotas API
+  version: 1.0.0
+  description: |
+    资源配额管理 API,基于 Kueue 实现多租户资源管理。
+
+    **对应 User Story**: US-003 资源配额管理
+
+servers:
+  - url: https://api.ai-training-platform.example.com/v1
+  - url: http://localhost:8000/v1
+
+tags:
+  - name: Resource Quotas
+
+security:
+  - BearerAuth: []
+
+paths:
+  /resource-quotas:
+    get:
+      tags:
+        - Resource Quotas
+      summary: 查询资源配额列表
+      operationId: listResourceQuotas
+      parameters:
+        - name: quota_type
+          in: query
+          schema:
+            type: string
+            enum: [user, team, project]
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [active, suspended, expired]
+      responses:
+        '200':
+          description: 成功返回资源配额列表
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ResourceQuotaSummary'
+
+    post:
+      tags:
+        - Resource Quotas
+      summary: 创建资源配额
+      operationId: createResourceQuota
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateResourceQuotaRequest'
+      responses:
+        '201':
+          description: 资源配额创建成功
+
+  /resource-quotas/{quota_id}:
+    get:
+      tags:
+        - Resource Quotas
+      summary: 查询资源配额详情
+      operationId: getResourceQuota
+      parameters:
+        - name: quota_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: 成功返回资源配额详情
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResourceQuotaDetail'
+
+  /resource-quotas/{quota_id}/usage:
+    get:
+      tags:
+        - Resource Quotas
+      summary: 查询资源配额使用情况
+      operationId: getResourceQuotaUsage
+      parameters:
+        - name: quota_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: 成功返回配额使用情况
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResourceQuotaUsage'
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+
+  schemas:
+    ResourceQuotaSummary:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        quota_type:
+          type: string
+          enum: [user, team, project]
+        max_cpu_cores:
+          type: integer
+        max_gpu_count:
+          type: integer
+        max_memory_gb:
+          type: integer
+        max_concurrent_jobs:
+          type: integer
+        status:
+          type: string
+          enum: [active, suspended, expired]
+        valid_from:
+          type: string
+          format: date-time
+        valid_until:
+          type: string
+          format: date-time
+          nullable: true
+
+    ResourceQuotaDetail:
+      allOf:
+        - $ref: '#/components/schemas/ResourceQuotaSummary'
+        - type: object
+          properties:
+            description:
+              type: string
+            reserved_cpu_cores:
+              type: integer
+            reserved_gpu_count:
+              type: integer
+            gpu_types:
+              type: array
+              items:
+                type: string
+              example: ["ml.p4d.24xlarge", "ml.g5.xlarge"]
+            reserved_memory_gb:
+              type: integer
+            max_storage_gb:
+              type: integer
+            max_spot_instances:
+              type: integer
+
+    ResourceQuotaUsage:
+      type: object
+      properties:
+        quota_id:
+          type: integer
+        cpu_cores_used:
+          type: integer
+        gpu_count_used:
+          type: integer
+        memory_gb_used:
+          type: integer
+        concurrent_jobs_used:
+          type: integer
+        cpu_cores_available:
+          type: integer
+        gpu_count_available:
+          type: integer
+        memory_gb_available:
+          type: integer
+        concurrent_jobs_available:
+          type: integer
+
+    CreateResourceQuotaRequest:
+      type: object
+      required:
+        - name
+        - quota_type
+        - max_cpu_cores
+        - max_gpu_count
+        - max_memory_gb
+        - max_concurrent_jobs
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        quota_type:
+          type: string
+          enum: [user, team, project]
+        max_cpu_cores:
+          type: integer
+          minimum: 1
+        max_gpu_count:
+          type: integer
+          minimum: 1
+        max_memory_gb:
+          type: integer
+          minimum: 1
+        max_concurrent_jobs:
+          type: integer
+          minimum: 1
+        gpu_types:
+          type: array
+          items:
+            type: string
+        valid_until:
+          type: string
+          format: date-time
+          nullable: true

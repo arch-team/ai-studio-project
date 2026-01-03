@@ -1,0 +1,1166 @@
+openapi: 3.0.3
+info:
+  title: Training Jobs API
+  version: 1.0.0
+  description: |
+    训练任务管理 API,基于 AWS SageMaker HyperPod SDK 封装。
+
+    **核心功能**:
+    - 创建训练任务 (DDP/FSDP/DeepSpeed)
+    - 查询任务状态和训练指标
+    - 管理训练生命周期 (暂停/恢复/取消)
+    - 查询训练日志和检查点
+
+    **对应 User Story**: US-001 训练任务管理
+
+  contact:
+    name: AI Training Platform Team
+    email: ai-platform@example.com
+
+servers:
+  - url: https://api.ai-training-platform.example.com/v1
+    description: 生产环境
+  - url: http://localhost:8000/v1
+    description: 开发环境
+
+tags:
+  - name: Training Jobs
+    description: 训练任务管理
+  - name: Training Logs
+    description: 训练日志查询
+  - name: Training Metrics
+    description: 训练指标监控
+
+security:
+  - BearerAuth: []
+
+paths:
+  /training-jobs:
+    get:
+      tags:
+        - Training Jobs
+      summary: 查询训练任务列表
+      description: |
+        分页查询训练任务列表,支持按状态、所有者、时间范围筛选。
+
+        **权限**: 普通用户只能查看自己的任务,管理员可查看所有任务。
+      operationId: listTrainingJobs
+      parameters:
+        - name: page
+          in: query
+          description: 页码 (从 1 开始)
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: page_size
+          in: query
+          description: 每页数量
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+        - name: status
+          in: query
+          description: 任务状态筛选
+          required: false
+          schema:
+            type: string
+            enum:
+              - submitted
+              - running
+              - paused
+              - preempted
+              - completed
+              - failed
+        - name: owner_id
+          in: query
+          description: 所有者用户ID (仅管理员可用)
+          required: false
+          schema:
+            type: integer
+        - name: submitted_after
+          in: query
+          description: 提交时间起始 (ISO 8601 格式)
+          required: false
+          schema:
+            type: string
+            format: date-time
+        - name: submitted_before
+          in: query
+          description: 提交时间结束 (ISO 8601 格式)
+          required: false
+          schema:
+            type: string
+            format: date-time
+        - name: sort_by
+          in: query
+          description: 排序字段
+          required: false
+          schema:
+            type: string
+            enum:
+              - created_at
+              - submitted_at
+              - completed_at
+            default: created_at
+        - name: sort_order
+          in: query
+          description: 排序方向
+          required: false
+          schema:
+            type: string
+            enum:
+              - asc
+              - desc
+            default: desc
+      responses:
+        '200':
+          description: 成功返回训练任务列表
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/TrainingJobSummary'
+                  total:
+                    type: integer
+                    description: 总记录数
+                  page:
+                    type: integer
+                    description: 当前页码
+                  page_size:
+                    type: integer
+                    description: 每页数量
+                  total_pages:
+                    type: integer
+                    description: 总页数
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+    post:
+      tags:
+        - Training Jobs
+      summary: 创建训练任务
+      description: |
+        创建新的训练任务并提交到 HyperPod 集群。
+
+        **工作流**:
+        1. 验证用户资源配额 (Kueue)
+        2. 创建 HyperPodPytorchJob 资源
+        3. 返回任务 ID 和初始状态
+
+        **权限**: 需要 `training:create` 权限
+      operationId: createTrainingJob
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateTrainingJobRequest'
+      responses:
+        '201':
+          description: 训练任务创建成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TrainingJobDetail'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          description: 资源冲突 (例如: 任务名称已存在)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '507':
+          description: 资源配额不足
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QuotaExceededError'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /training-jobs/{job_id}:
+    get:
+      tags:
+        - Training Jobs
+      summary: 查询训练任务详情
+      description: |
+        根据任务 ID 查询训练任务的详细信息,包括配置、状态、训练指标等。
+
+        **返回内容**:
+        - 任务基本信息
+        - 训练配置
+        - 当前状态和统计
+        - 最新训练指标
+        - 关联的检查点列表
+      operationId: getTrainingJob
+      parameters:
+        - name: job_id
+          in: path
+          description: 训练任务 ID
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: 成功返回训练任务详情
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TrainingJobDetail'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+    patch:
+      tags:
+        - Training Jobs
+      summary: 更新训练任务 (暂停/恢复)
+      description: |
+        更新训练任务状态或配置。
+
+        **支持的操作**:
+        - `pause`: 暂停训练 (保存检查点后停止)
+        - `resume`: 恢复训练 (从最新检查点恢复)
+        - `cancel`: 取消训练 (终止任务)
+
+        **权限**: 仅任务所有者或管理员
+      operationId: updateTrainingJob
+      parameters:
+        - name: job_id
+          in: path
+          description: 训练任务 ID
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateTrainingJobRequest'
+      responses:
+        '200':
+          description: 更新成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TrainingJobDetail'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: 状态冲突 (例如: 无法暂停已完成的任务)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+    delete:
+      tags:
+        - Training Jobs
+      summary: 删除训练任务
+      description: |
+        删除训练任务 (软删除)。
+
+        **删除行为**:
+        - 正在运行的任务: 先取消,再删除
+        - 已完成的任务: 直接标记为已删除
+        - 关联的检查点: 保留,不删除
+
+        **权限**: 仅任务所有者或管理员
+      operationId: deleteTrainingJob
+      parameters:
+        - name: job_id
+          in: path
+          description: 训练任务 ID
+          required: true
+          schema:
+            type: integer
+      responses:
+        '204':
+          description: 删除成功 (无返回内容)
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /training-jobs/{job_id}/logs:
+    get:
+      tags:
+        - Training Logs
+      summary: 查询训练日志
+      description: |
+        查询训练任务的实时日志 (CloudWatch Logs)。
+
+        **日志来源**:
+        - 训练容器 stdout/stderr
+        - 所有训练节点日志聚合
+
+        **延迟**: 3-10 秒 (research.md Section 2.4)
+      operationId: getTrainingJobLogs
+      parameters:
+        - name: job_id
+          in: path
+          description: 训练任务 ID
+          required: true
+          schema:
+            type: integer
+        - name: tail
+          in: query
+          description: 返回最新 N 行日志
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 10000
+            default: 100
+        - name: start_time
+          in: query
+          description: 日志起始时间 (ISO 8601 格式)
+          required: false
+          schema:
+            type: string
+            format: date-time
+        - name: end_time
+          in: query
+          description: 日志结束时间 (ISO 8601 格式)
+          required: false
+          schema:
+            type: string
+            format: date-time
+        - name: filter_pattern
+          in: query
+          description: CloudWatch Logs 过滤模式 (例如: "ERROR")
+          required: false
+          schema:
+            type: string
+        - name: pod_name
+          in: query
+          description: 指定 Pod 名称 (多节点训练时筛选特定节点日志)
+          required: false
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 成功返回训练日志
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  logs:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        timestamp:
+                          type: string
+                          format: date-time
+                          description: 日志时间戳
+                        pod_name:
+                          type: string
+                          description: Pod 名称
+                        message:
+                          type: string
+                          description: 日志内容
+                  next_token:
+                    type: string
+                    description: 分页令牌 (用于获取更多日志)
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /training-jobs/{job_id}/metrics:
+    get:
+      tags:
+        - Training Metrics
+      summary: 查询训练指标
+      description: |
+        查询训练任务的实时指标 (Prometheus + OpenTelemetry)。
+
+        **指标类型**:
+        - 系统指标: GPU 利用率、显存、CPU、内存
+        - 训练指标: Loss, Accuracy, Epoch, Step
+        - 性能指标: 吞吐量、批处理时间
+
+        **数据源**: Amazon Managed Prometheus
+      operationId: getTrainingJobMetrics
+      parameters:
+        - name: job_id
+          in: path
+          description: 训练任务 ID
+          required: true
+          schema:
+            type: integer
+        - name: metric_names
+          in: query
+          description: 指标名称列表 (逗号分隔)
+          required: false
+          schema:
+            type: string
+            example: "training.loss,training.accuracy,DCGM_FI_DEV_GPU_UTIL"
+        - name: start_time
+          in: query
+          description: 查询起始时间 (ISO 8601 格式)
+          required: false
+          schema:
+            type: string
+            format: date-time
+        - name: end_time
+          in: query
+          description: 查询结束时间 (ISO 8601 格式)
+          required: false
+          schema:
+            type: string
+            format: date-time
+        - name: step
+          in: query
+          description: 时间步长 (秒)
+          required: false
+          schema:
+            type: integer
+            default: 15
+      responses:
+        '200':
+          description: 成功返回训练指标
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  metrics:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        metric_name:
+                          type: string
+                          description: 指标名称
+                        data_points:
+                          type: array
+                          items:
+                            type: object
+                            properties:
+                              timestamp:
+                                type: string
+                                format: date-time
+                              value:
+                                type: number
+                              labels:
+                                type: object
+                                description: 指标标签 (例如: {"epoch": "10"})
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /training-jobs/{job_id}/checkpoints:
+    get:
+      tags:
+        - Training Jobs
+      summary: 查询训练任务的检查点列表
+      description: |
+        查询训练任务的所有检查点,按 epoch 降序排列。
+
+        **检查点来源**: 后端扫描 FSx for Lustre 存储生成 (research.md Section 1.4)
+      operationId: listTrainingJobCheckpoints
+      parameters:
+        - name: job_id
+          in: path
+          description: 训练任务 ID
+          required: true
+          schema:
+            type: integer
+        - name: checkpoint_type
+          in: query
+          description: 检查点类型筛选
+          required: false
+          schema:
+            type: string
+            enum:
+              - epoch
+              - step
+              - best
+              - final
+              - manual
+      responses:
+        '200':
+          description: 成功返回检查点列表
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  checkpoints:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Checkpoint'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: |
+        使用 JWT 令牌进行身份验证。
+
+        获取令牌: `POST /auth/login`
+
+  schemas:
+    TrainingJobSummary:
+      type: object
+      description: 训练任务摘要信息 (列表展示)
+      properties:
+        id:
+          type: integer
+          description: 训练任务 ID
+        job_name:
+          type: string
+          description: 任务名称
+        display_name:
+          type: string
+          description: 显示名称
+        owner_id:
+          type: integer
+          description: 所有者用户 ID
+        owner_username:
+          type: string
+          description: 所有者用户名
+        status:
+          type: string
+          enum:
+            - submitted
+            - running
+            - paused
+            - preempted
+            - completed
+            - failed
+          description: 任务状态
+        instance_type:
+          type: string
+          description: 实例类型
+        node_count:
+          type: integer
+          description: 节点数量
+        current_epoch:
+          type: integer
+          nullable: true
+          description: 当前训练轮次
+        latest_loss:
+          type: number
+          format: float
+          nullable: true
+          description: 最新损失值
+        submitted_at:
+          type: string
+          format: date-time
+          description: 提交时间
+        started_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: 开始时间
+        completed_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: 完成时间
+        duration_seconds:
+          type: integer
+          nullable: true
+          description: 运行时长 (秒)
+        estimated_cost_usd:
+          type: number
+          format: float
+          nullable: true
+          description: 预估成本 (USD)
+
+    TrainingJobDetail:
+      type: object
+      description: 训练任务详细信息
+      properties:
+        id:
+          type: integer
+          description: 训练任务 ID
+        job_name:
+          type: string
+          description: 任务名称
+        display_name:
+          type: string
+          description: 显示名称
+        description:
+          type: string
+          nullable: true
+          description: 任务描述
+        owner_id:
+          type: integer
+          description: 所有者用户 ID
+        owner_username:
+          type: string
+          description: 所有者用户名
+        status:
+          type: string
+          enum:
+            - submitted
+            - running
+            - paused
+            - preempted
+            - completed
+            - failed
+          description: 任务状态
+        hyperpod_status:
+          type: string
+          nullable: true
+          description: HyperPod Job 原始状态
+        kueue_workload_name:
+          type: string
+          nullable: true
+          description: Kueue Workload 名称
+        kueue_status:
+          type: string
+          nullable: true
+          description: Kueue Workload 状态
+        image_uri:
+          type: string
+          description: Docker 镜像 URI
+        instance_type:
+          type: string
+          description: 实例类型
+        node_count:
+          type: integer
+          description: 节点数量
+        tasks_per_node:
+          type: integer
+          description: 每节点任务数 (GPU 数量)
+        entrypoint_command:
+          type: array
+          items:
+            type: string
+          description: 启动命令
+        environment_variables:
+          type: object
+          additionalProperties:
+            type: string
+          nullable: true
+          description: 环境变量
+        dataset_id:
+          type: integer
+          nullable: true
+          description: 关联数据集 ID
+        dataset_name:
+          type: string
+          nullable: true
+          description: 关联数据集名称
+        data_mount_path:
+          type: string
+          nullable: true
+          description: 数据挂载路径
+        checkpoint_mount_path:
+          type: string
+          nullable: true
+          description: 检查点挂载路径
+        hyperparameters:
+          type: object
+          nullable: true
+          description: 超参数
+        max_epochs:
+          type: integer
+          nullable: true
+          description: 最大训练轮数
+        batch_size:
+          type: integer
+          nullable: true
+          description: 批次大小
+        learning_rate:
+          type: number
+          format: float
+          nullable: true
+          description: 学习率
+        distribution_strategy:
+          type: string
+          enum:
+            - ddp
+            - fsdp
+            - deepspeed
+            - horovod
+          description: 分布式策略
+        mixed_precision:
+          type: boolean
+          description: 是否使用混合精度训练
+        use_spot_instances:
+          type: boolean
+          description: 是否使用 Spot 实例
+        total_pods:
+          type: integer
+          nullable: true
+          description: 总 Pod 数量
+        running_pods:
+          type: integer
+          description: 运行中 Pod 数量
+        failed_pods:
+          type: integer
+          description: 失败 Pod 数量
+        current_epoch:
+          type: integer
+          nullable: true
+          description: 当前训练轮次
+        current_step:
+          type: integer
+          nullable: true
+          description: 当前训练步数
+        latest_loss:
+          type: number
+          format: float
+          nullable: true
+          description: 最新损失值
+        latest_accuracy:
+          type: number
+          format: float
+          nullable: true
+          description: 最新准确率
+        submitted_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: 提交时间
+        started_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: 开始时间
+        completed_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: 完成时间
+        duration_seconds:
+          type: integer
+          nullable: true
+          description: 运行时长 (秒)
+        total_gpu_hours:
+          type: number
+          format: float
+          nullable: true
+          description: 总 GPU 时
+        estimated_cost_usd:
+          type: number
+          format: float
+          nullable: true
+          description: 预估成本 (USD)
+        error_message:
+          type: string
+          nullable: true
+          description: 错误信息
+        failure_reason:
+          type: string
+          nullable: true
+          description: 失败原因
+        created_at:
+          type: string
+          format: date-time
+          description: 创建时间
+        updated_at:
+          type: string
+          format: date-time
+          description: 更新时间
+
+    CreateTrainingJobRequest:
+      type: object
+      required:
+        - job_name
+        - image_uri
+        - instance_type
+        - node_count
+        - entrypoint_command
+      properties:
+        job_name:
+          type: string
+          minLength: 3
+          maxLength: 128
+          pattern: '^[a-z0-9][a-z0-9-]*[a-z0-9]$'
+          description: |
+            任务名称 (全局唯一)
+
+            **命名规则**:
+            - 只能包含小写字母、数字和连字符
+            - 以字母或数字开头和结尾
+            - 长度: 3-128 字符
+          example: "llama3-70b-training-20260103"
+        display_name:
+          type: string
+          maxLength: 256
+          description: 显示名称 (中文友好)
+          example: "LLaMA 3 70B 微调训练"
+        description:
+          type: string
+          maxLength: 2000
+          nullable: true
+          description: 任务描述
+          example: "使用 LoRA 微调 LLaMA 3 70B 模型"
+        image_uri:
+          type: string
+          format: uri
+          description: |
+            Docker 镜像 URI (必须包含 PyTorch 和训练脚本)
+
+            **支持的镜像仓库**:
+            - Amazon ECR: `123456.dkr.ecr.us-west-2.amazonaws.com/pytorch:2.1`
+            - Docker Hub: `docker.io/pytorch/pytorch:2.1.0-cuda11.8`
+          example: "123456.dkr.ecr.us-west-2.amazonaws.com/pytorch:2.1"
+        instance_type:
+          type: string
+          description: |
+            EC2 实例类型 (必须支持 GPU)
+
+            **常用实例类型**:
+            - `ml.p4d.24xlarge`: 8x A100 (40GB), 96 vCPU, 1.1 TB RAM
+            - `ml.p4de.24xlarge`: 8x A100 (80GB), 96 vCPU, 1.1 TB RAM
+            - `ml.g5.xlarge`: 1x A10G (24GB), 4 vCPU, 16 GB RAM
+          example: "ml.p4d.24xlarge"
+        node_count:
+          type: integer
+          minimum: 1
+          maximum: 256
+          description: 节点数量 (分布式训练)
+          example: 16
+        tasks_per_node:
+          type: integer
+          minimum: 1
+          maximum: 8
+          default: 1
+          description: 每节点任务数 (通常等于 GPU 数量)
+          example: 8
+        entrypoint_command:
+          type: array
+          items:
+            type: string
+          minItems: 1
+          description: |
+            训练启动命令
+
+            **示例**:
+            - DDP: `["torchrun", "--nproc_per_node=8", "train.py"]`
+            - DeepSpeed: `["deepspeed", "--num_gpus=8", "train.py"]`
+          example:
+            - "torchrun"
+            - "--nproc_per_node=8"
+            - "--nnodes=16"
+            - "train.py"
+            - "--config=config.yaml"
+        environment_variables:
+          type: object
+          additionalProperties:
+            type: string
+          nullable: true
+          description: 环境变量
+          example:
+            NCCL_DEBUG: "INFO"
+            CUDA_VISIBLE_DEVICES: "0,1,2,3,4,5,6,7"
+        dataset_id:
+          type: integer
+          nullable: true
+          description: 关联数据集 ID
+          example: 123
+        data_mount_path:
+          type: string
+          default: "/data"
+          description: 数据集挂载路径 (容器内路径)
+          example: "/data"
+        checkpoint_mount_path:
+          type: string
+          default: "/checkpoints"
+          description: 检查点挂载路径 (容器内路径)
+          example: "/checkpoints"
+        checkpoint_interval:
+          type: integer
+          minimum: 1
+          nullable: true
+          description: 检查点保存间隔 (epoch)
+          example: 10
+        hyperparameters:
+          type: object
+          nullable: true
+          description: 超参数 (自定义键值对)
+          example:
+            learning_rate: 0.0001
+            weight_decay: 0.01
+            warmup_steps: 1000
+        max_epochs:
+          type: integer
+          minimum: 1
+          nullable: true
+          description: 最大训练轮数
+          example: 100
+        batch_size:
+          type: integer
+          minimum: 1
+          nullable: true
+          description: 批次大小 (per device)
+          example: 32
+        learning_rate:
+          type: number
+          format: float
+          minimum: 0
+          nullable: true
+          description: 学习率
+          example: 0.0001
+        distribution_strategy:
+          type: string
+          enum:
+            - ddp
+            - fsdp
+            - deepspeed
+            - horovod
+          default: ddp
+          description: |
+            分布式训练策略
+
+            **策略说明** (research.md Section 1.3):
+            - `ddp`: 数据并行 (SDK 原生支持)
+            - `fsdp`: 全分片数据并行 (用户脚本实现)
+            - `deepspeed`: DeepSpeed ZeRO (用户脚本 + 容器)
+            - `horovod`: Horovod (用户脚本)
+        mixed_precision:
+          type: boolean
+          default: false
+          description: 是否使用混合精度训练 (AMP)
+        use_spot_instances:
+          type: boolean
+          default: false
+          description: 是否使用 Spot 实例 (需集群支持)
+
+    UpdateTrainingJobRequest:
+      type: object
+      required:
+        - action
+      properties:
+        action:
+          type: string
+          enum:
+            - pause
+            - resume
+            - cancel
+          description: |
+            任务操作
+
+            **操作说明**:
+            - `pause`: 暂停训练 (保存检查点后停止)
+            - `resume`: 恢复训练 (从最新检查点恢复)
+            - `cancel`: 取消训练 (立即终止)
+
+    Checkpoint:
+      type: object
+      description: 训练检查点
+      properties:
+        id:
+          type: integer
+          description: 检查点 ID
+        training_job_id:
+          type: integer
+          description: 关联训练任务 ID
+        checkpoint_name:
+          type: string
+          description: 检查点名称
+        storage_path:
+          type: string
+          description: 存储路径
+        checkpoint_type:
+          type: string
+          enum:
+            - epoch
+            - step
+            - best
+            - final
+            - manual
+          description: 检查点类型
+        epoch:
+          type: integer
+          nullable: true
+          description: 训练轮次
+        step:
+          type: integer
+          nullable: true
+          description: 训练步数
+        size_bytes:
+          type: integer
+          description: 文件大小 (字节)
+        loss:
+          type: number
+          format: float
+          nullable: true
+          description: 损失值
+        accuracy:
+          type: number
+          format: float
+          nullable: true
+          description: 准确率
+        storage_tier:
+          type: string
+          enum:
+            - nvme
+            - fsx
+            - s3
+          description: 存储层级
+        status:
+          type: string
+          enum:
+            - available
+            - archived
+            - deleted
+          description: 检查点状态
+        created_at:
+          type: string
+          format: date-time
+          description: 创建时间
+
+    Error:
+      type: object
+      required:
+        - code
+        - message
+      properties:
+        code:
+          type: string
+          description: 错误代码
+        message:
+          type: string
+          description: 错误信息
+        details:
+          type: object
+          nullable: true
+          description: 错误详情
+
+    QuotaExceededError:
+      type: object
+      required:
+        - code
+        - message
+        - quota_type
+        - requested
+        - available
+      properties:
+        code:
+          type: string
+          example: "QUOTA_EXCEEDED"
+          description: 错误代码
+        message:
+          type: string
+          example: "Resource quota exceeded: insufficient GPU quota"
+          description: 错误信息
+        quota_type:
+          type: string
+          example: "gpu"
+          description: 配额类型 (cpu, gpu, memory)
+        requested:
+          type: integer
+          example: 128
+          description: 请求的资源量
+        available:
+          type: integer
+          example: 64
+          description: 可用的资源量
+
+  responses:
+    BadRequest:
+      description: 请求参数错误
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            code: "INVALID_REQUEST"
+            message: "Invalid parameter: instance_type must be a GPU instance"
+
+    Unauthorized:
+      description: 未授权 (缺少或无效的认证令牌)
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            code: "UNAUTHORIZED"
+            message: "Authentication required"
+
+    Forbidden:
+      description: 无权限访问资源
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            code: "FORBIDDEN"
+            message: "Insufficient permissions to access this resource"
+
+    NotFound:
+      description: 资源不存在
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            code: "NOT_FOUND"
+            message: "Training job not found"
+
+    InternalServerError:
+      description: 服务器内部错误
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            code: "INTERNAL_SERVER_ERROR"
+            message: "An unexpected error occurred"

@@ -1,0 +1,270 @@
+openapi: 3.0.3
+info:
+  title: Datasets API
+  version: 1.0.0
+  description: |
+    数据集管理 API,支持 FSx for Lustre, S3, EFS 数据源。
+
+    **核心功能**:
+    - 注册数据集元数据
+    - 查询数据集列表
+    - 数据集版本管理
+    - 访问权限控制
+
+    **对应 User Story**: US-002 数据集管理
+
+servers:
+  - url: https://api.ai-training-platform.example.com/v1
+  - url: http://localhost:8000/v1
+
+tags:
+  - name: Datasets
+
+security:
+  - BearerAuth: []
+
+paths:
+  /datasets:
+    get:
+      tags:
+        - Datasets
+      summary: 查询数据集列表
+      operationId: listDatasets
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: page_size
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+        - name: dataset_type
+          in: query
+          schema:
+            type: string
+            enum: [image, text, audio, video, tabular, custom]
+        - name: storage_type
+          in: query
+          schema:
+            type: string
+            enum: [fsx, s3, efs]
+        - name: owner_id
+          in: query
+          schema:
+            type: integer
+        - name: visibility
+          in: query
+          schema:
+            type: string
+            enum: [public, private, restricted]
+      responses:
+        '200':
+          description: 成功返回数据集列表
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/DatasetSummary'
+                  total:
+                    type: integer
+                  page:
+                    type: integer
+                  page_size:
+                    type: integer
+
+    post:
+      tags:
+        - Datasets
+      summary: 注册数据集
+      operationId: createDataset
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateDatasetRequest'
+      responses:
+        '201':
+          description: 数据集注册成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DatasetDetail'
+
+  /datasets/{dataset_id}:
+    get:
+      tags:
+        - Datasets
+      summary: 查询数据集详情
+      operationId: getDataset
+      parameters:
+        - name: dataset_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: 成功返回数据集详情
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DatasetDetail'
+
+    patch:
+      tags:
+        - Datasets
+      summary: 更新数据集元数据
+      operationId: updateDataset
+      parameters:
+        - name: dataset_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateDatasetRequest'
+      responses:
+        '200':
+          description: 更新成功
+
+    delete:
+      tags:
+        - Datasets
+      summary: 删除数据集
+      operationId: deleteDataset
+      parameters:
+        - name: dataset_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '204':
+          description: 删除成功
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+
+  schemas:
+    DatasetSummary:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        version:
+          type: string
+        description:
+          type: string
+        storage_type:
+          type: string
+          enum: [fsx, s3, efs]
+        dataset_type:
+          type: string
+          enum: [image, text, audio, video, tabular, custom]
+        total_size_bytes:
+          type: integer
+        file_count:
+          type: integer
+        visibility:
+          type: string
+          enum: [public, private, restricted]
+        owner_username:
+          type: string
+        status:
+          type: string
+          enum: [available, preparing, archived, error]
+        created_at:
+          type: string
+          format: date-time
+
+    DatasetDetail:
+      allOf:
+        - $ref: '#/components/schemas/DatasetSummary'
+        - type: object
+          properties:
+            storage_uri:
+              type: string
+            data_format:
+              type: string
+            tags:
+              type: array
+              items:
+                type: string
+            owner_id:
+              type: integer
+            last_accessed_at:
+              type: string
+              format: date-time
+
+    CreateDatasetRequest:
+      type: object
+      required:
+        - name
+        - storage_type
+        - storage_uri
+        - dataset_type
+      properties:
+        name:
+          type: string
+          minLength: 3
+          maxLength: 128
+        version:
+          type: string
+          default: "v1"
+        description:
+          type: string
+        storage_type:
+          type: string
+          enum: [fsx, s3, efs]
+        storage_uri:
+          type: string
+          format: uri
+          example: "s3://my-bucket/datasets/imagenet"
+        dataset_type:
+          type: string
+          enum: [image, text, audio, video, tabular, custom]
+        data_format:
+          type: string
+          example: "imagenet"
+        tags:
+          type: array
+          items:
+            type: string
+          example: ["cv", "classification"]
+        visibility:
+          type: string
+          enum: [public, private, restricted]
+          default: private
+
+    UpdateDatasetRequest:
+      type: object
+      properties:
+        description:
+          type: string
+        tags:
+          type: array
+          items:
+            type: string
+        visibility:
+          type: string
+          enum: [public, private, restricted]

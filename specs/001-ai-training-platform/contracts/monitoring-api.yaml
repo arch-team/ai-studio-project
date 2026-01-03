@@ -1,0 +1,155 @@
+openapi: 3.0.3
+info:
+  title: Monitoring API
+  version: 1.0.0
+  description: |
+    监控与可观测性 API,集成 Prometheus + Grafana。
+
+    **数据源**:
+    - Amazon Managed Prometheus (系统指标)
+    - OpenTelemetry (自定义训练指标)
+    - CloudWatch Logs (训练日志)
+
+servers:
+  - url: https://api.ai-training-platform.example.com/v1
+  - url: http://localhost:8000/v1
+
+tags:
+  - name: Cluster Monitoring
+  - name: Job Monitoring
+
+security:
+  - BearerAuth: []
+
+paths:
+  /monitoring/clusters/{cluster_name}/metrics:
+    get:
+      tags:
+        - Cluster Monitoring
+      summary: 查询集群监控指标
+      parameters:
+        - name: cluster_name
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: metric_names
+          in: query
+          schema:
+            type: string
+            example: "DCGM_FI_DEV_GPU_UTIL,node_cpu_seconds_total"
+        - name: start_time
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - name: end_time
+          in: query
+          schema:
+            type: string
+            format: date-time
+      responses:
+        '200':
+          description: 成功返回集群指标
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  metrics:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        metric_name:
+                          type: string
+                        data_points:
+                          type: array
+                          items:
+                            type: object
+                            properties:
+                              timestamp:
+                                type: string
+                                format: date-time
+                              value:
+                                type: number
+
+  /monitoring/jobs/{job_id}/gpu-utilization:
+    get:
+      tags:
+        - Job Monitoring
+      summary: 查询训练任务 GPU 利用率
+      parameters:
+        - name: job_id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: start_time
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - name: end_time
+          in: query
+          schema:
+            type: string
+            format: date-time
+      responses:
+        '200':
+          description: 成功返回 GPU 利用率数据
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  gpu_utilization:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        timestamp:
+                          type: string
+                          format: date-time
+                        pod_name:
+                          type: string
+                        gpu_id:
+                          type: integer
+                        utilization_percent:
+                          type: number
+                        memory_used_mb:
+                          type: number
+
+  /monitoring/grafana/dashboards:
+    get:
+      tags:
+        - Cluster Monitoring
+      summary: 获取 Grafana Dashboard 列表
+      responses:
+        '200':
+          description: 成功返回 Dashboard 列表
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  dashboards:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        dashboard_id:
+                          type: string
+                        title:
+                          type: string
+                        url:
+                          type: string
+                          format: uri
+                        description:
+                          type: string
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
