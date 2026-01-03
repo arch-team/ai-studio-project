@@ -455,13 +455,38 @@ training_job_failures_total{failure_category="..."}
   3. 第三选: Kubernetes 生态兼容组件
   4. 避免: 自行实现 HyperPod 已提供的功能
 
-- **Principle I.B (SDK-First)**: 所有与 SageMaker HyperPod 交互的功能实现 MUST 遵循 SDK 选择优先级：
-  1. 首选: `sagemaker-hyperpod` SDK（仅限 Cluster, Training, Inference, Space 功能）
-  2. 次选: AWS 原生 SDK (boto3, AWS SDK for Python)
-  3. 第三选: 成熟的开源 SDK
-  4. 最后: 自行实现
+- **Principle I.B (SDK-First)**: 尽可能使用 SDK 简化代码实现，避免重复造轮子。所有功能实现 MUST 按照以下决策流程选择实现方式：
+
+  **1. 优先使用官方 SDK** (如果 SDK 支持该功能)
+  - **HyperPod 功能** → 使用 `sagemaker-hyperpod` SDK（仅适用于 Cluster, Training, Inference, Space 四大功能模块）
+  - **AWS 服务集成** (S3, SQS, SNS, CloudWatch, IAM 等) → 使用 boto3 或其他 AWS SDK
+  - **Kubernetes 原生操作** → 使用 kubernetes-client
+
+  **2. 次选成熟的开源库** (如果官方 SDK 不支持)
+  - 社区广泛使用且维护活跃的库
+
+  **3. 最后自行实现** (仅在以上方式均无法满足需求时)
+  - MUST 提交例外申请并获得平台治理委员会批准
+
+  **sagemaker-hyperpod SDK 适用范围**:
+
+  | 功能模块 | 适用场景 | SDK 模块 |
+  |---------|---------|---------|
+  | **Cluster Management** | 集群连接、配置、监控、生命周期管理 | `sagemaker.hyperpod.cluster` |
+  | **Training** | 训练任务提交、状态监控、生命周期管理 | `sagemaker.hyperpod.training` |
+  | **Inference** | 模型端点创建、扩缩容、健康检查 | `sagemaker.hyperpod.inference` |
+  | **Space** | JupyterLab/VS Code IDE 的创建和管理 | `sagemaker.hyperpod.space` |
+
+  **实施要求**:
+  - 开发 HyperPod 相关功能前 MUST 首先查阅 `sagemaker-hyperpod` SDK 文档确认是否支持
+  - 开发 AWS 服务集成功能前 MUST 首先查阅 boto3 或相关 AWS SDK 文档
+  - 代码审查 MUST 验证 SDK 选择的合理性（按功能域选择合适的 SDK）
+  - 如需绕过 SDK 直接使用底层 API,MUST 在 PR 中说明理由
+  - 平台 API 设计 SHOULD 与相关 SDK 保持一致的抽象层级和术语
 
 - **Principle XI (UI/UX Consistency)**: 所有前端实现 MUST 使用 AWS Cloudscape Design System
+
+- **Principle IX (测试策略与质量保证)**: 所有核心功能 MUST 具备全面的自动化测试覆盖，遵循测试金字塔策略。详细测试覆盖率要求参见 Success Criteria SC-011~SC-014
 
 详细的组件选择和实现约束请参考各功能需求 (FR) 的具体说明。
 
@@ -476,51 +501,90 @@ training_job_failures_total{failure_category="..."}
   - 📋 **说明**: 每种训练模式对资源的要求和适用场景详见技术规格文档
   - 🔒 **技术约束**: (1)DataParallel 与 DDP 互斥，不能同时使用 (2)FSDP 与 DeepSpeed ZeRO 互斥，不能同时使用 (3)DDP 可以与 FSDP 组合使用（数据并行+模型分片） (4)DataParallel 仅适用于单机多卡场景，不支持与其他技术组合
   - 🎯 **选型建议**: 单机多卡推荐 DataParallel 或 DDP；多节点训练推荐 DDP；超大模型（>10B参数）推荐 FSDP 或 DeepSpeed ZeRO
-  - 🔧 **实施约束**: MUST 使用 `sagemaker-hyperpod` SDK 的训练任务提交 API 实现，避免直接操作 Kubernetes API
+  - 🔧 **实施约束**: MUST 使用 `sagemaker-hyperpod.training` 模块的训练任务提交 API 实现（该模块专门用于训练任务的提交、状态监控和生命周期管理）。
+    具体方法参考: `sagemaker.hyperpod.training.submit_training_job()`
+    如该模块不支持特定训练模式（DataParallel/DDP/FSDP/DeepSpeed ZeRO）或需要更细粒度控制,
+    MAY 使用 boto3（SageMaker API）或 kubernetes-client（直接操作 PyTorchJob CRD）作为备选方案
 - **FR-002**: 系统必须提供训练任务队列管理，包括任务提交、调度、暂停、恢复和终止功能
-  - 🔧 **实施约束**: MUST 使用 `sagemaker-hyperpod` SDK 进行训练任务生命周期管理（创建、监控、暂停、恢复、终止）
+  - 🔧 **实施约束**: MUST 使用 `sagemaker-hyperpod.training` 模块进行训练任务生命周期管理。
+    具体操作包括：创建任务（submit_training_job）、监控状态（get_training_job_status）、暂停任务（pause_training_job）、恢复任务（resume_training_job）、终止任务（stop_training_job）。
+    如该模块不支持特定生命周期操作,MAY 使用 boto3（SageMaker API）或 kubernetes-client（操作 PyTorchJob CRD）作为备选方案
 - **FR-003**: 系统必须实现Gang Scheduling（组调度）机制，确保分布式训练任务的所有Pod在同一调度周期内被调度(时间窗口≤60秒)，所有Pod必须同时就绪后才能开始训练。具体实现机制采用HyperPod Training Operator的默认Gang Scheduling行为：
-  - ⏱️ **调度窗口**: 所有Pod必须在60秒内达到就绪状态（基于HyperPod Training Operator默认配置）
+  - ⏱️ **调度窗口**: 所有Pod必须在60秒内达到就绪状态（基于HyperPod Training Operator默认配置，具体值以 AWS 官方文档为准）
   - 🔄 **失败处理**: 若超时或部分Pod调度失败，任务状态转为Failed，已创建的Pod自动清理
   - 🔁 **重试机制**: 遵循HyperPod Training Operator的默认重试策略（具体配置参考HyperPod官方文档）
   - 📊 **状态转换**: Pending → Scheduling → Running（全部就绪）或 Failed（超时/失败）
   - 📚 **参考文档**: [AWS SageMaker HyperPod Training Operator Documentation](https://docs.aws.amazon.com/sagemaker/latest/dg/hyperpod-training-operator.html)
-  - 🔧 **实施约束**: MUST 使用 HyperPod Training Operator 的原生 Gang Scheduling 能力，通过 `sagemaker-hyperpod` SDK 配置训练任务以启用组调度
-- **FR-004**: 系统必须支持基于优先级的抢占式调度，采用三级优先级体系(高/中/低)，高优先级任务可以抢占中低优先级任务的资源，中优先级任务可以抢占低优先级任务的资源，并在抢占前根据FR-010自动创建检查点保存训练状态。抢占时序保证：(1)抢占信号发出后,系统等待检查点创建完成后才释放资源 (2)检查点创建超时(默认5分钟)后强制抢占,记录警告日志 (3)强制抢占时保留上一个有效检查点,确保可恢复。优先级机制：(1)完全采用SageMaker HyperPod Task Governance原生优先级规则 (2)三级优先级映射到HyperPod的critical/high/medium级别 (3)同级任务排序依照HyperPod默认策略(基于提交时间和资源需求) (4)抢占规则遵循HyperPod原生行为,包括冷却期和最大抢占次数限制
-  - 🔧 **实施约束**: MUST 使用 HyperPod Task Governance (Kueue) 的原生抢占机制，通过 `sagemaker-hyperpod` SDK 配置任务优先级和抢占策略
+  - 🔧 **实施约束**: MUST 使用 HyperPod Training Operator 的原生 Gang Scheduling 能力。
+    通过 `sagemaker-hyperpod.training` 模块提交训练任务时，Gang Scheduling 默认启用（无需额外配置）。
+    如需自定义 Gang Scheduling 参数（如超时时间），MAY 在训练任务配置中指定相关参数，或使用 kubernetes-client 直接配置 PyTorchJob CRD
+- **FR-004**: 系统必须支持基于优先级的抢占式调度，采用三级优先级体系(高/中/低)，高优先级任务可以抢占中低优先级任务的资源，中优先级任务可以抢占低优先级任务的资源，并在抢占前根据FR-010自动创建检查点保存训练状态。抢占时序保证：(1)抢占信号发出后,系统等待检查点创建完成后才释放资源 (2)检查点创建超时(默认5分钟)后强制抢占,记录警告日志 (3)强制抢占时保留上一个有效检查点,确保可恢复。优先级机制：(1)**完全采用SageMaker HyperPod Task Governance (基于 Kueue) 原生优先级规则** (2)三级优先级映射到HyperPod的critical/high/medium级别 (3)同级任务排序依照HyperPod默认策略(基于提交时间和资源需求) (4)抢占规则遵循HyperPod原生行为,包括冷却期和最大抢占次数限制
+  - 🔧 **实施约束**: MUST 使用 HyperPod Task Governance (Kueue) 的原生抢占机制。
+    任务优先级配置：通过 `sagemaker-hyperpod.training` 模块提交训练任务时，在任务配置中指定优先级参数（high/medium/low）。
+    抢占状态监控：底层 Kueue Workload 状态驱动抢占流程（详见 Training Job State Model 章节），通过 `get_training_job_status()` 方法获取抢占状态。
+    如需细粒度配置（如自定义抢占策略、冷却期参数），MAY 使用 kubernetes-client 直接配置 Kueue ClusterQueue 和 PriorityClass 资源
 - **FR-005**: 系统必须提供大文件数据集的上传功能，支持断点续传和数据完整性校验
 - **FR-006**: 系统必须实现数据集的版本控制功能，支持版本创建、标记和比较（版本比较包括文件列表差异、元数据对比和统计指标变化）
 - **FR-007**: 系统必须提供训练任务级的实时监控功能，监控指标包括：(1)训练进度指标-Loss、Accuracy、Epoch/Step进度、学习率(Learning Rate) (2)资源利用率指标-GPU利用率、GPU显存使用率、CPU利用率、内存使用率 (3)性能指标-训练吞吐量(samples/sec)、迭代耗时 (4)可选高级指标-梯度范数(用户可选开启)。性能要求：训练指标刷新间隔≤30秒、日志流延迟<10秒、监控数据查询响应时间P99<2秒
-  - 🔧 **实施约束**: MUST 使用 HyperPod Observability Add-on (Prometheus + Grafana) 进行指标采集和可视化，通过 Prometheus API 或 AWS SDK (boto3) 查询监控指标
+  - 🔧 **实施约束**: MUST 使用 HyperPod Observability Add-on (Prometheus + Grafana) 进行指标采集和可视化。
+    监控指标获取方式（按功能域选择）：
+    1. **训练任务状态监控**：使用 `sagemaker-hyperpod.training.get_training_job_status()` 获取任务状态和基本进度信息
+    2. **资源利用率指标**：使用 boto3 调用 CloudWatch Metrics API 获取 GPU/CPU/内存利用率，或直接查询 Prometheus API
+    3. **自定义训练指标**（Loss/Accuracy等）：由训练代码通过 MLflow 或 Prometheus Client 上报，使用 boto3 查询 CloudWatch 或直接查询 Prometheus API
+    4. **日志流**：使用 boto3 调用 CloudWatch Logs API 获取实时日志
+    如需统一监控查询接口，MAY 使用 prometheus-client 或 grafana-api 等开源 SDK
 - **FR-008**: 系统必须实现多租户隔离，支持按部门/项目分配资源配额
 - **FR-009**: 系统必须提供资源使用统计和成本分析功能，支持按时间、项目和用户维度的数据查询，采用按分钟计费粒度进行成本核算，确保精确的资源使用成本追踪
 - **FR-010**: 系统必须实现自动检查点创建和断点续训功能，在以下场景自动触发检查点创建：(1)训练中断 (2)节点故障 (3)资源抢占 (4)用户手动触发 (5)定期自动创建(默认间隔10-15分钟)，确保训练状态可恢复且故障时平均损失训练进度不超过7.5分钟。系统依赖 HyperPod 的 Auto-Resume 机制和 Health Check Agent 实现节点故障自动检测和训练任务自动恢复
-  - 🔧 **实施约束**: MUST 使用 HyperPod Elastic Agent 的检查点管理能力和 Auto-Resume 机制，通过 `sagemaker-hyperpod` SDK 配置检查点策略和恢复机制
+  - 🔧 **实施约束**: MUST 使用 HyperPod Elastic Agent 的检查点管理能力和 Auto-Resume 机制。
+    实施方式（按功能域选择）：
+    1. **训练任务检查点配置**：通过 `sagemaker-hyperpod.training` 模块提交训练任务时，在任务配置中指定检查点参数（检查点间隔、存储路径、恢复策略等）
+    2. **集群级检查点策略**：使用 boto3 配置 HyperPod Cluster 的 Auto-Resume 参数和检查点存储配置
+    3. **细粒度检查点控制**：如需自定义检查点触发逻辑或存储策略，MAY 使用 kubernetes-client 配置 PyTorchJob CRD 的检查点相关参数
+    4. **手动触发检查点**：通过 `sagemaker-hyperpod.training.create_checkpoint()` 方法手动创建检查点
 - **FR-011**: 系统必须实现分层检查点存储策略，采用三层存储架构(NVMe本地存储→FSx for Lustre→S3)，根据检查点创建时间自动分层，优化长时间训练的检查点写入性能和存储成本。实现细节:(1) 热检查点(创建时间最近的3个)保留在NVMe本地存储,提供最快访问 (2) 温检查点(创建时间第4-10个)自动迁移到FSx for Lustre (3) 冷检查点(创建序号>10个或创建时间超过72小时)自动归档到S3 (4) 迁移在训练任务空闲时段(检查点间隔期)异步执行 (5) S3保留最近30天的检查点,超期自动清理 (6) **存储满载处理**:当NVMe/FSx存储使用率>90%时触发紧急迁移至下一层,若所有层均满载则告警并暂停新检查点创建(保留最近1个) (7) **迁移失败回退**:迁移失败时保留原位置检查点,记录失败日志,下次迁移周期重试(最多3次),持续失败则触发告警 (8) **检查点完整性保护**:创建时计算SHA-256校验和,恢复前验证完整性,若损坏则自动尝试上一个有效检查点并告警
 - **FR-012**: 系统必须提供JupyterLab/VS Code在线开发环境，支持GPU直连 (通过 Amazon SageMaker Spaces Add-on 实现)
-  - 🔧 **实施约束**: MUST 使用 Amazon SageMaker Spaces Add-on 提供在线开发环境，通过 `sagemaker-hyperpod` SDK 管理 Spaces 的创建、配置和生命周期
-- **FR-024**: 系统所有前端界面必须采用 AWS Cloudscape Design System 实现，确保UI组件、交互模式和视觉风格的一致性。具体要求包括：(1)使用Cloudscape组件库的标准组件(Button、Table、Form、Modal等) (2)遵循Cloudscape的设计模式和交互规范 (3)使用Cloudscape提供的主题和样式系统 (4)确保所有界面符合WCAG 2.1 AA级无障碍标准
-  - 🔧 **实施约束**: MUST 使用 AWS Cloudscape Design System (@cloudscape-design/components) 作为唯一的 UI 组件库，禁止使用其他UI框架(如Material-UI、Ant Design等)
+  - 🔧 **实施约束**: MUST 使用 Amazon SageMaker Spaces Add-on 提供在线开发环境。
+    Space 管理（Space 是 `sagemaker-hyperpod` SDK 的四大功能模块之一）：
+    1. **Space 生命周期管理**：使用 `sagemaker-hyperpod.space` 模块进行 Space 的创建、配置和生命周期管理
+    2. **具体方法**：`create_space()`、`delete_space()`、`get_space_details()`、`update_space_settings()` 等
+    3. **备选方案**：如 `sagemaker-hyperpod.space` 模块不支持特定 Space 配置（如自定义镜像、资源配额），MAY 使用 boto3 调用 SageMaker Spaces API
+- **FR-024**: 系统所有前端界面必须采用 AWS Cloudscape Design System 实现，确保UI组件、交互模式和视觉风格的一致性
+  - 🔧 **实施约束**: MUST 遵循 Principle XI (UI/UX Consistency) 的完整要求,
+    包括使用 AWS Cloudscape Design System 作为唯一 UI 组件库、遵循 AWS Console
+    设计语言和交互模式、确保 WCAG 2.1 AA 无障碍标准等。详细要求参见
+    constitution.md 中的 Principle XI 章节
 - **FR-025**: 系统基础设施和配置管理必须采用 GitOps 工作流，所有基础设施配置（Kubernetes manifests、Terraform 配置）和应用配置通过 Git 仓库管理，配置变更通过 Pull Request 审核后自动部署。系统必须使用声明式配置方式，支持配置版本控制、变更审计和自动化部署
   - 🔧 **实施约束**: MUST 使用 GitOps 工具（如 ArgoCD 或 Flux）实现配置自动同步和部署，所有配置文件必须存储在 Git 仓库中并通过 CI/CD 流程验证
 - **FR-013**: 系统必须支持模型版本管理，包括模型存储、标记和比较功能
-  - 🔧 **实施约束**: MUST 使用 SageMaker Model Registry 进行模型版本控制和治理，通过 AWS SDK (boto3) 或 `sagemaker-hyperpod` SDK 集成进行模型注册和管理
+  - 🔧 **实施约束**: MUST 使用 SageMaker Model Registry 进行模型版本控制和治理。
+    **注意**：Model Registry 不在 `sagemaker-hyperpod` SDK 的适用范围内（该 SDK 仅适用于 Cluster/Training/Inference/Space 四大功能模块）。
+    实施方式（按功能域选择 AWS 服务集成 SDK）：
+    1. **首选**：使用 boto3 调用 SageMaker Model Registry API（`register_model`、`create_model_package`、`update_model_package` 等）
+    2. **次选**：如需更高层抽象，MAY 使用 `sagemaker` Python SDK（`ModelPackage` 类）
+    3. **备选**：如有特殊集成需求，MAY 使用其他成熟的开源 SDK
 - **FR-014**: 系统必须提供全链路日志收集和查询功能。日志来源：(1)容器stdout/stderr (2)训练框架日志(PyTorch等) (3)系统事件日志(Pod生命周期、调度事件)。日志格式：JSON结构化格式,包含timestamp、level、job_id、pod_name、message字段。性能要求：日志保留期30天、查询响应时间P99<3秒、支持全文检索。敏感信息处理：由用户在训练代码中自行处理,系统不做自动脱敏
 - **FR-015**: 系统必须实现完整的用户认证和权限控制，支持企业SSO(SAML/OIDC)集成与企业身份系统对接，同时提供本地账号作为备用认证方式，确保在SSO服务不可用时系统仍可正常运行。访问控制必须实现基于角色的访问控制（RBAC），遵循最小权限原则，确保用户仅能访问其职责范围内的资源和操作
 - **FR-016**: 系统必须提供集群级资源使用监控仪表盘和告警功能，包括节点健康、GPU利用率和内存/网络利用率。节点健康监控依赖 HyperPod 的 Health Check Agent 进行自动健康检查和故障检测，支持 Deep Health Check 进行深度硬件和软件层面的健康验证
-  - 🔧 **实施约束**: MUST 使用 HyperPod Observability Add-on (Prometheus + Grafana) 和 Amazon Managed Grafana 进行集群监控和可视化，通过 Prometheus API 或 AWS SDK (boto3) 查询集群级指标。节点健康状态由 HyperPod Health Check Agent 提供
+  - 🔧 **实施约束**: MUST 使用 HyperPod Observability Add-on (Prometheus + Grafana) 和 Amazon Managed Grafana 进行集群监控和可视化。
+    监控数据获取方式（按功能域选择）：
+    1. **集群状态和节点健康**：使用 `sagemaker-hyperpod.cluster` 模块查询集群整体状态和节点健康状态（由 Health Check Agent 提供）
+    2. **资源利用率指标**（GPU/CPU/内存/网络）：使用 boto3 调用 CloudWatch Metrics API 或 EKS API 获取集群级资源指标
+    3. **自定义监控查询**：直接查询 Prometheus API 或使用 prometheus-client 等开源 SDK
+    4. **可视化仪表盘**：使用 Amazon Managed Grafana 或通过 grafana-api 自定义仪表盘
 - **FR-017**: 系统必须实现100%关键操作的审计日志记录，审计日志保留期≥90天，记录内容包括用户身份、操作时间、操作类型、操作对象和操作结果
 - **FR-018**: 系统必须支持数据加密，包括静态数据加密（使用 S3 SSE-KMS）和传输中加密（所有网络通信使用 TLS 1.2 或更高版本）
 - **FR-019**: 系统必须根据用户角色和项目设置训练任务的默认资源限制，并允许管理员进行调整
 - **FR-020**: 系统必须在训练数据量接近存储系统容量时（剩余空间<10%）发出告警，并支持配置自动扩容或数据分层策略
 - **FR-021**: 系统必须实现网络带宽管理和QoS策略，采用HyperPod默认网络隔离机制(EFA网络优化、Pod级网络命名空间隔离)，确保分布式训练任务间的网络隔离和性能保证。性能目标：网络延迟P99<10ms、带宽利用率>80%。可选扩展：支持用户通过任务配置自定义NetworkPolicy规则。隔离保证：完全依赖HyperPod网络隔离能力，隔离程度以HyperPod官方文档为准，任务间实际性能影响由底层基础设施决定
+  - 🔧 **实施约束**: 网络隔离和QoS配置 MUST 优先依赖 HyperPod EKS 集群的原生 NetworkPolicy 和 EFA 网络拓扑优化，避免自行实现网络管理组件。如需扩展，MAY 通过 Kubernetes NetworkPolicy 进行自定义配置
 - **FR-022**: 系统必须实现训练任务超时和停滞检测机制。检测策略：(1)主检测指标为Loss(默认)或用户指定的单一指标 (2)停滞判定标准为主指标在可配置时间窗口(默认30分钟)内变化率<0.1% (3)其他指标异常仅记录日志供参考,不触发告警 (4)支持用户禁用停滞检测(适用于GAN/RL等Loss震荡的特殊训练场景)。触发后发送告警并提供自动/手动终止选项
 
 ### Key Entities
 
 - **训练任务（TrainingJob）**: 表示一个AI模型训练作业，包含训练配置、资源需求、关联数据集、训练状态和指标数据
 - **数据集（Dataset）**: 表示训练数据集合，包含元数据、版本信息、存储位置和使用权限
-- **资源配额（ResourceQuota）**: 表示分配给特定团队/项目的计算资源限制，包含GPU数量、CPU核心、内存等资源指标和优先级信息(高/中/低三级优先级)
+- **资源配额（ResourceQuota）**: 表示分配给特定团队/项目的计算资源限制，包含GPU数量、CPU核心、内存等资源指标和优先级信息(高/中/低三级优先级，映射到 Kueue 的 PriorityClass: critical/high/medium)
 - **用户（User）**: 系统用户，包含身份信息、所属团队/项目、权限等级和资源使用记录
 - **检查点（Checkpoint）**: 训练过程中保存的模型状态，包含存储位置、创建时间和相关训练指标
 - **模型（Model）**: 训练产出的模型，包含版本信息、性能指标、部署状态和生命周期信息
