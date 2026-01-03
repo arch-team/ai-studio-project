@@ -2,37 +2,37 @@
 ===============================================================================
 SYNC IMPACT REPORT
 ===============================================================================
-Version change: 1.7.4 → 1.7.5 (Current)
-Version bump rationale: PATCH - 重构 SDK 优先级为四级体系,明确 sagemaker-hyperpod SDK → AWS SDK → 开源 SDK → 自行实现的优先顺序
+Version change: 1.7.5 → 1.7.6 (Current)
+Version bump rationale: PATCH - 修正 SDK 优先原则的核心定义,明确原则目的是"避免重复造轮子",正确定位 sagemaker-hyperpod SDK 的适用范围
 
 Modified principles:
   - I.B SDK 优先 (SDK-First)
-    * 重构为四级优先顺序:
-      1. 首选: sagemaker-hyperpod SDK
-      2. 次选: AWS 原生 SDK (boto3 等)
-      3. 第三选: 成熟的开源 SDK
-      4. 最后: 自行实现
-    * 每级增加适用场景说明
-    * 自行实现增加审批要求
-    * 更新实施要求以匹配新优先级体系
+    * 修正核心原则定义: "尽可能使用 SDK 简化代码实现,避免重复造轮子"
+    * 正确定位 sagemaker-hyperpod SDK 为 HyperPod 四大功能模块的专用 SDK (而非泛化的"首选 SDK")
+    * 重构决策流程: 按功能域选择合适的 SDK,而非按 SDK 排列优先级
+    * 新增 sagemaker-hyperpod SDK 适用范围说明 (Cluster, Training, Inference, Space)
+    * 明确不同功能域的 SDK 选择指南
 
 Benefits:
-  - 与 Principle I.A 组件优先级保持格式一致
-  - 明确 SDK 选择的决策路径,减少团队决策困惑
-  - 增强与 AWS 生态的集成灵活性 (boto3, kubernetes-client)
-  - 保持 HyperPod SDK 首选地位,同时为其他场景提供明确指导
+  - 原则目的更加清晰: 核心是避免重复造轮子
+  - 正确反映 sagemaker-hyperpod SDK 的定位: HyperPod 功能专用,非通用首选
+  - 消除团队对 SDK 选择的困惑: 按功能域选择而非按优先级排列
+  - 与官方文档一致: sagemaker-hyperpod SDK 明确支持 Cluster/Training/Inference/Space
 
 Templates requiring updates:
-  ✅ .specify/templates/plan-template.md - 无需更新 (仍引用 Principle I.B)
-  ✅ .specify/templates/spec-template.md - 无需更新 (仍引用 Principle I.B)
-  ✅ .specify/templates/tasks-template.md - 无需更新 (仍引用 Principle I.B)
+  ✅ .specify/templates/plan-template.md - 无需更新 (原则引用不变,描述更准确)
+  ✅ .specify/templates/spec-template.md - 无需更新 (原则引用不变)
+  ✅ .specify/templates/tasks-template.md - 无需更新 (原则引用不变)
 
 Follow-up TODOs:
-  - 无新增 TODO (本次为澄清性修改,不影响现有引用)
+  - 无新增 TODO (本次为修正性澄清,不影响现有引用)
 
 ===============================================================================
 Previous Version History:
 ===============================================================================
+Version 1.7.5 (2026-01-03):
+  - PATCH: 重构 SDK 优先级为四级体系 (后续被 1.7.6 修正)
+
 Version 1.7.4 (2026-01-03):
   - PATCH: 明确原则边界、统一格式和术语、消除交叉引用、添加术语表、补充技术互斥性约束
   - 修正 Principle X 中的 SDK 引用为 "Principle I.B"
@@ -143,34 +143,40 @@ Version 1.7.0 (2026-01-03):
 
 #### B. SDK 优先 (SDK-First)
 
-所有平台功能实现 MUST 按照以下优先级选择 SDK:
+**核心原则**: 尽可能使用 SDK 简化代码实现,避免重复造轮子。
 
-1. **首选**: sagemaker-hyperpod SDK（如果支持该功能）
-   - 集群管理: 集群连接、配置和监控
-   - 训练任务管理: 任务提交、状态监控、生命周期管理 (PyTorch, TensorFlow, MPI 等)
-   - 推理部署: 模型端点创建、扩缩容、健康检查
-   - 开发空间: Spaces 创建、配置和生命周期管理
+所有平台功能实现 MUST 按照以下决策流程选择实现方式:
 
-2. **次选**: AWS 原生 SDK (如 boto3, AWS SDK for Python)
-   - sagemaker-hyperpod SDK 不支持但 AWS 原生 SDK 支持的功能
-   - 与其他 AWS 服务的集成 (S3, SQS, SNS, CloudWatch 等)
-   - IAM 和安全相关操作
+1. **优先使用官方 SDK** (如果 SDK 支持该功能)
+   - **HyperPod 功能** → 使用 `sagemaker-hyperpod` SDK (见下方适用范围)
+   - **AWS 服务集成** (S3, SQS, SNS, CloudWatch, IAM 等) → 使用 boto3 或其他 AWS SDK
+   - **Kubernetes 原生操作** → 使用 kubernetes-client
 
-3. **第三选**: 成熟的开源 SDK
-   - AWS SDK 不支持的 Kubernetes 原生操作 (kubernetes-client)
-   - 标准化接口和跨平台兼容需求
+2. **次选成熟的开源库** (如果官方 SDK 不支持)
    - 社区广泛使用且维护活跃的库
+   - 标准化接口和跨平台兼容需求
 
-4. **最后**: 自行实现
-   - 仅在以上三种方式均无法满足需求时
+3. **最后自行实现** (仅在以上方式均无法满足需求时)
    - MUST 提交例外申请并获得平台治理委员会批准
    - MUST 在代码中明确注释说明自行实现的原因
 
+**sagemaker-hyperpod SDK 适用范围**:
+
+`sagemaker-hyperpod` SDK 是 AWS 官方为 HyperPod 提供的 Python SDK,专门用于以下四大功能模块:
+
+| 功能模块 | 适用场景 | SDK 模块 |
+|---------|---------|---------|
+| **Cluster Management** | 集群连接、配置、监控、生命周期管理 | `sagemaker.hyperpod.cluster` |
+| **Training** | 训练任务提交、状态监控、生命周期管理 (PyTorch, TensorFlow, MPI 等) | `sagemaker.hyperpod.training` |
+| **Inference** | 模型端点创建、扩缩容、健康检查、JumpStart 模型部署 | `sagemaker.hyperpod.inference` |
+| **Space** | JupyterLab/VS Code IDE 的创建、配置和生命周期管理 | `sagemaker.hyperpod.space` |
+
 **实施要求**:
-- 开发新功能前 MUST 首先查阅 `sagemaker-hyperpod` SDK 文档
-- 代码审查 MUST 按照上述优先级验证 SDK 选择的合理性
-- 如需使用低优先级方案,MUST 在 PR 中说明理由和评估替代方案
-- 平台 API 设计 MUST 与 HyperPod SDK 保持一致的抽象层级和术语
+- 开发 HyperPod 相关功能前 MUST 首先查阅 `sagemaker-hyperpod` SDK 文档确认是否支持
+- 开发 AWS 服务集成功能前 MUST 首先查阅 boto3 或相关 AWS SDK 文档
+- 代码审查 MUST 验证 SDK 选择的合理性 (按功能域选择合适的 SDK)
+- 如需绕过 SDK 直接使用底层 API,MUST 在 PR 中说明理由
+- 平台 API 设计 SHOULD 与相关 SDK 保持一致的抽象层级和术语
 
 #### C. 例外处理 (Exception Handling)
 
@@ -740,4 +746,4 @@ SDK和组件可以避免重复造轮子,利用社区智慧,获得持续更新和
 - 代码实现 MUST 优先验证 `sagemaker-hyperpod` SDK 支持
 - UI 实现 MUST 验证使用 Cloudscape 组件,禁止自定义实现
 
-**Version**: 1.7.5 | **Ratified**: 2025-12-23 | **Last Amended**: 2026-01-03
+**Version**: 1.7.6 | **Ratified**: 2025-12-23 | **Last Amended**: 2026-01-03
