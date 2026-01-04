@@ -2,7 +2,7 @@
 
 ## 概述
 
-本文档包含企业级AI训练平台的完整实施任务清单,共计 153 个任务,按用户故事和优先级组织。
+本文档包含企业级AI训练平台的完整实施任务清单,共计 155 个任务,按用户故事和优先级组织。
 
 **技术栈**:
 - 后端: Python 3.11, FastAPI 0.109+, SQLAlchemy 2.0+, Alembic, sagemaker-hyperpod SDK (包含 Space 模块), boto3 (AWS SDK for S3/CloudWatch/IAM 等非 HyperPod 服务)
@@ -16,11 +16,11 @@
 - **P1 (Must-Have)**: US1 训练任务管理, US2 数据集管理, US3 资源配额和集群监控
 - **P2 (Important)**: US4 资源使用报表和成本分析, US5 在线开发环境
 
-**MVP 范围**: Phase 1 (Setup + IaC) + Phase 2 (Foundational) + Phase 3 (US1) + Phase 4 (US2) + Phase 5 (US3) = 100 个任务,提供完整的 P1 核心功能集:项目基础结构、IaC 基础、HyperPod EKS 集群、HyperPod Add-ons (Training Operator/Kueue/Observability/Elastic Agent/Spaces)、FSx for Lustre 高性能存储、基础设施验证测试、HyperPod SDK 方法验证、企业级认证、数据加密、训练任务管理、模型版本控制、数据集管理、资源配额、集群监控和审计日志。
+**MVP 范围**: Phase 1 (Setup + IaC) + Phase 2 (Foundational) + Phase 3 (US1) + Phase 4 (US2) + Phase 5 (US3) = 103 个任务,提供完整的 P1 核心功能集:项目基础结构、IaC 基础、HyperPod EKS 集群（拆分为基础配置/节点组/安全配置 3 个子任务）、HyperPod Add-ons (Training Operator/Kueue/Observability/Elastic Agent/Spaces)、FSx for Lustre 高性能存储、ALB 和 TLS 终止配置、基础设施验证测试、HyperPod SDK 方法验证（提前到 Phase 1 初期执行）及备选方案、企业级认证、数据加密、训练任务管理、模型版本控制、数据集管理、资源配额、集群监控和审计日志。
 
 ---
 
-## Phase 1: Setup - 项目初始化和基础设施即代码 (16 tasks)
+## Phase 1: Setup - 项目初始化和基础设施即代码 (20 tasks)
 
 **目标**: 搭建项目基础结构,配置开发环境,建立 IaC 基础
 
@@ -47,6 +47,25 @@
 
 ### 基础设施即代码 (IaC)
 - [ ] [T008a] AWS CDK 项目结构 - 创建 `infrastructure/cdk/` 目录结构,初始化 CDK Python 项目 (与后端技术栈一致),配置 `cdk.json` 和 `requirements.txt`,定义 Stack 组织结构 (NetworkStack, DatabaseStack, StorageStack, ComputeStack),配置多环境支持 (dev/staging/prod)
+
+### HyperPod SDK 方法验证 (提前验证以降低后续开发风险)
+- [ ] [T008h] [P] HyperPod SDK 方法名验证 - 查阅 `sagemaker-hyperpod` SDK 官方文档,验证并记录正确的方法签名和参数：
+  - **Training 模块**: 训练任务提交、状态查询、暂停/恢复/终止方法的准确方法名和签名
+  - **Space 模块**: Space 创建、删除、查询方法的准确方法名和签名
+  - **Cluster 模块**: 集群状态查询、节点列表方法的准确方法名和签名
+  - **输出**: 生成方法签名参考文档 (`docs/hyperpod-sdk-reference.md`),包含示例代码和参数说明
+  - **风险评估**: 如发现 SDK 方法不可用或签名不符，立即触发 T008h-fallback 任务
+  - **依赖**: T008a (CDK 项目结构 - 提供文档存放位置)
+  - **参考**: [SageMaker HyperPod SDK Documentation](https://sagemaker-hyperpod-cli.readthedocs.io/)
+- [ ] [T008h-fallback] HyperPod SDK 备选方案设计 (条件任务,仅在 T008h 发现 SDK 不可用时执行) - 设计 boto3/kubernetes-client 备选方案:
+  - **触发条件**: T008h 验证发现 SDK 方法不存在、签名不符或功能不完整
+  - **备选方案分析**: 评估 boto3 (SageMaker API) 和 kubernetes-client (直接操作 CRD) 的可行性
+  - **接口设计**: 设计统一的客户端抽象层,支持 SDK/boto3/kubernetes-client 切换
+  - **例外申请流程**: 准备平台治理委员会例外申请文档 (遵循宪章 Principle I.B)
+  - **输出**: SDK 备选方案设计文档 (`docs/hyperpod-sdk-fallback.md`),例外申请模板
+  - **影响评估**: 评估对 Phase 2/3/7 任务的影响范围和返工成本
+  - **依赖**: T008h (SDK 方法验证结果)
+
 - [ ] [T008b] AWS CDK 核心 Stacks - 编写以下基础设施 Stacks:
   - **VPC Stack**:
     - VPC CIDR: 10.0.0.0/16 (65,536 个 IP 地址)
@@ -61,25 +80,36 @@
     - 连接池: 启用 RDS Proxy (连接池大小根据 ACU 自动调整), 空闲连接超时 30 分钟
     - 高可用: 多可用区部署, 故障转移时间 <30 秒
   - **S3 Buckets Stack**: 数据集、模型、检查点存储桶,启用版本控制和生命周期策略
+    - **默认加密配置**: 所有存储桶启用 SSE-KMS 默认加密 (指定 KMS key ID),确保静态数据安全
+    - **加密强制策略**: 配置 Bucket Policy 拒绝未加密上传 (aws:SecureTransport = false 拒绝)
+    - **验证测试**: 验证未加密上传被拒绝,加密上传自动应用 SSE-KMS
   - **IAM Roles Stack**: EKS 节点角色、应用服务角色 (遵循最小权限原则)
 
 ### HyperPod EKS 集群创建
-- [ ] [T008c] [P] HyperPod EKS 集群 Stack - `infrastructure/cdk/stacks/hyperpod_stack.py`,编写 AWS CDK Stack 创建 SageMaker HyperPod with EKS 集群:
+- [ ] [T008c-1] [P] HyperPod EKS 集群基础配置 - `infrastructure/cdk/stacks/hyperpod_stack.py`,创建 SageMaker HyperPod with EKS 集群基础:
   - **EKS 集群配置**: 版本 EKS 1.32+,配置 VPC 和子网关联 (使用 T008b 创建的 VPC)
+  - **EKS Add-ons**: 安装 EBS CSI Driver, FSx CSI Driver, VPC CNI (最新稳定版本)
+  - **输出**: HyperPod 集群 ARN、EKS 集群名称、集群 API Endpoint
+  - **依赖**: T008a (CDK 项目结构), T008b (VPC Stack)
+  - **参考**: plan.md Constraints "Requires AWS SageMaker HyperPod with EKS infrastructure", spec.md FR-001
+- [ ] [T008c-2] [P] GPU 节点组和 Auto Scaling 配置 - `infrastructure/cdk/stacks/hyperpod_stack.py`,创建 GPU 节点组和扩缩容策略:
   - **GPU 节点组**: 创建 GPU 节点组 (p4d.24xlarge, p5.48xlarge, trn1.32xlarge),配置 Auto Scaling Group (最小 2 节点,最大 100 节点)
   - **Auto Scaling 策略**:
     - 扩容触发: Kueue 队列中 Pending Workloads 数量 >0 且持续 5 分钟
     - 缩容触发: 节点 GPU 利用率 <20% 且持续 15 分钟
     - 缩容保护: 运行中训练任务的节点不参与缩容
     - 冷却期: 扩容后 10 分钟内不触发缩容
-  - **EKS Add-ons**: 安装 EBS CSI Driver, FSx CSI Driver, VPC CNI (最新稳定版本)
   - **EFA 网络配置**: 启用 EFA (Elastic Fabric Adapter) 高性能网络,配置网络拓扑优化
+  - **输出**: 节点组 ID、Auto Scaling 策略配置参数、EFA 网络配置
+  - **依赖**: T008c-1 (EKS 集群基础配置)
+  - **参考**: spec.md FR-003/FR-004
+- [ ] [T008c-3] [P] IAM 和安全配置 - `infrastructure/cdk/stacks/hyperpod_stack.py`,配置 IAM 角色和安全策略:
   - **IAM 角色配置**: 创建 EKS 节点角色、Pod IAM 角色、Service Account 映射 (遵循最小权限原则)
   - **安全配置**: 配置 Security Group (训练任务端口、Kubernetes API 端口、EFA 网络端口),配置 RBAC 策略
   - **高可用性配置**: 多可用区部署 (至少 3 个 AZ),控制平面冗余
-  - **输出**: HyperPod 集群 ARN、EKS 集群名称、节点组配置参数
-  - **依赖**: T008a (CDK 项目结构), T008b (VPC Stack)
-  - **参考**: plan.md Constraints "Requires AWS SageMaker HyperPod with EKS infrastructure", spec.md FR-001/FR-003/FR-004
+  - **输出**: IAM 角色 ARN、Security Group ID、RBAC 策略清单
+  - **依赖**: T008c-1 (EKS 集群基础配置)
+  - **参考**: spec.md FR-001 (安全要求)
 
 ### HyperPod Add-ons 安装
 - [ ] [T008d] [P] HyperPod Add-ons 配置 - `infrastructure/k8s/hyperpod-addons/`,安装和配置 HyperPod 核心组件:
@@ -90,7 +120,7 @@
   - **Elastic Agent**: 配置 HyperPod Elastic Agent,设置检查点管理参数 (默认 10-15 分钟间隔),配置 Auto-Resume 策略 (节点故障自动恢复),配置节点故障检测阈值 (PodsReady=False 持续 >30 秒)。Deep Health Check 完全遵循 HyperPod Health Check Agent 原生能力 (GPU/EFA/存储健康检测),参见 [HyperPod Health Checks Documentation](https://docs.aws.amazon.com/sagemaker/latest/dg/sagemaker-hyperpod-operate-health-checks.html)
   - **Spaces Add-on**: 安装 Amazon SageMaker Spaces Add-on,配置 JupyterLab 和 VS Code IDE 镜像 (Data Science, PyTorch, TensorFlow),配置 EFS 持久化存储挂载,配置自动保存间隔 (JupyterLab 120 秒, VS Code 1 秒)
   - **验证测试**: 验证所有 Add-ons Pod 状态为 Running,验证 Kueue ClusterQueue 就绪,验证 Prometheus 可查询指标 (up, node_cpu_seconds_total),验证 Training Operator Webhook 响应 (curl localhost:9443/healthz)
-  - **依赖**: T008c (HyperPod EKS 集群)
+  - **依赖**: T008c-1, T008c-2, T008c-3 (HyperPod EKS 集群完整配置)
   - **参考**: spec.md FR-001 (Training Operator), FR-004 (Kueue), FR-007/FR-016 (Observability), FR-010/FR-011 (Elastic Agent), FR-012/SC-015 (Spaces)
 
 ### FSx for Lustre 文件系统创建
@@ -99,12 +129,12 @@
   - **容量规划**: 初始容量 ≥10 TiB (支持 spec.md FR-007 ≥10TB 数据集需求),启用自动扩容策略 (使用率 >80% 触发扩容),最大容量 100 TiB
   - **S3 集成**: 配置 S3 Data Repository Association,链接训练数据 S3 存储桶 (T008b 创建),启用自动导入/导出 (ImportPath, ExportPath),配置 AutoImportPolicy (NEW/CHANGED/DELETED 事件自动同步)
   - **网络配置**: 部署到 T008b 创建的 VPC 私有子网,配置安全组 (允许 EKS 节点访问 FSx 端口 988, 1021-1023),启用 VPC 内 DNS 解析
-  - **FSx CSI Driver**: 安装 AWS FSx CSI Driver 到 EKS 集群 (依赖 T008c),创建 StorageClass (provisioner: fsx.csi.aws.com, parameters: dnsname/mountname),配置 PersistentVolume 自动创建
+  - **FSx CSI Driver**: 使用 T008c-1 中已安装的 AWS FSx CSI Driver,创建 StorageClass (provisioner: fsx.csi.aws.com, parameters: dnsname/mountname),配置 PersistentVolume 自动创建
   - **挂载点配置**: 配置 DNS 名称和挂载路径 (/fsx),生成 PersistentVolume YAML 模板供训练任务使用,配置 lustre client 内核模块
   - **性能验证**: 使用 fio 工具验证单客户端顺序读写吞吐量 ≥5GB/s,验证多客户端聚合带宽,确认满足 SC-005 性能目标 (S3 到 FSx 同步 1TB 数据 <10 分钟)
   - **生命周期策略**: 配置每日自动备份到 S3 (备份保留期 7 天),配置数据同步调度 (每小时增量同步到 S3),设置存储容量告警 (使用率 >80%)
   - **输出**: FSx 文件系统 ID、DNS 名称、挂载路径、StorageClass 名称
-  - **依赖**: T008a (CDK 项目结构), T008b (VPC Stack, S3 Buckets Stack), T008c (EKS 集群用于安装 CSI Driver)
+  - **依赖**: T008a (CDK 项目结构), T008b (VPC Stack, S3 Buckets Stack), T008c-1 (EKS 集群 - 包含 FSx CSI Driver), T008c-2 (GPU 节点组), T008c-3 (IAM 和安全配置), T008d (HyperPod Add-ons - 确保完整环境就绪)
   - **参考**: spec.md Technical Context "FSx for Lustre (训练数据), ≥5GB/s 吞吐量", FR-007 "支持 ≥10TB 数据集", SC-005 "S3 到 FSx 同步时间 <10分钟 (1TB 数据集)"
 - [ ] [T008f] Kubernetes NetworkPolicy 和 QoS 配置 - `infrastructure/k8s/network-policies/`,配置 HyperPod EKS 集群网络隔离和 QoS 策略:
   - **Pod 级网络隔离**: 使用 Kubernetes NetworkPolicy 实现训练任务 Pod 间的网络命名空间隔离
@@ -115,7 +145,19 @@
   - **EFA 网络亲和性**: 配置 nodeSelector 和 tolerations 确保 EFA 网络拓扑优化生效
   - **监控和告警**: 集成 Prometheus NetworkPolicy Exporter 监控网络策略生效状态和连接拒绝事件
   - **性能验证**: 验证网络延迟 P99 <10ms,带宽利用率 >80% 性能目标
-  - **参考**: spec.md FR-021 网络带宽管理和 QoS 策略 (依赖 T008c HyperPod EKS 集群, T008d HyperPod Add-ons)
+  - **参考**: spec.md FR-021 网络带宽管理和 QoS 策略 (依赖 T008c-1/T008c-2/T008c-3 HyperPod EKS 集群, T008d HyperPod Add-ons)
+
+### ALB 和 TLS 配置
+- [ ] [T008i] [P] ALB Ingress 和 TLS 终止配置 - `infrastructure/cdk/stacks/alb_stack.py`,创建 Application Load Balancer Stack:
+  - **ALB 配置**: 创建面向互联网的 ALB,部署到 T008b 创建的公有子网,配置健康检查和目标组
+  - **TLS 终止**: 配置 HTTPS 监听器 (端口 443),绑定 AWS Certificate Manager (ACM) 证书,强制 TLS 1.2+ (禁用 TLS 1.0/1.1)
+  - **HTTPS 重定向**: 配置 HTTP (端口 80) 到 HTTPS (端口 443) 自动重定向
+  - **安全策略**: 使用 AWS 推荐的安全策略 (ELBSecurityPolicy-TLS-1-2-2017-01 或更新版本)
+  - **WAF 集成**: 可选配置 AWS WAF (Web Application Firewall) 防护
+  - **Kubernetes Ingress**: 创建 K8s Ingress 资源,配置 AWS Load Balancer Controller 注解,关联 ALB 和后端服务
+  - **输出**: ALB DNS 名称、ACM 证书 ARN、Ingress 配置文件路径
+  - **依赖**: T008a (CDK 项目结构), T008b (VPC Stack), T008c-1 (EKS 集群)
+  - **参考**: spec.md FR-018 传输层加密要求, AWS ALB TLS 最佳实践
 
 ### 基础设施验证测试
 - [ ] [T008g] [P] HyperPod 基础设施验证测试 - 执行综合验证套件,确保基础设施就绪:
@@ -129,23 +171,21 @@
     - Spaces Add-on: 验证 Spaces CRD 注册, 检查 Spaces Controller Pod 状态
   - **FSx 存储验证**: 创建测试 PersistentVolumeClaim, 挂载到测试 Pod, 执行读写性能测试 (dd 命令), 验证 S3 Data Repository Association 同步
   - **网络连通性测试**: 验证 Pod 到 Internet 连通性 (curl https://aws.amazon.com), 验证 Pod 到 S3/CloudWatch PrivateLink 连通性, 验证 EFA 网络接口可用
+  - **TLS/HTTPS 验证**: 验证 ALB HTTPS 端点可访问 (curl https://<alb-dns>), 验证 TLS 版本 ≥1.2 (openssl s_client), 验证 HTTP 自动重定向到 HTTPS, 验证 ACM 证书有效性
   - **输出**: 生成验证报告 (infrastructure-validation-report.md), 包含所有测试结果、失败项诊断建议、关键配置参数快照
-  - **依赖**: T008c (EKS 集群), T008d (Add-ons), T008e (FSx), T008f (NetworkPolicy)
+  - **依赖**: T008c-1, T008c-2, T008c-3 (EKS 集群完整配置), T008d (Add-ons), T008e (FSx), T008f (NetworkPolicy), T008i (ALB 和 TLS)
   - **参考**: aws-infrastructure.md CHK-TASK-019/020/021
 
-### HyperPod SDK 方法验证
-- [ ] [T008h] [P] HyperPod SDK 方法名验证 - 查阅 `sagemaker-hyperpod` SDK 官方文档,验证并记录正确的方法签名和参数：
-  - **Training 模块**: 训练任务提交、状态查询、暂停/恢复/终止方法的准确方法名和签名
-  - **Space 模块**: Space 创建、删除、查询方法的准确方法名和签名
-  - **Cluster 模块**: 集群状态查询、节点列表方法的准确方法名和签名
-  - **输出**: 生成方法签名参考文档 (`docs/hyperpod-sdk-reference.md`),包含示例代码和参数说明
-  - **参考**: [SageMaker HyperPod SDK Documentation](https://sagemaker-hyperpod-cli.readthedocs.io/)
-
-**并行执行机会**: T001, T002, T004, T005, T007 可并行执行,T003/T006/T008 依赖前者完成,T008a → T008b → T008c → T008d → T008e (串行,FSx CSI Driver 依赖 Add-ons) → T008f/T008h (可并行) → T008g (串行,验证所有基础设施) 串行。
+**并行执行机会**:
+- T001 (backend 结构) 和 T002 (frontend 结构) 可并行
+- T001 完成后 → T004, T007 可并行
+- T002 完成后 → T005 可开始
+- T003, T006, T008 依赖 T001/T002 完成
+- T008a → T008h (SDK 方法验证,提前执行) → {T008h-fallback (条件任务), T008b} → T008c-1 → {T008c-2, T008c-3} 可并行 → T008d → T008e → T008f (NetworkPolicy) → T008i (ALB 和 TLS) → T008g (串行,验证所有基础设施)
 
 ---
 
-## Phase 2: Foundational - 基础设施 (22 tasks)
+## Phase 2: Foundational - 基础设施 (20 tasks)
 
 **目标**: 创建核心数据模型、企业级认证系统、审计日志基础设施、客户端封装和安全配置
 
@@ -180,12 +220,10 @@
 
 ### AWS 客户端封装
 - [ ] [T014] [P] HyperPod SDK 客户端封装 - `backend/src/clients/hyperpod_client.py`,封装 HyperPod Training 模块 API,使用 T008h 验证的方法名实现训练任务生命周期管理 (提交、状态查询、暂停/恢复/终止),参考 `docs/hyperpod-sdk-reference.md` 获取准确的方法签名 (依赖 T008h)
-- [ ] [T015] [P] S3 客户端封装 - `backend/src/clients/s3_client.py`,封装 boto3 S3 操作 (upload_file, download_file, list_objects),支持 presigned URLs
-- [ ] [T015a] S3 加密配置 - `backend/src/clients/s3_client.py`,配置所有 S3 上传使用 SSE-KMS 加密,指定 KMS key ID,验证加密状态,确保静态数据安全
+- [ ] [T015] [P] S3 客户端封装 - `backend/src/clients/s3_client.py`,封装 boto3 S3 操作 (upload_file, download_file, list_objects),支持 presigned URLs,继承 T008b 配置的 SSE-KMS 默认加密
 
 ### FastAPI 应用配置
-- [ ] [T016] 配置 FastAPI 应用入口 - `backend/src/main.py`,注册路由,配置 CORS,集成认证中间件,配置 OpenAPI docs
-- [ ] [T016a] TLS 1.2+ 配置 - `backend/src/main.py`,配置 FastAPI 强制使用 TLS 1.2+,禁用旧版 SSL/TLS,配置 HTTPS 重定向,确保传输层安全
+- [ ] [T016] 配置 FastAPI 应用入口 - `backend/src/main.py`,注册路由,配置 CORS,集成认证中间件,配置 OpenAPI docs (TLS 终止由 T008i ALB 处理,应用无需配置 HTTPS)
 - [ ] [T016b] 审计日志中间件 - `backend/src/middleware/audit.py`,拦截所有 API 请求,自动记录操作日志 (user_id, operation_type, resource_type, request/response data),异步写入数据库,确保审计完整性
 
 ### 前端基础配置
@@ -195,10 +233,10 @@
 - [ ] [T020] [P] 配置 TanStack Query - `frontend/src/lib/queryClient.ts`,配置全局 query client,设置重试策略和缓存策略
 
 **并行执行机会**:
-- 数据库迁移: T009, T010, T010b, T010a 可并行
-- SQLAlchemy 模型: T011, T012, T012b, T012a 可并行 (依赖 T009, T010, T010b, T010a)
-- 认证系统: T013 → T013a, T013b, T013c (可并行) → T016 → T016a → T016b (依赖 T012a)
-- 客户端封装: T014, T015 可并行 → T015a (依赖 T015)
+- 数据库迁移: T009 → T010 → T010b → T010a 串行执行 (确保 Alembic 版本号正确)
+- SQLAlchemy 模型: T011, T012, T012b, T012a 可并行 (依赖 T009-T010a 完成)
+- 认证系统: T013 → T013a, T013b, T013c (可并行) → T016 → T016b (依赖 T012a)
+- 客户端封装: T014, T015 可并行
 - 前端配置: T017, T018, T019, T020 可并行
 
 ---
@@ -245,7 +283,7 @@
   - **验证场景 3**: 验证 HyperPod Training Operator 默认 Gang Scheduling 配置生效
   - **监控指标**: 记录 Pod 就绪时间差,验证时间窗口 ≤60 秒
   - **测试工具**: 使用 pytest + kubernetes-client 查询 Pod 状态和事件
-  - **参考**: spec.md FR-003 Gang Scheduling 机制 (依赖 T036, T008c HyperPod 集群)
+  - **参考**: spec.md FR-003 Gang Scheduling 机制 (依赖 T036, T008c-1/T008c-2/T008c-3 HyperPod 集群)
 - [ ] [T037] [US1] 训练任务状态同步服务 - `backend/src/services/training_sync_service.py`,定时任务 (30秒) 同步 HyperPod 训练状态到数据库,使用 T008h 验证的状态查询方法获取任务状态,处理状态转换事件,参考 `docs/hyperpod-sdk-reference.md`。如需细粒度状态监控,MAY 使用 kubernetes-client 查询 Kueue Workload 状态,但 MUST 提交例外申请并获得平台治理委员会批准,在代码中注释说明理由 (遵循宪章 Principle I.B) (依赖 T008h, T036)
 - [ ] [T037d] [US1] 抢占连续失败转 Failed 状态测试 - `backend/tests/integration/test_preemption_exhausted.py`,验证 FR-004 连续抢占失败机制:
   - **验证场景 1**: 模拟训练任务被连续抢占 3 次,验证第 3 次抢占后任务状态转为 Failed
@@ -648,17 +686,32 @@ Foundational (Phase 2)
 
 | Phase | 任务数 | 预估工作量 (人时) | 并行后工作量 (人时) | 优先级 |
 |-------|--------|-------------------|---------------------|--------|
-| Phase 1: Setup + IaC | 16 | 38 | 23 | 阻塞性 |
-| Phase 2: Foundational | 22 | 44 | 24 | 阻塞性 |
+| Phase 1: Setup + IaC | 20 | 46 | 28 | 阻塞性 |
+| Phase 2: Foundational | 20 | 40 | 20 | 阻塞性 |
 | Phase 3: US1 (P1) | 30 | 60 | 30 | Must-Have |
 | Phase 4: US2 (P1) | 14 | 28 | 14 | Must-Have |
 | Phase 5: US3 (P1) | 19 | 38 | 18 | Must-Have |
 | Phase 6: US4 (P2) | 13 | 26 | 15 | Important |
 | Phase 7: US5 (P2) | 15 | 30 | 17 | Important |
 | Phase 8: Polish + GitOps | 24 | 48 | 29 | 质量保障 |
-| **总计** | **153** | **312** | **170** | - |
+| **总计** | **155** | **316** | **171** | - |
 
-**MVP 范围 (Phase 1-5)**: 101 个任务, 109 人时 (并行后) - 包含完整的 P1 核心功能:训练任务、模型版本、数据集、资源配额、集群监控、审计日志、HyperPod EKS 集群、HyperPod Add-ons、FSx for Lustre 高性能存储、基础设施验证测试、HyperPod SDK 方法验证和 IaC 基础
+**MVP 范围 (Phase 1-5)**: 103 个任务, 实际估算:
+- **纯开发时间**: 110 人时 (并行后)
+- **集成测试和调试**: 44 人时 (40% of 开发时间)
+- **代码审查和返工**: 22 人时 (20%)
+- **文档编写**: 11 人时 (10%)
+- **基础设施部署等待**: 10 人时 (EKS 集群创建、FSx 配置、数据库迁移、验证测试)
+- **小计**: 约 197 人时
+- **风险缓冲** (20%): 40 人时
+- **最终估算**: 约 **240 人时**
+
+**说明**:
+- 估算基于并行开发模式（多团队协作）
+- 假设基础设施环境稳定（AWS 服务可用性 99.9%+）
+- 不含 Phase 6-8 的 P2 功能和质量保障任务
+
+**包含功能**: 项目基础结构、IaC 基础、HyperPod EKS 集群（拆分为 3 个子任务）、HyperPod Add-ons、FSx for Lustre 高性能存储、基础设施验证测试、HyperPod SDK 方法验证（提前执行）及备选方案、训练任务管理、模型版本控制、数据集管理、资源配额、集群监控和审计日志
 
 ---
 
