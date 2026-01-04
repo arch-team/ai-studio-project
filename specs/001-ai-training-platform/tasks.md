@@ -35,6 +35,9 @@
 ### 开发环境配置
 - [ ] [T003] 创建 Docker Compose 配置 - MySQL 8.0.28 服务,端口 3306,环境变量配置 (`docker-compose.yml`)
 - [ ] [T006] 创建环境变量模板 - `.env.example` 包含 DATABASE_URL, AWS_REGION, HYPERPOD_CLUSTER_ARN 等必需配置
+  - **AWS 凭证配置**: 支持 AWS CLI profile 或环境变量 (AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY)
+  - **开发者 IAM 权限**: 需要 SageMaker、EKS、S3、CloudWatch 相关权限 (具体策略在 IaC 中定义)
+  - **kubectl 配置**: 通过 `aws eks update-kubeconfig --name <cluster-name> --region <region>` 配置集群访问
 
 ### 数据库迁移系统
 - [ ] [T007] [P] 初始化 Alembic 迁移系统 - 配置 `backend/alembic.ini` 和 `backend/alembic/env.py`,支持 SQLAlchemy 2.0 异步引擎
@@ -44,12 +47,31 @@
 
 ### 基础设施即代码 (IaC)
 - [ ] [T008a] AWS CDK 项目结构 - 创建 `infrastructure/cdk/` 目录结构,初始化 CDK Python 项目 (与后端技术栈一致),配置 `cdk.json` 和 `requirements.txt`,定义 Stack 组织结构 (NetworkStack, DatabaseStack, StorageStack, ComputeStack),配置多环境支持 (dev/staging/prod)
-- [ ] [T008b] AWS CDK 核心 Stacks - 编写 VPC Stack (子网、安全组、NAT Gateway)、RDS Aurora MySQL Stack (Serverless v2, 自动备份)、S3 Buckets Stack (数据集、模型、检查点存储桶,启用版本控制和生命周期策略)、IAM Roles Stack (EKS 节点角色、应用服务角色)
+- [ ] [T008b] AWS CDK 核心 Stacks - 编写以下基础设施 Stacks:
+  - **VPC Stack**:
+    - VPC CIDR: 10.0.0.0/16 (65,536 个 IP 地址)
+    - 公有子网: 10.0.0.0/20, 10.0.16.0/20, 10.0.32.0/20 (3 个 AZ, 用于 NAT Gateway/ALB)
+    - 私有子网 (应用层): 10.0.64.0/19, 10.0.96.0/19, 10.0.128.0/19 (3 个 AZ, 用于 EKS 节点/RDS)
+    - 私有子网 (数据层): 10.0.160.0/20, 10.0.176.0/20, 10.0.192.0/20 (3 个 AZ, 用于 FSx/ElastiCache)
+    - NAT Gateway: 每个 AZ 部署一个 (高可用)
+    - 安全组、VPC 端点
+  - **RDS Aurora MySQL Stack**:
+    - Serverless v2 配置: 最小 ACU 0.5 (开发环境可暂停), 最大 ACU 16 (生产环境), 自动扩缩容
+    - 备份策略: 自动备份保留期 7 天, 备份窗口 UTC 03:00-04:00, 启用时间点恢复 (PITR)
+    - 连接池: 启用 RDS Proxy (连接池大小根据 ACU 自动调整), 空闲连接超时 30 分钟
+    - 高可用: 多可用区部署, 故障转移时间 <30 秒
+  - **S3 Buckets Stack**: 数据集、模型、检查点存储桶,启用版本控制和生命周期策略
+  - **IAM Roles Stack**: EKS 节点角色、应用服务角色 (遵循最小权限原则)
 
 ### HyperPod EKS 集群创建
 - [ ] [T008c] [P] HyperPod EKS 集群 Stack - `infrastructure/cdk/stacks/hyperpod_stack.py`,编写 AWS CDK Stack 创建 SageMaker HyperPod with EKS 集群:
   - **EKS 集群配置**: 版本 EKS 1.32+,配置 VPC 和子网关联 (使用 T008b 创建的 VPC)
   - **GPU 节点组**: 创建 GPU 节点组 (p4d.24xlarge, p5.48xlarge, trn1.32xlarge),配置 Auto Scaling Group (最小 2 节点,最大 100 节点)
+  - **Auto Scaling 策略**:
+    - 扩容触发: Kueue 队列中 Pending Workloads 数量 >0 且持续 5 分钟
+    - 缩容触发: 节点 GPU 利用率 <20% 且持续 15 分钟
+    - 缩容保护: 运行中训练任务的节点不参与缩容
+    - 冷却期: 扩容后 10 分钟内不触发缩容
   - **EKS Add-ons**: 安装 EBS CSI Driver, FSx CSI Driver, VPC CNI (最新稳定版本)
   - **EFA 网络配置**: 启用 EFA (Elastic Fabric Adapter) 高性能网络,配置网络拓扑优化
   - **IAM 角色配置**: 创建 EKS 节点角色、Pod IAM 角色、Service Account 映射 (遵循最小权限原则)
@@ -62,9 +84,10 @@
 ### HyperPod Add-ons 安装
 - [ ] [T008d] [P] HyperPod Add-ons 配置 - `infrastructure/k8s/hyperpod-addons/`,安装和配置 HyperPod 核心组件:
   - **Training Operator**: 安装 HyperPod Training Operator (PyTorchJob, TensorFlowJob CRD),配置训练框架支持 (PyTorch DDP/FSDP/DeepSpeed ZeRO),验证 Webhook 就绪
-  - **Task Governance (Kueue)**: 安装 Kueue 资源调度器,创建 ClusterQueue 和 LocalQueue,配置三级优先级 (PriorityClass: critical/high/medium 映射到 spec.md 的 high/medium/low),配置抢占规则和 Gang Scheduling (默认 60 秒超时,可配置)
+  - **Task Governance (Kueue)**: 安装 Kueue 资源调度器,创建 ClusterQueue 和 LocalQueue,配置三级优先级 (PriorityClass: critical/high/medium 映射到 spec.md 的 high/medium/low),配置 Gang Scheduling (默认 60 秒超时,可配置)
+  - **抢占策略**: 完全遵循 Kueue 原生抢占行为,不做自定义扩展。具体参数 (冷却期、借用策略等) 以 HyperPod Task Governance 默认配置为准,参见 [Kueue Preemption Documentation](https://kueue.sigs.k8s.io/docs/concepts/preemption/)
   - **Observability Add-on**: 部署 Prometheus + Grafana,配置 Node Exporter, cAdvisor, DCGM Exporter (GPU 指标),配置数据保留期 (30 天),创建预定义 Grafana 仪表盘 (集群健康、训练任务分布、资源利用率)
-  - **Elastic Agent**: 配置 HyperPod Elastic Agent,设置检查点管理参数 (默认 10-15 分钟间隔),配置 Auto-Resume 策略 (节点故障自动恢复),配置 Deep Health Check 和节点故障检测阈值 (PodsReady=False 持续 >30 秒)
+  - **Elastic Agent**: 配置 HyperPod Elastic Agent,设置检查点管理参数 (默认 10-15 分钟间隔),配置 Auto-Resume 策略 (节点故障自动恢复),配置节点故障检测阈值 (PodsReady=False 持续 >30 秒)。Deep Health Check 完全遵循 HyperPod Health Check Agent 原生能力 (GPU/EFA/存储健康检测),参见 [HyperPod Health Checks Documentation](https://docs.aws.amazon.com/sagemaker/latest/dg/sagemaker-hyperpod-operate-health-checks.html)
   - **Spaces Add-on**: 安装 Amazon SageMaker Spaces Add-on,配置 JupyterLab 和 VS Code IDE 镜像 (Data Science, PyTorch, TensorFlow),配置 EFS 持久化存储挂载,配置自动保存间隔 (JupyterLab 120 秒, VS Code 1 秒)
   - **验证测试**: 验证所有 Add-ons Pod 状态为 Running,验证 Kueue ClusterQueue 就绪,验证 Prometheus 可查询指标 (up, node_cpu_seconds_total),验证 Training Operator Webhook 响应 (curl localhost:9443/healthz)
   - **依赖**: T008c (HyperPod EKS 集群)

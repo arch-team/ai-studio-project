@@ -28,9 +28,21 @@
 - 后端: FastAPI 0.109+, SQLAlchemy 2.0+, Pydantic v2, `sagemaker-hyperpod` SDK (最新稳定版,包含 Space 模块), boto3 (AWS SDK for S3/CloudWatch/IAM 等非 HyperPod 服务), aiomysql (MySQL 异步驱动)
 - 前端: React 18, AWS Cloudscape Design System (@cloudscape-design/components), Vite (构建工具), Zustand (状态管理), TanStack Query v5 (数据获取)
 - HyperPod: HyperPod Training Operator, Task Governance (Kueue), Observability Add-on, Elastic Agent, Spaces Add-on
-- Target Platform: AWS EKS cluster  
+- Target Platform: AWS EKS cluster
 - Constraints: Requires AWS SageMaker HyperPod with EKS infrastructure
 
+**EKS Add-ons 版本要求**:
+- EBS CSI Driver: ≥v1.28.0 (支持 EKS 1.32)
+- FSx CSI Driver: ≥v1.9.0 (支持 Lustre 文件系统)
+- VPC CNI: ≥v1.16.0 (支持 EKS 1.32 和 NetworkPolicy)
+- 版本选择原则: 使用 EKS 托管 Add-on 的默认推荐版本，或高于上述最低版本
+
+**GPU 驱动和 CUDA 版本要求**:
+- NVIDIA Driver: ≥535.104.05 (支持 CUDA 12.2)
+- CUDA Toolkit: ≥12.2 (与 PyTorch 2.2+ 兼容)
+- cuDNN: ≥8.9.0
+- NCCL: ≥2.18.0 (分布式训练通信库)
+- 说明: HyperPod AMI 默认包含上述驱动，自定义容器镜像需确保兼容性
 
 **Storage**:
 - 关系数据库: MySQL 8.0+ (开发环境本地部署), Amazon Aurora MySQL 3.x+ (生产环境,兼容 MySQL 8.0)
@@ -38,6 +50,11 @@
 - 模型制品: Amazon S3 + SageMaker Model Registry
 - 检查点存储: 分层架构 (NVMe 本地存储 → FSx for Lustre → S3)
 - 日志存储: Amazon CloudWatch Logs (30天保留期)
+
+**VPC 端点 (PrivateLink)**:
+- 必需端点: S3 Gateway、ECR (API/Docker)、CloudWatch (Logs/Monitoring)、STS、SageMaker API
+- 目的: 确保 EKS 节点通过私有网络访问 AWS 服务，提升安全性和网络性能
+- 详细配置: 在 IaC 实施阶段根据实际需求确定具体端点列表和安全组规则
 
 **Testing**:
 - 后端: pytest (单元/集成测试), pytest-asyncio (异步测试), httpx (API 测试)
@@ -47,6 +64,7 @@
 **Target Platform**:
 - 后端: Linux server (Amazon EKS worker nodes), Python 3.11 runtime
 - 前端: Chrome (用户仅需支持 Chrome 浏览器)
+- 前端开发环境: Node.js ≥18.x LTS, npm ≥9.x (与 Vite 5.x 和 React 18 兼容)
 - 基础设施: AWS SageMaker HyperPod with EKS 1.32+
 
 **Project Type**: Web 应用 (前后端分离架构)
@@ -63,6 +81,8 @@
 **Constraints**:
 - 平台可用性 99%+ (年度) (SC-003)
 - 数据加密: 静态数据 (S3 SSE-KMS), 传输加密 (TLS 1.2+)
+  - KMS 密钥策略: 使用 AWS 托管密钥 (aws/s3) 或客户托管密钥 (CMK)，按资源类型分离密钥
+  - 密钥轮换: 启用自动密钥轮换 (年度)，符合安全合规要求
 - 审计日志保留期 ≥90天,100%关键操作可追溯 (SC-010, SC-015)
 - 无障碍访问: WCAG 2.1 AA 合规 (Principle XI)
 - 成本约束: 优先使用 HyperPod 托管组件,避免自行实现
