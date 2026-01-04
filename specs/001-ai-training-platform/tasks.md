@@ -131,7 +131,13 @@
   - **网络配置**: 部署到 T008b 创建的 VPC 私有子网,配置安全组 (允许 EKS 节点访问 FSx 端口 988, 1021-1023),启用 VPC 内 DNS 解析
   - **FSx CSI Driver**: 使用 T008c-1 中已安装的 AWS FSx CSI Driver,创建 StorageClass (provisioner: fsx.csi.aws.com, parameters: dnsname/mountname),配置 PersistentVolume 自动创建
   - **挂载点配置**: 配置 DNS 名称和挂载路径 (/fsx),生成 PersistentVolume YAML 模板供训练任务使用,配置 lustre client 内核模块
-  - **性能验证**: 使用 fio 工具验证单客户端顺序读写吞吐量 ≥5GB/s,验证多客户端聚合带宽,确认满足 SC-005 性能目标 (S3 到 FSx 同步 1TB 数据 <10 分钟)
+  - **性能验证**:
+    - **单客户端测试**: 使用 fio 验证顺序读写吞吐量 ≥5GB/s (块大小 1MB, 队列深度 64)
+    - **多客户端聚合**: 使用 4-8 个客户端 Pod 并发读取,验证聚合带宽 ≥20GB/s
+    - **分布式训练模拟**: 模拟 PyTorch DataLoader 多进程读取场景,验证吞吐量稳定性
+    - **S3 同步性能**: 确认满足 SC-005 性能目标 (S3 到 FSx 同步 1TB 数据 <10 分钟)
+    - **调优方案**: 如吞吐量不达标,调整 FSx 吞吐量级别 (500 → 1000 MB/s/TiB) 或增加容量
+    - **验证工具**: 提供性能测试脚本 (`infrastructure/tests/fsx-performance-test.sh`)
   - **生命周期策略**: 配置每日自动备份到 S3 (备份保留期 7 天),配置数据同步调度 (每小时增量同步到 S3),设置存储容量告警 (使用率 >80%)
   - **输出**: FSx 文件系统 ID、DNS 名称、挂载路径、StorageClass 名称
   - **依赖**: T008a (CDK 项目结构), T008b (VPC Stack, S3 Buckets Stack), T008c-1 (EKS 集群 - 包含 FSx CSI Driver), T008c-2 (GPU 节点组), T008c-3 (IAM 和安全配置), T008d (HyperPod Add-ons - 确保完整环境就绪)
@@ -319,9 +325,12 @@
   - **(3) 节点故障**: 检测到 PodsReady=False 且持续 >30 秒时触发检查点创建
   - **(4) 资源抢占**: 检测到 Kueue Evicted condition (reason: Preempted) 时立即触发检查点创建（在抢占前完成，超时 5 分钟则强制抢占）
   - **(5) 用户手动触发**: 提供服务接口支持 API 调用创建检查点 (参见 T031d)
-  - **检查点保存**: 自动保存到 FSx/S3,实现 FR-011 分层存储策略 (NVMe → FSx → S3)
+  - **检查点保存**: 创建检查点并保存到初始存储位置 (优先 NVMe 本地存储,若不可用则保存到 FSx),记录检查点元数据 (创建时间、序号、存储路径、SHA-256 校验和)
+  - **接口设计**: 提供 `create_checkpoint(job_id, trigger_type)` 接口创建检查点,提供 `list_checkpoints(job_id, filters)` 接口供 T038b 查询检查点列表
+  - **职责边界**: T038 负责检查点创建和初始保存,不负责后续迁移 (迁移由 T038b 负责)
   - **参考**: spec.md FR-010 检查点触发场景映射
 - [ ] [T038b] [US1] Checkpoint 分层迁移服务 - `backend/src/services/checkpoint_migration_service.py`,实现 FR-011 分层存储迁移策略:
+  - **依赖接口**: 调用 T038 的 `list_checkpoints(job_id)` 接口获取检查点列表和元数据 (创建时间、序号、存储路径、校验和)
   - **热检查点管理**: 保留最近 3 个检查点在 NVMe 本地存储
   - **温检查点迁移**: 第 4-10 个检查点自动迁移到 FSx for Lustre
   - **冷检查点归档**: 创建序号 >10 或创建时间 >72 小时的检查点归档到 S3
@@ -331,6 +340,7 @@
   - **完整性保护**: 创建时计算 SHA-256 校验和,恢复前验证完整性,若损坏则自动尝试上一个有效检查点并告警
   - **S3 生命周期策略**: 配置 S3 生命周期规则,自动删除 30 天前的冷检查点
   - **定时任务调度**: 每 10 分钟执行一次迁移检查和执行
+  - **职责边界**: T038b 仅负责迁移已创建的检查点,不负责创建检查点 (创建由 T038 负责)
   - **参考**: spec.md FR-011 分层检查点存储策略, Edge Cases (检查点存储满载/检查点损坏处理) (依赖 T038)
 - [ ] [T038a] [US1] SageMaker Model Registry 集成 - `backend/src/services/model_registry_service.py`,封装 SageMaker Model Registry API,自动注册训练完成的模型,管理模型版本生命周期(注册→批准→部署→归档)
 
@@ -339,7 +349,7 @@
 - SQLAlchemy 模型: T023, T024, T024a 可并行 (依赖 T021, T022, T022a)
 - 后端 API: T025-T031 可部分并行 (依赖 T023, T024) → T031a, T031b, T031c 可并行 (依赖 T024a)
 - 前端页面: T032-T035 可并行 (依赖 T025-T031) → T035a (依赖 T031a-T031c)
-- 服务逻辑: T036 → T037, T037c, T037a, T037b 可并行 → T038, T038a 可并行
+- 服务逻辑: T036 → {T037, T037a} 可并行 → {T037c, T037b} 可并行 → {T038, T038a} 可并行
 
 **验收标准**:
 - FR-001: 训练任务提交成功率 >95%
@@ -413,6 +423,8 @@
 - [ ] [T061] [US3] GET /monitoring/metrics 端点实现 - `backend/src/api/monitoring.py`,查询 Prometheus 指标 (GPU 利用率,集群容量,任务队列长度),支持时间范围过滤
 - [ ] [T061a] [US3] GET /audit-logs 端点实现 - `backend/src/api/audit_logs.py`,支持分页、过滤 (user_id, operation_type, resource_type, time_range)、排序 (created_at),返回审计日志列表,管理员权限
 - [ ] [T061b] [US3] DELETE /audit-logs/cleanup 端点实现 - 清理过期审计日志 (expires_at < now),管理员权限,定时任务调用,记录清理统计
+  - **职责**: 提供 API 接口供自动清理服务 (T102a) 或管理员手动调用
+  - **输出**: 返回清理统计 (清理条数、执行耗时、失败记录数)
 
 ### 监控集成服务
 - [ ] [T062] [US3] Prometheus 指标采集集成 - `backend/src/services/prometheus_service.py`,封装 Prometheus HTTP API,查询 HyperPod Observability Add-on 指标,实现 ≤30秒刷新频率:
@@ -458,6 +470,8 @@
 - [ ] [T069a] [US4] AWS Cost Explorer 集成 - `backend/src/clients/cost_explorer_client.py`,封装 AWS Cost Explorer API,获取实际账单数据 (EC2, S3, FSx, EBS),支持按资源标签过滤成本数据,缓存策略 (1小时刷新)
 - [ ] [T069b] [US4] 训练成本定价模型 - `backend/src/services/pricing_model.py`,维护 HyperPod 实例定价表 (p4d.24xlarge, p5.48xlarge, trn1.32xlarge),FSx for Lustre 存储定价 (按吞吐量和容量),S3 存储和数据传输定价,网络传输成本计算
 - [ ] [T069c] [US4] 成本准确率验证测试 - `backend/tests/test_cost_accuracy.py`,对比计算成本 vs AWS Cost Explorer 实际账单,误差率计算 (目标 <2%),回归测试 (使用历史训练任务数据),准确率监控告警 (误差 >2% 触发)
+  - **依赖**: T069 (成本计算引擎), T069a (Cost Explorer 集成), T069b (定价模型), T070 (资源使用聚合查询)
+  - **测试数据**: 使用 T070 聚合的历史训练任务数据 (至少 30 天)
 - [ ] [T070] [US4] 资源使用聚合查询 - `backend/src/services/usage_aggregator.py`,使用 SQLAlchemy aggregation functions 聚合用户/项目资源使用,支持按时间维度分组 (day/week/month)
 
 ### 后端 API 端点
@@ -477,7 +491,7 @@
 - [ ] [T078] [US4] 报表导出功能 - `backend/src/services/report_export_service.py`,实现 CSV/PDF 导出,使用 pandas 和 reportlab,支持自定义报表模板
 
 **并行执行机会**:
-- 成本计算服务: T069, T069a, T069b, T070 可并行 → T069c (依赖 T069, T069a, T069b)
+- 成本计算服务: T069, T069a, T069b, T070 可并行 → T069c (依赖 T069, T069a, T069b, T070)
 - 后端 API: T071, T072, T073 可部分并行 (依赖 T069, T070)
 - 前端页面: T074-T077 可并行 (依赖 T071, T072)
 - 报表导出: T078 依赖 T071, T072
@@ -493,7 +507,11 @@
 
 **用户故事**: 算法工程师使用 Amazon SageMaker Spaces 在线开发环境 (JupyterLab/VS Code)
 
-**依赖**: US1 完成 (需要训练任务基础设施)
+**依赖**: Phase 1 基础设施完成 (T008c-1/2/3 HyperPod EKS 集群, T008d Spaces Add-on, T008h SDK 方法验证), Phase 2 基础认证完成 (T013)
+
+**不依赖**: US1 训练任务管理逻辑 (T036-T038)
+
+**可以并行**: US5 可以与 US1/US2/US3/US4 并行开发 (仅依赖 Phase 1-2 基础设施)
 
 **技术选型**: Amazon SageMaker Spaces Add-on (JupyterLab/VS Code IDE)
 
@@ -526,7 +544,8 @@
 - 数据库迁移: T079 独立
 - SQLAlchemy 模型: T080 依赖 T079
 - 后端 API: T081-T084 可部分并行 (依赖 T080)
-- SageMaker Spaces 服务: T085, T085a, T086, T090 可并行 → T085b, T085c (依赖 T085, T085a)
+- SageMaker Spaces 服务: T085, T085a, T086, T090 可并行 → T085b (部署监控) → T085c (执行测试并验证监控数据)
+  - **理由**: T085c 测试需要 T085b 监控指标来验证启动时间 P95/P99，确保测试结果可观测
 - 前端页面: T087-T089 可并行 (依赖 T081-T084)
 
 **验收标准**:
@@ -568,7 +587,9 @@
 - [ ] [T101] CloudWatch Logs 配置验证 - 验证 30天日志留存策略,配置日志组 (/aws/hyperpod/training-platform),创建 CloudWatch Logs Insights 查询模板
 - [ ] [T101a] 加密合规性验证 - 验证所有 S3 存储桶启用 SSE-KMS 加密,验证 API 端点强制 TLS 1.2+,生成加密审计报告,确保符合 FR-018 要求
 - [ ] [T102] 性能监控埋点 - 使用 FastAPI middleware 记录 API 延迟,上报到 CloudWatch Metrics,配置告警 (P95 延迟 >500ms)
-- [ ] [T102a] 审计日志自动清理 - `backend/src/services/audit_cleanup_service.py`,配置定时任务 (使用 APScheduler 或 Celery Beat,每日凌晨 2:00 执行),调用 DELETE /audit-logs/cleanup API (T061b),清理 90 天前的审计日志 (expires_at < now),记录清理统计 (清理条数、执行耗时、失败记录数),CloudWatch Logs 记录清理事件 (级别 INFO,包含清理时间和统计),配置清理失败告警 (连续 3 天失败触发),确保符合 FR-017 保留策略 ≥90天 (依赖 T061b cleanup API)
+- [ ] [T102a] 审计日志自动清理服务 - `backend/src/services/audit_cleanup_service.py`,配置定时任务 (使用 APScheduler 或 Celery Beat,每日凌晨 2:00 执行),调用 DELETE /audit-logs/cleanup API (T061b),记录清理统计 (清理条数、执行耗时、失败记录数),CloudWatch Logs 记录清理事件 (级别 INFO,包含清理时间和统计),配置清理失败告警 (连续 3 天失败触发),确保符合 FR-017 保留策略 ≥90天
+  - **职责**: 定时任务调度和执行监控,不负责实际清理逻辑 (委托给 T061b)
+  - **依赖**: T061b (cleanup API)
 
 ### 前端性能优化
 - [ ] [T103] 前端性能优化 - 实现 React.lazy() 代码分割,路由级别懒加载,使用 Vite 构建优化 (tree shaking, minification),目标首屏加载 <3秒
@@ -632,6 +653,22 @@ Foundational (Phase 2)
 2. **US1 + US2 + US3 → US4**: 成本分析依赖训练任务、数据集、配额数据的完整性
 3. **US1 → US5**: IDE 环境依赖训练任务基础设施 (HyperPod 集群、容器镜像管理)
 4. **US1/US2/US3 可并行**: P1 优先级的三个核心故事相互独立,可并行开发
+
+### 并行开发前置条件
+
+**Phase 3 (US1 训练任务) 可以启动的条件**:
+- ✅ Phase 1 完成: T008c-1/2/3 (HyperPod EKS 集群), T008d (HyperPod Add-ons), T008h (SDK 方法验证)
+- ✅ Phase 2 完成: T009-T012 (核心数据模型), T013 (认证中间件), T014 (HyperPod SDK 客户端)
+
+**Phase 4 (US2 数据集) 可以启动的条件**:
+- ✅ Phase 1 完成: T008b (S3 Buckets Stack 含加密), T008e (FSx Stack)
+- ✅ Phase 2 完成: T009-T012 (核心数据模型), T013 (认证中间件), T015 (S3 客户端封装)
+
+**Phase 5 (US3 配额监控) 可以启动的条件**:
+- ✅ Phase 1 完成: T008d (Kueue 调度器 + Observability Add-on)
+- ✅ Phase 2 完成: T009-T012 (核心数据模型), T013 (认证中间件)
+
+**接口约定**: Phase 3/4/5 并行开发时,需要提前约定 API 接口规范 (contracts/*.yaml),避免集成冲突
 
 ---
 
