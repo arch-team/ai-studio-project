@@ -530,7 +530,7 @@
 - [ ] [T101] CloudWatch Logs 配置验证 - 验证 30天日志留存策略,配置日志组 (/aws/hyperpod/training-platform),创建 CloudWatch Logs Insights 查询模板
 - [ ] [T101a] 加密合规性验证 - 验证所有 S3 存储桶启用 SSE-KMS 加密,验证 API 端点强制 TLS 1.2+,生成加密审计报告,确保符合 FR-018 要求
 - [ ] [T102] 性能监控埋点 - 使用 FastAPI middleware 记录 API 延迟,上报到 CloudWatch Metrics,配置告警 (P95 延迟 >500ms)
-- [ ] [T102a] 审计日志自动清理 - 配置定时任务 (每日执行),调用 DELETE /audit-logs/cleanup API,清理 90 天前的审计日志,记录清理统计,确保符合 FR-017 保留策略
+- [ ] [T102a] 审计日志自动清理 - `backend/src/services/audit_cleanup_service.py`,配置定时任务 (使用 APScheduler 或 Celery Beat,每日凌晨 2:00 执行),调用 DELETE /audit-logs/cleanup API (T061b),清理 90 天前的审计日志 (expires_at < now),记录清理统计 (清理条数、执行耗时、失败记录数),CloudWatch Logs 记录清理事件 (级别 INFO,包含清理时间和统计),配置清理失败告警 (连续 3 天失败触发),确保符合 FR-017 保留策略 ≥90天 (依赖 T061b cleanup API)
 
 ### 前端性能优化
 - [ ] [T103] 前端性能优化 - 实现 React.lazy() 代码分割,路由级别懒加载,使用 Vite 构建优化 (tree shaking, minification),目标首屏加载 <3秒
