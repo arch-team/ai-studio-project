@@ -43,11 +43,11 @@
 - [ ] [T008] 初始化项目文档 - 创建 `README.md` (项目概述,快速启动), `CONTRIBUTING.md` (开发规范,提交流程)
 
 ### 基础设施即代码 (IaC)
-- [ ] [T008a] AWS CDK 项目结构 - 创建 `infrastructure/cdk/` 目录结构,初始化 CDK TypeScript 项目,配置 `cdk.json`,定义 Stack 组织结构 (NetworkStack, DatabaseStack, StorageStack, ComputeStack),配置多环境支持 (dev/staging/prod)
+- [ ] [T008a] AWS CDK 项目结构 - 创建 `infrastructure/cdk/` 目录结构,初始化 CDK Python 项目 (与后端技术栈一致),配置 `cdk.json` 和 `requirements.txt`,定义 Stack 组织结构 (NetworkStack, DatabaseStack, StorageStack, ComputeStack),配置多环境支持 (dev/staging/prod)
 - [ ] [T008b] AWS CDK 核心 Stacks - 编写 VPC Stack (子网、安全组、NAT Gateway)、RDS Aurora MySQL Stack (Serverless v2, 自动备份)、S3 Buckets Stack (数据集、模型、检查点存储桶,启用版本控制和生命周期策略)、IAM Roles Stack (EKS 节点角色、应用服务角色)
 
 ### HyperPod EKS 集群创建
-- [ ] [T008c] [P] HyperPod EKS 集群 Stack - `infrastructure/cdk/lib/hyperpod-stack.ts`,编写 AWS CDK Stack 创建 SageMaker HyperPod with EKS 集群:
+- [ ] [T008c] [P] HyperPod EKS 集群 Stack - `infrastructure/cdk/stacks/hyperpod_stack.py`,编写 AWS CDK Stack 创建 SageMaker HyperPod with EKS 集群:
   - **EKS 集群配置**: 版本 EKS 1.32+,配置 VPC 和子网关联 (使用 T008b 创建的 VPC)
   - **GPU 节点组**: 创建 GPU 节点组 (p4d.24xlarge, p5.48xlarge, trn1.32xlarge),配置 Auto Scaling Group (最小 2 节点,最大 100 节点)
   - **EKS Add-ons**: 安装 EBS CSI Driver, FSx CSI Driver, VPC CNI (最新稳定版本)
@@ -216,6 +216,13 @@
 
 ### HyperPod 集成服务
 - [ ] [T036] [US1] HyperPodPytorchJob 集成逻辑 - `backend/src/services/hyperpod_service.py`,封装 HyperPod SDK 训练任务生命周期管理,使用 T008h 验证的 Training 模块方法实现训练任务提交、暂停、恢复、终止功能,实现错误处理和重试机制,参考 `docs/hyperpod-sdk-reference.md` (依赖 T008h, T014)
+- [ ] [T036a] [US1] Gang Scheduling 行为验证 - `backend/tests/integration/test_gang_scheduling.py`,验证 FR-003 Gang Scheduling 机制正确工作:
+  - **验证场景 1**: 提交多节点分布式训练任务 (≥2 节点),验证所有 Pods 在 60 秒内同时就绪
+  - **验证场景 2**: 模拟部分 Pod 调度失败,验证任务状态正确转为 Failed 且已创建的 Pods 自动清理
+  - **验证场景 3**: 验证 HyperPod Training Operator 默认 Gang Scheduling 配置生效
+  - **监控指标**: 记录 Pod 就绪时间差,验证时间窗口 ≤60 秒
+  - **测试工具**: 使用 pytest + kubernetes-client 查询 Pod 状态和事件
+  - **参考**: spec.md FR-003 Gang Scheduling 机制 (依赖 T036, T008c HyperPod 集群)
 - [ ] [T037] [US1] 训练任务状态同步服务 - `backend/src/services/training_sync_service.py`,定时任务 (30秒) 同步 HyperPod 训练状态到数据库,使用 T008h 验证的状态查询方法获取任务状态,处理状态转换事件,参考 `docs/hyperpod-sdk-reference.md` (依赖 T008h, T036)
 - [ ] [T037c] [US1] 训练任务停滞检测服务 - `backend/src/services/stall_detection_service.py`,实现 FR-022 停滞检测机制:
   - **主指标监控**: 默认监控 Loss 指标,支持用户指定单一主检测指标 (Accuracy/Perplexity 等)
@@ -247,7 +254,7 @@
   - **完整性保护**: 创建时计算 SHA-256 校验和,恢复前验证完整性,若损坏则自动尝试上一个有效检查点并告警
   - **S3 生命周期策略**: 配置 S3 生命周期规则,自动删除 30 天前的冷检查点
   - **定时任务调度**: 每 10 分钟执行一次迁移检查和执行
-  - **参考**: spec.md FR-011 分层检查点存储策略 (依赖 T038)
+  - **参考**: spec.md FR-011 分层检查点存储策略, Edge Cases (检查点存储满载/检查点损坏处理) (依赖 T038)
 - [ ] [T038a] [US1] SageMaker Model Registry 集成 - `backend/src/services/model_registry_service.py`,封装 SageMaker Model Registry API,自动注册训练完成的模型,管理模型版本生命周期(注册→批准→部署→归档)
 
 **并行执行机会**:
@@ -331,7 +338,11 @@
 - [ ] [T061b] [US3] DELETE /audit-logs/cleanup 端点实现 - 清理过期审计日志 (expires_at < now),管理员权限,定时任务调用,记录清理统计
 
 ### 监控集成服务
-- [ ] [T062] [US3] Prometheus 指标采集集成 - `backend/src/services/prometheus_service.py`,封装 Prometheus HTTP API,查询 HyperPod Observability Add-on 指标,实现 ≤30秒刷新频率
+- [ ] [T062] [US3] Prometheus 指标采集集成 - `backend/src/services/prometheus_service.py`,封装 Prometheus HTTP API,查询 HyperPod Observability Add-on 指标,实现 ≤30秒刷新频率:
+  - **存储容量监控 (FR-020)**: 采集 FSx for Lustre 和 S3 存储使用率指标,配置双阈值告警 (80% 警告/90% 严重),集成 CloudWatch Alarms 发送通知
+  - **网络性能监控 (FR-021)**: 采集 EFA 网络吞吐量、延迟指标 (node_network_receive/transmit_bytes_total),监控 Pod 间网络延迟 P99,配置告警 (延迟 >10ms 或带宽利用率 <80% 触发)
+  - **告警规则配置**: 创建 Prometheus AlertManager 规则 (`infrastructure/prometheus/alerts/storage-alerts.yaml`, `infrastructure/prometheus/alerts/network-alerts.yaml`),定义存储和网络告警条件
+  - **参考**: spec.md FR-020 存储容量监控, FR-021 网络带宽管理和 QoS 策略
 - [ ] [T063] [US3] Grafana 仪表盘配置 - 创建 Grafana dashboard JSON 配置 (`infrastructure/grafana/dashboards/hyperpod-overview.json`),展示集群健康、资源利用率、训练任务分布
 - [ ] [T068] [US3] 集群健康检查服务 - `backend/src/services/cluster_health_service.py`,定时任务 (1分钟) 检查 HyperPod 集群状态,更新 hyperpod_clusters 表,触发告警
 
@@ -353,6 +364,8 @@
 - FR-012: 配额检查延迟 <100ms
 - FR-013: 集群监控刷新频率 ≤30秒
 - FR-014: 支持 ≥1000 并发用户
+- FR-020: 存储容量告警触发准确率 100% (80%/90% 双阈值)
+- FR-021: 网络延迟 P99 <10ms,带宽利用率 >80%
 - SC-008: Prometheus 指标保留期 ≥30天
 
 ---
@@ -408,16 +421,16 @@
 **技术选型**: Amazon SageMaker Spaces Add-on (JupyterLab/VS Code IDE)
 
 ### 数据表迁移
-- [ ] [T079] [US5] IDE 会话表迁移 - `backend/alembic/versions/007_create_ide_sessions.py`,字段: id, session_name, owner_id (FK users), ide_type (enum: jupyterlab/vscode), sagemaker_space_name, sagemaker_space_arn, instance_type (enum: ml.t3.medium/ml.g4dn.xlarge), status (enum: Pending/InService/Stopping/Stopped/Failed), studio_url, created_at, updated_at
+- [ ] [T079] [US5] 在线开发环境表迁移 - `backend/alembic/versions/007_create_dev_environments.py`,字段: id, environment_name, owner_id (FK users), ide_type (enum: jupyterlab/vscode), sagemaker_space_name, sagemaker_space_arn, instance_type (enum: ml.t3.medium/ml.g4dn.xlarge), status (enum: Pending/InService/Stopping/Stopped/Failed), studio_url, created_at, updated_at
 
 ### SQLAlchemy 模型
-- [ ] [T080] [US5] IDESession 模型 - `backend/src/models/ide_session.py`,包含 SageMaker Space 生命周期管理 (Pending → InService → Stopped),关联 User,存储 Space ARN 和 Studio URL
+- [ ] [T080] [US5] DevEnvironment 模型 - `backend/src/models/dev_environment.py`,包含 SageMaker Space 生命周期管理 (Pending → InService → Stopped),关联 User,存储 Space ARN 和 Studio URL
 
 ### 后端 API 端点
 - [ ] [T081] [US5] POST /ide/sessions 端点实现 - `backend/src/api/ide.py`,验证 IDE 配置,调用 SageMaker Spaces API 创建 Space,配置实例类型 (ml.t3.medium/ml.g4dn.xlarge),返回 SageMaker Studio URL
 - [ ] [T082] [US5] GET /ide/sessions 端点实现 - 支持分页、过滤 (status, owner_id)、排序 (created_at)
-- [ ] [T083] [US5] GET /ide/sessions/{id} 端点实现 - 返回 IDE 会话详情,包含 SageMaker Studio URL、Space 状态、实例类型、资源使用
-- [ ] [T084] [US5] DELETE /ide/sessions/{id} 端点实现 - 调用 SageMaker DeleteSpace API 停止 IDE 会话,清理 Space 资源
+- [ ] [T083] [US5] GET /ide/sessions/{id} 端点实现 - 返回在线开发环境详情,包含 SageMaker Studio URL、Space 状态、实例类型、资源使用
+- [ ] [T084] [US5] DELETE /ide/sessions/{id} 端点实现 - 调用 SageMaker DeleteSpace API 停止在线开发环境,清理 Space 资源
 
 ### SageMaker Spaces 集成服务
 - [ ] [T085] [US5] SageMaker Spaces 集成 - `backend/src/services/sagemaker_spaces_service.py`,封装 `sagemaker-hyperpod.space` 模块 API,使用 T008h 验证的 Space 模块方法实现 Space 创建、删除、查询功能,配置生命周期脚本 (Lifecycle Configuration) 预装常用库,管理 Space 状态转换,参考 `docs/hyperpod-sdk-reference.md`。如 SDK 不支持特定配置,MAY 使用 boto3 作为备选并在代码中注释说明理由 (依赖 T008h)
@@ -429,7 +442,7 @@
 
 ### 前端页面组件
 - [ ] [T087] [US5] [P] IDE 启动页面 - `frontend/src/pages/IDE/Launch.tsx`,使用 Cloudscape Form,选择 IDE 类型 (JupyterLab/VS Code)、实例类型 (ml.t3.medium/ml.g4dn.xlarge)、SageMaker Studio 镜像,显示启动进度和预估启动时间
-- [ ] [T088] [US5] [P] IDE 会话列表页面 - `frontend/src/pages/IDE/Sessions.tsx`,使用 Cloudscape Table,显示 SageMaker Space 会话列表,支持启动/停止/删除操作,显示 Space 状态和启动耗时
+- [ ] [T088] [US5] [P] 在线开发环境列表页面 - `frontend/src/pages/IDE/Sessions.tsx`,使用 Cloudscape Table,显示 SageMaker Space 列表,支持启动/停止/删除操作,显示 Space 状态和启动耗时
 - [ ] [T089] [US5] [P] IDE 嵌入组件 - `frontend/src/components/IDEFrame.tsx`,使用 iframe 嵌入 SageMaker Studio URL (JupyterLab/VS Code),支持全屏模式
 
 **并行执行机会**:
@@ -441,8 +454,8 @@
 
 **验收标准**:
 - FR-023: IDE 启动时间 <3分钟
-- FR-024: 支持 ≥50 并发 IDE 会话
-- SC-015: IDE 会话自动保存间隔 ≤5分钟
+- FR-024: 支持 ≥50 并发在线开发环境
+- SC-015: 在线开发环境自动保存间隔 ≤5分钟
   - **技术实现**: SageMaker HyperPod Spaces Add-on 内置自动保存功能
     - JupyterLab: 默认 120秒 (2分钟) 自动保存到 EFS
     - VS Code: 默认 1秒 (afterDelay) 自动保存到 EFS
@@ -486,6 +499,15 @@
 ### 无障碍访问
 - [ ] [T104] 无障碍访问测试 - 使用 axe-core 测试 WCAG 2.1 AA 级别合规性,修复键盘导航、屏幕阅读器、颜色对比度问题
 
+### 用户引导测试
+- [ ] [T104a] 用户引导 E2E 测试 - `frontend/tests/e2e/test_user_onboarding.spec.ts`,验证 SC-005 首次用户引导完成率 ≥90%:
+  - **引导流程测试**: 模拟首次登录用户,验证引导向导正确显示和步骤流转
+  - **关键功能覆盖**: 验证引导覆盖核心功能 (创建训练任务、上传数据集、查看监控)
+  - **完成率统计**: 集成前端埋点,统计引导各步骤完成率和跳出率
+  - **可用性验证**: 验证引导提示清晰易懂,支持跳过和重新开始
+  - **测试工具**: 使用 Playwright 执行 E2E 测试,生成引导完成率报告
+  - **参考**: spec.md SC-005 用户引导完成率 ≥90%
+
 ### UI 组件库合规性
 - [ ] [T106] Cloudscape 组件库合规性审计 - 扫描前端代码 (`frontend/src/`),验证所有 UI 组件来自 @cloudscape-design/components,禁止使用 MUI/Ant Design/自定义实现,使用 ESLint 规则 (no-restricted-imports) 自动检测,生成合规性报告 (不合规组件列表、违规文件路径、修复建议),CI/CD 集成 (不合规则 PR 失败)
 
@@ -504,7 +526,7 @@
 - 集成测试: T093, T094, T095 可并行
 - 文档和错误处理: T096, T097, T098, T099 可并行
 - 日志和监控: T100, T101 可并行 → T101a (依赖 T101) → T102, T102a 可并行
-- 前端优化: T103, T104 可并行
+- 前端优化和测试: T103, T104, T104a 可并行
 - GitOps 工作流: T105a → T105b, T105c, T105d 可并行 (依赖 T105a) → T105e (依赖 T105b)
 
 ---
@@ -589,15 +611,15 @@ Foundational (Phase 2)
 |-------|--------|-------------------|---------------------|--------|
 | Phase 1: Setup + IaC | 16 | 38 | 23 | 阻塞性 |
 | Phase 2: Foundational | 22 | 44 | 24 | 阻塞性 |
-| Phase 3: US1 (P1) | 29 | 58 | 29 | Must-Have |
+| Phase 3: US1 (P1) | 30 | 60 | 30 | Must-Have |
 | Phase 4: US2 (P1) | 14 | 28 | 14 | Must-Have |
 | Phase 5: US3 (P1) | 19 | 38 | 18 | Must-Have |
 | Phase 6: US4 (P2) | 13 | 26 | 15 | Important |
 | Phase 7: US5 (P2) | 15 | 30 | 17 | Important |
-| Phase 8: Polish + GitOps | 23 | 46 | 28 | 质量保障 |
-| **总计** | **151** | **308** | **168** | - |
+| Phase 8: Polish + GitOps | 24 | 48 | 29 | 质量保障 |
+| **总计** | **153** | **312** | **170** | - |
 
-**MVP 范围 (Phase 1-5)**: 100 个任务, 108 人时 (并行后) - 包含完整的 P1 核心功能:训练任务、模型版本、数据集、资源配额、集群监控、审计日志、HyperPod EKS 集群、HyperPod Add-ons、FSx for Lustre 高性能存储、基础设施验证测试、HyperPod SDK 方法验证和 IaC 基础
+**MVP 范围 (Phase 1-5)**: 101 个任务, 109 人时 (并行后) - 包含完整的 P1 核心功能:训练任务、模型版本、数据集、资源配额、集群监控、审计日志、HyperPod EKS 集群、HyperPod Add-ons、FSx for Lustre 高性能存储、基础设施验证测试、HyperPod SDK 方法验证和 IaC 基础
 
 ---
 
@@ -606,7 +628,8 @@ Foundational (Phase 2)
 ### 功能需求 (Functional Requirements)
 - **FR-001**: 训练任务提交成功率 >95% (Phase 3, T025)
 - **FR-002**: 训练任务启动时间 <2分钟 (Phase 3, T036)
-- **FR-003**: 状态同步延迟 <30秒 (Phase 3, T037)
+- **FR-003**: Gang Scheduling Pod 就绪时间窗口 ≤60秒 (Phase 3, T036a)
+- **FR-003b**: 状态同步延迟 <30秒 (Phase 3, T037)
 - **FR-006**: 数据集上传速度 ≥100MB/s (Phase 4, T047)
 - **FR-007**: 支持 ≥10TB 数据集 (Phase 4, T048)
 - **FR-008**: 版本控制支持 ≥100 个版本 (Phase 4, T046)
@@ -616,7 +639,7 @@ Foundational (Phase 2)
 - **FR-018**: 报表生成时间 <5秒 (Phase 6, T071-T072)
 - **FR-019**: 成本计算准确率 >98% (Phase 6, T069)
 - **FR-023**: IDE 启动时间 <3分钟 (Phase 7, T081)
-- **FR-024**: 支持 ≥50 并发 IDE 会话 (Phase 7, T085)
+- **FR-024**: 支持 ≥50 并发在线开发环境 (Phase 7, T085)
 
 ### 成功标准 (Success Criteria)
 - **SC-001**: 支持 PyTorch DDP/FSDP/DeepSpeed ZeRO (Phase 3, T036)
@@ -624,7 +647,7 @@ Foundational (Phase 2)
 - **SC-005**: S3 到 FSx 同步时间 <10分钟 (1TB 数据集) (Phase 4, T048)
 - **SC-008**: Prometheus 指标保留期 ≥30天 (Phase 5, T062)
 - **SC-012**: 支持 ≥12个月历史数据查询 (Phase 6, T070)
-- **SC-015**: IDE 会话自动保存间隔 ≤5分钟 (Phase 7, T090)
+- **SC-015**: 在线开发环境自动保存间隔 ≤5分钟 (Phase 7, T090)
 
 ---
 

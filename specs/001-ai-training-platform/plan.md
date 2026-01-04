@@ -77,167 +77,37 @@
 
 *GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*
 
-### HyperPod Native-First (Principle I)
-- ✅ **训练任务管理**: 使用 `sagemaker-hyperpod.training` 模块 API (submit_training_job, get_training_job_status, pause/resume/stop_training_job)
-- ✅ **集群管理**: 使用 `sagemaker-hyperpod.cluster` 模块查询集群状态和节点健康
-- ✅ **开发空间**: 使用 `sagemaker-hyperpod.space` 模块管理 JupyterLab/VS Code IDE (Spaces Add-on)
-- ✅ **监控数据**: 主要通过 boto3 (CloudWatch Metrics/Logs API) 和 Prometheus API 查询,训练状态通过 SDK 获取
-- ⚠️ **推理部署** (FR-013 模型版本管理): 使用 boto3 调用 SageMaker Model Registry API (非 HyperPod SDK 适用范围)
+> **参考文档**: 完整原则定义见 [constitution.md](../../constitution.md)
 
-**SDK 绕过场景**:
-- Kueue Workload 状态监控: 需要 kubernetes-client 查询 Workload CRD (HyperPod SDK 未提供 Kueue 状态详情 API)
-- 自定义 NetworkPolicy 配置: 需要 kubernetes-client 配置网络隔离策略 (可选扩展功能)
+### 合规状态摘要
 
-**理由**: 上述场景为 HyperPod SDK 当前未覆盖的细粒度控制需求,已记录并将在实施时评估必要性。
+| 原则 | 状态 | 关键决策 |
+|------|------|----------|
+| **I. HyperPod Native-First** | ✅ 合规 | 使用 `sagemaker-hyperpod` SDK (Training/Cluster/Space 模块) |
+| **I.A HyperPod-Enhanced First** | ✅ 合规 | 优先 HyperPod Add-ons → AWS 托管服务 → K8S 生态 |
+| **I.B SDK-First Development** | ✅ 合规 | HyperPod SDK + boto3 + 成熟开源库 |
+| **II. Multi-Tenant Governance** | ✅ 合规 | HyperPod Task Governance (Kueue) + 三级优先级 |
+| **III. Full Lifecycle Observability** | ✅ 合规 | HyperPod Observability Add-on + CloudWatch + MLflow |
+| **IV. Resilience & Auto-Recovery** | ✅ 合规 | Auto-Resume + 分层检查点 (NVMe→FSx→S3) |
+| **V. Security & Compliance** | ✅ 合规 | TLS 1.2+ / VPC 隔离 / IAM+RBAC / KMS 加密 |
+| **VIII. IaC Excellence** | ✅ 合规 | AWS CDK (Python) + ArgoCD GitOps |
+| **IX. Test Strategy** | ✅ 合规 | 测试金字塔 (单元≥70%/集成100%/E2E) + TDD |
+| **X. Code Quality** | ✅ 合规 | SOLID + DRY/KISS/YAGNI + Clean Code |
+| **XI. UI/UX Consistency** | ✅ 合规 | AWS Cloudscape Design System (无例外) |
 
-### SDK-First Development (Principle I.B)
-- ✅ **HyperPod 功能**: 优先使用 `sagemaker-hyperpod` SDK (Cluster/Training/Inference/Space 四大模块)
-- ✅ **AWS 服务集成**: 优先使用 boto3 (S3, CloudWatch, SageMaker Model Registry, IAM 等)
-- ✅ **Kubernetes 操作**: 使用 kubernetes-client (仅在 SDK 不支持场景)
-- ✅ **数据库**: 使用 SQLAlchemy 2.0+ 和 aiomysql (成熟 ORM 和驱动)
-- ✅ **API 框架**: 使用 FastAPI 0.109+ 和 Pydantic v2 (现代 Python Web 框架)
-- ✅ **前端生态**: 使用 React 18, Cloudscape, Zustand, TanStack Query (成熟生态组件)
+### SDK 绕过场景 (已记录)
 
-**文档审查计划**: Phase 0 研究将验证 `sagemaker-hyperpod` SDK 对以下功能的支持:
-- 训练任务提交和生命周期管理 (DDP/FSDP/DeepSpeed 配置)
-- 检查点创建和恢复 API
-- Gang Scheduling 和抢占式调度配置
-- 训练任务状态监控和指标获取
+| 场景 | 原因 | 替代方案 |
+|------|------|----------|
+| Kueue Workload 状态监控 | HyperPod SDK 未提供 Kueue 状态详情 API | kubernetes-client |
+| NetworkPolicy 配置 | SDK 未覆盖网络隔离策略 | kubernetes-client |
+| SageMaker Model Registry | 非 HyperPod SDK 适用范围 | boto3 |
 
-### HyperPod-Enhanced Capabilities First (Principle I.A)
-- ✅ **首选 HyperPod 托管组件**:
-  - HyperPod Training Operator - 分布式训练管理 ✅
-  - HyperPod Task Governance (Kueue) - 资源配额和三级优先级调度 ✅
-  - HyperPod Observability Add-on (Prometheus + Grafana) - 监控和日志 ✅
-  - HyperPod Elastic Agent - 检查点管理和 Auto-Resume ✅
-  - Amazon SageMaker Spaces Add-on - JupyterLab/VS Code IDE ✅
+### 待验证项 (Phase 0 研究)
 
-- ✅ **次选 AWS 托管服务**:
-  - SageMaker Model Registry - 模型版本控制 ✅
-  - FSx for Lustre - 高性能训练数据存储 ✅
-  - S3 - 模型制品和冷检查点归档 ✅
-  - CloudWatch Logs - 日志聚合 ✅
-
-- ⚠️ **第三选 Kubernetes 生态组件**:
-  - kubernetes-client - 仅用于 Kueue Workload 状态查询和 NetworkPolicy 配置 (SDK 未覆盖场景)
-
-- ✅ **充分利用 HyperPod 特有扩展**:
-  - Deep Health Checks - 节点健康检测 ✅
-  - Auto-Resume 机制 - 训练任务自动恢复 ✅
-  - Tiered Checkpointing - 分层检查点存储 ✅
-
-- ✅ **工作负载锁定策略**: 平台专为 HyperPod 设计,不要求可在标准 K8S 集群运行 ✅
-
-**未使用非原生组件理由**: 所有核心功能均由 HyperPod 原生能力和 AWS 托管服务提供,无需引入第三方组件。
-
-### Code Design and Implementation Quality (Principle X)
-- ✅ **SOLID 原则**:
-  - 单一职责: 后端服务层按功能域划分 (训练任务/数据集/资源配额/用户管理)
-  - 开闭原则: 训练任务提交逻辑通过策略模式支持扩展新训练框架
-  - 依赖倒置: Repository 模式抽象数据访问,Service 层依赖接口
-
-- ✅ **DRY/KISS/YAGNI**:
-  - DRY: 公共逻辑提取为工具函数和 Base Service/Repository
-  - KISS: 优先使用 FastAPI 声明式路由和 Pydantic 验证,避免复杂中间件
-  - YAGNI: 仅实现 spec.md 明确要求的 5 个 User Stories 功能
-
-- ✅ **组件复用优先**:
-  - 后端: FastAPI (Web 框架), SQLAlchemy (ORM), Pydantic (验证), pytest (测试)
-  - 前端: React 18 (UI 框架), Cloudscape (组件库), Zustand (状态管理), TanStack Query (数据获取)
-  - HyperPod: `sagemaker-hyperpod` SDK (核心交互), boto3 (AWS 服务集成)
-
-- ✅ **Clean Code 实践**:
-  - 命名: 清晰的类名/函数名/变量名 (如 `TrainingJobService.submit_job()`)
-  - 函数精简: 单个函数 <50行,复杂逻辑拆分为私有方法
-  - 参数控制: 函数参数 ≤3个,超过则使用 Pydantic 模型封装
-  - 错误处理: 使用异常,避免返回 None 或错误码
-
-- ✅ **代码审查和测试**:
-  - 所有 PR 必须通过代码审查,验证 SOLID 原则和测试覆盖率
-  - 核心功能 (P1) 单元测试覆盖率 ≥80%
-  - 所有 API 端点集成测试覆盖率 100%
-  - 每个 User Story 至少 1 个 E2E 测试
-
-**自行实现场景**: 无。所有功能均使用成熟 SDK 和库实现。
-
-### UI/UX Consistency (Principle XI)
-- ✅ **AWS Cloudscape Design System**:
-  - 使用 `@cloudscape-design/components` 和 `@cloudscape-design/global-styles` ✅
-  - 所有 UI 组件从 Cloudscape 选择,禁止自定义实现或使用其他库 ✅
-
-- ✅ **视觉一致性**:
-  - 颜色方案: Cloudscape 预定义主题色/辅助色/状态色 ✅
-  - 字体系统: Amazon Ember 字体族 ✅
-  - 图标库: Cloudscape 官方图标集 ✅
-  - 间距系统: Cloudscape 栅格系统 ✅
-
-- ✅ **交互一致性**:
-  - 操作模式: 遵循 AWS Console 按钮位置和操作流程 ✅
-  - 反馈机制: 使用 Cloudscape 的 Flash/StatusIndicator/Spinner 组件 ✅
-  - 表单规范: Cloudscape 的 FormField/Input/Select/DatePicker 组件 ✅
-  - 导航模式: AppLayout/BreadcrumbGroup/SideNavigation 组件 ✅
-
-- ✅ **术语一致性**:
-  - 使用 AWS 官方术语: "Training Job" (非 Job/Task), "Cluster" (非 Environment)
-  - 术语词典: Phase 1 设计时创建,映射业务术语到 AWS 标准
-
-- ✅ **无障碍访问**:
-  - WCAG 2.1 AA 合规 (Cloudscape 内置支持) ✅
-  - 键盘导航支持 (所有组件可键盘操作) ✅
-  - ARIA 标签和语义化 HTML (Cloudscape 自动处理) ✅
-
-- ✅ **浏览器支持**: 仅支持 Chrome (用户需求明确)
-
-**参考设计**: AWS SageMaker Console, AWS EKS Console
-
-**组件库例外**: 无例外,必须使用 Cloudscape。
-
-### Multi-Tenant Resource Governance (Principle II)
-- ✅ 使用 HyperPod Task Governance (Kueue) 实现多租户配额管理
-- ✅ 支持三级优先级调度 (高/中/低 → Kueue PriorityClass: critical/high/medium)
-- ✅ 细粒度配额分配 (GPU/vCPU/内存按部门/项目维度)
-- ✅ 资源使用报告和成本归属 (CloudWatch Metrics + 平台数据库)
-- ✅ 配额借用和空闲资源共享策略 (Kueue BorrowWithinCohort 和 LendingLimit)
-
-### Full Lifecycle Observability (Principle III)
-- ✅ 集群级监控: HyperPod Observability Add-on (Prometheus + Grafana) + CloudWatch Metrics
-- ✅ 任务级监控: SDK 训练状态 + Prometheus 自定义指标 + CloudWatch Logs
-- ✅ 实验管理: SageMaker Managed MLflow (MLflow 3.0 Tracing)
-- ✅ 统一仪表板: Amazon Managed Grafana
-
-### Resilience and Auto-Recovery (Principle IV)
-- ✅ 深度健康检查: HyperPod Health Check Agent (GPU/网络/节点健康)
-- ✅ 自动节点恢复: HyperPod Automatic Node Recovery
-- ✅ 训练任务自动恢复: HyperPod Auto-Resume + 检查点加载
-- ✅ 分层检查点存储: NVMe (热) → FSx for Lustre (温) → S3 (冷)
-
-**弹性训练技术选择**: 暂不启用 Elastic Training 或 Checkpointless Training (Phase 2 评估)
-- 原因: User Stories 未明确要求动态扩缩容或秒级恢复,标准 Checkpointing 已满足需求
-- 互斥性: 两者不能同时启用,需根据具体训练场景选择
-
-### Security and Compliance (Principle V)
-- ✅ TLS 1.2+ 加密: 外部入口和 API 通信
-- ✅ VPC 隔离: HyperPod 集群部署在私有 VPC,使用 PrivateLink 访问 AWS 服务
-- ✅ IAM + Kubernetes RBAC: 细粒度权限控制 (用户角色映射到 K8S ServiceAccount)
-- ✅ KMS 加密: S3 SSE-KMS (模型制品/检查点/数据集)
-- ✅ 审计日志: 100%关键操作记录,90天保留期 (CloudWatch Logs + 平台数据库)
-
-### Infrastructure as Code Excellence (Principle VIII)
-- ✅ AWS CDK (TypeScript/Python): 基础设施配置：使用Python
-- ✅ GitOps (ArgoCD): EKS 集群配置和应用部署
-- ✅ Helm Charts: 应用部署标准化
-- ✅ 版本控制: 所有 IaC 代码存储在 Git 仓库
-- ✅ 自动化漂移检测: ArgoCD 同步状态监控
-
-### Test Strategy and Quality Assurance (Principle IX)
-- ✅ **测试金字塔**:
-  - 单元测试: 后端 ≥70%, 前端 ≥60%, 核心功能 (P1) ≥80%
-  - 集成测试: 所有 API 端点 100%
-  - E2E 测试: 每个 User Story 至少 1 个完整测试
-
-- ✅ **TDD 实践**: 先写测试,确保失败,再实现功能
-- ✅ **CI/CD 集成**: 所有测试在 PR 提交时自动运行,失败不允许合并
-- ✅ **测试覆盖率门禁**: 低于目标值的 PR 不允许合并
+- [ ] `sagemaker-hyperpod` SDK 训练任务生命周期管理 API 签名
+- [ ] 检查点创建和恢复 API 支持情况
+- [ ] Gang Scheduling 配置方式
 
 ## Project Structure
 
@@ -375,14 +245,15 @@ frontend/
 └── playwright.config.ts            # Playwright 配置
 
 infrastructure/                     # 基础设施即代码 (IaC)
-├── cdk/                            # AWS CDK (TypeScript)
-│   ├── lib/
-│   │   ├── hyperpod-stack.ts       # HyperPod 集群 Stack
-│   │   ├── database-stack.ts       # Aurora MySQL Stack
-│   │   ├── storage-stack.ts        # FSx/S3 Stack
-│   │   └── network-stack.ts        # VPC/PrivateLink Stack
-│   └── bin/
-│       └── app.ts                  # CDK 应用入口
+├── cdk/                            # AWS CDK (Python)
+│   ├── stacks/
+│   │   ├── hyperpod_stack.py       # HyperPod 集群 Stack
+│   │   ├── database_stack.py       # Aurora MySQL Stack
+│   │   ├── storage_stack.py        # FSx/S3 Stack
+│   │   └── network_stack.py        # VPC/PrivateLink Stack
+│   ├── app.py                      # CDK 应用入口
+│   ├── cdk.json                    # CDK 配置文件
+│   └── requirements.txt            # Python 依赖
 │
 └── gitops/                         # GitOps 配置 (ArgoCD)
     ├── apps/                       # 应用部署配置
