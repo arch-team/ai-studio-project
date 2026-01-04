@@ -18,6 +18,191 @@
 - Q: 成本核算的计费时间粒度应该是多少? → A: 按分钟计费，符合云计算标准实践，精确且开销可控
 - Q: 预算预警的阈值应该如何设置? → A: 多级预警(80%/90%/100%)，提供渐进式预警机制
 
+## Terminology Standards
+
+本章节定义平台术语标准，确保跨文档、代码和 API 的命名一致性。
+
+### 核心实体术语
+
+| 中文术语 | 英文术语 | 数据模型 (Python) | 数据库表 (MySQL) | API 路径 | 使用场景 |
+|---------|---------|-------------------|-----------------|----------|---------|
+| 训练任务 | Training Job | `TrainingJob` | `training_jobs` | `/training-jobs` | 自然语言描述、用户界面 |
+| 数据集 | Dataset | `Dataset` | `datasets` | `/datasets` | 自然语言描述、用户界面 |
+| 检查点 | Checkpoint | `Checkpoint` | `checkpoints` | `/checkpoints` | 自然语言描述、用户界面 |
+| 模型 | Model | `Model` | `models` | `/models` | 自然语言描述、用户界面 |
+| 资源配额 | Resource Quota | `ResourceQuota` | `resource_quotas` | `/resource-quotas` | 自然语言描述、用户界面 |
+| 用户 | User | `User` | `users` | `/users` | 自然语言描述、用户界面 |
+| 集群 | Cluster | `HyperPodCluster` | `hyperpod_clusters` | `/clusters` | 自然语言描述、用户界面 |
+| 审计日志 | Audit Log | `AuditLog` | `audit_logs` | `/audit-logs` | 自然语言描述、用户界面 |
+
+### 命名规范
+
+**1. 自然语言描述** (规范文档、用户界面、日志消息)
+- **中文**: "训练任务"、"数据集"、"检查点"、"资源配额"
+- **英文**: "Training Job"、"Dataset"、"Checkpoint"、"Resource Quota" (首字母大写，空格分隔)
+- **使用场景**: spec.md 功能需求描述、tasks.md 任务说明、UI 界面文本、用户通知消息
+
+**2. 代码实现** (Python 类、函数、变量)
+- **类名**: `TrainingJob`、`Dataset`、`Checkpoint`、`ResourceQuota` (PascalCase)
+- **变量/函数**: `training_job`、`dataset`、`checkpoint`、`resource_quota` (snake_case)
+- **常量**: `TRAINING_JOB_STATUS`、`MAX_RETRY_COUNT`、`DEFAULT_PRIORITY` (UPPER_SNAKE_CASE)
+- **模块名**: `training_job_service.py`、`dataset_repository.py` (小写 + 下划线)
+
+**3. 数据库** (MySQL 表、列)
+- **表名**: `training_jobs`、`datasets`、`checkpoints`、`resource_quotas` (小写复数 + 下划线)
+- **列名**: `job_name`、`dataset_uri`、`checkpoint_path`、`quota_type` (小写 + 下划线)
+- **索引名**: `idx_training_jobs_status`、`idx_users_email` (小写 + 下划线)
+
+**4. API 接口** (RESTful URL 路径)
+- **资源路径**: `/training-jobs`、`/datasets`、`/checkpoints`、`/resource-quotas` (小写复数 + 短横线)
+- **操作路径**: `/training-jobs/{id}/pause`、`/datasets/{id}/versions` (小写 + 短横线)
+- **查询参数**: `?job_id=123&status=running&owner_id=456` (小写 + 下划线)
+
+**5. 前端代码** (TypeScript/React)
+- **接口类型**: `TrainingJob`、`Dataset`、`Checkpoint` (PascalCase)
+- **变量/函数**: `trainingJob`、`dataset`、`checkpoint` (camelCase)
+- **组件名**: `TrainingJobList`、`DatasetUploader`、`CheckpointViewer` (PascalCase)
+- **文件名**: `TrainingJobList.tsx`、`DatasetUploader.tsx` (PascalCase)
+
+### 状态和枚举值
+
+#### 训练任务状态 (TrainingJob Status)
+
+| 状态 (中文) | 状态 (英文) | 代码常量 (Python) | API 值 | 数据库值 | 说明 |
+|------------|------------|------------------|--------|---------|------|
+| 已提交 | Submitted | `TrainingJobStatus.SUBMITTED` | `"Submitted"` | `"submitted"` | 等待资源分配和调度 |
+| 运行中 | Running | `TrainingJobStatus.RUNNING` | `"Running"` | `"running"` | 训练正在执行 |
+| 已暂停 | Paused | `TrainingJobStatus.PAUSED` | `"Paused"` | `"paused"` | 用户主动暂停 |
+| 被抢占 | Preempted | `TrainingJobStatus.PREEMPTED` | `"Preempted"` | `"preempted"` | 被更高优先级任务抢占 |
+| 已完成 | Completed | `TrainingJobStatus.COMPLETED` | `"Completed"` | `"completed"` | 训练成功完成 |
+| 失败 | Failed | `TrainingJobStatus.FAILED` | `"Failed"` | `"failed"` | 训练失败 |
+
+📖 **完整状态转换规则**: 参见 [Training Job State Model](#training-job-state-model-mandatory) 章节
+
+#### 优先级和训练模式
+
+| 概念 | 代码常量 (Python) | API 值 | 数据库值 | 显示文本 (中文) | 显示文本 (英文) |
+|------|------------------|--------|---------|----------------|----------------|
+| 优先级 - 高 | `Priority.HIGH` | `"High"` | `"high"` | "高" | "High" |
+| 优先级 - 中 | `Priority.MEDIUM` | `"Medium"` | `"medium"` | "中" | "Medium" |
+| 优先级 - 低 | `Priority.LOW` | `"Low"` | `"low"` | "低" | "Low" |
+| 训练模式 - DDP | `TrainingMode.DDP` | `"DDP"` | `"dpp"` | "DDP" | "DDP" |
+| 训练模式 - FSDP | `TrainingMode.FSDP` | `"FSDP"` | `"fsdp"` | "FSDP" | "FSDP" |
+| 训练模式 - DeepSpeed | `TrainingMode.DEEPSPEED` | `"DeepSpeed"` | `"deepspeed"` | "DeepSpeed" | "DeepSpeed" |
+
+**命名原则**:
+- **代码常量**: 全大写 + 下划线 (UPPER_SNAKE_CASE)
+- **API 值**: 首字母大写驼峰 (PascalCase)，保持可读性
+- **数据库值**: 全小写 (lowercase)，节省存储和便于索引
+- **显示文本**: 根据用户语言偏好选择中文或英文
+
+### 模型管理术语
+
+| 中文术语 | 英文术语 | 数据模型 (Python) | 数据库表/列 | API 路径/字段 | 说明 |
+|---------|---------|-------------------|------------|--------------|------|
+| 模型 | Model | `Model` | `models` | `/models` | 训练产出的模型制品 |
+| 模型版本 | Model Version | `Model.version` | `models.version` | `/models/{id}/versions` | 模型的特定版本号 (语义化版本) |
+| 模型注册表 | Model Registry | - | - | - | 通用概念，指模型版本管理系统 |
+| SageMaker Model Registry | SageMaker Model Registry | `Model.registry_arn` | `models.registry_arn` | `registryArn` | AWS 托管的模型注册服务 |
+| 模型制品 | Model Artifact | `Model.model_uri` | `models.model_uri` | `modelUri` | 模型文件的存储路径 (S3 URI) |
+| 训练指标 | Training Metrics | `Model.metrics` | `models.metrics` (JSON) | `metrics` | 模型评估指标 (accuracy/loss) |
+| 超参数 | Hyperparameters | `Model.hyperparameters` | `models.hyperparameters` (JSON) | `hyperparameters` | 训练超参数配置 |
+
+**模型生命周期状态**:
+
+| 状态 (中文) | 状态 (英文) | 代码常量 | API 值 | 数据库值 | 说明 |
+|------------|------------|---------|--------|---------|------|
+| 训练中 | Training | `ModelStatus.TRAINING` | `"Training"` | `"training"` | 模型正在训练 |
+| 已注册 | Registered | `ModelStatus.REGISTERED` | `"Registered"` | `"registered"` | 模型已注册到 Model Registry |
+| 已批准 | Approved | `ModelStatus.APPROVED` | `"Approved"` | `"approved"` | 模型已通过审核，可部署 |
+| 已部署 | Deployed | `ModelStatus.DEPLOYED` | `"Deployed"` | `"deployed"` | 模型已部署到生产环境 |
+| 已归档 | Archived | `ModelStatus.ARCHIVED` | `"Archived"` | `"archived"` | 模型已归档，不再使用 |
+| 已拒绝 | Rejected | `ModelStatus.REJECTED` | `"Rejected"` | `"rejected"` | 模型未通过审核 |
+
+**术语关系说明**:
+- **训练任务 (Training Job)** → 产生 → **检查点 (Checkpoint)** → 提升为 → **模型 (Model)**
+- **模型 (Model)** → 注册到 → **SageMaker Model Registry** → 生成 → **Model Registry ARN**
+- **模型版本 (Model Version)** = 同一模型的不同训练批次 (例如 v1.0.0, v1.1.0, v2.0.0)
+- **模型制品 (Model Artifact)** = 模型文件的物理存储 (通常为 S3 URI，例如 `s3://bucket/models/bert-v1.0.0/model.pt`)
+
+**版本命名规范** (遵循语义化版本 Semantic Versioning):
+- **格式**: `MAJOR.MINOR.PATCH` (例如 `1.0.0`, `1.2.3`, `2.0.0`)
+- **MAJOR**: 不兼容的架构变更 (例如从 BERT 切换到 GPT)
+- **MINOR**: 向后兼容的功能新增或性能提升 (例如增加训练数据集)
+- **PATCH**: 向后兼容的 bug 修复或微调 (例如修复过拟合问题)
+- **示例**: `bert-pretraining-v1.2.3` 表示 BERT 预训练模型的第 1 个主版本、第 2 次功能迭代、第 3 次 bug 修复
+
+### 缩写规范
+
+**✅ 允许使用的缩写** (业界标准):
+- **云服务**: AWS, S3, EKS, FSx, EBS, IAM, VPC, ARN, URI, URL
+- **机器学习**: GPU, CPU, ML, AI, DDP, FSDP, MLflow
+- **通用技术**: API, SDK, REST, HTTP, TLS, JSON, YAML, SQL
+- **训练框架**: PyTorch, TensorFlow (不缩写)
+
+**❌ 禁止使用的缩写** (易混淆或非标准):
+- TrainJob (应使用 TrainingJob)
+- DS (Dataset 的缩写，易与 DeepSpeed 混淆)
+- CP (Checkpoint 的缩写，不明确)
+- RQ (ResourceQuota 的缩写，不明确)
+- 任何自创缩写 (除非在术语词典中明确定义)
+
+### 术语使用示例
+
+**规范文档 (spec.md)**:
+```markdown
+- **FR-001**: 系统必须支持用户提交训练任务 (Training Job)
+- 训练任务状态包括: Submitted, Running, Paused, Completed, Failed
+```
+
+**任务清单 (tasks.md)**:
+```markdown
+- [ ] [T025] POST /training-jobs 端点实现 - 创建训练任务
+- [ ] [T027] GET /training-jobs/{id} 端点实现 - 查询训练任务详情
+```
+
+**Python 后端代码**:
+```python
+class TrainingJob(Base):
+    __tablename__ = "training_jobs"
+
+    id = Column(String, primary_key=True)
+    job_name = Column(String, nullable=False)
+    status = Column(Enum(TrainingJobStatus), default=TrainingJobStatus.SUBMITTED)
+
+@router.post("/training-jobs")
+async def create_training_job(training_job: TrainingJobCreate):
+    pass
+```
+
+**TypeScript 前端代码**:
+```typescript
+interface TrainingJob {
+  id: string;
+  jobName: string;
+  status: 'Running' | 'Paused' | 'Completed' | 'Failed';
+}
+
+const TrainingJobList: React.FC = () => {
+  const { data: trainingJobs } = useTrainingJobs();
+  return <Table items={trainingJobs} />;
+};
+```
+
+**API 请求示例**:
+```bash
+# 创建训练任务
+POST /api/v1/training-jobs
+{
+  "jobName": "bert-pretraining",
+  "trainingMode": "FSDP",
+  "priority": "High"
+}
+
+# 查询训练任务
+GET /api/v1/training-jobs?status=running&owner_id=user123
+```
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - 算法工程师提交和监控分布式训练任务 (Priority: P1)
@@ -299,8 +484,9 @@ TrainingJob状态: Preempted → Failed
 **实现映射**:
 - **优先级体系**: 通过Kueue的PriorityClass实现(high/medium/low)
 - **抢占机制**: Kueue的Preemption功能自动驱动
-- **检查点保存**: 在检测到Evicted condition时立即触发(见"抢占流程映射")
+- **检查点保存**: 在检测到Evicted condition时立即触发
 - **状态管理**: Preempted状态清晰表达被抢占的任务,自动重新排队恢复
+- 📖 **详细状态转换流程**: 参见 [Training Job State Model](#training-job-state-model-mandatory) 章节的"抢占流程映射"
 
 #### FR-010 自动检查点与断点续训
 
@@ -317,6 +503,8 @@ TrainingJob状态: Preempted → Failed
 - Preempted → Submitted → Running: 从最新检查点自动恢复
 - 节点故障恢复: 系统自动从检查点加载状态,继续训练
 - 恢复时间目标: 5分钟内完成(符合SC-004)
+
+📖 **详细状态转换和检查点管理**: 参见 [Training Job State Model](#training-job-state-model-mandatory) 章节
 
 ### API状态字段定义
 
@@ -537,6 +725,7 @@ training_job_failures_total{failure_category="..."}
     具体方法参考: `sagemaker.hyperpod.training.submit_training_job()`
     如该模块不支持特定训练模式（DataParallel/DDP/FSDP/DeepSpeed ZeRO）或需要更细粒度控制,
     MAY 使用 boto3（SageMaker API）或 kubernetes-client（直接操作 PyTorchJob CRD）作为备选方案
+  - ⚠️ **错误处理**: 如果 HyperPod SDK 不支持用户请求的训练模式（例如 SDK 版本过低或集群配置不满足要求），SDK API 返回 `UnsupportedModeError` 及原因说明。训练任务提交失败，返回 HTTP 400 Bad Request，错误消息包含不支持原因和建议的替代训练模式（例如 "DeepSpeed ZeRO requires SDK version ≥2.0, current: 1.5. Suggested alternatives: FSDP, DDP"），记录到审计日志。系统**不**自动降级训练模式，由用户根据错误信息主动选择替代方案并重新提交
 - **FR-002**: 系统必须提供训练任务队列管理，包括任务提交、调度、暂停、恢复和终止功能
   - 🔧 **实施约束**: MUST 使用 `sagemaker-hyperpod.training` 模块进行训练任务生命周期管理。
     具体操作包括：创建任务（submit_training_job）、监控状态（get_training_job_status）、暂停任务（pause_training_job）、恢复任务（resume_training_job）、终止任务（stop_training_job）。
@@ -558,40 +747,88 @@ training_job_failures_total{failure_category="..."}
 - **FR-005**: 系统必须提供大文件数据集的上传功能，支持断点续传和数据完整性校验
 - **FR-006**: 系统必须实现数据集的版本控制功能，支持版本创建、标记和比较（版本比较包括文件列表差异、元数据对比和统计指标变化）
 - **FR-007**: 系统必须提供训练任务级的实时监控功能，监控指标包括：(1)训练进度指标-Loss、Accuracy、Epoch/Step进度、学习率(Learning Rate) (2)资源利用率指标-GPU利用率、GPU显存使用率、CPU利用率、内存使用率 (3)性能指标-训练吞吐量(samples/sec)、迭代耗时 (4)可选高级指标-梯度范数(用户可选开启)。性能要求：训练指标刷新间隔≤30秒、日志流延迟<10秒、监控数据查询响应时间P99<2秒
-  - 🔧 **实施约束**: MUST 使用 HyperPod Observability Add-on (Prometheus + Grafana) 进行指标采集和可视化。
-    监控指标获取方式（按功能域选择）：
+  - 🔧 **实施约束**: 采用**双层监控架构**，明确职责分离
+
+    **第一层：平台运维监控** (HyperPod Observability Add-on - Prometheus + Grafana)
+    - **职责**: 集群级基础设施监控 (GPU/CPU/内存利用率、节点健康、训练任务队列状态、Kueue 调度延迟、存储和网络性能)
+    - **数据采集**: 自动采集，用户无需集成 (通过 Node Exporter、cAdvisor、DCGM Exporter)
+    - **刷新频率**: 15-30秒
+    - **数据保留**: 15-30天
+    - **查询接口**: Prometheus PromQL API 或 boto3 CloudWatch Metrics API
+    - **可视化**: Amazon Managed Grafana 仪表盘
+    - **适用场景**: 实时告警 (GPU 故障、节点 NotReady、存储满载)、运维监控、资源规划
+
+    **第二层：实验和模型管理** (SageMaker Managed MLflow)
+    - **职责**: 训练业务指标追踪 (loss/accuracy/perplexity)、超参数版本管理、模型版本控制、实验对比和可复现性
+    - **数据采集**: 用户在训练脚本中主动集成 MLflow API
+    - **记录频率**: 用户自定义 (推荐每个 epoch 或每 100 steps)
+    - **数据保留**: 永久存储 (或根据策略归档)
+    - **查询接口**: MLflow Tracking Server REST API + Web UI
+    - **可视化**: MLflow UI 实验对比图表
+    - **适用场景**: 超参数调优、模型版本对比、实验可复现性、模型血缘追踪
+
+    **监控指标获取方式（按功能域选择）**：
     1. **训练任务状态监控**：使用 `sagemaker-hyperpod.training.get_training_job_status()` 获取任务状态和基本进度信息
-    2. **资源利用率指标**：使用 boto3 调用 CloudWatch Metrics API 获取 GPU/CPU/内存利用率，或直接查询 Prometheus API
-    3. **自定义训练指标**（Loss/Accuracy等）：由训练代码通过 MLflow 或 Prometheus Client 上报，使用 boto3 查询 CloudWatch 或直接查询 Prometheus API
+    2. **资源利用率指标**（第一层）：直接查询 Prometheus API 或使用 boto3 调用 CloudWatch Metrics API
+    3. **训练业务指标**（第二层）：从 MLflow Tracking Server 查询 (推荐) 或使用 Prometheus Pushgateway (备选，仅用于实时告警场景)
     4. **日志流**：使用 boto3 调用 CloudWatch Logs API 获取实时日志
-    如需统一监控查询接口，MAY 使用 prometheus-client 或 grafana-api 等开源 SDK
-  - 📝 **自定义指标集成步骤**：
+    如需统一监控查询接口，MAY 使用 prometheus-client 或 mlflow-client 等开源 SDK
 
-    **方式一：Prometheus Client 集成（推荐用于实时指标）**
-    1. **安装依赖**：在训练容器镜像中添加 `prometheus-client` 包
-    2. **初始化 Pushgateway**：训练脚本中配置 Prometheus Pushgateway 地址（HyperPod 集群默认端点：`http://prometheus-pushgateway.monitoring.svc.cluster.local:9091`）
-    3. **定义指标**：使用 `Gauge` 类型定义训练指标（如 `training_loss`, `training_accuracy`, `learning_rate`）
-    4. **周期性上报**：每个训练 step/epoch 结束后调用 `push_to_gateway()` 推送指标到 Pushgateway
-    5. **指标命名规范**：格式为 `{namespace}_{metric_name}`，例如 `training_loss`, `training_gpu_utilization`
+  - 📊 **训练业务指标集成步骤**（推荐方案：SageMaker Managed MLflow）：
 
-    **方式二：MLflow 集成（推荐用于实验跟踪）**
-    1. **安装依赖**：在训练容器镜像中添加 `mlflow` 包
-    2. **配置 Tracking URI**：设置环境变量 `MLFLOW_TRACKING_URI` 指向 MLflow Tracking Server（需提前部署）
-    3. **创建实验**：训练脚本开始时调用 `mlflow.start_run()` 创建实验运行
-    4. **记录指标**：每个 step/epoch 使用 `mlflow.log_metric()` 记录 Loss、Accuracy 等指标
-    5. **记录参数**：使用 `mlflow.log_params()` 记录超参数（learning_rate, batch_size 等）
-    6. **记录模型**：训练完成后使用 `mlflow.pytorch.log_model()` 保存模型
+    **集成步骤**:
+    1. **安装依赖**：在训练容器镜像中添加 `mlflow` 包 (`pip install mlflow`)
+    2. **配置 Tracking URI**：MLflow Tracking URI 通过环境变量 `MLFLOW_TRACKING_URI` 注入训练容器 (由平台自动配置)
+    3. **设置实验**：训练脚本中设置实验名称 `mlflow.set_experiment('experiment-name')`
+    4. **启动运行**：使用上下文管理器 `with mlflow.start_run():` 创建实验运行
+    5. **记录超参数**：`mlflow.log_param('learning_rate', 1e-4)` 或 `mlflow.log_params({'batch_size': 32, 'optimizer': 'adam'})`
+    6. **记录训练指标**：`mlflow.log_metric('loss', loss_value, step=epoch)` (推荐每个 epoch 记录)
+    7. **记录模型制品**：`mlflow.pytorch.log_model(model, 'model')` 或 `mlflow.log_artifact('model.pt')`
+    8. **注册模型**：`mlflow.register_model(f'runs:/{run_id}/model', 'ModelName')`
 
-    **环境变量配置（训练任务提交时指定）**：
-    - `PROMETHEUS_PUSHGATEWAY_URL`: Pushgateway 地址（Prometheus Client）
-    - `MLFLOW_TRACKING_URI`: MLflow Tracking Server 地址（MLflow）
-    - `TRAINING_JOB_ID`: 训练任务唯一标识（用于指标标签，由平台自动注入）
-    - `TRAINING_JOB_NAME`: 训练任务名称（用于指标分组，由平台自动注入）
+    **代码示例**:
+    ```python
+    import mlflow
+
+    mlflow.set_tracking_uri(os.environ['MLFLOW_TRACKING_URI'])
+    mlflow.set_experiment('bert-pretraining')
+
+    with mlflow.start_run():
+        mlflow.log_params({'learning_rate': 1e-4, 'batch_size': 32})
+
+        for epoch in range(epochs):
+            loss, accuracy = train_one_epoch()
+            mlflow.log_metrics({'loss': loss, 'accuracy': accuracy}, step=epoch)
+
+        mlflow.pytorch.log_model(model, 'model')
+        mlflow.register_model(f'runs:/{mlflow.active_run().info.run_id}/model', 'BertModel')
+    ```
+
+    **环境变量配置**（由平台自动注入）：
+    - `MLFLOW_TRACKING_URI`: MLflow Tracking Server 地址 (例如 `http://mlflow.platform.svc.cluster.local:5000`)
+    - `TRAINING_JOB_ID`: 训练任务唯一标识 (用于实验标签)
+    - `TRAINING_JOB_NAME`: 训练任务名称 (用于实验分组)
 
     **性能要求**：
-    - 指标上报频率：建议每 10-30 秒上报一次，避免过于频繁导致性能下降
-    - 批量上报：建议使用批量 API（如 MLflow 的 `log_metrics()` 而非多次 `log_metric()`）
-    - 异步上报：推荐使用独立线程或异步方式上报指标，避免阻塞训练主循环
+    - 记录频率：推荐每个 epoch 或每 100 steps 记录一次 (避免过于频繁)
+    - 批量记录：使用 `mlflow.log_metrics()` 批量记录多个指标 (而非多次调用 `log_metric()`)
+    - 异步记录：MLflow 客户端内部已实现异步上报，用户无需额外处理
+
+  - 🔄 **备选方案：Prometheus Pushgateway**（仅用于实时告警场景）：
+
+    **适用场景**: 需要秒级实时告警的关键指标 (例如 loss 异常波动、梯度爆炸)
+
+    **集成步骤**:
+    1. **安装依赖**：`pip install prometheus-client`
+    2. **配置 Pushgateway 地址**：通过环境变量 `PROMETHEUS_PUSHGATEWAY_URL` 获取 (例如 `http://pushgateway.monitoring.svc.cluster.local:9091`)
+    3. **定义指标**：`from prometheus_client import CollectorRegistry, Gauge`
+    4. **推送指标**：`push_to_gateway(pushgateway_url, job='training-job-123', registry=registry)`
+
+    **限制**:
+    - ⚠️ 仅支持数值型指标 (无法记录超参数、模型制品)
+    - ⚠️ 无实验管理和版本对比能力
+    - ⚠️ 数据保留期短 (15-30天)
+    - ⚠️ 不推荐作为主要指标记录方案
 - **FR-008**: 系统必须实现多租户隔离，支持按部门/项目分配资源配额
 - **FR-009**: 系统必须提供资源使用统计和成本分析功能，支持按时间、项目和用户维度的数据查询，采用按分钟计费粒度进行成本核算，确保精确的资源使用成本追踪
 - **FR-010**: 系统必须实现自动检查点创建和断点续训功能，在以下场景自动触发检查点创建：(1)训练中断 (2)节点故障 (3)资源抢占 (4)用户手动触发 (5)定期自动创建(默认间隔10-15分钟)，确保训练状态可恢复且故障时平均损失训练进度不超过7.5分钟。系统依赖 HyperPod 的 Auto-Resume 机制和 Health Check Agent 实现节点故障自动检测和训练任务自动恢复

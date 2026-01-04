@@ -2,10 +2,10 @@
 
 ## 概述
 
-本文档包含企业级AI训练平台的完整实施任务清单,共计 136 个任务,按用户故事和优先级组织。
+本文档包含企业级AI训练平台的完整实施任务清单,共计 151 个任务,按用户故事和优先级组织。
 
 **技术栈**:
-- 后端: Python 3.11, FastAPI 0.109+, SQLAlchemy 2.0+, Alembic, sagemaker-hyperpod SDK, boto3 (SageMaker Spaces API)
+- 后端: Python 3.11, FastAPI 0.109+, SQLAlchemy 2.0+, Alembic, sagemaker-hyperpod SDK (包含 Space 模块), boto3 (AWS SDK for S3/CloudWatch/IAM 等非 HyperPod 服务)
 - 前端: React 18, TypeScript 5.3+, AWS Cloudscape Design System, Vite, Zustand, TanStack Query v5
 - 数据库: MySQL 8.0.28 (开发), Aurora MySQL 3.04.x (生产)
 - 存储: FSx for Lustre (训练数据), S3 (模型/检查点)
@@ -16,11 +16,11 @@
 - **P1 (Must-Have)**: US1 训练任务管理, US2 数据集管理, US3 资源配额和集群监控
 - **P2 (Important)**: US4 资源使用报表和成本分析, US5 在线开发环境
 
-**MVP 范围**: Phase 1 (Setup + IaC) + Phase 2 (Foundational) + Phase 3 (US1) + Phase 4 (US2) + Phase 5 (US3) = 87 个任务,提供完整的 P1 核心功能集:项目基础结构、IaC 基础、企业级认证、数据加密、训练任务管理、模型版本控制、数据集管理、资源配额、集群监控和审计日志。
+**MVP 范围**: Phase 1 (Setup + IaC) + Phase 2 (Foundational) + Phase 3 (US1) + Phase 4 (US2) + Phase 5 (US3) = 100 个任务,提供完整的 P1 核心功能集:项目基础结构、IaC 基础、HyperPod EKS 集群、HyperPod Add-ons (Training Operator/Kueue/Observability/Elastic Agent/Spaces)、FSx for Lustre 高性能存储、基础设施验证测试、HyperPod SDK 方法验证、企业级认证、数据加密、训练任务管理、模型版本控制、数据集管理、资源配额、集群监控和审计日志。
 
 ---
 
-## Phase 1: Setup - 项目初始化和基础设施即代码 (10 tasks)
+## Phase 1: Setup - 项目初始化和基础设施即代码 (16 tasks)
 
 **目标**: 搭建项目基础结构,配置开发环境,建立 IaC 基础
 
@@ -46,22 +46,96 @@
 - [ ] [T008a] AWS CDK 项目结构 - 创建 `infrastructure/cdk/` 目录结构,初始化 CDK TypeScript 项目,配置 `cdk.json`,定义 Stack 组织结构 (NetworkStack, DatabaseStack, StorageStack, ComputeStack),配置多环境支持 (dev/staging/prod)
 - [ ] [T008b] AWS CDK 核心 Stacks - 编写 VPC Stack (子网、安全组、NAT Gateway)、RDS Aurora MySQL Stack (Serverless v2, 自动备份)、S3 Buckets Stack (数据集、模型、检查点存储桶,启用版本控制和生命周期策略)、IAM Roles Stack (EKS 节点角色、应用服务角色)
 
-**并行执行机会**: T001, T002, T004, T005, T007 可并行执行,T003/T006/T008 依赖前者完成,T008a → T008b 串行。
+### HyperPod EKS 集群创建
+- [ ] [T008c] [P] HyperPod EKS 集群 Stack - `infrastructure/cdk/lib/hyperpod-stack.ts`,编写 AWS CDK Stack 创建 SageMaker HyperPod with EKS 集群:
+  - **EKS 集群配置**: 版本 EKS 1.32+,配置 VPC 和子网关联 (使用 T008b 创建的 VPC)
+  - **GPU 节点组**: 创建 GPU 节点组 (p4d.24xlarge, p5.48xlarge, trn1.32xlarge),配置 Auto Scaling Group (最小 2 节点,最大 100 节点)
+  - **EKS Add-ons**: 安装 EBS CSI Driver, FSx CSI Driver, VPC CNI (最新稳定版本)
+  - **EFA 网络配置**: 启用 EFA (Elastic Fabric Adapter) 高性能网络,配置网络拓扑优化
+  - **IAM 角色配置**: 创建 EKS 节点角色、Pod IAM 角色、Service Account 映射 (遵循最小权限原则)
+  - **安全配置**: 配置 Security Group (训练任务端口、Kubernetes API 端口、EFA 网络端口),配置 RBAC 策略
+  - **高可用性配置**: 多可用区部署 (至少 3 个 AZ),控制平面冗余
+  - **输出**: HyperPod 集群 ARN、EKS 集群名称、节点组配置参数
+  - **依赖**: T008a (CDK 项目结构), T008b (VPC Stack)
+  - **参考**: plan.md Constraints "Requires AWS SageMaker HyperPod with EKS infrastructure", spec.md FR-001/FR-003/FR-004
+
+### HyperPod Add-ons 安装
+- [ ] [T008d] [P] HyperPod Add-ons 配置 - `infrastructure/k8s/hyperpod-addons/`,安装和配置 HyperPod 核心组件:
+  - **Training Operator**: 安装 HyperPod Training Operator (PyTorchJob, TensorFlowJob CRD),配置训练框架支持 (PyTorch DDP/FSDP/DeepSpeed ZeRO),验证 Webhook 就绪
+  - **Task Governance (Kueue)**: 安装 Kueue 资源调度器,创建 ClusterQueue 和 LocalQueue,配置三级优先级 (PriorityClass: critical/high/medium 映射到 spec.md 的 high/medium/low),配置抢占规则和 Gang Scheduling (默认 60 秒超时,可配置)
+  - **Observability Add-on**: 部署 Prometheus + Grafana,配置 Node Exporter, cAdvisor, DCGM Exporter (GPU 指标),配置数据保留期 (30 天),创建预定义 Grafana 仪表盘 (集群健康、训练任务分布、资源利用率)
+  - **Elastic Agent**: 配置 HyperPod Elastic Agent,设置检查点管理参数 (默认 10-15 分钟间隔),配置 Auto-Resume 策略 (节点故障自动恢复),配置 Deep Health Check 和节点故障检测阈值 (PodsReady=False 持续 >30 秒)
+  - **Spaces Add-on**: 安装 Amazon SageMaker Spaces Add-on,配置 JupyterLab 和 VS Code IDE 镜像 (Data Science, PyTorch, TensorFlow),配置 EFS 持久化存储挂载,配置自动保存间隔 (JupyterLab 120 秒, VS Code 1 秒)
+  - **验证测试**: 验证所有 Add-ons Pod 状态为 Running,验证 Kueue ClusterQueue 就绪,验证 Prometheus 可查询指标 (up, node_cpu_seconds_total),验证 Training Operator Webhook 响应 (curl localhost:9443/healthz)
+  - **依赖**: T008c (HyperPod EKS 集群)
+  - **参考**: spec.md FR-001 (Training Operator), FR-004 (Kueue), FR-007/FR-016 (Observability), FR-010/FR-011 (Elastic Agent), FR-012/SC-015 (Spaces)
+
+### FSx for Lustre 文件系统创建
+- [ ] [T008e] [P] FSx for Lustre Stack - `infrastructure/cdk/lib/fsx-stack.ts`,创建 Amazon FSx for Lustre 高性能文件系统:
+  - **文件系统配置**: 创建 FSx for Lustre 文件系统,配置 Persistent_2 部署类型 (持久化存储),选择 500 MB/s/TiB 或 1000 MB/s/TiB 吞吐量级别以满足 ≥5GB/s 单客户端吞吐量要求 (推荐 1000 MB/s/TiB 配合 10 TiB 容量可达 10 GB/s)
+  - **容量规划**: 初始容量 ≥10 TiB (支持 spec.md FR-007 ≥10TB 数据集需求),启用自动扩容策略 (使用率 >80% 触发扩容),最大容量 100 TiB
+  - **S3 集成**: 配置 S3 Data Repository Association,链接训练数据 S3 存储桶 (T008b 创建),启用自动导入/导出 (ImportPath, ExportPath),配置 AutoImportPolicy (NEW/CHANGED/DELETED 事件自动同步)
+  - **网络配置**: 部署到 T008b 创建的 VPC 私有子网,配置安全组 (允许 EKS 节点访问 FSx 端口 988, 1021-1023),启用 VPC 内 DNS 解析
+  - **FSx CSI Driver**: 安装 AWS FSx CSI Driver 到 EKS 集群 (依赖 T008c),创建 StorageClass (provisioner: fsx.csi.aws.com, parameters: dnsname/mountname),配置 PersistentVolume 自动创建
+  - **挂载点配置**: 配置 DNS 名称和挂载路径 (/fsx),生成 PersistentVolume YAML 模板供训练任务使用,配置 lustre client 内核模块
+  - **性能验证**: 使用 fio 工具验证单客户端顺序读写吞吐量 ≥5GB/s,验证多客户端聚合带宽,确认满足 SC-005 性能目标 (S3 到 FSx 同步 1TB 数据 <10 分钟)
+  - **生命周期策略**: 配置每日自动备份到 S3 (备份保留期 7 天),配置数据同步调度 (每小时增量同步到 S3),设置存储容量告警 (使用率 >80%)
+  - **输出**: FSx 文件系统 ID、DNS 名称、挂载路径、StorageClass 名称
+  - **依赖**: T008a (CDK 项目结构), T008b (VPC Stack, S3 Buckets Stack), T008c (EKS 集群用于安装 CSI Driver)
+  - **参考**: spec.md Technical Context "FSx for Lustre (训练数据), ≥5GB/s 吞吐量", FR-007 "支持 ≥10TB 数据集", SC-005 "S3 到 FSx 同步时间 <10分钟 (1TB 数据集)"
+- [ ] [T008f] Kubernetes NetworkPolicy 和 QoS 配置 - `infrastructure/k8s/network-policies/`,配置 HyperPod EKS 集群网络隔离和 QoS 策略:
+  - **Pod 级网络隔离**: 使用 Kubernetes NetworkPolicy 实现训练任务 Pod 间的网络命名空间隔离
+  - **默认拒绝策略**: 配置 default-deny NetworkPolicy,仅允许必需的流量 (Kueue API, Prometheus metrics, MLflow tracking)
+  - **训练任务网络策略**: 为 PyTorchJob Pods 配置专用 NetworkPolicy,允许分布式训练通信 (EFA 网络) 和集群内部服务访问
+  - **QoS 类别配置**: 配置 Pod QoS Class (Guaranteed 用于训练任务,确保资源预留和稳定性)
+  - **带宽限制注解**: 使用 Kubernetes annotations 配置 Pod 网络带宽限制 (kubernetes.io/ingress-bandwidth, kubernetes.io/egress-bandwidth),防止单个任务占用过多带宽
+  - **EFA 网络亲和性**: 配置 nodeSelector 和 tolerations 确保 EFA 网络拓扑优化生效
+  - **监控和告警**: 集成 Prometheus NetworkPolicy Exporter 监控网络策略生效状态和连接拒绝事件
+  - **性能验证**: 验证网络延迟 P99 <10ms,带宽利用率 >80% 性能目标
+  - **参考**: spec.md FR-021 网络带宽管理和 QoS 策略 (依赖 T008c HyperPod EKS 集群, T008d HyperPod Add-ons)
+
+### 基础设施验证测试
+- [ ] [T008g] [P] HyperPod 基础设施验证测试 - 执行综合验证套件,确保基础设施就绪:
+  - **集群健康检查**: 验证 EKS 集群状态 (kubectl cluster-info), 节点 Ready 状态 (所有节点), 控制平面健康 (kube-apiserver, etcd)
+  - **GPU 节点验证**: 在 GPU 节点运行 nvidia-smi 测试 Pod, 验证 GPU 可见性和 CUDA 版本, 验证 GPU Operator 正常运行
+  - **HyperPod Add-ons 功能测试**:
+    - Training Operator: 提交测试 PyTorchJob (single-node hello-world), 验证 Job 状态转换为 Succeeded
+    - Kueue: 验证 ClusterQueue 和 LocalQueue 状态为 Active, 提交测试 Workload 验证调度
+    - Observability: 查询 Prometheus 指标 (up, node_cpu_seconds_total), 访问 Grafana 仪表盘
+    - Elastic Agent: 验证 Elastic Agent Pod Running, 检查检查点管理日志
+    - Spaces Add-on: 验证 Spaces CRD 注册, 检查 Spaces Controller Pod 状态
+  - **FSx 存储验证**: 创建测试 PersistentVolumeClaim, 挂载到测试 Pod, 执行读写性能测试 (dd 命令), 验证 S3 Data Repository Association 同步
+  - **网络连通性测试**: 验证 Pod 到 Internet 连通性 (curl https://aws.amazon.com), 验证 Pod 到 S3/CloudWatch PrivateLink 连通性, 验证 EFA 网络接口可用
+  - **输出**: 生成验证报告 (infrastructure-validation-report.md), 包含所有测试结果、失败项诊断建议、关键配置参数快照
+  - **依赖**: T008c (EKS 集群), T008d (Add-ons), T008e (FSx), T008f (NetworkPolicy)
+  - **参考**: aws-infrastructure.md CHK-TASK-019/020/021
+
+### HyperPod SDK 方法验证
+- [ ] [T008h] [P] HyperPod SDK 方法名验证 - 查阅 `sagemaker-hyperpod` SDK 官方文档,验证并记录正确的方法签名和参数：
+  - **Training 模块**: 训练任务提交、状态查询、暂停/恢复/终止方法的准确方法名和签名
+  - **Space 模块**: Space 创建、删除、查询方法的准确方法名和签名
+  - **Cluster 模块**: 集群状态查询、节点列表方法的准确方法名和签名
+  - **输出**: 生成方法签名参考文档 (`docs/hyperpod-sdk-reference.md`),包含示例代码和参数说明
+  - **参考**: [SageMaker HyperPod SDK Documentation](https://sagemaker-hyperpod-cli.readthedocs.io/)
+
+**并行执行机会**: T001, T002, T004, T005, T007 可并行执行,T003/T006/T008 依赖前者完成,T008a → T008b → T008c → T008d → T008e (串行,FSx CSI Driver 依赖 Add-ons) → T008f/T008h (可并行) → T008g (串行,验证所有基础设施) 串行。
 
 ---
 
-## Phase 2: Foundational - 基础设施 (20 tasks)
+## Phase 2: Foundational - 基础设施 (22 tasks)
 
 **目标**: 创建核心数据模型、企业级认证系统、审计日志基础设施、客户端封装和安全配置
 
 ### 核心数据表迁移
 - [ ] [T009] 创建 users 表迁移 - `backend/alembic/versions/001_create_users.py`,字段: id (UUID), username, email, iam_identity_id, role (enum), status, resource_quota_id (FK)
 - [ ] [T010] 创建 resource_quotas 表迁移 - `backend/alembic/versions/002_create_resource_quotas.py`,字段: id, name, quota_type, max_cpu_cores, max_gpu_count, max_memory_gb, max_storage_gb
+- [ ] [T010b] 创建 resource_limit_configs 表迁移 - `backend/alembic/versions/002b_create_resource_limit_configs.py`,字段: id, config_name, role (enum: admin/project_manager/engineer/viewer), project_id (FK, nullable), max_gpu_per_job, max_cpu_per_job, max_memory_gb_per_job, max_storage_gb_per_job, max_nodes_per_job, priority_default (enum: high/medium/low), created_at, updated_at
 - [ ] [T010a] 创建 audit_logs 表迁移 - `backend/alembic/versions/003_create_audit_logs.py`,字段: id, user_id (FK), operation_type (enum: create/update/delete/login/logout), resource_type (enum: training_job/dataset/model/user/quota), resource_id, request_data (JSON), response_data (JSON), ip_address, user_agent, status (enum: success/failed), created_at, expires_at (created_at + 90天)
 
 ### SQLAlchemy 模型
 - [ ] [T011] 创建 SQLAlchemy User 模型 - `backend/src/models/user.py`,使用 Pydantic v2 schema 验证,关联 resource_quotas
 - [ ] [T012] 创建 SQLAlchemy ResourceQuota 模型 - `backend/src/models/resource_quota.py`,包含配额验证逻辑
+- [ ] [T012b] 创建 ResourceLimitConfig 模型 - `backend/src/models/resource_limit_config.py`,包含限制验证逻辑,关联 User (通过 role),支持项目级和全局级配置 (project_id nullable),实现默认限制查询方法 (根据 user role + project 查找适用配置),提供配额检查和应用默认限制的服务接口
 - [ ] [T012a] 创建 AuditLog 模型 - `backend/src/models/audit_log.py`,包含自动过期逻辑 (expires_at = created_at + 90天),关联 User,支持操作类型和资源类型枚举,实现审计日志查询优化
 
 ### 认证中间件
@@ -70,10 +144,19 @@
 ### 企业级认证扩展
 - [ ] [T013a] SSO集成实现 - `backend/src/middleware/sso.py`,集成AWS IAM Identity Center (SAML 2.0/OIDC),配置IdP元数据,实现用户自动映射和角色同步
 - [ ] [T013b] RBAC策略管理 - `backend/src/services/rbac_service.py`,定义角色层次 (admin/project_manager/engineer/viewer),实现基于资源的权限检查,集成Kubernetes RBAC
-- [ ] [T013c] 本地账号管理API - `backend/src/api/auth.py`,实现POST/PUT /auth/local-accounts,支持密码重置和账号启用/禁用,作为SSO不可用时的备用认证
+- [ ] [T013c] 本地账号管理API - `backend/src/api/auth.py`,实现POST/PUT /auth/local-accounts,支持密码重置和账号启用/禁用,作为SSO不可用时的备用认证,包含以下密码安全要求:
+  - **密码强度策略**: 最小长度 12 字符,必须包含大小写字母、数字和特殊字符
+  - **密码哈希算法**: 使用 bcrypt (cost factor ≥12) 或 argon2id 存储密码哈希
+  - **密码重置安全**: 生成临时令牌 (有效期 15 分钟),通过邮件发送重置链接,令牌使用后立即失效
+  - **账号锁定策略**: 连续 5 次登录失败后锁定账号 30 分钟,防止暴力破解
+  - **密码历史记录**: 记录最近 5 个密码哈希,禁止重复使用
+  - **密码过期策略**: 密码有效期 90 天,过期后强制重置 (可选,管理员配置)
+  - **审计日志集成**: 记录所有密码操作 (创建、重置、修改) 到 audit_logs 表
+  - **安全响应头**: API 返回错误时使用通用消息 (避免泄露账号存在性信息)
+  - **参考**: spec.md FR-015 企业级认证和 SC-015 安全标准
 
 ### AWS 客户端封装
-- [ ] [T014] [P] HyperPod SDK 客户端封装 - `backend/src/clients/hyperpod_client.py`,封装 HyperPodPytorchJob API (create_training_job, get_job_status, pause_job, resume_job)
+- [ ] [T014] [P] HyperPod SDK 客户端封装 - `backend/src/clients/hyperpod_client.py`,封装 HyperPod Training 模块 API,使用 T008h 验证的方法名实现训练任务生命周期管理 (提交、状态查询、暂停/恢复/终止),参考 `docs/hyperpod-sdk-reference.md` 获取准确的方法签名 (依赖 T008h)
 - [ ] [T015] [P] S3 客户端封装 - `backend/src/clients/s3_client.py`,封装 boto3 S3 操作 (upload_file, download_file, list_objects),支持 presigned URLs
 - [ ] [T015a] S3 加密配置 - `backend/src/clients/s3_client.py`,配置所有 S3 上传使用 SSE-KMS 加密,指定 KMS key ID,验证加密状态,确保静态数据安全
 
@@ -89,15 +172,15 @@
 - [ ] [T020] [P] 配置 TanStack Query - `frontend/src/lib/queryClient.ts`,配置全局 query client,设置重试策略和缓存策略
 
 **并行执行机会**:
-- 数据库迁移: T009, T010, T010a 可并行
-- SQLAlchemy 模型: T011, T012, T012a 可并行 (依赖 T009, T010, T010a)
+- 数据库迁移: T009, T010, T010b, T010a 可并行
+- SQLAlchemy 模型: T011, T012, T012b, T012a 可并行 (依赖 T009, T010, T010b, T010a)
 - 认证系统: T013 → T013a, T013b, T013c (可并行) → T016 → T016a → T016b (依赖 T012a)
 - 客户端封装: T014, T015 可并行 → T015a (依赖 T015)
 - 前端配置: T017, T018, T019, T020 可并行
 
 ---
 
-## Phase 3: US1 (P1) - 训练任务管理 (24 tasks)
+## Phase 3: US1 (P1) - 训练任务管理 (29 tasks)
 
 **用户故事**: 算法工程师提交和监控分布式训练任务,管理模型版本
 
@@ -122,6 +205,7 @@
 - [ ] [T031a] [US1] POST /models 端点实现 - `backend/src/api/models.py`,注册训练完成的模型,自动从 checkpoint 提升,集成 SageMaker Model Registry,记录模型元数据(metrics, hyperparameters)
 - [ ] [T031b] [US1] GET /models 端点实现 - 支持分页、过滤 (training_job_id, status)、排序 (version, created_at),返回模型版本列表
 - [ ] [T031c] [US1] GET /models/{id}/versions 端点实现 - 返回模型版本历史,支持版本对比 (metrics diff, hyperparameter changes)
+- [ ] [T031d] [US1] POST /training-jobs/{id}/checkpoints 端点实现 - `backend/src/api/training_jobs.py`,支持用户手动触发检查点创建,验证任务状态 (仅 Running 状态可创建),调用 checkpoint_service 创建检查点,返回检查点 ID 和存储路径 (依赖 T038)
 
 ### 前端页面组件
 - [ ] [T032] [US1] [P] 训练任务列表页面 - `frontend/src/pages/TrainingJobs/List.tsx`,使用 Cloudscape Table 组件,支持分页/过滤/排序,实时状态更新
@@ -131,9 +215,39 @@
 - [ ] [T035a] [US1] [P] 模型版本管理页面 - `frontend/src/pages/Models/Versions.tsx`,使用 Cloudscape Table 展示模型版本历史,支持版本对比(metrics diff)、模型回滚、SageMaker Model Registry 同步状态显示
 
 ### HyperPod 集成服务
-- [ ] [T036] [US1] HyperPodPytorchJob 集成逻辑 - `backend/src/services/hyperpod_service.py`,封装 HyperPod SDK 训练任务生命周期管理 (create, pause, resume, delete),错误处理和重试
-- [ ] [T037] [US1] 训练任务状态同步服务 - `backend/src/services/training_sync_service.py`,定时任务 (30秒) 同步 HyperPod 训练状态到数据库,处理状态转换事件
-- [ ] [T038] [US1] Checkpoint 自动保存逻辑 - `backend/src/services/checkpoint_service.py`,监听训练任务检查点事件,自动保存到 FSx/S3,实现分层存储策略
+- [ ] [T036] [US1] HyperPodPytorchJob 集成逻辑 - `backend/src/services/hyperpod_service.py`,封装 HyperPod SDK 训练任务生命周期管理,使用 T008h 验证的 Training 模块方法实现训练任务提交、暂停、恢复、终止功能,实现错误处理和重试机制,参考 `docs/hyperpod-sdk-reference.md` (依赖 T008h, T014)
+- [ ] [T037] [US1] 训练任务状态同步服务 - `backend/src/services/training_sync_service.py`,定时任务 (30秒) 同步 HyperPod 训练状态到数据库,使用 T008h 验证的状态查询方法获取任务状态,处理状态转换事件,参考 `docs/hyperpod-sdk-reference.md` (依赖 T008h, T036)
+- [ ] [T037c] [US1] 训练任务停滞检测服务 - `backend/src/services/stall_detection_service.py`,实现 FR-022 停滞检测机制:
+  - **主指标监控**: 默认监控 Loss 指标,支持用户指定单一主检测指标 (Accuracy/Perplexity 等)
+  - **停滞判定逻辑**: 主指标在可配置时间窗口 (默认 30 分钟) 内变化率 <0.1% 触发停滞告警
+  - **辅助指标处理**: 其他指标异常仅记录日志供参考,不触发告警 (避免误报)
+  - **配置灵活性**: 支持用户自定义检测窗口时长和变化率阈值
+  - **禁用支持**: 支持用户禁用停滞检测 (适用于 GAN/RL 等 Loss 震荡场景)
+  - **告警机制**: 停滞检测触发后发送邮件/消息通知给任务提交者和平台管理员
+  - **终止选项**: 提供自动终止 (管理员配置) 或手动终止 (用户确认) 选项
+  - **定时任务调度**: 每 5 分钟执行一次检测 (覆盖所有 Running 状态任务)
+  - **参考**: spec.md FR-022 训练任务停滞检测机制 (依赖 T037 状态同步服务)
+- [ ] [T037a] [US1] SageMaker Managed MLflow 集成 - `backend/src/services/mlflow_service.py`,部署 MLflow Tracking Server (使用 SageMaker Managed MLflow 或自建),配置 MLflow Tracking URI 环境变量注入,提供 Python SDK 示例代码 (`backend/examples/mlflow_training_example.py`),文档化指标记录最佳实践 (指标命名规范、记录频率、超参数追踪模式),实现 MLflow 实验查询 API 集成到前端监控页面
+- [ ] [T037b] [US1] Prometheus Pushgateway 部署 (可选) - `infrastructure/monitoring/pushgateway.yaml`,部署 Pushgateway 服务到 EKS 集群 (仅用于实时告警场景),配置 Service 和环境变量 `PROMETHEUS_PUSHGATEWAY_URL` 注入,提供 Python SDK 示例代码 (`backend/examples/prometheus_metrics_example.py`),文档化与 MLflow 的职责分离和使用场景
+- [ ] [T038] [US1] Checkpoint 自动保存逻辑 - `backend/src/services/checkpoint_service.py`,实现 FR-010 定义的 5 种检查点创建触发场景:
+  - **(1) 定期自动创建**: 定时任务 (10-15 分钟间隔) 为 Running 状态的训练任务自动创建检查点
+  - **(2) 训练中断**: 检测到训练任务 Pods 异常终止时立即触发检查点创建
+  - **(3) 节点故障**: 检测到 PodsReady=False 且持续 >30 秒时触发检查点创建
+  - **(4) 资源抢占**: 检测到 Kueue Evicted condition (reason: Preempted) 时立即触发检查点创建（在抢占前完成，超时 5 分钟则强制抢占）
+  - **(5) 用户手动触发**: 提供服务接口支持 API 调用创建检查点 (参见 T031d)
+  - **检查点保存**: 自动保存到 FSx/S3,实现 FR-011 分层存储策略 (NVMe → FSx → S3)
+  - **参考**: spec.md FR-010 检查点触发场景映射
+- [ ] [T038b] [US1] Checkpoint 分层迁移服务 - `backend/src/services/checkpoint_migration_service.py`,实现 FR-011 分层存储迁移策略:
+  - **热检查点管理**: 保留最近 3 个检查点在 NVMe 本地存储
+  - **温检查点迁移**: 第 4-10 个检查点自动迁移到 FSx for Lustre
+  - **冷检查点归档**: 创建序号 >10 或创建时间 >72 小时的检查点归档到 S3
+  - **异步迁移执行**: 在检查点间隔期 (训练任务空闲时段) 执行迁移,避免影响训练性能
+  - **存储满载处理**: NVMe/FSx 使用率 >90% 时触发紧急迁移至下一层,所有层均满载则告警并暂停新检查点创建 (保留最近 1 个)
+  - **迁移失败回退**: 迁移失败时保留原位置检查点,记录失败日志,下次迁移周期重试 (最多 3 次),持续失败则触发告警
+  - **完整性保护**: 创建时计算 SHA-256 校验和,恢复前验证完整性,若损坏则自动尝试上一个有效检查点并告警
+  - **S3 生命周期策略**: 配置 S3 生命周期规则,自动删除 30 天前的冷检查点
+  - **定时任务调度**: 每 10 分钟执行一次迁移检查和执行
+  - **参考**: spec.md FR-011 分层检查点存储策略 (依赖 T038)
 - [ ] [T038a] [US1] SageMaker Model Registry 集成 - `backend/src/services/model_registry_service.py`,封装 SageMaker Model Registry API,自动注册训练完成的模型,管理模型版本生命周期(注册→批准→部署→归档)
 
 **并行执行机会**:
@@ -141,7 +255,7 @@
 - SQLAlchemy 模型: T023, T024, T024a 可并行 (依赖 T021, T022, T022a)
 - 后端 API: T025-T031 可部分并行 (依赖 T023, T024) → T031a, T031b, T031c 可并行 (依赖 T024a)
 - 前端页面: T032-T035 可并行 (依赖 T025-T031) → T035a (依赖 T031a-T031c)
-- 服务逻辑: T036 → T037 → T038, T038a 可并行
+- 服务逻辑: T036 → T037, T037c, T037a, T037b 可并行 → T038, T038a 可并行
 
 **验收标准**:
 - FR-001: 训练任务提交成功率 >95%
@@ -306,7 +420,7 @@
 - [ ] [T084] [US5] DELETE /ide/sessions/{id} 端点实现 - 调用 SageMaker DeleteSpace API 停止 IDE 会话,清理 Space 资源
 
 ### SageMaker Spaces 集成服务
-- [ ] [T085] [US5] SageMaker Spaces 集成 - `backend/src/services/sagemaker_spaces_service.py`,封装 SageMaker Spaces API (CreateSpace, DeleteSpace, DescribeSpace),配置生命周期脚本 (Lifecycle Configuration) 预装常用库,管理 Space 状态转换
+- [ ] [T085] [US5] SageMaker Spaces 集成 - `backend/src/services/sagemaker_spaces_service.py`,封装 `sagemaker-hyperpod.space` 模块 API,使用 T008h 验证的 Space 模块方法实现 Space 创建、删除、查询功能,配置生命周期脚本 (Lifecycle Configuration) 预装常用库,管理 Space 状态转换,参考 `docs/hyperpod-sdk-reference.md`。如 SDK 不支持特定配置,MAY 使用 boto3 作为备选并在代码中注释说明理由 (依赖 T008h)
 - [ ] [T085a] [US5] SageMaker Spaces 启动性能配置 - `backend/src/services/sagemaker_lifecycle_service.py`,配置 SageMaker Studio 生命周期脚本,预装常用 Python 库 (pip install pytorch transformers),选择合适的实例类型 (ml.t3.medium 开发/ml.g4dn.xlarge GPU 调试),配置 EFS 持久化存储避免重装,目标启动时间 <3分钟
 - [ ] [T085b] [US5] SageMaker Spaces 启动性能监控 - `backend/src/services/sagemaker_metrics_service.py`,集成 CloudWatch Metrics 监控 Space 启动时间,记录 CreateSpace API 调用到 InService 状态的耗时,P95/P99 启动时间统计,启动超时告警 (>3分钟触发)
 - [ ] [T085c] [US5] SageMaker Spaces 启动性能测试 - `backend/tests/test_sagemaker_spaces_performance.py`,端到端启动时间测试 (目标 <3分钟),并发启动压力测试 (≥50 并发 Space),不同实例类型启动时间对比,性能回归测试 (CI/CD 集成)
@@ -372,6 +486,9 @@
 ### 无障碍访问
 - [ ] [T104] 无障碍访问测试 - 使用 axe-core 测试 WCAG 2.1 AA 级别合规性,修复键盘导航、屏幕阅读器、颜色对比度问题
 
+### UI 组件库合规性
+- [ ] [T106] Cloudscape 组件库合规性审计 - 扫描前端代码 (`frontend/src/`),验证所有 UI 组件来自 @cloudscape-design/components,禁止使用 MUI/Ant Design/自定义实现,使用 ESLint 规则 (no-restricted-imports) 自动检测,生成合规性报告 (不合规组件列表、违规文件路径、修复建议),CI/CD 集成 (不合规则 PR 失败)
+
 ### 用户手册和部署文档
 - [ ] [T105] 用户手册和部署文档 - 创建用户手册 (`docs/user-guide.md`),部署文档 (`docs/deployment.md`),包含环境配置、故障排查、最佳实践
 
@@ -380,6 +497,7 @@
 - [ ] [T105b] ArgoCD Application 配置 - `infrastructure/argocd/applications/`,创建 ArgoCD Application 清单 (backend-app.yaml, frontend-app.yaml),配置 Git 仓库源 (auto-sync, self-heal),定义目标集群和命名空间,配置同步策略和健康检查
 - [ ] [T105c] Kubernetes 部署清单 - `infrastructure/k8s/`,编写 Deployment (backend/frontend), Service (ClusterIP/LoadBalancer), Ingress (ALB), ConfigMap (环境变量), Secret (敏感信息), HPA (自动扩缩容) 清单,遵循 Kubernetes 最佳实践
 - [ ] [T105d] CI/CD 流水线集成 - `.github/workflows/deploy.yaml`,配置 GitHub Actions 流水线,实现 build → test → push image → update Git manifest → ArgoCD auto-sync 完整流程,支持多环境部署 (dev/staging/prod)
+- [ ] [T105e] 配置漂移检测和审计追踪 - `infrastructure/gitops/monitoring/`,配置 ArgoCD 同步状态监控 (SyncStatus, Health Status),设置漂移告警规则 (Slack/邮件通知),记录配置变更审计日志 (Git commit SHA, 操作者, 变更时间),定时检查 (5分钟间隔) 并生成漂移报告,集成到 Grafana 仪表盘
 
 **并行执行机会**:
 - 单元测试: T091, T092 可并行
@@ -387,7 +505,7 @@
 - 文档和错误处理: T096, T097, T098, T099 可并行
 - 日志和监控: T100, T101 可并行 → T101a (依赖 T101) → T102, T102a 可并行
 - 前端优化: T103, T104 可并行
-- GitOps 工作流: T105a → T105b, T105c, T105d 可并行 (依赖 T105a)
+- GitOps 工作流: T105a → T105b, T105c, T105d 可并行 (依赖 T105a) → T105e (依赖 T105b)
 
 ---
 
@@ -469,17 +587,17 @@ Foundational (Phase 2)
 
 | Phase | 任务数 | 预估工作量 (人时) | 并行后工作量 (人时) | 优先级 |
 |-------|--------|-------------------|---------------------|--------|
-| Phase 1: Setup + IaC | 10 | 20 | 12 | 阻塞性 |
-| Phase 2: Foundational | 20 | 40 | 22 | 阻塞性 |
-| Phase 3: US1 (P1) | 24 | 48 | 23 | Must-Have |
+| Phase 1: Setup + IaC | 16 | 38 | 23 | 阻塞性 |
+| Phase 2: Foundational | 22 | 44 | 24 | 阻塞性 |
+| Phase 3: US1 (P1) | 29 | 58 | 29 | Must-Have |
 | Phase 4: US2 (P1) | 14 | 28 | 14 | Must-Have |
 | Phase 5: US3 (P1) | 19 | 38 | 18 | Must-Have |
 | Phase 6: US4 (P2) | 13 | 26 | 15 | Important |
 | Phase 7: US5 (P2) | 15 | 30 | 17 | Important |
-| Phase 8: Polish + GitOps | 21 | 42 | 24 | 质量保障 |
-| **总计** | **136** | **272** | **145** | - |
+| Phase 8: Polish + GitOps | 23 | 46 | 28 | 质量保障 |
+| **总计** | **151** | **308** | **168** | - |
 
-**MVP 范围 (Phase 1-5)**: 87 个任务, 89 人时 (并行后) - 包含完整的 P1 核心功能:训练任务、模型版本、数据集、资源配额、集群监控、审计日志和 IaC 基础
+**MVP 范围 (Phase 1-5)**: 100 个任务, 108 人时 (并行后) - 包含完整的 P1 核心功能:训练任务、模型版本、数据集、资源配额、集群监控、审计日志、HyperPod EKS 集群、HyperPod Add-ons、FSx for Lustre 高性能存储、基础设施验证测试、HyperPod SDK 方法验证和 IaC 基础
 
 ---
 

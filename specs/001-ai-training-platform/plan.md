@@ -25,9 +25,12 @@
 **Language/Version**: Python 3.11 (后端), TypeScript 5.3+ (前端)
 
 **Primary Dependencies**:
-- 后端: FastAPI 0.109+, SQLAlchemy 2.0+, Pydantic v2, `sagemaker-hyperpod` SDK (最新稳定版), boto3 (AWS SDK), aiomysql (MySQL 异步驱动)
+- 后端: FastAPI 0.109+, SQLAlchemy 2.0+, Pydantic v2, `sagemaker-hyperpod` SDK (最新稳定版,包含 Space 模块), boto3 (AWS SDK for S3/CloudWatch/IAM 等非 HyperPod 服务), aiomysql (MySQL 异步驱动)
 - 前端: React 18, AWS Cloudscape Design System (@cloudscape-design/components), Vite (构建工具), Zustand (状态管理), TanStack Query v5 (数据获取)
 - HyperPod: HyperPod Training Operator, Task Governance (Kueue), Observability Add-on, Elastic Agent, Spaces Add-on
+- Target Platform: AWS EKS cluster  
+- Constraints: Requires AWS SageMaker HyperPod with EKS infrastructure
+
 
 **Storage**:
 - 关系数据库: MySQL 8.0+ (开发环境本地部署), Amazon Aurora MySQL 3.x+ (生产环境,兼容 MySQL 8.0)
