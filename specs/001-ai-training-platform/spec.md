@@ -277,11 +277,18 @@ GET /api/v1/training-jobs?status=running&owner_id=user123
 
 **Why this priority**: 在线开发环境提供了便捷的实验能力，但作为辅助功能优先级低于核心训练和数据管理功能。
 
+**资源限制说明**:
+- **GPU 类型**: 支持 ml.g5.xlarge (1x NVIDIA A10G) 或 ml.g5.2xlarge (1x NVIDIA A10G) 实例
+- **会话超时**: 空闲 1 小时自动关闭，最长运行时间 8 小时
+- **存储配额**: 每用户 50GB EBS 存储（持久化环境），可访问共享 FSx for Lustre 数据集
+- **并发限制**: 每用户同时运行 1 个开发环境实例
+- **配额计算**: 开发环境资源消耗计入用户资源配额（参见 FR-008）
+
 **Independent Test**: 可以通过算法工程师登录在线环境，创建笔记本并运行GPU加速代码来验证。提供独立价值：实现快速实验能力。
 
 **Acceptance Scenarios**:
 
-1. **Given** 算法工程师已登录平台，**When** 启动在线JupyterLab环境，**Then** 系统分配资源并在30秒内提供可用的开发环境
+1. **Given** 算法工程师已登录平台，**When** 启动在线JupyterLab环境，**Then** 系统分配资源并在3分钟内提供可用的开发环境（基于SageMaker Spaces冷启动性能基准）
 2. **Given** 工程师在JupyterLab中编写PyTorch代码，**When** 执行使用GPU的代码，**Then** 代码能直接访问已分配的GPU资源并加速执行
 3. **Given** 工程师在开发环境中完成实验，**When** 点击"提交为训练任务"，**Then** 系统将代码转换为正式训练任务并提交到队列
 
@@ -294,7 +301,7 @@ GET /api/v1/training-jobs?status=running&owner_id=user123
 - **当用户提交的任务耗费资源但长期没有进展(训练卡住)时的处理**: 系统实现智能超时检测机制,监控训练任务的指标进度(如Loss值、Accuracy等)。如果任务在可配置的时间窗口内(默认30分钟)没有指标更新或指标无明显变化(变化率<0.1%),系统将:(1) 发送告警通知给任务提交者 (2) 标记任务为"疑似卡住"状态 (3) 提供手动终止或自动终止选项(需管理员配置) (4) 记录详细诊断日志用于问题排查
 - 当单个节点网络中断但未完全故障时，分布式训练如何正确响应？
 - 当配额调整导致正在运行的低优先级任务需要被抢占时，系统将在抢占前自动创建检查点，确保数据不丢失
-- **检查点存储满载时的处理**: 当检查点存储空间 (NVMe/FSx/S3) 使用率超过阈值时,系统采用分层应对策略:(1) 使用率 >80% 时触发告警并加速向下一层迁移 (2) 使用率 >90% 时触发紧急迁移,优先迁移最旧的检查点 (3) 所有层均满载时,系统保留最近 1 个检查点,暂停新检查点创建并发送紧急告警 (4) 管理员可配置自动清理策略 (保留最近 N 个检查点)
+- **检查点存储满载时的处理**: 当所有存储层 (NVMe/FSx/S3) 均满载时,系统保留最近1个检查点并暂停新检查点创建,发送紧急告警。详细分层应对策略 (告警阈值、迁移优先级、自动清理配置) 参见 FR-011 分层检查点存储策略
 - **检查点损坏时的处理**: 系统在检查点创建时计算 SHA-256 校验和,恢复前验证完整性。若检测到损坏:(1) 自动尝试从上一个有效检查点恢复 (2) 记录损坏事件并发送告警 (3) 如果连续多个检查点损坏,暂停自动恢复并通知用户手动介入 (4) 提供检查点健康检查 API 供用户主动验证
 
 ## Training Job State Model *(mandatory)*
@@ -466,7 +473,7 @@ TrainingJob状态: Preempted → Failed
 | 转换 | 触发条件 | 系统行为 |
 |------|---------|---------|
 | Submitted → Running | Kueue: Admitted=True AND PodsReady=True | 开始训练,启动指标监控 |
-| Submitted → Failed | 配置验证失败 OR 调度超时(>30分钟) OR 权限拒绝 | 记录失败原因,通知用户 |
+| Submitted → Failed | 配置验证失败 OR Gang Scheduling 连续失败(参见 FR-003 重试机制) OR 权限拒绝 | 记录失败原因,通知用户 |
 | Running → Paused | 用户调用 POST /training-jobs/{id}/actions/pause | 保存检查点,停止训练进程,保留资源 |
 | Running → Preempted | Kueue: Evicted=True (reason: Preempted) | 创建检查点,释放资源,自动重新排队 |
 | Running → Completed | 训练脚本exit code=0 AND Kueue: Finished=True | 保存最终模型,记录指标,释放资源 |
@@ -726,7 +733,8 @@ training_job_failures_total{failure_category="..."}
   - 🔧 **实施约束**: MUST 使用 `sagemaker-hyperpod.training` 模块的训练任务提交 API 实现（该模块专门用于训练任务的提交、状态监控和生命周期管理）。
     具体方法参考: `sagemaker.hyperpod.training.submit_training_job()`
     如该模块不支持特定训练模式（DataParallel/DDP/FSDP/DeepSpeed ZeRO）或需要更细粒度控制,
-    MAY 使用 boto3（SageMaker API）或 kubernetes-client（直接操作 PyTorchJob CRD）作为备选方案
+    MAY 使用 boto3（SageMaker API）或 kubernetes-client（直接操作 PyTorchJob CRD）作为备选方案,
+    但 MUST 提交例外申请并获得平台治理委员会批准,在代码中注释说明理由(遵循宪章 Principle I.B)
   - ⚠️ **错误处理**: 如果 HyperPod SDK 不支持用户请求的训练模式（例如 SDK 版本过低或集群配置不满足要求），SDK API 返回 `UnsupportedModeError` 及原因说明。训练任务提交失败，返回 HTTP 400 Bad Request，错误消息包含不支持原因和建议的替代训练模式（例如 "DeepSpeed ZeRO requires SDK version ≥2.0, current: 1.5. Suggested alternatives: FSDP, DDP"），记录到审计日志。系统**不**自动降级训练模式，由用户根据错误信息主动选择替代方案并重新提交
 - **FR-002**: 系统必须提供训练任务队列管理，包括任务提交、调度、暂停、恢复和终止功能
   - 🔧 **实施约束**: MUST 使用 `sagemaker-hyperpod.training` 模块进行训练任务生命周期管理。
@@ -735,20 +743,50 @@ training_job_failures_total{failure_category="..."}
 - **FR-003**: 系统必须实现Gang Scheduling（组调度）机制，确保分布式训练任务的所有Pod在同一调度周期内被调度(时间窗口≤60秒)，所有Pod必须同时就绪后才能开始训练。具体实现机制采用HyperPod Training Operator的默认Gang Scheduling行为：
   - ⏱️ **调度窗口**: 所有Pod必须在60秒内达到就绪状态（基于HyperPod Training Operator默认配置，具体值以 AWS 官方文档为准）
   - 🔄 **失败处理**: 若超时或部分Pod调度失败，任务状态转为Failed，已创建的Pod自动清理
-  - 🔁 **重试机制**: 遵循HyperPod Training Operator的默认重试策略（具体配置参考HyperPod官方文档）
+  - 🔁 **重试机制**: Gang Scheduling 失败后自动重试,策略如下 (基于 HyperPod Training Operator 默认配置,Phase 0 研究时验证):
+    - 最大重试次数: 3 次
+    - 重试间隔: 30 秒 (指数退避: 30s → 60s → 120s)
+    - 连续失败判定: 连续 3 次重试均失败后,任务状态转为 Failed
+    - 失败原因记录: statusDetails.failureCategory = "GangSchedulingExhausted"
+    - 可配置性: 可通过训练任务配置覆盖默认重试参数
+    - 📚 **参考文档**: [HyperPod Training Operator 重试配置](https://docs.aws.amazon.com/sagemaker/latest/dg/hyperpod-training-operator.html)
   - 📊 **状态转换**: Pending → Scheduling → Running（全部就绪）或 Failed（超时/失败）
   - 📚 **参考文档**: [AWS SageMaker HyperPod Training Operator Documentation](https://docs.aws.amazon.com/sagemaker/latest/dg/hyperpod-training-operator.html)
   - 🔧 **实施约束**: MUST 使用 HyperPod Training Operator 的原生 Gang Scheduling 能力。
     通过 `sagemaker-hyperpod.training` 模块提交训练任务时，Gang Scheduling 默认启用（无需额外配置）。
-    如需自定义 Gang Scheduling 参数（如超时时间），MAY 在训练任务配置中指定相关参数，或使用 kubernetes-client 直接配置 PyTorchJob CRD
-- **FR-004**: 系统必须支持基于优先级的抢占式调度，采用三级优先级体系(高/中/低)，高优先级任务可以抢占中低优先级任务的资源，中优先级任务可以抢占低优先级任务的资源，并在抢占前根据FR-010自动创建检查点保存训练状态。抢占时序保证：(1)抢占信号发出后,系统等待检查点创建完成后才释放资源 (2)检查点创建超时(默认5分钟)后强制抢占,记录警告日志 (3)强制抢占时保留上一个有效检查点,确保可恢复。优先级机制：(1)**完全采用SageMaker HyperPod Task Governance (基于 Kueue) 原生优先级规则** (2)三级优先级映射到HyperPod的critical/high/medium级别 (3)同级任务排序依照HyperPod默认策略(基于提交时间和资源需求) (4)抢占规则遵循HyperPod原生行为,包括冷却期和最大抢占次数限制
+    如需自定义 Gang Scheduling 参数（如超时时间），MAY 在训练任务配置中指定相关参数，或使用 kubernetes-client 直接配置 PyTorchJob CRD,
+    但 MUST 提交例外申请并获得平台治理委员会批准,在代码中注释说明理由(遵循宪章 Principle I.B)
+- **FR-004**: 系统必须支持基于优先级的抢占式调度，采用三级优先级体系(高/中/低)，高优先级任务可以抢占中低优先级任务的资源，中优先级任务可以抢占低优先级任务的资源，并在抢占前根据FR-010自动创建检查点保存训练状态。
+  - **抢占时序保证**:
+    - (1) 抢占信号发出后，系统等待检查点创建完成后才释放资源
+    - (2) 检查点创建超时（默认 5 分钟，参见 FR-010）后强制抢占，记录警告日志
+    - (3) 强制抢占时保留上一个有效检查点，确保可恢复
+  - **抢占恢复时序保证**:
+    - 检测到抢占 → 检查点保存: 最长 5 分钟（超时则强制终止，标记 checkpointTimeout）
+    - 检查点保存完成 → Pod 释放: 30 秒内
+    - 重新排队 → 重新调度: 取决于资源可用性，遵循 Kueue 调度策略
+    - 重新调度成功 → 恢复训练: 最长 2 分钟（加载检查点）
+  - **恢复优先级**: 被抢占任务保持原优先级重新排队（高优先级被抢占任务优先恢复）
+  - **恢复失败处理**: 若连续 3 次恢复失败，任务状态转为 Failed（参见状态模型连续抢占失败逻辑）
+  - **优先级机制**: (1)**完全采用SageMaker HyperPod Task Governance (基于 Kueue) 原生优先级规则** (2)三级优先级映射到HyperPod的critical/high/medium级别 (3)同级任务排序依照HyperPod默认策略(基于提交时间和资源需求) (4)抢占规则遵循HyperPod原生行为,包括冷却期和最大抢占次数限制
   - 🔧 **实施约束**: MUST 使用 HyperPod Task Governance (Kueue) 的原生抢占机制。
     任务优先级配置：通过 `sagemaker-hyperpod.training` 模块提交训练任务时，在任务配置中指定优先级参数（high/medium/low）。
     抢占状态监控：底层 Kueue Workload 状态驱动抢占流程（详见 Training Job State Model 章节），通过 `get_training_job_status()` 方法获取抢占状态。
-    如需细粒度配置（如自定义抢占策略、冷却期参数），MAY 使用 kubernetes-client 直接配置 Kueue ClusterQueue 和 PriorityClass 资源
+    如需细粒度配置（如自定义抢占策略、冷却期参数），MAY 使用 kubernetes-client 直接配置 Kueue ClusterQueue 和 PriorityClass 资源,
+    但 MUST 提交例外申请并获得平台治理委员会批准,在代码中注释说明理由(遵循宪章 Principle I.B)
 - **FR-005**: 系统必须提供大文件数据集的上传功能，支持断点续传和数据完整性校验
-- **FR-006**: 系统必须实现数据集的版本控制功能，支持版本创建、标记和比较（版本比较包括文件列表差异、元数据对比和统计指标变化）
-- **FR-007**: 系统必须提供训练任务级的实时监控功能，监控指标包括：(1)训练进度指标-Loss、Accuracy、Epoch/Step进度、学习率(Learning Rate) (2)资源利用率指标-GPU利用率、GPU显存使用率、CPU利用率、内存使用率 (3)性能指标-训练吞吐量(samples/sec)、迭代耗时 (4)可选高级指标-梯度范数(用户可选开启)。性能要求：训练指标刷新间隔≤30秒、日志流延迟<10秒、监控数据查询响应时间P99<2秒
+- **FR-006**: 系统必须实现数据集的版本控制功能，支持版本创建、标记和比较。版本比较功能包括：
+  - **文件列表差异**: 新增文件、删除文件、修改文件（基于文件路径和 MD5 校验和）
+  - **元数据对比**: 版本号、创建时间、创建者、描述信息、标签变化
+  - **统计指标变化**: 文件数量、总大小、数据集类型分布（如图像/文本/音频比例）
+  - **输出格式**: JSON 格式，包含 added_files、deleted_files、modified_files、metadata_diff、statistics_diff 字段
+- **FR-007**: 系统必须提供**训练任务级**的实时监控功能，监控指标包括：(1)训练进度指标-Loss、Accuracy、Epoch/Step进度、学习率(Learning Rate) (2)**任务维度资源利用率**-GPU利用率(按训练任务聚合,反映单个任务的GPU资源占用)、GPU显存使用率(按训练任务聚合)、CPU利用率(按训练任务Pod聚合)、内存使用率(按训练任务Pod聚合) (3)性能指标-训练吞吐量(samples/sec)、迭代耗时 (4)可选高级指标-梯度范数(用户可选开启)。性能要求：
+  - **训练业务指标刷新**（MLflow UI 可见性）: 用户记录后 30 秒内在 MLflow UI 可查询
+  - **资源利用率指标刷新**（GPU/CPU/内存）: Prometheus 采集间隔 15 秒，前端 UI 轮询间隔 30 秒
+  - **日志流延迟**: 从容器 stdout 到 CloudWatch Logs 可见 <10 秒
+  - **监控数据查询响应**: API 查询 Prometheus/MLflow 的 P99 响应时间 <2 秒
+
+  **职责边界说明**: FR-007 关注**训练任务维度**的监控(单个任务的资源占用、训练业务指标),FR-016 关注**集群维度**的监控(节点健康、节点级GPU利用率、集群整体负载)。两者在GPU利用率指标上的差异:FR-007反映"任务X使用了多少GPU资源",FR-016反映"节点Y的GPU被占用了多少"
   - 🔧 **实施约束**: 采用**双层监控架构**，明确职责分离
 
     **第一层：平台运维监控** (HyperPod Observability Add-on - Prometheus + Grafana)
@@ -833,14 +871,19 @@ training_job_failures_total{failure_category="..."}
     - ⚠️ 不推荐作为主要指标记录方案
 - **FR-008**: 系统必须实现多租户隔离，支持按部门/项目分配资源配额
 - **FR-009**: 系统必须提供资源使用统计和成本分析功能，支持按时间、项目和用户维度的数据查询，采用按分钟计费粒度进行成本核算，确保精确的资源使用成本追踪
-- **FR-010**: 系统必须实现自动检查点创建和断点续训功能，在以下场景自动触发检查点创建：(1)训练中断 (2)节点故障 (3)资源抢占 (4)用户手动触发 (5)定期自动创建(默认间隔10-15分钟)，确保训练状态可恢复且故障时平均损失训练进度不超过7.5分钟。系统依赖 HyperPod 的 Auto-Resume 机制和 Health Check Agent 实现节点故障自动检测和训练任务自动恢复
+- **FR-010**: 系统必须实现自动检查点创建和断点续训功能，支持 5 种检查点触发场景（详见 Training Job State Model 章节的"检查点触发场景映射"），确保训练状态可恢复且故障时平均损失训练进度不超过7.5分钟。系统依赖 HyperPod 的 Auto-Resume 机制和 Health Check Agent 实现节点故障自动检测和训练任务自动恢复
   - 🔧 **实施约束**: MUST 使用 HyperPod Elastic Agent 的检查点管理能力和 Auto-Resume 机制。
     实施方式（按功能域选择）：
     1. **训练任务检查点配置**：通过 `sagemaker-hyperpod.training` 模块提交训练任务时，在任务配置中指定检查点参数（检查点间隔、存储路径、恢复策略等）
     2. **集群级检查点策略**：使用 boto3 配置 HyperPod Cluster 的 Auto-Resume 参数和检查点存储配置
     3. **细粒度检查点控制**：如需自定义检查点触发逻辑或存储策略，MAY 使用 kubernetes-client 配置 PyTorchJob CRD 的检查点相关参数
     4. **手动触发检查点**：通过 `sagemaker-hyperpod.training.create_checkpoint()` 方法手动创建检查点
-- **FR-011**: 系统必须实现分层检查点存储策略，采用三层存储架构(NVMe本地存储→FSx for Lustre→S3)，根据检查点创建时间自动分层，优化长时间训练的检查点写入性能和存储成本。实现细节:(1) 热检查点(创建时间最近的3个)保留在NVMe本地存储,提供最快访问 (2) 温检查点(创建时间第4-10个)自动迁移到FSx for Lustre (3) 冷检查点(创建序号>10个或创建时间超过72小时)自动归档到S3 (4) 迁移在训练任务空闲时段(检查点间隔期)异步执行 (5) S3保留最近30天的检查点,超期自动清理 (6) **存储满载处理**:当NVMe/FSx存储使用率>90%时触发紧急迁移至下一层,若所有层均满载则告警并暂停新检查点创建(保留最近1个) (7) **迁移失败回退**:迁移失败时保留原位置检查点,记录失败日志,下次迁移周期重试(最多3次),持续失败则触发告警 (8) **检查点完整性保护**:创建时计算SHA-256校验和,恢复前验证完整性,若损坏则自动尝试上一个有效检查点并告警
+- **FR-011**: 系统必须实现分层检查点存储策略，采用三层存储架构(NVMe本地存储→FSx for Lustre→S3)，根据检查点创建时间自动分层，优化长时间训练的检查点写入性能和存储成本。实现细节:(1) 热检查点(创建时间最近的3个)保留在NVMe本地存储,提供最快访问 (2) 温检查点(创建时间第4-10个)自动迁移到FSx for Lustre (3) 冷检查点(创建序号>10个或创建时间超过72小时)自动归档到S3 (4) **迁移触发机制**:
+  - **主触发**: 检查点创建完成后立即异步触发迁移评估,在后续 10 分钟内执行迁移（避免影响下次检查点创建）
+  - **兜底机制**: 后台进程每 30 分钟扫描一次,执行失败或遗漏的迁移任务
+  - **强制迁移**: 当存储使用率 >90% 时,忽略性能保护机制,强制执行迁移以释放空间
+
+  (5) S3保留最近30天的检查点,超期自动清理 (6) **存储满载处理**:采用分层应对策略,当NVMe/FSx存储使用率>80%时触发告警并加速向下一层迁移,使用率>90%时触发紧急迁移(优先迁移最旧的检查点),若所有层均满载则保留最近1个检查点,暂停新检查点创建并发送紧急告警,管理员可配置自动清理策略(保留最近N个检查点) (7) **迁移失败回退**:迁移失败时保留原位置检查点,记录失败日志,下次迁移周期重试(最多3次),持续失败则触发告警 (8) **检查点完整性保护**:创建时计算SHA-256校验和,恢复前验证完整性,若损坏则自动尝试上一个有效检查点并告警
 - **FR-012**: 系统必须提供JupyterLab/VS Code在线开发环境，支持GPU直连 (通过 Amazon SageMaker Spaces Add-on 实现)
   - 🔧 **实施约束**: MUST 使用 Amazon SageMaker Spaces Add-on 提供在线开发环境。
     Space 管理（Space 是 `sagemaker-hyperpod` SDK 的四大功能模块之一）：
@@ -862,30 +905,82 @@ training_job_failures_total{failure_category="..."}
     2. **次选**：如需更高层抽象，MAY 使用 `sagemaker` Python SDK（`ModelPackage` 类）
     3. **备选**：如有特殊集成需求，MAY 使用其他成熟的开源 SDK
 - **FR-014**: 系统必须提供全链路日志收集和查询功能。日志来源：(1)容器stdout/stderr (2)训练框架日志(PyTorch等) (3)系统事件日志(Pod生命周期、调度事件)。日志格式：JSON结构化格式,包含timestamp、level、job_id、pod_name、message字段。性能要求：日志保留期30天、查询响应时间P99<3秒、支持全文检索。敏感信息处理：由用户在训练代码中自行处理,系统不做自动脱敏
-- **FR-015**: 系统必须实现完整的用户认证和权限控制，支持企业SSO(SAML/OIDC)集成与企业身份系统对接，同时提供本地账号作为备用认证方式，确保在SSO服务不可用时系统仍可正常运行。访问控制必须实现基于角色的访问控制（RBAC），遵循最小权限原则，确保用户仅能访问其职责范围内的资源和操作
-- **FR-016**: 系统必须提供集群级资源使用监控仪表盘和告警功能，包括节点健康、GPU利用率和内存/网络利用率。节点健康监控依赖 HyperPod 的 Health Check Agent 进行自动健康检查和故障检测，支持 Deep Health Check 进行深度硬件和软件层面的健康验证
+- **FR-015**: 系统必须实现完整的用户认证和权限控制，支持企业SSO(SAML/OIDC)集成与企业身份系统对接，同时提供本地账号作为备用认证方式，确保在SSO服务不可用时系统仍可正常运行。**SSO故障转移机制**:(1)SSO请求超时阈值为5秒 (2)检测到SSO请求超时或连续失败3次时,自动降级到本地账号登录模式 (3)降级期间,登录页面显示"SSO服务暂时不可用,请使用本地账号登录"提示 (4)后台每分钟执行SSO健康检查,恢复后自动切回SSO优先模式 (5)故障转移事件记录到审计日志。访问控制必须实现基于角色的访问控制（RBAC），遵循最小权限原则，确保用户仅能访问其职责范围内的资源和操作
+- **FR-016**: 系统必须提供**集群级**资源使用监控仪表盘和告警功能，监控指标包括：(1)节点健康状态 (2)**节点维度资源利用率**-节点级GPU利用率(反映单个节点的GPU被占用情况)、节点级内存利用率、节点级网络利用率 (3)集群整体负载-总GPU使用率、任务队列长度、Kueue调度延迟。节点健康监控依赖 HyperPod 的 Health Check Agent 进行自动健康检查和故障检测，支持 Deep Health Check 进行深度硬件和软件层面的健康验证。**职责边界说明**: FR-016 关注**集群和节点维度**的监控(基础设施健康、资源容量),FR-007 关注**训练任务维度**的监控(单个任务的资源消耗和业务指标)。两者在GPU利用率指标上的差异:FR-016反映"节点Y的GPU被占用了多少"(节点视角),FR-007反映"任务X使用了多少GPU资源"(任务视角)
   - 🔧 **实施约束**: MUST 使用 HyperPod Observability Add-on (Prometheus + Grafana) 和 Amazon Managed Grafana 进行集群监控和可视化。
     监控数据获取方式（按功能域选择）：
     1. **集群状态和节点健康**：使用 `sagemaker-hyperpod.cluster` 模块查询集群整体状态和节点健康状态（由 Health Check Agent 提供）
     2. **资源利用率指标**（GPU/CPU/内存/网络）：使用 boto3 调用 CloudWatch Metrics API 或 EKS API 获取集群级资源指标
     3. **自定义监控查询**：直接查询 Prometheus API 或使用 prometheus-client 等开源 SDK
     4. **可视化仪表盘**：使用 Amazon Managed Grafana 或通过 grafana-api 自定义仪表盘
-- **FR-017**: 系统必须实现100%关键操作的审计日志记录，审计日志保留期≥90天，记录内容包括用户身份、操作时间、操作类型、操作对象和操作结果
+- **FR-017**: 系统必须实现100%关键操作的审计日志记录，审计日志保留期≥90天，记录内容包括用户身份、操作时间、操作类型、操作对象和操作结果。
+  - **审计职责分层**:
+    - **AWS 原生审计** (AWS CloudTrail 自动记录): IAM 身份认证、S3 对象访问、EKS API 调用、SageMaker HyperPod API 调用
+    - **应用层审计** (本系统记录到 CloudWatch Logs): 训练任务生命周期操作、数据集管理、资源配额变更、检查点操作、模型版本管理
+  - **应用层关键操作范围**:
+    - 训练任务: 创建、更新、删除、暂停、恢复、终止
+    - 数据集: 创建、删除、版本创建
+    - 用户: 创建、更新角色、删除
+    - 资源配额: 创建、更新、删除
+    - 检查点: 创建、删除、恢复
+    - 模型: 注册、批准、部署、归档
+  - **审计日志字段结构** (JSON 格式):
+    ```json
+    {
+      "timestamp": "ISO 8601 时间戳",
+      "user_id": "用户ID",
+      "user_email": "用户邮箱",
+      "user_ip": "客户端IP地址",
+      "operation_type": "CREATE|UPDATE|DELETE|PAUSE|RESUME|TERMINATE",
+      "resource_type": "TrainingJob|Dataset|User|ResourceQuota|Checkpoint|Model",
+      "resource_id": "资源唯一标识符",
+      "resource_arn": "AWS ARN (如适用)",
+      "operation_result": "SUCCESS|FAILURE",
+      "error_message": "失败时的错误信息",
+      "request_id": "API 请求唯一标识符"
+    }
+    ```
+  - **存储实现**: 应用层审计日志写入 CloudWatch Logs（日志组: `/ai-platform/audit-logs`），保留期配置为 90 天，AWS 原生审计由 CloudTrail 自动管理
+  - **查询能力**: 支持按 user_id、resource_type、operation_type、time_range 过滤查询（通过 CloudWatch Logs Insights）
 - **FR-018**: 系统必须支持数据加密，包括静态数据加密（使用 S3 SSE-KMS）和传输中加密（所有网络通信使用 TLS 1.2 或更高版本）
 - **FR-019**: 系统必须根据用户角色和项目设置训练任务的默认资源限制，并允许管理员进行调整
-- **FR-020**: 系统必须在训练数据量接近存储系统容量时（剩余空间<10%）发出告警，并支持配置自动扩容或数据分层策略
+- **FR-020**: 系统必须实现分层存储容量监控和告警机制：
+  - **监控粒度**: 分别监控 NVMe、FSx for Lustre 二层存储使用率
+  - **告警阈值**:
+    - 警告级别 (80%): 发送邮件通知管理员，加速检查点迁移到下一层
+    - 严重级别 (90%): 触发紧急迁移（参见 FR-011），暂停新检查点创建（保留最近 1 个）
+    - 满载级别 (95%): 暂停新训练任务提交，发送紧急告警，要求管理员介入
+  - **自动扩容**: S3 自动扩容无需配置，FSx 支持自动扩容（需管理员在基础设施配置中启用），NVMe 容量固定不支持自动扩容
+  - **运行中任务保护**: 存储告警不影响已运行任务，但会限制新检查点创建频率（从 10-15 分钟延长到 30 分钟）
 - **FR-021**: 系统必须实现网络带宽管理和QoS策略，采用HyperPod默认网络隔离机制(EFA网络优化、Pod级网络命名空间隔离)，确保分布式训练任务间的网络隔离和性能保证。性能目标：网络延迟P99<10ms、带宽利用率>80%。可选扩展：支持用户通过任务配置自定义NetworkPolicy规则。隔离保证：完全依赖HyperPod网络隔离能力，隔离程度以HyperPod官方文档为准，任务间实际性能影响由底层基础设施决定
   - 🔧 **实施约束**: 网络隔离和QoS配置 MUST 优先依赖 HyperPod EKS 集群的原生 NetworkPolicy 和 EFA 网络拓扑优化，避免自行实现网络管理组件。如需扩展，MAY 通过 Kubernetes NetworkPolicy 进行自定义配置
-- **FR-022**: 系统必须实现训练任务超时和停滞检测机制。检测策略：(1)主检测指标为Loss(默认)或用户指定的单一指标 (2)停滞判定标准为主指标在可配置时间窗口(默认30分钟)内变化率<0.1% (3)其他指标异常仅记录日志供参考,不触发告警 (4)支持用户禁用停滞检测(适用于GAN/RL等Loss震荡的特殊训练场景)。触发后发送告警并提供自动/手动终止选项
+- **FR-022**: 系统必须实现训练任务超时和停滞检测机制。检测策略：
+  - **主指标选择逻辑**:
+    1. 优先使用用户在训练配置中指定的 `stall_detection_metric` 参数
+    2. 若未指定，按优先级自动选择第一个可用指标: Loss → Accuracy → Perplexity → 首个用户记录的指标
+    3. 若 30 分钟内无任何指标记录，不触发停滞检测
+  - **变化率计算**: 相对变化率 = |当前值 - 30分钟前值| / |30分钟前值|
+    - 特殊处理: 若 30 分钟前值为 0，使用绝对变化 |当前值 - 30分钟前值| < 0.001
+    - 停滞判定标准: 相对变化率 < 0.1% (可配置时间窗口默认 30 分钟)
+  - **其他指标处理**: 其他指标异常仅记录日志供参考，不触发告警
+  - **震荡型训练处理**: 用户可在训练配置中设置 `disable_stall_detection: true` 禁用检测（适用于 GAN/RL 等场景）
+
+  触发后发送告警并提供自动/手动终止选项
 
 ### Key Entities
 
 - **训练任务（TrainingJob）**: 表示一个AI模型训练作业，包含训练配置、资源需求、关联数据集、训练状态和指标数据
 - **数据集（Dataset）**: 表示训练数据集合，包含元数据、版本信息、存储位置和使用权限
-- **资源配额（ResourceQuota）**: 表示分配给特定团队/项目的计算资源限制，包含GPU数量、CPU核心、内存等资源指标和优先级信息(高/中/低三级优先级，映射到 Kueue 的 PriorityClass: critical/high/medium)
+- **资源配额（ResourceQuota）**: 表示分配给特定团队/项目的计算资源限制，包含GPU数量、CPU核心、内存等资源指标和优先级信息(高/中/低三级优先级，映射到 Kueue 的 PriorityClass: high/medium/low)
 - **用户（User）**: 系统用户，包含身份信息、所属团队/项目、权限等级和资源使用记录
 - **检查点（Checkpoint）**: 训练过程中保存的模型状态，包含存储位置、创建时间和相关训练指标
-- **模型（Model）**: 训练产出的模型，包含版本信息、性能指标、部署状态和生命周期信息
+- **模型（Model）**: 训练产出的模型，包含版本信息、性能指标、部署状态和生命周期信息。模型生命周期状态包括：
+  - **Training**: 训练中，模型尚未完成
+  - **Registered**: 已注册到 SageMaker Model Registry，待审批
+  - **Approved**: 已批准，可用于部署
+  - **Deployed**: 已部署到推理端点
+  - **Archived**: 已归档，不再使用
+  - **状态转换规则**: Training → Registered（训练完成自动注册）→ Approved（人工批准）→ Deployed（部署到端点）→ Archived（废弃时归档），支持从 Approved/Deployed 直接归档
 - **资源限制配置（ResourceLimitConfig）**: 基于用户角色和项目的默认资源限制设置，包含最大GPU数、内存限制、存储空间等
 
 ## Success Criteria *(mandatory)*

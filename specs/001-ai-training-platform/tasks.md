@@ -2,7 +2,7 @@
 
 ## 概述
 
-本文档包含企业级AI训练平台的完整实施任务清单,共计 151 个任务,按用户故事和优先级组织。
+本文档包含企业级AI训练平台的完整实施任务清单,共计 153 个任务,按用户故事和优先级组织。
 
 **技术栈**:
 - 后端: Python 3.11, FastAPI 0.109+, SQLAlchemy 2.0+, Alembic, sagemaker-hyperpod SDK (包含 Space 模块), boto3 (AWS SDK for S3/CloudWatch/IAM 等非 HyperPod 服务)
@@ -180,7 +180,7 @@
 
 ---
 
-## Phase 3: US1 (P1) - 训练任务管理 (29 tasks)
+## Phase 3: US1 (P1) - 训练任务管理 (31 tasks)
 
 **用户故事**: 算法工程师提交和监控分布式训练任务,管理模型版本
 
@@ -215,7 +215,7 @@
 - [ ] [T035a] [US1] [P] 模型版本管理页面 - `frontend/src/pages/Models/Versions.tsx`,使用 Cloudscape Table 展示模型版本历史,支持版本对比(metrics diff)、模型回滚、SageMaker Model Registry 同步状态显示
 
 ### HyperPod 集成服务
-- [ ] [T036] [US1] HyperPodPytorchJob 集成逻辑 - `backend/src/services/hyperpod_service.py`,封装 HyperPod SDK 训练任务生命周期管理,使用 T008h 验证的 Training 模块方法实现训练任务提交、暂停、恢复、终止功能,实现错误处理和重试机制,参考 `docs/hyperpod-sdk-reference.md` (依赖 T008h, T014)
+- [ ] [T036] [US1] HyperPodPytorchJob 集成逻辑 - `backend/src/services/hyperpod_service.py`,封装 HyperPod SDK 训练任务生命周期管理,使用 T008h 验证的 Training 模块方法实现训练任务提交、暂停、恢复、终止功能,实现错误处理和重试机制,参考 `docs/hyperpod-sdk-reference.md`。如该模块不支持特定训练模式,MAY 使用 boto3 (SageMaker API) 或 kubernetes-client (直接操作 PyTorchJob CRD) 作为备选方案,但 MUST 提交例外申请并获得平台治理委员会批准,在代码中注释说明理由 (遵循宪章 Principle I.B) (依赖 T008h, T014)
 - [ ] [T036a] [US1] Gang Scheduling 行为验证 - `backend/tests/integration/test_gang_scheduling.py`,验证 FR-003 Gang Scheduling 机制正确工作:
   - **验证场景 1**: 提交多节点分布式训练任务 (≥2 节点),验证所有 Pods 在 60 秒内同时就绪
   - **验证场景 2**: 模拟部分 Pod 调度失败,验证任务状态正确转为 Failed 且已创建的 Pods 自动清理
@@ -223,7 +223,15 @@
   - **监控指标**: 记录 Pod 就绪时间差,验证时间窗口 ≤60 秒
   - **测试工具**: 使用 pytest + kubernetes-client 查询 Pod 状态和事件
   - **参考**: spec.md FR-003 Gang Scheduling 机制 (依赖 T036, T008c HyperPod 集群)
-- [ ] [T037] [US1] 训练任务状态同步服务 - `backend/src/services/training_sync_service.py`,定时任务 (30秒) 同步 HyperPod 训练状态到数据库,使用 T008h 验证的状态查询方法获取任务状态,处理状态转换事件,参考 `docs/hyperpod-sdk-reference.md` (依赖 T008h, T036)
+- [ ] [T037] [US1] 训练任务状态同步服务 - `backend/src/services/training_sync_service.py`,定时任务 (30秒) 同步 HyperPod 训练状态到数据库,使用 T008h 验证的状态查询方法获取任务状态,处理状态转换事件,参考 `docs/hyperpod-sdk-reference.md`。如需细粒度状态监控,MAY 使用 kubernetes-client 查询 Kueue Workload 状态,但 MUST 提交例外申请并获得平台治理委员会批准,在代码中注释说明理由 (遵循宪章 Principle I.B) (依赖 T008h, T036)
+- [ ] [T037d] [US1] 抢占连续失败转 Failed 状态测试 - `backend/tests/integration/test_preemption_exhausted.py`,验证 FR-004 连续抢占失败机制:
+  - **验证场景 1**: 模拟训练任务被连续抢占 3 次,验证第 3 次抢占后任务状态转为 Failed
+  - **验证场景 2**: 验证 preemption_count 计数器正确累加 (每次抢占 +1)
+  - **验证场景 3**: 验证失败分类正确记录 (failureCategory = "PreemptionExhausted")
+  - **验证场景 4**: 验证自动停止重新排队,不再创建新的 Kueue Workload
+  - **验证场景 5**: 验证告警通知发送给任务提交者和平台管理员
+  - **测试工具**: 使用 pytest + kubernetes-client 模拟 Kueue Evicted condition
+  - **参考**: spec.md L427-462 连续抢占失败逻辑 (依赖 T037)
 - [ ] [T037c] [US1] 训练任务停滞检测服务 - `backend/src/services/stall_detection_service.py`,实现 FR-022 停滞检测机制:
   - **主指标监控**: 默认监控 Loss 指标,支持用户指定单一主检测指标 (Accuracy/Perplexity 等)
   - **停滞判定逻辑**: 主指标在可配置时间窗口 (默认 30 分钟) 内变化率 <0.1% 触发停滞告警
@@ -234,6 +242,14 @@
   - **终止选项**: 提供自动终止 (管理员配置) 或手动终止 (用户确认) 选项
   - **定时任务调度**: 每 5 分钟执行一次检测 (覆盖所有 Running 状态任务)
   - **参考**: spec.md FR-022 训练任务停滞检测机制 (依赖 T037 状态同步服务)
+- [ ] [T037e] [US1] 停滞检测机制测试 - `backend/tests/integration/test_stall_detection.py`,验证 FR-022 停滞检测功能:
+  - **验证场景 1**: 模拟 Loss 指标 30 分钟内变化率 <0.1%,验证停滞告警触发
+  - **验证场景 2**: 验证用户指定主指标 (Accuracy) 时的停滞检测逻辑
+  - **验证场景 3**: 验证禁用停滞检测配置 (disable_stall_detection: true) 生效
+  - **验证场景 4**: 验证告警通知发送给任务提交者和管理员
+  - **验证场景 5**: 验证主指标选择逻辑 (Loss → Accuracy → Perplexity 自动选择)
+  - **测试工具**: 使用 pytest + MLflow API 模拟指标记录和查询
+  - **参考**: spec.md FR-022 停滞检测策略 (依赖 T037c 停滞检测服务)
 - [ ] [T037a] [US1] SageMaker Managed MLflow 集成 - `backend/src/services/mlflow_service.py`,部署 MLflow Tracking Server (使用 SageMaker Managed MLflow 或自建),配置 MLflow Tracking URI 环境变量注入,提供 Python SDK 示例代码 (`backend/examples/mlflow_training_example.py`),文档化指标记录最佳实践 (指标命名规范、记录频率、超参数追踪模式),实现 MLflow 实验查询 API 集成到前端监控页面
 - [ ] [T037b] [US1] Prometheus Pushgateway 部署 (可选) - `infrastructure/monitoring/pushgateway.yaml`,部署 Pushgateway 服务到 EKS 集群 (仅用于实时告警场景),配置 Service 和环境变量 `PROMETHEUS_PUSHGATEWAY_URL` 注入,提供 Python SDK 示例代码 (`backend/examples/prometheus_metrics_example.py`),文档化与 MLflow 的职责分离和使用场景
 - [ ] [T038] [US1] Checkpoint 自动保存逻辑 - `backend/src/services/checkpoint_service.py`,实现 FR-010 定义的 5 种检查点创建触发场景:
@@ -278,7 +294,7 @@
 **用户故事**: 数据工程师管理和版本控制训练数据集
 
 ### 数据表迁移
-- [ ] [T039] 创建 datasets 表迁移 - `backend/alembic/versions/005_create_datasets.py`,字段: id, name, version, storage_type (enum: s3/fsx), storage_uri, dataset_type (enum: image/text/audio/video), size_bytes, owner_id (FK users), created_at, updated_at
+- [ ] [T039] 创建 datasets 表迁移 - `backend/alembic/versions/006_create_datasets.py`,字段: id, name, version, storage_type (enum: s3/fsx), storage_uri, dataset_type (enum: image/text/audio/video), size_bytes, owner_id (FK users), created_at, updated_at
 
 ### SQLAlchemy 模型
 - [ ] [T040] 创建 Dataset 模型 - `backend/src/models/dataset.py`,包含版本控制逻辑,关联 User,支持元数据存储
@@ -433,7 +449,7 @@
 - [ ] [T084] [US5] DELETE /ide/sessions/{id} 端点实现 - 调用 SageMaker DeleteSpace API 停止在线开发环境,清理 Space 资源
 
 ### SageMaker Spaces 集成服务
-- [ ] [T085] [US5] SageMaker Spaces 集成 - `backend/src/services/sagemaker_spaces_service.py`,封装 `sagemaker-hyperpod.space` 模块 API,使用 T008h 验证的 Space 模块方法实现 Space 创建、删除、查询功能,配置生命周期脚本 (Lifecycle Configuration) 预装常用库,管理 Space 状态转换,参考 `docs/hyperpod-sdk-reference.md`。如 SDK 不支持特定配置,MAY 使用 boto3 作为备选并在代码中注释说明理由 (依赖 T008h)
+- [ ] [T085] [US5] SageMaker Spaces 集成 - `backend/src/services/sagemaker_spaces_service.py`,封装 `sagemaker-hyperpod.space` 模块 API,使用 T008h 验证的 Space 模块方法实现 Space 创建、删除、查询功能,配置生命周期脚本 (Lifecycle Configuration) 预装常用库,管理 Space 状态转换,参考 `docs/hyperpod-sdk-reference.md`。如 SDK 不支持特定配置,MAY 使用 boto3 调用 SageMaker Spaces API 作为备选,但 MUST 提交例外申请并获得平台治理委员会批准,在代码中注释说明理由 (遵循宪章 Principle I.B) (依赖 T008h)
 - [ ] [T085a] [US5] SageMaker Spaces 启动性能配置 - `backend/src/services/sagemaker_lifecycle_service.py`,配置 SageMaker Studio 生命周期脚本,预装常用 Python 库 (pip install pytorch transformers),选择合适的实例类型 (ml.t3.medium 开发/ml.g4dn.xlarge GPU 调试),配置 EFS 持久化存储避免重装,目标启动时间 <3分钟
 - [ ] [T085b] [US5] SageMaker Spaces 启动性能监控 - `backend/src/services/sagemaker_metrics_service.py`,集成 CloudWatch Metrics 监控 Space 启动时间,记录 CreateSpace API 调用到 InService 状态的耗时,P95/P99 启动时间统计,启动超时告警 (>3分钟触发)
 - [ ] [T085c] [US5] SageMaker Spaces 启动性能测试 - `backend/tests/test_sagemaker_spaces_performance.py`,端到端启动时间测试 (目标 <3分钟),并发启动压力测试 (≥50 并发 Space),不同实例类型启动时间对比,性能回归测试 (CI/CD 集成)
