@@ -128,11 +128,230 @@
 | NetworkPolicy 配置 | SDK 未覆盖网络隔离策略 | kubernetes-client |
 | SageMaker Model Registry | 非 HyperPod SDK 适用范围 | boto3 |
 
-### 待验证项 (Phase 0 研究)
+## Phase 0: 技术可行性研究
 
-- [ ] `sagemaker-hyperpod` SDK 训练任务生命周期管理 API 签名
-- [ ] 检查点创建和恢复 API 支持情况
-- [ ] Gang Scheduling 配置方式
+*GATE: Must complete before Phase 1 implementation. Critical risk mitigation phase.*
+
+### 研究目标
+
+**核心目标**: 验证 `sagemaker-hyperpod` SDK 的可用性和完整性,确保后续开发基于真实可用的 API,避免架构假设错误导致的大规模返工。
+
+**关键问题**:
+1. SDK 方法签名是否与需求匹配?
+2. SDK 是否支持所有核心功能(训练管理、Space 管理、集群查询)?
+3. 如 SDK 不可用,备选方案的可行性如何?
+
+### Phase 0 研究任务
+
+#### T000: HyperPod SDK 方法验证研究
+
+**输入**:
+- SageMaker HyperPod 官方文档
+- `sagemaker-hyperpod` SDK 源码/文档
+- 项目功能需求 (spec.md FR-001, FR-002, FR-012)
+
+**研究内容**:
+1. **Training 模块验证**:
+   - [ ] 训练任务提交方法签名和参数 (submit_job/create_training_job)
+   - [ ] 训练任务状态查询方法 (get_job_status/describe_training_job)
+   - [ ] 训练任务生命周期控制 (pause/resume/stop/terminate)
+   - [ ] Gang Scheduling 配置参数支持情况
+   - [ ] 检查点创建和恢复 API 支持情况
+
+2. **Space 模块验证**:
+   - [ ] Space 创建方法签名 (create_space)
+   - [ ] Space 删除和查询方法 (delete_space/describe_space)
+   - [ ] Lifecycle Configuration 配置方式
+   - [ ] Space 状态管理 API
+
+3. **Cluster 模块验证**:
+   - [ ] 集群状态查询方法 (describe_cluster)
+   - [ ] 节点列表和资源监控 API
+   - [ ] 集群配置更新方法
+
+**输出产物**:
+- `docs/hyperpod-sdk-reference.md`: SDK 方法签名参考文档
+  - 包含所有验证通过的方法签名
+  - 示例代码和参数说明
+  - 版本兼容性说明
+- `docs/hyperpod-sdk-gaps.md`: SDK 功能缺口分析
+  - 列出不可用或不符合预期的功能
+  - 影响范围评估 (哪些需求受影响)
+  - 触发备选方案的决策依据
+
+**风险评估**:
+- ✅ **验证通过**: 进入 Phase 1,使用 SDK-First 开发模式
+- ⚠️ **部分功能缺失**: 触发 T000-fallback,设计混合方案
+- ❌ **SDK 不可用**: 触发治理委员会例外审批流程
+
+#### T000-fallback: SDK 备选方案设计与 POC 验证 (条件任务)
+
+**触发条件**: T000 验证发现 SDK 方法不存在、签名不符或功能不完整
+
+**执行策略**: 分三阶段进行,确保备选方案的技术可行性和架构合理性
+
+---
+
+##### 阶段 1: 备选方案分析 (0.5 人日)
+
+**boto3 方案评估** (SageMaker API):
+- **适用场景**: 训练任务管理、Model Registry 集成
+- **API 能力调研**:
+  - `create_training_job()`: 支持 HyperPod 集群的参数配置
+  - `describe_training_job()`: 状态查询和监控能力
+  - `stop_training_job()`: 终止任务支持 (暂停/恢复能力待验证)
+- **优势**: AWS 官方支持,稳定可靠,完整的错误处理
+- **劣势**: API 粒度较粗,缺少 HyperPod 特定功能 (如 Gang Scheduling 细粒度控制)
+- **风险**: 暂停/恢复功能可能不支持,需 POC 验证
+
+**kubernetes-client 方案评估** (直接操作 CRD):
+- **适用场景**: PyTorchJob/TFJob 状态监控、Kueue Workload 查询、NetworkPolicy 配置
+- **CRD 操作能力**:
+  - PyTorchJob/TFJob CRD: 创建、状态查询、更新、删除
+  - Kueue Workload CRD: 队列状态、优先级、配额查询
+  - NetworkPolicy: 网络隔离策略配置
+- **优势**: 完全控制 Kubernetes 资源,细粒度操作能力
+- **劣势**: 绕过 HyperPod 抽象层,需自行实现重试、错误处理、状态转换逻辑
+- **风险**: 实现复杂度可能显著高于预期,需 POC 验证
+
+**接口设计**:
+- 统一客户端抽象接口 (`clients/training_client.py`):
+  ```python
+  class TrainingClient(ABC):
+      @abstractmethod
+      def submit_job(self, job_spec: JobSpec) -> JobHandle
+      @abstractmethod
+      def get_job_status(self, job_id: str) -> JobStatus
+      @abstractmethod
+      def pause_job(self, job_id: str) -> bool
+      @abstractmethod
+      def resume_job(self, job_id: str) -> bool
+      @abstractmethod
+      def stop_job(self, job_id: str) -> bool
+  ```
+- 多种后端实现:
+  - `HyperPodSDKClient`: 优先使用 (如果 SDK 可用)
+  - `Boto3Client`: boto3 SageMaker API 实现
+  - `KubernetesClient`: kubernetes-client CRD 操作实现
+- 配置文件控制: `config.yaml` 中指定使用哪种客户端
+
+---
+
+##### 阶段 2: POC 技术验证 (1 人日)
+
+**目标**: 通过实际代码验证备选方案的技术可行性,识别潜在风险
+
+**boto3 POC 验证任务**:
+1. **创建训练任务**:
+   - 使用 `boto3.client('sagemaker').create_training_job()`
+   - 配置 HyperPod 集群 ARN: `ResourceConfig.ClusterArn`
+   - 验证 Gang Scheduling 参数: `ResourceConfig.InstanceGroups` 配置
+   - 预期结果: 成功创建训练任务,返回 JobName
+
+2. **查询任务状态**:
+   - 使用 `describe_training_job(TrainingJobName=...)`
+   - 验证状态字段: `TrainingJobStatus`, `SecondaryStatus`
+   - 查询训练指标: `FinalMetricDataList`
+   - 预期结果: 获取完整的任务状态信息
+
+3. **生命周期控制**:
+   - 暂停: 验证是否支持 `pause_training_job()` (可能不支持)
+   - 恢复: 验证是否支持 `resume_training_job()` (可能不支持)
+   - 终止: 使用 `stop_training_job()`,验证优雅停止机制
+   - 预期结果: 识别支持和不支持的操作,记录限制
+
+4. **日志和监控**:
+   - 通过 CloudWatch Logs 查询训练日志
+   - 验证 CloudWatch Metrics 集成
+   - 预期结果: 确认日志查询的延迟和完整性
+
+**kubernetes-client POC 验证任务**:
+1. **PyTorchJob CRD 操作**:
+   - 使用 `kubernetes.client.CustomObjectsApi` 查询 PyTorchJob
+   - 解析 `status.conditions` 判断任务状态
+   - 更新 PyTorchJob spec (如资源限制)
+   - 预期结果: 成功操作 CRD,理解状态转换逻辑
+
+2. **Kueue Workload 查询**:
+   - 查询 Kueue Workload CRD: `workload.status.admission`
+   - 获取队列优先级和配额使用情况
+   - 监控 Workload 的调度状态变化
+   - 预期结果: 成功获取细粒度调度信息
+
+3. **NetworkPolicy 配置**:
+   - 创建 NetworkPolicy 资源实现网络隔离
+   - 验证与 HyperPod EFA 网络的兼容性
+   - 预期结果: 确认 NetworkPolicy 不影响训练性能
+
+4. **错误处理和重试**:
+   - 实现 Kubernetes API 的指数退避重试
+   - 处理 API Server 超时、版本冲突等错误
+   - 预期结果: 评估自行实现错误处理的复杂度 (代码行数、测试覆盖率)
+
+**性能和兼容性测试**:
+- **API 响应时间**: 测量 boto3/kubernetes-client 的 P50/P99 延迟
+- **并发性能**: 测试 50 并发请求下的性能表现
+- **兼容性验证**: 确认与 HyperPod Training Operator 版本的兼容性
+- **边界情况**: 测试网络异常、API 限流、并发冲突等场景
+
+**输出**: POC 代码 (`poc/boto3-training-poc.py`, `poc/k8s-client-poc.py`) 和验证报告
+
+---
+
+##### 阶段 3: 方案整合与治理 (0.5 人日)
+
+**接口设计完善**:
+- 基于 POC 结果调整统一客户端接口
+- 确定不支持的功能及降级策略 (如 boto3 不支持暂停,fallback 到终止)
+- 设计配置切换机制和迁移路径
+
+**治理流程**:
+- 准备例外申请文档 (遵循宪章 Principle I.B):
+  - 说明 SDK 不可用的具体原因和影响范围
+  - 论证备选方案的必要性和合理性
+  - 提供 POC 验证结果作为技术支撑
+- 提交平台治理委员会审批
+- 审批通过后更新架构决策记录 (ADR)
+
+**影响评估**:
+- **Phase 2 任务影响**: T014 (HyperPod SDK 客户端封装) 需调整实现方式
+- **Phase 3 任务影响**: T036/T037 (训练任务管理和状态同步) 需修改 API 调用
+- **Phase 7 任务影响**: T085 (SageMaker Spaces 集成) 可能需要 boto3 替代
+- **返工成本估算**: 2-5 人日 (取决于缺失功能范围和接口调整复杂度)
+
+---
+
+**输出产物**:
+- `docs/hyperpod-sdk-fallback.md`: 备选方案详细设计 (含 POC 验证结果)
+- `docs/exception-request-template.md`: 例外申请模板
+- `docs/adr/001-sdk-fallback-strategy.md`: 架构决策记录
+- `poc/boto3-training-poc.py`: boto3 训练任务管理 POC 代码
+- `poc/k8s-client-poc.py`: kubernetes-client CRD 操作 POC 代码
+- `docs/poc-validation-report.md`: POC 验证报告
+  - 技术可行性结论
+  - 性能测试结果 (延迟、吞吐量)
+  - 功能限制清单
+  - 实施复杂度评估
+  - 风险和缓解策略
+
+**工作量**: 2 人日 (分析 0.5 + POC 1.0 + 整合 0.5)
+
+### Phase 0 完成标准
+
+- ✅ `docs/hyperpod-sdk-reference.md` 文档完成,包含所有核心方法签名
+- ✅ SDK 可用性决策明确: 完全可用 / 部分可用(需备选方案) / 不可用(需例外审批)
+- ✅ 如需备选方案,`docs/hyperpod-sdk-fallback.md` 设计完成
+- ✅ 治理委员会审批通过 (如需例外)
+
+### Phase 0 → Phase 1 交接
+
+**关键信息传递**:
+- SDK 可用性结论和验证报告
+- 方法签名参考文档供后续开发使用
+- 备选方案设计 (如适用)
+- 风险和约束条件清单
+
+**Phase 1 依赖**: Phase 1 的 IaC 和后端开发 MUST 基于 Phase 0 研究结论,禁止基于假设进行开发
 
 ## Project Structure
 
