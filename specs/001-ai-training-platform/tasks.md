@@ -117,10 +117,21 @@
 - [ ] [T008a] AWS CDK 项目结构 - 创建 `infrastructure/cdk/` 目录结构,初始化 CDK Python 项目 (与后端技术栈一致),配置 `cdk.json` 和 `requirements.txt`,定义 Stack 组织结构 (NetworkStack, DatabaseStack, StorageStack, ComputeStack),配置多环境支持 (dev/staging/prod)
 - [ ] [T008b] AWS CDK 核心 Stacks - 编写以下基础设施 Stacks:
   - **VPC Stack**:
-    - VPC CIDR: 10.0.0.0/16 (65,536 个 IP 地址)
-    - 公有子网: 10.0.0.0/20, 10.0.16.0/20, 10.0.32.0/20 (3 个 AZ, 用于 NAT Gateway/ALB)
-    - 私有子网 (应用层): 10.0.64.0/19, 10.0.96.0/19, 10.0.128.0/19 (3 个 AZ, 用于 EKS 节点/RDS)
-    - 私有子网 (数据层): 10.0.160.0/20, 10.0.176.0/20, 10.0.192.0/20 (3 个 AZ, 用于 FSx/ElastiCache)
+    - **VPC CIDR 配置**: 默认 10.0.0.0/16 (65,536 个 IP 地址),支持通过 CDK 上下文变量配置 (例如 `cdk.json` 中的 `vpcCidr` 参数或 `cdk deploy --context vpcCidr=10.0.0.0/15`)
+    - **容量验证**: CDK Stack 实现时需验证 CIDR 容量满足集群扩展需求 (计算公式: 可用节点数 ≈ 私有应用层子网IP数 / 每节点平均IP需求20,目标支持 ≥1000 节点)
+    - **子网自动划分**: 根据配置的 VPC CIDR 自动计算子网划分 (保持比例: 公有子网18.75%, 私有应用层37.5%, 私有数据层18.75%)
+    - **三层隔离设计** (符合 AWS Well-Architected 安全最佳实践):
+      - 公有子网 (默认): 10.0.0.0/20, 10.0.16.0/20, 10.0.32.0/20 (3 个 AZ, 用于 NAT Gateway/ALB)
+      - 私有子网-应用层 (默认): 10.0.64.0/19, 10.0.96.0/19, 10.0.128.0/19 (3 个 AZ, 用于 EKS 节点/RDS)
+      - 私有子网-数据层 (默认): 10.0.160.0/20, 10.0.176.0/20, 10.0.192.0/20 (3 个 AZ, 用于 FSx/ElastiCache)
+    - **部署模式配置** (通过 CDK 上下文变量 `deploymentMode` 选择,优化跨AZ流量成本):
+      - `single-az`: 单AZ部署 (开发/测试环境,跨AZ流量费用 ~$0/月,但无高可用保障)
+      - `multi-az` (默认): 多AZ高可用部署 (生产环境,所有层3个AZ均衡分布)
+      - `hybrid`: 混合模式 (推荐用于生产环境,计算层3AZ + 数据层主实例单AZ,跨AZ流量费用减少60-70%)
+    - **成本优化策略**:
+      - 混合模式: FSx/RDS 主实例固定在 AZ-a,备份在 AZ-b/AZ-c,配合 EKS 节点 AZ 亲和性调度 (参见 T008c-2),减少跨AZ数据传输费用
+      - 拓扑感知: EKS 节点组配置 `topologySpreadConstraints` 和 `nodeAffinity`,训练任务 Pod 优先调度到数据层同AZ节点
+      - 数据本地化: 利用节点 NVMe 本地存储缓存 FSx 数据,减少重复跨AZ传输
     - NAT Gateway: 在 2 个 AZ 部署 (AZ-a 和 AZ-b, 成本优化同时保留高可用)
       - AZ-a 私有子网 → NAT Gateway-a
       - AZ-b 私有子网 → NAT Gateway-b
@@ -159,9 +170,27 @@
     - 缩容触发: 节点 GPU 利用率 <20% 且持续 15 分钟
     - 缩容保护: 运行中训练任务的节点不参与缩容
     - 冷却期: 扩容后 10 分钟内不触发缩容
+  - **AZ 亲和性调度配置** (成本优化,减少跨AZ流量):
+    - 节点标签: 为每个节点自动添加 `topology.kubernetes.io/zone` 标签 (例如 `us-east-1a`)
+    - 拓扑约束: 配置节点组 `topologySpreadConstraints`,优先在数据层主 AZ (默认 AZ-a) 部署节点
+    - 训练任务亲和性模板: 提供 Pod 模板配置 `nodeAffinity`,自动将训练任务调度到与 FSx/RDS 同 AZ 的节点
+    - 数据本地化: 启用节点 NVMe 本地存储作为 FSx 数据缓存层,减少重复跨AZ数据传输
+    - 配置示例 (注入到训练任务 Pod):
+      ```yaml
+      affinity:
+        nodeAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            preference:
+              matchExpressions:
+              - key: topology.kubernetes.io/zone
+                operator: In
+                values:
+                - us-east-1a  # 与 FSx/RDS 主实例部署的 AZ 一致
+      ```
   - **EFA 网络配置**: 启用 EFA (Elastic Fabric Adapter) 高性能网络,配置网络拓扑优化
-  - **输出**: 节点组 ID、Auto Scaling 策略配置参数、EFA 网络配置
-  - **依赖**: T008c-1 (EKS 集群基础配置)
+  - **输出**: 节点组 ID、Auto Scaling 策略配置参数、AZ 亲和性配置、EFA 网络配置
+  - **依赖**: T008c-1 (EKS 集群基础配置), T008b (VPC Stack 部署模式配置)
   - **参考**: spec.md FR-003/FR-004
 - [ ] [T008c-3] [P] IAM 和安全配置 - `infrastructure/cdk/stacks/hyperpod_stack.py`,配置 IAM 角色和安全策略:
   - **IAM 角色配置**: 创建 EKS 节点角色、Pod IAM 角色、Service Account 映射 (遵循最小权限原则)
