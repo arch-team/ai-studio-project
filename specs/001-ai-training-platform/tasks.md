@@ -137,7 +137,15 @@
       - AZ-b 私有子网 → NAT Gateway-b
       - AZ-c 私有子网 → NAT Gateway-b (跨 AZ 路由)
       - 成本节省: $100/月 → $67/月 (节省 33%)
-    - 安全组、VPC 端点
+    - **VPC 端点 (PrivateLink)** - 创建以下必需端点（参考 plan.md L54-64）:
+      - S3 Gateway 端点 (无额外费用)
+      - ECR Interface 端点 (API + Docker)
+      - CloudWatch Interface 端点 (Logs + Monitoring)
+      - STS Interface 端点
+      - SageMaker API Interface 端点
+      - **EFS Interface 端点** (SageMaker Spaces 持久化存储必需，US5 依赖)
+      - 配置安全组规则允许 EKS 节点访问所有端点
+    - 安全组配置
   - **RDS Aurora MySQL Stack**:
     - Serverless v2 配置: 最小 ACU 0.5 (开发环境可暂停), 最大 ACU 16 (生产环境), 自动扩缩容
     - 备份策略: 自动备份保留期 7 天, 备份窗口 UTC 03:00-04:00, 启用时间点恢复 (PITR)
@@ -159,17 +167,18 @@
 ### HyperPod EKS 集群创建
 - [ ] [T008c-1] [P] HyperPod EKS 集群基础配置 - `infrastructure/cdk/stacks/hyperpod_stack.py`,创建 SageMaker HyperPod with EKS 集群基础:
   - **EKS 集群配置**: 版本 EKS 1.32+,配置 VPC 和子网关联 (使用 T008b 创建的 VPC)
-  - **EKS Add-ons**: 安装 EBS CSI Driver, FSx CSI Driver, VPC CNI (最新稳定版本)
+  - **EKS Add-ons**: 安装 EBS CSI Driver (≥v1.28.0), FSx CSI Driver (≥v1.9.0), VPC CNI (≥v1.16.0)，详细版本要求参见 plan.md L35-38
   - **输出**: HyperPod 集群 ARN、EKS 集群名称、集群 API Endpoint
   - **依赖**: T008a (CDK 项目结构), T008b (VPC Stack)
   - **参考**: plan.md Constraints "Requires AWS SageMaker HyperPod with EKS infrastructure", spec.md FR-001
 - [ ] [T008c-2] [P] GPU 节点组和 Auto Scaling 配置 - `infrastructure/cdk/stacks/hyperpod_stack.py`,创建 GPU 节点组和扩缩容策略:
   - **GPU 节点组**: 创建 GPU 节点组 (p4d.24xlarge, p5.48xlarge, trn1.32xlarge),配置 Auto Scaling Group (最小 2 节点,最大 100 节点)
-  - **Auto Scaling 策略**:
-    - 扩容触发: Kueue 队列中 Pending Workloads 数量 >0 且持续 5 分钟
-    - 缩容触发: 节点 GPU 利用率 <20% 且持续 15 分钟
-    - 缩容保护: 运行中训练任务的节点不参与缩容
-    - 冷却期: 扩容后 10 分钟内不触发缩容
+  - **Auto Scaling 策略**（使用 SageMaker HyperPod Autoscaling 原生能力）:
+    - 扩容触发: Kueue 队列中 Pending Workloads 数量 >0 且持续 5 分钟（HyperPod 默认配置）
+    - 缩容触发: 节点 GPU 利用率 <20% 且持续 15 分钟（HyperPod 默认配置）
+    - 缩容保护: 运行中训练任务的节点不参与缩容（HyperPod 原生能力）
+    - 冷却期: 扩容后 10 分钟内不触发缩容（HyperPod 默认配置）
+    - 配置方式: 使用 HyperPod Auto Scaling Group 配置，无定制化扩展
   - **AZ 亲和性调度配置** (成本优化,减少跨AZ流量):
     - 节点标签: 为每个节点自动添加 `topology.kubernetes.io/zone` 标签 (例如 `us-east-1a`)
     - 拓扑约束: 配置节点组 `topologySpreadConstraints`,优先在数据层主 AZ (默认 AZ-a) 部署节点
@@ -193,24 +202,32 @@
   - **依赖**: T008c-1 (EKS 集群基础配置), T008b (VPC Stack 部署模式配置)
   - **参考**: spec.md FR-003/FR-004
 - [ ] [T008c-3] [P] IAM 和安全配置 - `infrastructure/cdk/stacks/hyperpod_stack.py`,配置 IAM 角色和安全策略:
-  - **IAM 角色配置**: 创建 EKS 节点角色、Pod IAM 角色、Service Account 映射 (遵循最小权限原则)
-  - **安全配置**: 配置 Security Group (训练任务端口、Kubernetes API 端口、EFA 网络端口),配置 RBAC 策略
+  - **IAM 角色配置** (遵循最小权限原则):
+    - **EKS 节点角色**: ec2:DescribeInstances, ec2:DescribeNetworkInterfaces, ecr:GetAuthorizationToken, ecr:BatchGetImage, ecr:GetDownloadUrlForLayer, s3:GetObject/PutObject (限定 datasets/models/checkpoints bucket), logs:CreateLogStream/PutLogEvents, sts:AssumeRole
+    - **训练任务 Pod IAM 角色**: s3:GetObject/PutObject (限定训练相关 bucket), sagemaker:Describe*/List* (只读), cloudwatch:PutMetricData, logs:CreateLogStream/PutLogEvents
+    - **监控 Pod IAM 角色**: cloudwatch:GetMetricData/PutMetricData, logs:DescribeLogStreams/GetLogEvents (只读)
+    - **Service Account 映射**: training-sa → Training Pod Role, monitoring-sa → Monitoring Role, spaces-sa → Spaces Role
+  - **RBAC 策略配置**:
+    - **ClusterRole**: hyperpod-admin (集群管理), hyperpod-project-manager (项目管理 + 资源配额), hyperpod-engineer (训练任务 CRUD), hyperpod-viewer (只读)
+    - **Role (命名空间级)**: training-job-manager (训练任务 CRUD + Pod 日志查看), config-reader (ConfigMap/Secret 只读)
+    - **RoleBinding**: 用户角色映射到对应的 ClusterRole/Role (admin → hyperpod-admin, project_manager → hyperpod-project-manager, engineer → hyperpod-engineer, viewer → hyperpod-viewer)
+  - **安全配置**: 配置 Security Group (训练任务端口、Kubernetes API 端口、EFA 网络端口),启用 Pod Security Standards (restricted 模式)
   - **高可用性配置**: 多可用区部署 (至少 3 个 AZ),控制平面冗余
-  - **输出**: IAM 角色 ARN、Security Group ID、RBAC 策略清单
+  - **输出**: IAM 角色 ARN、Security Group ID、RBAC 策略清单、权限验证报告
   - **依赖**: T008c-1 (EKS 集群基础配置)
-  - **参考**: spec.md FR-001 (安全要求)
+  - **参考**: spec.md FR-001 (安全要求), AWS EKS IAM 最佳实践, K8s RBAC 文档
 
 ### HyperPod Add-ons 安装
 - [ ] [T008d-1] [P] 训练核心组件安装 - `infrastructure/k8s/hyperpod-addons/training/`,安装训练调度核心组件:
   - **Training Operator**: 安装 HyperPod Training Operator (PyTorchJob, TensorFlowJob CRD),配置训练框架支持 (PyTorch DDP/FSDP/DeepSpeed ZeRO),验证 Webhook 就绪
-  - **Task Governance (Kueue)**: 安装 Kueue 资源调度器,创建 ClusterQueue 和 LocalQueue,配置三级优先级 (PriorityClass: critical/high/medium 映射到 spec.md 的 high/medium/low),配置 Gang Scheduling (默认 60 秒超时,可配置)
+  - **Task Governance (Kueue)**: 安装 Kueue 资源调度器,创建 ClusterQueue 和 LocalQueue,配置三级优先级 (PriorityClass: high/medium/low，与 spec.md 保持一致),配置 Gang Scheduling (默认 60 秒超时,可配置)
   - **抢占策略**: 完全遵循 Kueue 原生抢占行为,不做自定义扩展。具体参数 (冷却期、借用策略等) 以 HyperPod Task Governance 默认配置为准,参见 [Kueue Preemption Documentation](https://kueue.sigs.k8s.io/docs/concepts/preemption/)
   - **验证测试**: 提交测试 PyTorchJob (single-node hello-world),验证 Job 状态转换为 Succeeded,验证 Kueue Workload 调度生效,验证 Training Operator Webhook 响应 (curl localhost:9443/healthz)
   - **依赖**: T008c-1, T008c-2, T008c-3 (HyperPod EKS 集群完整配置)
   - **参考**: spec.md FR-001 (Training Operator), FR-004 (Kueue)
 - [ ] [T008d-2] [P] 监控和弹性组件安装 - `infrastructure/k8s/hyperpod-addons/ops/`,安装运维监控组件:
   - **Observability Add-on**: 部署 Prometheus + Grafana,配置 Node Exporter, cAdvisor, DCGM Exporter (GPU 指标),配置数据保留期 (30 天),创建预定义 Grafana 仪表盘 (集群健康、训练任务分布、资源利用率)
-  - **Elastic Agent**: 配置 HyperPod Elastic Agent,设置检查点管理参数 (默认 10-15 分钟间隔),配置 Auto-Resume 策略 (节点故障自动恢复),配置节点故障检测阈值 (PodsReady=False 持续 >30 秒)。Deep Health Check 完全遵循 HyperPod Health Check Agent 原生能力 (GPU/EFA/存储健康检测),参见 [HyperPod Health Checks Documentation](https://docs.aws.amazon.com/sagemaker/latest/dg/sagemaker-hyperpod-operate-health-checks.html)
+  - **Elastic Agent**: 配置 HyperPod Elastic Agent,设置检查点管理参数 (默认间隔 10-15 分钟，支持用户通过训练任务配置自定义间隔范围 5-30 分钟),配置 Auto-Resume 策略 (节点故障自动恢复),配置节点故障检测阈值 (PodsReady=False 持续 >30 秒)。Deep Health Check 完全遵循 HyperPod Health Check Agent 原生能力 (GPU/EFA/存储健康检测),参见 [HyperPod Health Checks Documentation](https://docs.aws.amazon.com/sagemaker/latest/dg/sagemaker-hyperpod-operate-health-checks.html)
   - **验证测试**: 查询 Prometheus 指标 (up, node_cpu_seconds_total),访问 Grafana 仪表盘,验证 Elastic Agent Pod Running,验证健康检查日志
   - **依赖**: T008d-1 (需要 Training Operator CRD 用于监控训练任务)
   - **参考**: spec.md FR-007/FR-016 (Observability), FR-010/FR-011 (Elastic Agent)

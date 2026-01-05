@@ -36,6 +36,7 @@
 - FSx CSI Driver: ≥v1.9.0 (支持 Lustre 文件系统)
 - VPC CNI: ≥v1.16.0 (支持 EKS 1.32 和 NetworkPolicy)
 - 版本选择原则: 使用 EKS 托管 Add-on 的默认推荐版本，或高于上述最低版本
+- **HyperPod Training Operator 兼容性**: EKS 1.32+ 已验证兼容（官方支持 Kubernetes 1.28-1.33）
 
 **GPU 驱动和 CUDA 版本要求**:
 - NVIDIA Driver: ≥535.104.05 (支持 CUDA 12.2)
@@ -52,9 +53,16 @@
 - 日志存储: Amazon CloudWatch Logs (30天保留期)
 
 **VPC 端点 (PrivateLink)**:
-- 必需端点: S3 Gateway、ECR (API/Docker)、CloudWatch (Logs/Monitoring)、STS、SageMaker API
+- 必需端点:
+  - **S3 Gateway** - 数据集、模型、检查点存储 (Gateway 端点，无额外费用)
+  - **ECR (API/Docker)** - 容器镜像拉取 (Interface 端点)
+  - **CloudWatch (Logs/Monitoring)** - 日志和监控指标 (Interface 端点)
+  - **STS** - IAM 角色凭证获取 (Interface 端点)
+  - **SageMaker API** - HyperPod SDK 调用 (Interface 端点)
+  - **EFS** - SageMaker Spaces 持久化存储 (Interface 端点，US5 必需)
 - 目的: 确保 EKS 节点通过私有网络访问 AWS 服务，提升安全性和网络性能
-- 详细配置: 在 IaC 实施阶段根据实际需求确定具体端点列表和安全组规则
+- 详细配置: 在 IaC 实施阶段 (T008b) 创建所有必需端点和安全组规则
+- **可选端点**: KMS (S3 SSE-KMS 加密密钥访问优化)、Secrets Manager (敏感配置管理)
 
 **Testing**:
 - 后端: pytest (单元/集成测试), pytest-asyncio (异步测试), httpx (API 测试)

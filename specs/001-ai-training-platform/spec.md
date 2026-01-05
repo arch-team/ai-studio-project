@@ -768,7 +768,7 @@ training_job_failures_total{failure_category="..."}
     - 重新调度成功 → 恢复训练: 最长 2 分钟（加载检查点）
   - **恢复优先级**: 被抢占任务保持原优先级重新排队（高优先级被抢占任务优先恢复）
   - **恢复失败处理**: 若连续 3 次恢复失败，任务状态转为 Failed（参见状态模型连续抢占失败逻辑）
-  - **优先级机制**: (1)**完全采用SageMaker HyperPod Task Governance (基于 Kueue) 原生优先级规则** (2)三级优先级映射到HyperPod的critical/high/medium级别 (3)同级任务排序依照HyperPod默认策略(基于提交时间和资源需求) (4)抢占规则遵循HyperPod原生行为,包括冷却期和最大抢占次数限制
+  - **优先级机制**: (1)**完全采用SageMaker HyperPod Task Governance (基于 Kueue) 原生优先级规则** (2)三级优先级使用 Kueue PriorityClass: high/medium/low (3)同级任务排序依照HyperPod默认策略(基于提交时间和资源需求) (4)抢占规则遵循HyperPod原生行为,包括冷却期和最大抢占次数限制
   - 🔧 **实施约束**: MUST 使用 HyperPod Task Governance (Kueue) 的原生抢占机制。
     任务优先级配置：通过 `sagemaker-hyperpod.training` 模块提交训练任务时，在任务配置中指定优先级参数（high/medium/low）。
     抢占状态监控：底层 Kueue Workload 状态驱动抢占流程（详见 Training Job State Model 章节），通过 `get_training_job_status()` 方法获取抢占状态。

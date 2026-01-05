@@ -36,16 +36,58 @@
   - **成本节省**: $100/月 → $67/月 (节省 $33/月, 33%)
   - **高可用性**: 保留 2 AZ 容错能力, 单 AZ 故障时其他 AZ 不受影响
   - **权衡**: AZ-c 跨 AZ 数据传输成本略增 (~$0.01/GB), 但训练平台主要流量走 PrivateLink, 影响有限
-- [ ] CHK004 - VPC端点(PrivateLink)配置是否覆盖所有必需的AWS服务(S3/ECR/CloudWatch/SageMaker)？[完整性, plan.md L53-57]
+- [x] **CHK004 - ✅ 已解决** - VPC端点配置已补充EFS端点，满足SageMaker Spaces需求。[完整性, plan.md L54-64, tasks.md L140-148]
+  - **解决方案**: 采用方案 A (最小化配置) - 在现有端点基础上添加 EFS Interface 端点
+  - **已配置端点**: S3 Gateway、ECR (API/Docker)、CloudWatch (Logs/Monitoring)、STS、SageMaker API、**EFS** (新增)
+  - **EFS 端点用途**: SageMaker Spaces 持久化存储 (JupyterLab/VS Code 自动保存到 EFS，US5 必需)
+  - **可选优化**: KMS 端点 (S3 SSE-KMS 性能优化)、Secrets Manager 端点 (敏感配置管理)
+  - **风险提示**: 未配置 KMS 端点时，S3 SSE-KMS 加密将通过公网访问 KMS API，可能产生跨 AZ 流量费用
 - [ ] CHK005 - NetworkPolicy 网络隔离策略是否与HyperPod EFA网络优化兼容？[技术兼容性, tasks.md T008f]
 
 ### 2. EKS 集群配置
 
-- [ ] CHK006 - EKS 1.32+ 版本选择是否与HyperPod Training Operator兼容？[版本兼容性, plan.md L38]
-- [ ] CHK007 - EKS Add-ons (EBS CSI≥v1.28, FSx CSI≥v1.9, VPC CNI≥v1.16) 版本要求是否明确？[依赖管理, plan.md L34-38]
-- [ ] CHK008 - HyperPod EKS集群创建拆分为3个子任务(T008c-1/2/3)的设计是否合理？是否存在任务粒度过细的问题？[任务设计, tasks.md L89-112]
-- [ ] CHK009 - GPU节点组Auto Scaling策略(扩容/缩容触发条件、冷却期)是否足够灵活？[可配置性, tasks.md L96-102]
-- [ ] CHK010 - IAM角色和RBAC策略设计是否遵循最小权限原则？[安全性, tasks.md L106-111]
+- [x] **CHK006 - ✅ 已解决** - EKS 1.32+ 版本与HyperPod Training Operator兼容性已验证。[版本兼容性, plan.md L39]
+  - **决策**: 保持 "EKS 1.32+" 表述
+  - **兼容性验证**: HyperPod Training Operator 官方支持 Kubernetes 1.28, 1.29, 1.30, 1.31, 1.32, 和 1.33
+  - **EKS 1.32 兼容性**: ✅ 完全兼容
+  - **说明**: "1.32+" 表示支持 1.32 及更新版本（当前最新支持到 1.33）
+  - **实施要求**: plan.md L39 已添加兼容性说明
+- [x] **CHK007 - ✅ 已解决** - EKS Add-ons版本要求已明确，tasks.md已引用plan.md版本规范。[依赖管理, plan.md L35-38, tasks.md L170]
+  - **决策**: 在 tasks.md 中引用 plan.md 版本要求（单一数据源原则）
+  - **版本要求**: EBS CSI Driver ≥v1.28.0, FSx CSI Driver ≥v1.9.0, VPC CNI ≥v1.16.0
+  - **版本选择原则**: 使用 EKS 托管 Add-on 的默认推荐版本，或高于最低版本要求
+  - **实施要求**: tasks.md L170 已添加明确版本号和 plan.md 引用
+- [x] **CHK008 - ✅ 已解决** - HyperPod EKS集群创建拆分为3个子任务设计合理，粒度适中。[任务设计, tasks.md L168-209]
+  - **决策**: 保持 T008c-1/2/3 三个子任务设计
+  - **设计评估**:
+    - T008c-1: EKS 集群基础配置（集群创建 + VPC 关联 + Add-ons 安装）
+    - T008c-2: GPU 节点组和 Auto Scaling 配置（节点组 + 扩缩容 + AZ 亲和性 + EFA）
+    - T008c-3: IAM 和安全配置（IAM 角色 + Security Group + RBAC + 高可用）
+  - **优势**: 职责清晰、支持并行执行（T008c-2 和 T008c-3）、问题隔离良好、粒度适中
+  - **依赖关系**: T008c-2 和 T008c-3 依赖 T008c-1，但可并行执行
+  - **一致性**: 与 CHK011 的 HyperPod Add-ons 拆分策略一致（3个逻辑任务组）
+- [x] **CHK009 - ✅ 已解决** - GPU节点组Auto Scaling策略使用HyperPod原生能力，无需定制化扩展。[可配置性, tasks.md L176-181]
+  - **决策**: 使用 SageMaker HyperPod Autoscaling 原生能力，不做定制化扩展
+  - **原生能力**:
+    - 扩容触发: Kueue 队列 Pending Workloads >0 且持续 5 分钟（默认配置）
+    - 缩容触发: 节点 GPU 利用率 <20% 且持续 15 分钟（默认配置）
+    - 缩容保护: 运行中训练任务的节点不参与缩容（原生能力）
+    - 冷却期: 扩容后 10 分钟内不触发缩容（默认配置）
+  - **配置方式**: 使用 HyperPod Auto Scaling Group 配置，依赖原生默认行为
+  - **实施要求**: tasks.md L176-181 已标注使用原生能力
+- [x] **CHK010 - ✅ 已解决** - IAM角色和RBAC策略设计已明确权限范围，遵循最小权限原则。[安全性, tasks.md L204-218]
+  - **决策**: 明确具体权限范围和 RBAC 策略细节
+  - **IAM 角色权限**:
+    - EKS 节点角色: EC2/ECR/S3/Logs 必需权限（限定 bucket 范围）
+    - 训练任务 Pod 角色: S3/SageMaker/CloudWatch 权限（只读 + 指标写入）
+    - 监控 Pod 角色: CloudWatch/Logs 只读权限
+    - Service Account 映射: training-sa, monitoring-sa, spaces-sa
+  - **RBAC 策略**:
+    - ClusterRole: hyperpod-admin, hyperpod-project-manager, hyperpod-engineer, hyperpod-viewer
+    - Role: training-job-manager, config-reader（命名空间级）
+    - RoleBinding: 用户角色映射到对应的 ClusterRole/Role
+  - **安全增强**: 启用 Pod Security Standards (restricted 模式)
+  - **实施要求**: tasks.md L205-213 已补充详细权限清单
 
 ### 3. HyperPod Add-ons 配置
 
@@ -55,10 +97,51 @@
   - **T008d-2**: 监控组件 (Observability Add-on) - 可与 T008d-3 并行
   - **T008d-3**: 开发环境组件 (Spaces Add-on) - 可与 T008d-2 并行
   - **优势**: 更好的问题隔离，降低重试成本，启用并行执行机会
-- [ ] CHK012 - Kueue三级优先级(critical/high/medium)映射到spec.md的high/medium/low是否合理？[需求对齐, tasks.md L117-118]
-- [ ] CHK013 - HyperPod抢占策略完全依赖Kueue原生行为，是否需要额外的自定义抢占逻辑？[灵活性 vs 原生优先, tasks.md L118]
-- [ ] CHK014 - Elastic Agent的检查点管理参数(10-15分钟间隔)是否可配置？是否需要动态调整？[可配置性, tasks.md L120]
-- [ ] CHK015 - Deep Health Check完全依赖HyperPod Health Check Agent原生能力，是否需要自定义健康检查规则？[灵活性 vs 简单性, tasks.md L120]
+- [x] **CHK012 - ✅ 已解决** - Kueue优先级名称已统一为high/medium/low，与spec.md用户层优先级保持一致。[需求对齐, tasks.md L223, spec.md L771]
+  - **决策**: 调整 Kueue PriorityClass 命名为 high/medium/low (方案 B)
+  - **修改内容**:
+    - tasks.md L223: PriorityClass 从 critical/high/medium 改为 high/medium/low
+    - spec.md L771: 优先级机制描述更新为 "三级优先级使用 Kueue PriorityClass: high/medium/low"
+  - **优点**: 用户层和 Kueue 层优先级名称完全一致，无需额外转换逻辑，降低实施复杂度
+  - **一致性验证**: spec.md L959 ResourceQuota 定义已确认使用 "high/medium/low" 映射
+  - **实施要求**: T008d-1 Kueue 配置时使用 high/medium/low PriorityClass 名称
+- [x] **CHK013 - ✅ 已解决** - HyperPod抢占策略完全依赖Kueue原生行为，无需自定义抢占逻辑。[原生优先, tasks.md L224, spec.md L771-776]
+  - **决策**: 保持当前设计，完全依赖 Kueue 原生抢占能力（方案 A）
+  - **理由**:
+    - Kueue 原生能力已覆盖所有抢占需求（冷却期、借用策略、最大抢占次数限制）
+    - HyperPod Elastic Agent 自动在抢占前创建检查点（T008d-2，FR-010）
+    - 恢复机制：Kueue 自动重新排队，保持原优先级（spec.md L769）
+    - 失败处理：平台状态同步服务（T037）检测连续3次失败转Failed（spec.md L427-462）
+  - **合规性**: 完全符合 spec.md FR-004 实施约束 "MUST 使用原生抢占机制"（L772）
+  - **扩展路径**: spec.md L775-776 已定义例外流程，如未来需要自定义可走治理委员会审批
+  - **优势**: 降低系统复杂度、自动获得 HyperPod 未来版本改进、遵循 YAGNI 原则
+- [x] **CHK014 - ✅ 已解决** - Elastic Agent检查点管理参数已支持用户自定义配置，默认10-15分钟，可配置范围5-30分钟。[可配置性, tasks.md L230, spec.md FR-010]
+  - **决策**: 支持用户可配置检查点间隔 (方案 A)
+  - **修改内容**:
+    - tasks.md L230: 添加配置说明 "默认间隔 10-15 分钟，支持用户通过训练任务配置自定义间隔范围 5-30 分钟"
+  - **配置范围**: 5-30 分钟（灵活性与性能平衡）
+  - **默认值**: 10-15 分钟（适合大多数训练场景）
+  - **用例适配**:
+    - 短训练任务/频繁迭代: 配置 5 分钟间隔
+    - 长训练任务/大模型: 配置 20-30 分钟间隔
+    - 一般训练任务: 使用默认 10-15 分钟
+  - **合规性**: 符合 spec.md FR-010 "在任务配置中指定检查点参数（检查点间隔、存储路径、恢复策略等）"
+  - **实施要求**: T008d-2 配置 Elastic Agent 时支持用户自定义间隔参数
+- [x] **CHK015 - ✅ 已解决** - Deep Health Check完全依赖HyperPod Health Check Agent原生能力，无需自定义健康检查规则。[原生优先, tasks.md L230]
+  - **决策**: 完全依赖 HyperPod 原生健康检查能力（方案 A）
+  - **原生能力覆盖**:
+    - GPU 健康检查（NVIDIA DCGM 集成）
+    - EFA 网络性能检测
+    - 存储系统健康（FSx for Lustre / EBS）
+    - 节点级别系统健康状态
+  - **理由**:
+    - HyperPod Health Check Agent 原生能力已覆盖所有核心健康检查场景
+    - 符合宪章 Principle I.A (HyperPod Native-First) 和 Principle X (YAGNI)
+    - 自动获得 AWS 健康检查改进和更新
+    - 降低系统复杂度和维护成本
+  - **扩展路径**: 如未来确实需要自定义健康规则，可通过 spec.md 定义的例外流程和治理委员会审批
+  - **合规性**: 完全符合当前 tasks.md L230 设计 "Deep Health Check 完全遵循 HyperPod Health Check Agent 原生能力"
+  - **优势**: 零额外开发成本、自动获得 AWS 更新、降低运维复杂度
 
 ### 4. 存储架构设计
 
