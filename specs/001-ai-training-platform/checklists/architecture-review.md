@@ -282,7 +282,14 @@
 
 ### 1. 数据加密
 
-- [ ] CHK114 - S3 SSE-KMS加密配置是否强制启用？是否有Bucket Policy拒绝未加密上传？[加密强制, tasks.md L83-85]
+- [x] **CHK114 - ✅ 已解决** - S3 SSE-KMS加密配置已增强,采用静态数据自动加密 + HTTPS传输强制策略。[加密强制, tasks.md L131-141]
+  - **解决方案**: 增强 T008b S3 Buckets Stack 配置
+  - **实施内容**:
+    - 明确三类存储桶: datasets/models/checkpoints,统一启用 SSE-KMS 默认加密
+    - 静态数据加密: S3 自动对所有上传对象应用 SSE-KMS,客户端无需指定加密参数
+    - 传输加密: Bucket Policy 拒绝 HTTP 传输 (aws:SecureTransport = false)
+    - 验证测试: HTTP 请求拒绝、HTTPS 成功且自动加密、GetObject API 验证、Console 验证
+  - **符合需求**: FR-018 静态数据加密 (S3 SSE-KMS)、传输加密 (TLS 1.2+)、SC-015 安全标准
 - [ ] CHK115 - ALB TLS终止配置是否强制TLS 1.2+？是否禁用不安全的cipher suite？[传输加密, tasks.md L160]
 - [ ] CHK116 - 数据库连接是否使用TLS加密？Aurora MySQL是否启用传输加密？[数据库加密, tasks.md L79]
 
@@ -352,7 +359,10 @@
    - 解决方案: T000-fallback 增加三阶段执行策略 (分析 → POC验证 → 整合治理)
    - 影响: POC验证覆盖 boto3/kubernetes-client 关键功能,工作量1人日→2人日
    - 产出: POC代码 + 验证报告,确保备选方案技术可行性
-3. CHK114 - S3加密配置必须强制启用并验证
+3. ~~CHK114 - S3加密配置必须强制启用并验证~~ ✅ **已完成 (2026-01-05)**
+   - 解决方案: 增强 T008b S3 Buckets Stack 配置,采用静态数据自动加密 + HTTPS传输强制
+   - 影响: 明确三类存储桶 (datasets/models/checkpoints),SSE-KMS 自动加密,Bucket Policy 拒绝 HTTP
+   - 验证: HTTP 拒绝测试 + GetObject API 验证 + Console 配置验证
 
 **P1 - 近期处理 (高风险问题)**:
 4. CHK011 - HyperPod Add-ons安装任务应拆分为更细粒度的子任务

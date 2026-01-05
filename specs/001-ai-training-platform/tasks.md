@@ -128,10 +128,17 @@
     - 备份策略: 自动备份保留期 7 天, 备份窗口 UTC 03:00-04:00, 启用时间点恢复 (PITR)
     - 连接池: 启用 RDS Proxy (连接池大小根据 ACU 自动调整), 空闲连接超时 30 分钟
     - 高可用: 多可用区部署, 故障转移时间 <30 秒
-  - **S3 Buckets Stack**: 数据集、模型、检查点存储桶,启用版本控制和生命周期策略
-    - **默认加密配置**: 所有存储桶启用 SSE-KMS 默认加密 (指定 KMS key ID),确保静态数据安全
-    - **加密强制策略**: 配置 Bucket Policy 拒绝未加密上传 (aws:SecureTransport = false 拒绝)
-    - **验证测试**: 验证未加密上传被拒绝,加密上传自动应用 SSE-KMS
+  - **S3 Buckets Stack**: 创建以下存储桶,均启用版本控制和生命周期策略:
+    - `{project}-datasets-{env}`: 训练数据集存储
+    - `{project}-models-{env}`: 训练产出的模型文件
+    - `{project}-checkpoints-{env}`: 检查点和快照文件
+    - **静态数据加密配置**: 所有存储桶启用 SSE-KMS 默认加密 (使用 AWS 托管密钥 aws/s3 或指定 CMK),S3 自动对所有上传对象应用加密,无需客户端指定加密参数
+    - **传输加密强制策略**: 配置 Bucket Policy 拒绝非 HTTPS 传输 (aws:SecureTransport = false),确保数据传输安全
+    - **验证测试**:
+      - ❌ HTTP PUT 请求被拒绝 (403 Forbidden)
+      - ✅ HTTPS PUT 请求成功,且对象自动应用 SSE-KMS 加密
+      - ✅ 通过 GetObject API 验证对象 ServerSideEncryption=aws:kms
+      - ✅ 通过 S3 Console 验证存储桶默认加密配置已启用
   - **IAM Roles Stack**: EKS 节点角色、应用服务角色 (遵循最小权限原则)
 
 ### HyperPod EKS 集群创建
@@ -161,16 +168,24 @@
   - **参考**: spec.md FR-001 (安全要求)
 
 ### HyperPod Add-ons 安装
-- [ ] [T008d] [P] HyperPod Add-ons 配置 - `infrastructure/k8s/hyperpod-addons/`,安装和配置 HyperPod 核心组件:
+- [ ] [T008d-1] [P] 训练核心组件安装 - `infrastructure/k8s/hyperpod-addons/training/`,安装训练调度核心组件:
   - **Training Operator**: 安装 HyperPod Training Operator (PyTorchJob, TensorFlowJob CRD),配置训练框架支持 (PyTorch DDP/FSDP/DeepSpeed ZeRO),验证 Webhook 就绪
   - **Task Governance (Kueue)**: 安装 Kueue 资源调度器,创建 ClusterQueue 和 LocalQueue,配置三级优先级 (PriorityClass: critical/high/medium 映射到 spec.md 的 high/medium/low),配置 Gang Scheduling (默认 60 秒超时,可配置)
   - **抢占策略**: 完全遵循 Kueue 原生抢占行为,不做自定义扩展。具体参数 (冷却期、借用策略等) 以 HyperPod Task Governance 默认配置为准,参见 [Kueue Preemption Documentation](https://kueue.sigs.k8s.io/docs/concepts/preemption/)
+  - **验证测试**: 提交测试 PyTorchJob (single-node hello-world),验证 Job 状态转换为 Succeeded,验证 Kueue Workload 调度生效,验证 Training Operator Webhook 响应 (curl localhost:9443/healthz)
+  - **依赖**: T008c-1, T008c-2, T008c-3 (HyperPod EKS 集群完整配置)
+  - **参考**: spec.md FR-001 (Training Operator), FR-004 (Kueue)
+- [ ] [T008d-2] [P] 监控和弹性组件安装 - `infrastructure/k8s/hyperpod-addons/ops/`,安装运维监控组件:
   - **Observability Add-on**: 部署 Prometheus + Grafana,配置 Node Exporter, cAdvisor, DCGM Exporter (GPU 指标),配置数据保留期 (30 天),创建预定义 Grafana 仪表盘 (集群健康、训练任务分布、资源利用率)
   - **Elastic Agent**: 配置 HyperPod Elastic Agent,设置检查点管理参数 (默认 10-15 分钟间隔),配置 Auto-Resume 策略 (节点故障自动恢复),配置节点故障检测阈值 (PodsReady=False 持续 >30 秒)。Deep Health Check 完全遵循 HyperPod Health Check Agent 原生能力 (GPU/EFA/存储健康检测),参见 [HyperPod Health Checks Documentation](https://docs.aws.amazon.com/sagemaker/latest/dg/sagemaker-hyperpod-operate-health-checks.html)
+  - **验证测试**: 查询 Prometheus 指标 (up, node_cpu_seconds_total),访问 Grafana 仪表盘,验证 Elastic Agent Pod Running,验证健康检查日志
+  - **依赖**: T008d-1 (需要 Training Operator CRD 用于监控训练任务)
+  - **参考**: spec.md FR-007/FR-016 (Observability), FR-010/FR-011 (Elastic Agent)
+- [ ] [T008d-3] [P] 开发环境组件安装 - `infrastructure/k8s/hyperpod-addons/spaces/`,安装 Spaces Add-on:
   - **Spaces Add-on**: 安装 Amazon SageMaker Spaces Add-on,配置 JupyterLab 和 VS Code IDE 镜像 (Data Science, PyTorch, TensorFlow),配置 EFS 持久化存储挂载,配置自动保存间隔 (JupyterLab 120 秒, VS Code 1 秒)
-  - **验证测试**: 验证所有 Add-ons Pod 状态为 Running,验证 Kueue ClusterQueue 就绪,验证 Prometheus 可查询指标 (up, node_cpu_seconds_total),验证 Training Operator Webhook 响应 (curl localhost:9443/healthz)
-  - **依赖**: T008c-1, T008c-2, T008c-3 (HyperPod EKS 集群完整配置)
-  - **参考**: spec.md FR-001 (Training Operator), FR-004 (Kueue), FR-007/FR-016 (Observability), FR-010/FR-011 (Elastic Agent), FR-012/SC-015 (Spaces)
+  - **验证测试**: 验证 Spaces CRD 注册,检查 Spaces Controller Pod 状态,创建测试 Space (可选,建议在 US5 开发时执行)
+  - **依赖**: T008c-1, T008c-2, T008c-3 (HyperPod EKS 集群完整配置,与训练组件无依赖,可并行执行)
+  - **参考**: spec.md FR-012/SC-015 (Spaces)
 
 ### FSx for Lustre 文件系统创建
 - [ ] [T008e] [P] FSx for Lustre Stack - `infrastructure/cdk/lib/fsx-stack.ts`,创建 Amazon FSx for Lustre 高性能文件系统:
@@ -228,7 +243,7 @@
   - **网络连通性测试**: 验证 Pod 到 Internet 连通性 (curl https://aws.amazon.com), 验证 Pod 到 S3/CloudWatch PrivateLink 连通性, 验证 EFA 网络接口可用
   - **TLS/HTTPS 验证**: 验证 ALB HTTPS 端点可访问 (curl https://<alb-dns>), 验证 TLS 版本 ≥1.2 (openssl s_client), 验证 HTTP 自动重定向到 HTTPS, 验证 ACM 证书有效性
   - **输出**: 生成验证报告 (infrastructure-validation-report.md), 包含所有测试结果、失败项诊断建议、关键配置参数快照
-  - **依赖**: T008c-1, T008c-2, T008c-3 (EKS 集群完整配置), T008d (Add-ons), T008e (FSx), T008f (NetworkPolicy), T008i (ALB 和 TLS)
+  - **依赖**: T008c-1, T008c-2, T008c-3 (EKS 集群完整配置), T008d-1, T008d-2, T008d-3 (Add-ons), T008e (FSx), T008f (NetworkPolicy), T008i (ALB 和 TLS)
   - **参考**: aws-infrastructure.md CHK-TASK-019/020/021
 
 **并行执行机会**:
@@ -236,7 +251,7 @@
 - T001 完成后 → T004, T007 可并行
 - T002 完成后 → T005 可开始
 - T003, T006, T008 依赖 T001/T002 完成
-- T000 (Phase 0 SDK 验证) → {T000-fallback (条件任务), T008a} → T008b → T008c-1 → {T008c-2, T008c-3} 可并行 → T008d → T008e → T008f (NetworkPolicy) → T008i (ALB 和 TLS) → T008g (串行,验证所有基础设施)
+- T000 (Phase 0 SDK 验证) → {T000-fallback (条件任务), T008a} → T008b → T008c-1 → {T008c-2, T008c-3} 可并行 → T008d-1 → {T008d-2, T008d-3} 可并行 → T008e → T008f (NetworkPolicy) → T008i (ALB 和 TLS) → T008g (串行,验证所有基础设施)
 
 ---
 
