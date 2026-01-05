@@ -121,7 +121,11 @@
     - 公有子网: 10.0.0.0/20, 10.0.16.0/20, 10.0.32.0/20 (3 个 AZ, 用于 NAT Gateway/ALB)
     - 私有子网 (应用层): 10.0.64.0/19, 10.0.96.0/19, 10.0.128.0/19 (3 个 AZ, 用于 EKS 节点/RDS)
     - 私有子网 (数据层): 10.0.160.0/20, 10.0.176.0/20, 10.0.192.0/20 (3 个 AZ, 用于 FSx/ElastiCache)
-    - NAT Gateway: 每个 AZ 部署一个 (高可用)
+    - NAT Gateway: 在 2 个 AZ 部署 (AZ-a 和 AZ-b, 成本优化同时保留高可用)
+      - AZ-a 私有子网 → NAT Gateway-a
+      - AZ-b 私有子网 → NAT Gateway-b
+      - AZ-c 私有子网 → NAT Gateway-b (跨 AZ 路由)
+      - 成本节省: $100/月 → $67/月 (节省 33%)
     - 安全组、VPC 端点
   - **RDS Aurora MySQL Stack**:
     - Serverless v2 配置: 最小 ACU 0.5 (开发环境可暂停), 最大 ACU 16 (生产环境), 自动扩缩容

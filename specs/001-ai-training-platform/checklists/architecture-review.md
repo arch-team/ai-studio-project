@@ -21,7 +21,11 @@
 
 - [ ] CHK001 - VPC CIDR 10.0.0.0/16 是否满足集群扩展需求（支持≥1000节点）？[可扩展性, tasks.md T008b]
 - [ ] CHK002 - 公有子网、私有子网(应用层)、私有子网(数据层)的三层隔离设计是否合理？[安全性+可维护性, tasks.md T008b]
-- [ ] CHK003 - 每个AZ部署一个NAT Gateway的高可用设计是否存在成本优化空间？[成本优化 vs 高可用, tasks.md T008b]
+- [x] **CHK003 - ✅ 已解决** - NAT Gateway 部署优化为双 AZ 配置（平衡成本和高可用）。[成本优化 vs 高可用, tasks.md T008b]
+  - **决策**: 在 2 个 AZ 部署 NAT Gateway (AZ-a 和 AZ-b), AZ-c 跨 AZ 路由到 AZ-b
+  - **成本节省**: $100/月 → $67/月 (节省 $33/月, 33%)
+  - **高可用性**: 保留 2 AZ 容错能力, 单 AZ 故障时其他 AZ 不受影响
+  - **权衡**: AZ-c 跨 AZ 数据传输成本略增 (~$0.01/GB), 但训练平台主要流量走 PrivateLink, 影响有限
 - [ ] CHK004 - VPC端点(PrivateLink)配置是否覆盖所有必需的AWS服务(S3/ECR/CloudWatch/SageMaker)？[完整性, plan.md L53-57]
 - [ ] CHK005 - NetworkPolicy 网络隔离策略是否与HyperPod EFA网络优化兼容？[技术兼容性, tasks.md T008f]
 
@@ -116,7 +120,15 @@
 
 ### 1. 代码架构设计
 
-- [ ] CHK046 - 后端采用Repository模式和Service层抽象是否合理？是否存在过度分层的问题？[架构复杂度, plan.md L299]
+- [x] **CHK046 - ✅ 已解决** - 后端采用Repository模式和Service层抽象经评估后保持当前设计。[架构复杂度, plan.md L299]
+  - **决策**: 保持 Repository + Service 4层架构
+  - **理由**:
+    - 符合企业级 DDD 模式和架构最佳实践
+    - 职责清晰,数据访问层、业务逻辑层、API路由层明确分离
+    - 可测试性强,Repository 层可独立 mock
+    - 为未来多数据源切换和复杂数据聚合预留架构空间
+    - 便于大规模团队并行开发
+  - **风险缓解**: 通过 Base Repository 封装通用 CRUD 方法,减少样板代码;确保开发文档清晰说明各层职责
 - [ ] CHK047 - API路由按功能域垂直切分(training_jobs/datasets/users)是否清晰？是否存在职责重叠？[职责划分, plan.md L189-196]
 - [ ] CHK048 - 前端组件划分(common/domain)是否合理？domain组件是否存在过度抽象的风险？[组件设计, plan.md L235-240]
 - [ ] CHK049 - SQLAlchemy模型与Pydantic Schema的双层数据模型设计是否必要？是否可以简化？[过度设计, plan.md L173-183]
@@ -154,7 +166,19 @@
 
 ### 2. KISS (Keep It Simple, Stupid) 原则
 
-- [ ] CHK065 - 训练任务状态模型包含6种状态(Submitted/Running/Paused/Preempted/Completed/Failed)是否过于复杂？[状态复杂度, spec.md L310-342]
+- [x] **CHK065 - ✅ 已解决** - 训练任务状态模型经评估后保持当前6状态设计。[状态复杂度, spec.md L310-342]
+  - **决策**: 保持 Submitted/Running/Paused/Preempted/Completed/Failed 6状态模型
+  - **理由**:
+    - 精确反映 HyperPod 调度机制 (三级优先级抢占、Gang Scheduling)
+    - 目标用户为算法工程师,能理解并利用调度细节优化训练效率
+    - 每个状态有明确业务语义 (Paused用户主动暂停 vs Preempted系统抢占)
+    - 提供精确故障定位能力,便于排查任务失败原因
+    - 状态模型与平台核心能力紧密结合,不属于过度设计
+  - **用户体验优化**:
+    - UI 友好化: 列表页使用直观状态名称 (Preempted → "排队等待资源")
+    - 用户引导: 提供首次使用引导和状态帮助文档
+    - 详情页细化: 展示状态转换历史和 Submitted 子阶段
+    - 监控告警: Preempted 频繁时主动告警并提示优化建议
 - [ ] CHK066 - Submitted状态的三个子阶段(WaitingForQuota/WaitingForAdmission/StartingPods)是否必要暴露给用户？[用户体验, spec.md L372-379]
 - [ ] CHK067 - 检查点触发的5种场景是否过于详细？是否可以合并为自动触发和手动触发两类？[简单性, spec.md L502-509]
 - [ ] CHK068 - 模型生命周期状态包含6种状态(Training/Registered/Approved/Deployed/Archived/Rejected)是否过于复杂？[状态复杂度, spec.md L962-968]
@@ -226,7 +250,11 @@
 
 ### 2. 成本优化机会
 
-- [ ] CHK091 - 每个AZ部署独立NAT Gateway的设计是否可以优化为单个NAT Gateway+故障转移？[成本优化, tasks.md L75]
+- [x] **CHK091 - ✅ 已解决** - NAT Gateway 部署优化为双 AZ 配置。[成本优化, tasks.md L124-128]
+  - **决策**: 采用方案C (2 个 NAT Gateway) - 在 AZ-a 和 AZ-b 部署, AZ-c 跨 AZ 路由
+  - **成本节省**: $100/月 → $67/月 (节省 $33/月, 33%)
+  - **高可用性**: 保留 2 AZ 容错, 符合企业级标准
+  - **理由**: 平衡成本和高可用性, 训练平台主要流量走 PrivateLink, NAT Gateway 跨 AZ 流量成本影响有限
 - [ ] CHK092 - Aurora Serverless v2的按需扩缩容配置是否会导致意外高成本？是否需要成本告警？[成本控制, tasks.md L78]
 - [ ] CHK093 - S3冷检查点的30天保留期是否可以进一步优化(例如15天)？[存储成本, tasks.md L141]
 - [ ] CHK094 - GPU节点的Auto Scaling缩容策略(空闲>15分钟)是否过于激进？是否会导致频繁扩缩容？[成本 vs 性能, tasks.md L98]
@@ -363,12 +391,24 @@
    - 解决方案: 增强 T008b S3 Buckets Stack 配置,采用静态数据自动加密 + HTTPS传输强制
    - 影响: 明确三类存储桶 (datasets/models/checkpoints),SSE-KMS 自动加密,Bucket Policy 拒绝 HTTP
    - 验证: HTTP 拒绝测试 + GetObject API 验证 + Console 配置验证
+4. ~~CHK011 - HyperPod Add-ons安装任务应拆分为更细粒度的子任务~~ ✅ **已完成 (2026-01-05)**
+   - 解决方案: 拆分 T008d 为 3 个逻辑任务组 (T008d-1/2/3)
+   - 影响: T008d-1 (训练核心) → {T008d-2 (监控), T008d-3 (开发环境)} 可并行执行
+   - 产出: 更好的问题隔离,降低重试成本,启用并行执行机会
+5. ~~CHK046 - 评估后端架构是否存在过度分层~~ ✅ **已完成 (2026-01-05)**
+   - 决策: 保持 Repository + Service 4层架构
+   - 理由: 符合企业级 DDD 模式,职责清晰,可测试性强,为未来扩展预留空间
+   - 风险缓解: Base Repository 封装通用 CRUD,开发文档明确各层职责
+6. ~~CHK065 - 简化训练任务状态模型~~ ✅ **已完成 (2026-01-05)**
+   - 决策: 保持 Submitted/Running/Paused/Preempted/Completed/Failed 6状态模型
+   - 理由: 精确反映 HyperPod 调度机制,目标用户能理解调度细节,每个状态有明确业务语义
+   - 用户体验优化: UI 友好化、用户引导、详情页细化、监控告警
+7. ~~CHK091 (CHK003) - NAT Gateway 成本优化~~ ✅ **已完成 (2026-01-05)**
+   - 决策: 采用双 NAT Gateway 配置 (AZ-a 和 AZ-b)
+   - 成本节省: $100/月 → $67/月 (节省 $33/月, 33%)
+   - 高可用性: 保留 2 AZ 容错能力,平衡成本和可靠性
 
 **P1 - 近期处理 (高风险问题)**:
-4. CHK011 - HyperPod Add-ons安装任务应拆分为更细粒度的子任务
-5. CHK046 - 评估后端架构是否存在过度分层，考虑简化
-6. CHK065 - 简化训练任务状态模型，减少复杂度
-7. CHK091 - 评估NAT Gateway成本优化方案
 
 **P2 - 持续改进 (优化建议)**:
 8. CHK016 - 明确FSx吞吐量级别选择标准，避免过度配置
