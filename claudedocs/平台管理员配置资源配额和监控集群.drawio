@@ -1,0 +1,642 @@
+<mxfile host="app.diagrams.net" modified="2026-01-07T00:00:00.000Z" agent="5.0" version="21.0.0" type="device">
+  <diagram id="sequence-admin-quota-monitoring" name="平台管理员配置资源配额和监控集群">
+    <mxGraphModel dx="1434" dy="836" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="2000" pageHeight="2200" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+
+        <!-- 标题 -->
+        <mxCell id="title" value="时序图: 平台管理员配置资源配额和监控集群" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=20;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="550" y="20" width="600" height="40" as="geometry"/>
+        </mxCell>
+
+        <!-- 参与者 - Actor -->
+        <mxCell id="actor-admin" value="平台管理员" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=1;outlineConnect=0;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+          <mxGeometry x="60" y="80" width="40" height="60" as="geometry"/>
+        </mxCell>
+
+        <!-- 参与者 - 组件 -->
+        <mxCell id="comp-frontend" value="前端 UI&#xa;(React + Cloudscape)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
+          <mxGeometry x="160" y="80" width="120" height="50" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="comp-backend" value="后端 API&#xa;(FastAPI)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
+          <mxGeometry x="320" y="80" width="120" height="50" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="comp-hyperpod-sdk" value="HyperPod SDK&#xa;(cluster 模块)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
+          <mxGeometry x="480" y="80" width="120" height="50" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="comp-kueue" value="Task Governance&#xa;(Kueue)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
+          <mxGeometry x="640" y="80" width="120" height="50" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="comp-prometheus" value="Prometheus&#xa;(监控)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;" vertex="1" parent="1">
+          <mxGeometry x="800" y="80" width="100" height="50" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="comp-grafana" value="Grafana&#xa;(可视化)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;" vertex="1" parent="1">
+          <mxGeometry x="940" y="80" width="100" height="50" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="comp-cloudwatch" value="CloudWatch&#xa;(告警)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;" vertex="1" parent="1">
+          <mxGeometry x="1080" y="80" width="100" height="50" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="comp-mysql" value="MySQL&#xa;(配置存储)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;" vertex="1" parent="1">
+          <mxGeometry x="1220" y="80" width="100" height="50" as="geometry"/>
+        </mxCell>
+
+        <!-- 生命线 -->
+        <mxCell id="lifeline-admin" value="" style="endArrow=none;dashed=1;html=1;dashPattern=1 3;strokeWidth=2;strokeColor=#666666;" edge="1" parent="1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="80" y="160" as="sourcePoint"/>
+            <mxPoint x="80" y="2100" as="targetPoint"/>
+          </mxGeometry>
+        </mxCell>
+
+        <mxCell id="lifeline-frontend" value="" style="endArrow=none;dashed=1;html=1;dashPattern=1 3;strokeWidth=2;strokeColor=#666666;" edge="1" parent="1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="220" y="130" as="sourcePoint"/>
+            <mxPoint x="220" y="2100" as="targetPoint"/>
+          </mxGeometry>
+        </mxCell>
+
+        <mxCell id="lifeline-backend" value="" style="endArrow=none;dashed=1;html=1;dashPattern=1 3;strokeWidth=2;strokeColor=#666666;" edge="1" parent="1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="380" y="130" as="sourcePoint"/>
+            <mxPoint x="380" y="2100" as="targetPoint"/>
+          </mxGeometry>
+        </mxCell>
+
+        <mxCell id="lifeline-hyperpod" value="" style="endArrow=none;dashed=1;html=1;dashPattern=1 3;strokeWidth=2;strokeColor=#666666;" edge="1" parent="1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="540" y="130" as="sourcePoint"/>
+            <mxPoint x="540" y="2100" as="targetPoint"/>
+          </mxGeometry>
+        </mxCell>
+
+        <mxCell id="lifeline-kueue" value="" style="endArrow=none;dashed=1;html=1;dashPattern=1 3;strokeWidth=2;strokeColor=#666666;" edge="1" parent="1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="700" y="130" as="sourcePoint"/>
+            <mxPoint x="700" y="2100" as="targetPoint"/>
+          </mxGeometry>
+        </mxCell>
+
+        <mxCell id="lifeline-prometheus" value="" style="endArrow=none;dashed=1;html=1;dashPattern=1 3;strokeWidth=2;strokeColor=#666666;" edge="1" parent="1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="850" y="130" as="sourcePoint"/>
+            <mxPoint x="850" y="2100" as="targetPoint"/>
+          </mxGeometry>
+        </mxCell>
+
+        <mxCell id="lifeline-grafana" value="" style="endArrow=none;dashed=1;html=1;dashPattern=1 3;strokeWidth=2;strokeColor=#666666;" edge="1" parent="1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="990" y="130" as="sourcePoint"/>
+            <mxPoint x="990" y="2100" as="targetPoint"/>
+          </mxGeometry>
+        </mxCell>
+
+        <mxCell id="lifeline-cloudwatch" value="" style="endArrow=none;dashed=1;html=1;dashPattern=1 3;strokeWidth=2;strokeColor=#666666;" edge="1" parent="1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="1130" y="130" as="sourcePoint"/>
+            <mxPoint x="1130" y="2100" as="targetPoint"/>
+          </mxGeometry>
+        </mxCell>
+
+        <mxCell id="lifeline-mysql" value="" style="endArrow=none;dashed=1;html=1;dashPattern=1 3;strokeWidth=2;strokeColor=#666666;" edge="1" parent="1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="1270" y="130" as="sourcePoint"/>
+            <mxPoint x="1270" y="2100" as="targetPoint"/>
+          </mxGeometry>
+        </mxCell>
+
+        <!-- ==================== 阶段1: 管理员身份认证 ==================== -->
+        <mxCell id="phase1-box" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#6c8ebf;strokeWidth=1;" vertex="1" parent="1">
+          <mxGeometry x="20" y="170" width="1300" height="120" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="phase1-label" value="阶段1: 管理员身份认证" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=12;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="30" y="175" width="160" height="25" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="msg1" value="1. 登录平台 (管理员账号)" style="endArrow=classic;html=1;strokeWidth=2;strokeColor=#0066CC;" edge="1" parent="1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="80" y="210" as="sourcePoint"/>
+            <mxPoint x="220" y="210" as="targetPoint"/>
+          </mxGeometry>
+        </mxCell>
+
+        <mxCell id="msg2" value="2. SSO 认证 + 角色验证 (role: admin)" style="endArrow=classic;html=1;strokeWidth=2;strokeColor=#0066CC;" edge="1" parent="1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="220" y="240" as="sourcePoint"/>
+            <mxPoint x="380" y="240" as="targetPoint"/>
+          </mxGeometry>
+        </mxCell>
+
+        <mxCell id="msg3" value="3. 返回 JWT Token + 管理员权限&#xa;(resource_quota:write, cluster:read)" style="endArrow=classic;html=1;strokeWidth=2;strokeColor=#009900;dashed=1;" edge="1" parent="1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="380" y="270" as="sourcePoint"/>
+            <mxPoint x="80" y="270" as="targetPoint"/>
+          </mxGeometry>
+        </mxCell>
+
+        <!-- ==================== 阶段2: 配置部门资源配额 ==================== -->
+        <mxCell id="phase2-box" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#82b366;strokeWidth=1;" vertex="1" parent="1">
+          <mxGeometry x="20" y="310" width="1300" height="320" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="phase2-label" value="阶段2: 配置部门资源配额 (市场部: 50 GPU, 低优先级)" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=12;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="30" y="315" width="350" height="25" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="msg4" value="4. 进入资源配额管理页面&#xa;选择「新建配额」" style="endArrow=classic;html=1;strokeWidth=2;strokeColor=#0066CC;" edge="1" parent="1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="80" y="360" as="sourcePoint"/>
+            <mxPoint x="220" y="360" as="targetPoint"/>
+          </mxGeometry>
+        </mxCell>
+
+        <mxCell id="msg5" value="5. POST /resource-quotas&#xa;{department: &quot;市场部&quot;, gpu: 50, cpu: 200, memory: &quot;500Gi&quot;, priority: &quot;low&quot;}" style="endArrow=classic;html=1;strokeWidth=2;strokeColor=#0066CC;" edge="1" parent="1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="220" y="400" as="sourcePoint"/>
+            <mxPoint x="380" y="400" as="targetPoint"/>
+          </mxGeometry>
+        </mxCell>
+
+        <mxCell id="msg6" value="6. 创建 ClusterQueue&#xa;(名称: marketing-dept-queue)" style="endArrow=classic;html=1;strokeWidth=2;strokeColor=#CC6600;" edge="1" parent="1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="380" y="440" as="sourcePoint"/>
+            <mxPoint x="700" y="440" as="targetPoint"/>
+          </mxGeometry>
+        </mxCell>
+
+        <mxCell id="msg7" value="7. 配置资源 Flavors&#xa;{nvidia.com/gpu: 50, cpu: 200, memory: 500Gi}" style="endArrow=classic;html=1;strokeWidth=2;strokeColor=#CC6600;" edge="1" parent="1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="700" y="470" as="sourcePoint"/>
+            <mxPoint x="700" y="500" as="targetPoint"/>
+            <Array as="points">
+              <mxPoint x="750" y="470"/>
+              <mxPoint x="750" y="500"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+
+        <mxCell id="msg8" value="8. 创建 LocalQueue&#xa;(namespace: marketing)" style="endArrow=classic;html=1;strokeWidth=2;strokeColor=#CC6600;" edge="1" parent="1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="700" y="520" as="sourcePoint"/>
+            <mxPoint x="700" y="550" as="targetPoint"/>
+            <Array as="points">
+              <mxPoint x="750" y="520"/>
+              <mxPoint x="750" y="550"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+
+        <mxCell id="msg9" value="9. ClusterQueue 创建成功" style="endArrow=classic;html=1;strokeWidth=2;strokeColor=#009900;dashed=1;" edge="1" parent="1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="700" y="570" as="sourcePoint"/>
+            <mxPoint x="380" y="570" as="targetPoint"/>
+          </mxGeometry>
+        </mxCell>
+
+        <mxCell id="msg10" value="10. INSERT resource_quotas&#xa;记录配额配置到数据库" style="endArrow=classic;html=1;strokeWidth=2;strokeColor=#9900CC;" edge="1" parent="1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="380" y="600" as="sourcePoint"/>
+            <mxPoint x="1270" y="600" as="targetPoint"/>
+          </mxGeometry>
+        </mxCell>
+
+        <mxCell id="msg11" value="11. 201 Created&#xa;返回配额详情" style="endArrow=classic;html=1;strokeWidth=2;strokeColor=#009900;dashed=1;" edge="1" parent="1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="380" y="620" as="sourcePoint"/>
+            <mxPoint x="80" y="620" as="targetPoint"/>
+          </mxGeometry>
+        </mxCell>
+
+        <!-- ==================== 阶段3: 配置优先级策略 ==================== -->
+        <mxCell id="phase3-box" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#d6b656;strokeWidth=1;" vertex="1" parent="1">
+          <mxGeometry x="20" y="650" width="1300" height="250" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="phase3-label" value="阶段3: 配置优先级策略 (三级: high/medium/low)" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=12;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="30" y="655" width="300" height="25" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="msg12" value="12. 配置研发部配额&#xa;(gpu: 100, priority: high)" style="endArrow=classic;html=1;strokeWidth=2;strokeColor=#0066CC;" edge="1" parent="1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="80" y="700" as="sourcePoint"/>
+            <mxPoint x="220" y="700" as="targetPoint"/>
+          </mxGeometry>
+        </mxCell>
+
+        <mxCell id="msg13" value="13. POST /resource-quotas&#xa;{department: &quot;研发部&quot;, gpu: 100, priority: &quot;high&quot;}" style="endArrow=classic;html=1;strokeWidth=2;strokeColor=#0066CC;" edge="1" parent="1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="220" y="730" as="sourcePoint"/>
+            <mxPoint x="380" y="730" as="targetPoint"/>
+          </mxGeometry>
+        </mxCell>
+
+        <mxCell id="msg14" value="14. 创建 PriorityClass&#xa;(name: high-priority, value: 1000)" style="endArrow=classic;html=1;strokeWidth=2;strokeColor=#CC6600;" edge="1" parent="1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="380" y="760" as="sourcePoint"/>
+            <mxPoint x="700" y="760" as="targetPoint"/>
+          </mxGeometry>
+        </mxCell>
+
+        <mxCell id="msg15" value="15. 配置抢占策略&#xa;(preemptionPolicy: PreemptLowerPriority)" style="endArrow=classic;html=1;strokeWidth=2;strokeColor=#CC6600;" edge="1" parent="1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="700" y="790" as="sourcePoint"/>
+            <mxPoint x="700" y="820" as="targetPoint"/>
+            <Array as="points">
+              <mxPoint x="750" y="790"/>
+              <mxPoint x="750" y="820"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+
+        <mxCell id="msg16" value="16. 关联 ClusterQueue 与 PriorityClass" style="endArrow=classic;html=1;strokeWidth=2;strokeColor=#CC6600;" edge="1" parent="1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="700" y="840" as="sourcePoint"/>
+            <mxPoint x="700" y="870" as="targetPoint"/>
+            <Array as="points">
+              <mxPoint x="750" y="840"/>
+              <mxPoint x="750" y="870"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+
+        <mxCell id="msg17" value="17. 优先级策略配置完成" style="endArrow=classic;html=1;strokeWidth=2;strokeColor=#009900;dashed=1;" edge="1" parent="1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="380" y="890" as="sourcePoint"/>
+            <mxPoint x="80" y="890" as="targetPoint"/>
+          </mxGeometry>
+        </mxCell>
+
+        <!-- ==================== 阶段4: 监控集群状态 ==================== -->
+        <mxCell id="phase4-box" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#9673a6;strokeWidth=1;" vertex="1" parent="1">
+          <mxGeometry x="20" y="920" width="1300" height="320" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="phase4-label" value="阶段4: 监控集群状态 (资源使用率、任务队列、节点健康)" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=12;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="30" y="925" width="380" height="25" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="msg18" value="18. 访问集群监控仪表盘" style="endArrow=classic;html=1;strokeWidth=2;strokeColor=#0066CC;" edge="1" parent="1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="80" y="970" as="sourcePoint"/>
+            <mxPoint x="220" y="970" as="targetPoint"/>
+          </mxGeometry>
+        </mxCell>
+
+        <mxCell id="msg19" value="19. GET /clusters/{id}/status" style="endArrow=classic;html=1;strokeWidth=2;strokeColor=#0066CC;" edge="1" parent="1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="220" y="1000" as="sourcePoint"/>
+            <mxPoint x="380" y="1000" as="targetPoint"/>
+          </mxGeometry>
+        </mxCell>
+
+        <mxCell id="msg20" value="20. get_cluster_status()&#xa;查询节点健康状态" style="endArrow=classic;html=1;strokeWidth=2;strokeColor=#CC6600;" edge="1" parent="1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="380" y="1030" as="sourcePoint"/>
+            <mxPoint x="540" y="1030" as="targetPoint"/>
+          </mxGeometry>
+        </mxCell>
+
+        <mxCell id="msg21" value="21. PromQL 查询&#xa;cluster_gpu_utilization, node_cpu_usage" style="endArrow=classic;html=1;strokeWidth=2;strokeColor=#9900CC;" edge="1" parent="1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="380" y="1060" as="sourcePoint"/>
+            <mxPoint x="850" y="1060" as="targetPoint"/>
+          </mxGeometry>
+        </mxCell>
+
+        <mxCell id="msg22" value="22. 返回资源指标&#xa;{gpu_util: 75%, cpu_util: 60%, memory_util: 70%}" style="endArrow=classic;html=1;strokeWidth=2;strokeColor=#009900;dashed=1;" edge="1" parent="1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="850" y="1090" as="sourcePoint"/>
+            <mxPoint x="380" y="1090" as="targetPoint"/>
+          </mxGeometry>
+        </mxCell>
+
+        <mxCell id="msg23" value="23. 查询 Kueue 队列状态&#xa;(pending_workloads, admitted_workloads)" style="endArrow=classic;html=1;strokeWidth=2;strokeColor=#CC6600;" edge="1" parent="1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="380" y="1120" as="sourcePoint"/>
+            <mxPoint x="700" y="1120" as="targetPoint"/>
+          </mxGeometry>
+        </mxCell>
+
+        <mxCell id="msg24" value="24. 返回队列状态&#xa;{pending: 5, running: 20, preempted: 2}" style="endArrow=classic;html=1;strokeWidth=2;strokeColor=#009900;dashed=1;" edge="1" parent="1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="700" y="1150" as="sourcePoint"/>
+            <mxPoint x="380" y="1150" as="targetPoint"/>
+          </mxGeometry>
+        </mxCell>
+
+        <mxCell id="msg25" value="25. 加载 Grafana 仪表盘&#xa;(HyperPod Cluster Overview)" style="endArrow=classic;html=1;strokeWidth=2;strokeColor=#9900CC;" edge="1" parent="1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="220" y="1180" as="sourcePoint"/>
+            <mxPoint x="990" y="1180" as="targetPoint"/>
+          </mxGeometry>
+        </mxCell>
+
+        <mxCell id="msg26" value="26. 显示集群监控面板&#xa;GPU利用率、节点状态、队列长度" style="endArrow=classic;html=1;strokeWidth=2;strokeColor=#009900;dashed=1;" edge="1" parent="1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="380" y="1220" as="sourcePoint"/>
+            <mxPoint x="80" y="1220" as="targetPoint"/>
+          </mxGeometry>
+        </mxCell>
+
+        <!-- ==================== 阶段5: 查看部门资源使用情况 ==================== -->
+        <mxCell id="phase5-box" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#b85450;strokeWidth=1;" vertex="1" parent="1">
+          <mxGeometry x="20" y="1260" width="1300" height="200" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="phase5-label" value="阶段5: 查看部门资源使用情况" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=12;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="30" y="1265" width="220" height="25" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="msg27" value="27. 查看各部门配额使用率" style="endArrow=classic;html=1;strokeWidth=2;strokeColor=#0066CC;" edge="1" parent="1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="80" y="1310" as="sourcePoint"/>
+            <mxPoint x="220" y="1310" as="targetPoint"/>
+          </mxGeometry>
+        </mxCell>
+
+        <mxCell id="msg28" value="28. GET /resource-quotas/usage" style="endArrow=classic;html=1;strokeWidth=2;strokeColor=#0066CC;" edge="1" parent="1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="220" y="1340" as="sourcePoint"/>
+            <mxPoint x="380" y="1340" as="targetPoint"/>
+          </mxGeometry>
+        </mxCell>
+
+        <mxCell id="msg29" value="29. 查询 ClusterQueue 使用量&#xa;(usedResources vs nominalQuota)" style="endArrow=classic;html=1;strokeWidth=2;strokeColor=#CC6600;" edge="1" parent="1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="380" y="1370" as="sourcePoint"/>
+            <mxPoint x="700" y="1370" as="targetPoint"/>
+          </mxGeometry>
+        </mxCell>
+
+        <mxCell id="msg30" value="30. 返回使用情况&#xa;市场部: 40/50 GPU (80%)&#xa;研发部: 85/100 GPU (85%)" style="endArrow=classic;html=1;strokeWidth=2;strokeColor=#009900;dashed=1;" edge="1" parent="1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="380" y="1430" as="sourcePoint"/>
+            <mxPoint x="80" y="1430" as="targetPoint"/>
+          </mxGeometry>
+        </mxCell>
+
+        <!-- ==================== 阶段6: 调整资源限制 ==================== -->
+        <mxCell id="phase6-box" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#6c8ebf;strokeWidth=1;" vertex="1" parent="1">
+          <mxGeometry x="20" y="1480" width="1300" height="200" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="phase6-label" value="阶段6: 调整资源限制 (立即生效)" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=12;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="30" y="1485" width="240" height="25" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="msg31" value="31. 修改市场部配额&#xa;(50 → 60 GPU)" style="endArrow=classic;html=1;strokeWidth=2;strokeColor=#0066CC;" edge="1" parent="1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="80" y="1530" as="sourcePoint"/>
+            <mxPoint x="220" y="1530" as="targetPoint"/>
+          </mxGeometry>
+        </mxCell>
+
+        <mxCell id="msg32" value="32. PUT /resource-quotas/{id}&#xa;{gpu: 60}" style="endArrow=classic;html=1;strokeWidth=2;strokeColor=#0066CC;" edge="1" parent="1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="220" y="1560" as="sourcePoint"/>
+            <mxPoint x="380" y="1560" as="targetPoint"/>
+          </mxGeometry>
+        </mxCell>
+
+        <mxCell id="msg33" value="33. 更新 ClusterQueue&#xa;(resourceGroups.flavors)" style="endArrow=classic;html=1;strokeWidth=2;strokeColor=#CC6600;" edge="1" parent="1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="380" y="1590" as="sourcePoint"/>
+            <mxPoint x="700" y="1590" as="targetPoint"/>
+          </mxGeometry>
+        </mxCell>
+
+        <mxCell id="msg34" value="34. 配置立即生效&#xa;新任务按新配额调度" style="endArrow=classic;html=1;strokeWidth=2;strokeColor=#009900;dashed=1;" edge="1" parent="1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="700" y="1620" as="sourcePoint"/>
+            <mxPoint x="380" y="1620" as="targetPoint"/>
+          </mxGeometry>
+        </mxCell>
+
+        <mxCell id="msg35" value="35. UPDATE resource_quotas&#xa;记录配置变更" style="endArrow=classic;html=1;strokeWidth=2;strokeColor=#9900CC;" edge="1" parent="1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="380" y="1650" as="sourcePoint"/>
+            <mxPoint x="1270" y="1650" as="targetPoint"/>
+          </mxGeometry>
+        </mxCell>
+
+        <!-- ==================== 阶段7: 抢占场景 (资源紧张时) ==================== -->
+        <mxCell id="phase7-box" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#CC0000;strokeWidth=1;" vertex="1" parent="1">
+          <mxGeometry x="20" y="1700" width="1300" height="380" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="phase7-label" value="阶段7: 抢占场景 (高优先级任务抢占低优先级资源)" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=12;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="30" y="1705" width="340" height="25" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="preemption-note" value="⚠️ 集群资源紧张: GPU 使用率 95%" style="text;html=1;strokeColor=#CC0000;fillColor=#f8cecc;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=1;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="40" y="1735" width="220" height="25" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="msg36" value="36. 研发部提交高优先级任务&#xa;(需要 20 GPU)" style="endArrow=classic;html=1;strokeWidth=2;strokeColor=#CC0000;" edge="1" parent="1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="80" y="1780" as="sourcePoint"/>
+            <mxPoint x="380" y="1780" as="targetPoint"/>
+          </mxGeometry>
+        </mxCell>
+
+        <mxCell id="msg37" value="37. 检测到资源不足&#xa;触发抢占评估" style="endArrow=classic;html=1;strokeWidth=2;strokeColor=#CC0000;" edge="1" parent="1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="380" y="1810" as="sourcePoint"/>
+            <mxPoint x="700" y="1810" as="targetPoint"/>
+          </mxGeometry>
+        </mxCell>
+
+        <mxCell id="msg38" value="38. 选择低优先级任务抢占&#xa;(市场部任务 job-marketing-001)" style="endArrow=classic;html=1;strokeWidth=2;strokeColor=#CC0000;" edge="1" parent="1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="700" y="1840" as="sourcePoint"/>
+            <mxPoint x="700" y="1870" as="targetPoint"/>
+            <Array as="points">
+              <mxPoint x="750" y="1840"/>
+              <mxPoint x="750" y="1870"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+
+        <mxCell id="msg39" value="39. 触发检查点创建&#xa;(抢占前保存状态)" style="endArrow=classic;html=1;strokeWidth=2;strokeColor=#CC0000;" edge="1" parent="1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="700" y="1890" as="sourcePoint"/>
+            <mxPoint x="380" y="1890" as="targetPoint"/>
+          </mxGeometry>
+        </mxCell>
+
+        <mxCell id="msg40" value="40. 检查点保存完成 (5分钟超时)&#xa;Workload Evicted=True" style="endArrow=classic;html=1;strokeWidth=2;strokeColor=#009900;dashed=1;" edge="1" parent="1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="380" y="1920" as="sourcePoint"/>
+            <mxPoint x="700" y="1920" as="targetPoint"/>
+          </mxGeometry>
+        </mxCell>
+
+        <mxCell id="msg41" value="41. 释放市场部任务资源&#xa;接纳研发部高优先级任务" style="endArrow=classic;html=1;strokeWidth=2;strokeColor=#CC0000;" edge="1" parent="1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="700" y="1950" as="sourcePoint"/>
+            <mxPoint x="700" y="1980" as="targetPoint"/>
+            <Array as="points">
+              <mxPoint x="750" y="1950"/>
+              <mxPoint x="750" y="1980"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+
+        <mxCell id="msg42" value="42. 市场部任务重新排队&#xa;(status: Preempted → Submitted)" style="endArrow=classic;html=1;strokeWidth=2;strokeColor=#009900;dashed=1;" edge="1" parent="1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="700" y="2010" as="sourcePoint"/>
+            <mxPoint x="380" y="2010" as="targetPoint"/>
+          </mxGeometry>
+        </mxCell>
+
+        <mxCell id="msg43" value="43. 发送告警通知&#xa;(抢占事件、任务状态变更)" style="endArrow=classic;html=1;strokeWidth=2;strokeColor=#9900CC;" edge="1" parent="1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="380" y="2040" as="sourcePoint"/>
+            <mxPoint x="1130" y="2040" as="targetPoint"/>
+          </mxGeometry>
+        </mxCell>
+
+        <mxCell id="msg44" value="44. 监控面板更新&#xa;显示抢占事件" style="endArrow=classic;html=1;strokeWidth=2;strokeColor=#009900;dashed=1;" edge="1" parent="1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="380" y="2070" as="sourcePoint"/>
+            <mxPoint x="80" y="2070" as="targetPoint"/>
+          </mxGeometry>
+        </mxCell>
+
+        <!-- 图例 -->
+        <mxCell id="legend-box" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;dashed=1;" vertex="1" parent="1">
+          <mxGeometry x="1350" y="80" width="240" height="220" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="legend-title" value="图例" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontStyle=1;fontSize=14;" vertex="1" parent="1">
+          <mxGeometry x="1430" y="90" width="80" height="20" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="legend1" value="" style="endArrow=classic;html=1;strokeWidth=2;strokeColor=#0066CC;" edge="1" parent="1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="1370" y="130" as="sourcePoint"/>
+            <mxPoint x="1430" y="130" as="targetPoint"/>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="legend1-text" value="同步请求" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="1440" y="120" width="80" height="20" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="legend2" value="" style="endArrow=classic;html=1;strokeWidth=2;strokeColor=#009900;dashed=1;" edge="1" parent="1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="1370" y="160" as="sourcePoint"/>
+            <mxPoint x="1430" y="160" as="targetPoint"/>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="legend2-text" value="响应/回调" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="1440" y="150" width="80" height="20" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="legend3" value="" style="endArrow=classic;html=1;strokeWidth=2;strokeColor=#CC6600;" edge="1" parent="1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="1370" y="190" as="sourcePoint"/>
+            <mxPoint x="1430" y="190" as="targetPoint"/>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="legend3-text" value="Kueue 配置" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="1440" y="180" width="80" height="20" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="legend4" value="" style="endArrow=classic;html=1;strokeWidth=2;strokeColor=#9900CC;" edge="1" parent="1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="1370" y="220" as="sourcePoint"/>
+            <mxPoint x="1430" y="220" as="targetPoint"/>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="legend4-text" value="监控/数据库" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="1440" y="210" width="80" height="20" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="legend5" value="" style="endArrow=classic;html=1;strokeWidth=2;strokeColor=#CC0000;" edge="1" parent="1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="1370" y="250" as="sourcePoint"/>
+            <mxPoint x="1430" y="250" as="targetPoint"/>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="legend5-text" value="抢占流程" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="1440" y="240" width="80" height="20" as="geometry"/>
+        </mxCell>
+
+        <!-- 组件分类图例 -->
+        <mxCell id="comp-legend-box" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;dashed=1;" vertex="1" parent="1">
+          <mxGeometry x="1350" y="320" width="240" height="160" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="comp-legend-title" value="组件分类" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontStyle=1;fontSize=14;" vertex="1" parent="1">
+          <mxGeometry x="1430" y="330" width="80" height="20" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="comp-legend1" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
+          <mxGeometry x="1370" y="360" width="40" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="comp-legend1-text" value="平台应用层" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="1420" y="360" width="80" height="20" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="comp-legend2" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
+          <mxGeometry x="1370" y="390" width="40" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="comp-legend2-text" value="HyperPod/Kueue" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="1420" y="390" width="100" height="20" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="comp-legend3" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;" vertex="1" parent="1">
+          <mxGeometry x="1370" y="420" width="40" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="comp-legend3-text" value="监控/告警" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="1420" y="420" width="80" height="20" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="comp-legend4" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;" vertex="1" parent="1">
+          <mxGeometry x="1370" y="450" width="40" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="comp-legend4-text" value="数据存储" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="1420" y="450" width="80" height="20" as="geometry"/>
+        </mxCell>
+
+        <!-- Kueue 概念说明 -->
+        <mxCell id="kueue-box" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;dashed=1;" vertex="1" parent="1">
+          <mxGeometry x="1350" y="500" width="240" height="160" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="kueue-title" value="Kueue 资源概念" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontStyle=1;fontSize=14;" vertex="1" parent="1">
+          <mxGeometry x="1410" y="510" width="120" height="20" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="kueue1" value="• ClusterQueue: 集群级资源池" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="1360" y="535" width="180" height="20" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="kueue2" value="• LocalQueue: 命名空间级队列" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="1360" y="555" width="180" height="20" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="kueue3" value="• PriorityClass: 优先级定义" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="1360" y="575" width="180" height="20" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="kueue4" value="• Workload: 调度单元" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="1360" y="595" width="180" height="20" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="kueue5" value="优先级: high(1000) &gt; medium(500) &gt; low(100)" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=10;fontStyle=2" vertex="1" parent="1">
+          <mxGeometry x="1360" y="625" width="220" height="20" as="geometry"/>
+        </mxCell>
+
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

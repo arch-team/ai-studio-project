@@ -29,12 +29,18 @@
 ### HyperPod SDK 方法验证
 - [ ] [T000] [P] HyperPod SDK 方法名验证 - 查阅 `sagemaker-hyperpod` SDK 官方文档,验证并记录正确的方法签名和参数：
   - **Training 模块**: 训练任务提交、状态查询、暂停/恢复/终止方法的准确方法名和签名
+    - **状态信息完整性验证**: 验证 `get_training_job_status()` 返回值是否包含所有必需状态（Submitted/Running/Paused/Preempted/Completed/Failed）和状态转换所需的详细信息（抢占原因、失败分类、检查点路径等）。如状态信息不足以支持 spec.md Training Job State Model 的完整状态转换逻辑，记录缺口到 `docs/hyperpod-sdk-gaps.md` 并触发 T000-fallback
   - **Space 模块**: Space 创建、删除、查询方法的准确方法名和签名
   - **Cluster 模块**: 集群状态查询、节点列表方法的准确方法名和签名
   - **输出产物**:
     - `docs/hyperpod-sdk-reference.md`: SDK 方法签名参考文档,包含示例代码和参数说明
     - `docs/hyperpod-sdk-gaps.md`: SDK 功能缺口分析(如有缺口)
   - **风险评估**: 如发现 SDK 方法不可用或签名不符,立即触发 T000-fallback 任务
+    - **触发条件说明**:
+      - "方法不存在": 核心方法（create/get/pause/resume/terminate）在 SDK 中找不到
+      - "签名不符": 参数名称/类型/数量与预期不匹配，或返回值格式严重不符
+      - "功能不完整": 核心方法存在但不支持必需特性（如从检查点恢复、Gang Scheduling 配置）
+    - **触发原因记录**: T000 执行者应详细记录触发原因、影响范围和备选方案建议到 `docs/hyperpod-sdk-gaps.md`
   - **参考**: [SageMaker HyperPod SDK Documentation](https://sagemaker-hyperpod-cli.readthedocs.io/)
   - **工作量估算**: 0.5 人日
 - [ ] [T000-fallback] HyperPod SDK 备选方案设计与 POC 验证 (条件任务,仅在 T000 发现 SDK 不可用时执行) - 设计并验证 boto3/kubernetes-client 备选方案:
@@ -62,6 +68,7 @@
     - 基于 POC 结果完善接口设计
     - 准备平台治理委员会例外申请文档 (遵循宪章 Principle I.B)
     - 评估对 Phase 2/3/7 任务的影响范围和返工成本
+    - **风险缓解**: 如阶段 1 评估发现 boto3 和 kubernetes-client 两种备选方案都不可行，应立即上报治理委员会并停止 POC，避免无效工作
   - **输出产物**:
     - `docs/hyperpod-sdk-fallback.md`: 备选方案详细设计 (含 POC 验证结果)
     - `docs/exception-request-template.md`: 例外申请模板
@@ -155,7 +162,7 @@
     - `{project}-datasets-{env}`: 训练数据集存储
     - `{project}-models-{env}`: 训练产出的模型文件
     - `{project}-checkpoints-{env}`: 检查点和快照文件
-    - **静态数据加密配置**: 所有存储桶启用 SSE-KMS 默认加密 (使用 AWS 托管密钥 aws/s3 或指定 CMK),S3 自动对所有上传对象应用加密,无需客户端指定加密参数
+    - **静态数据加密配置**: 所有存储桶启用 SSE-KMS 默认加密，统一使用 AWS 托管密钥 (aws/s3)，S3 自动对所有上传对象应用加密,无需客户端指定加密参数。MVP 阶段简化配置，如需更强审计能力可迁移到 CMK
     - **传输加密强制策略**: 配置 Bucket Policy 拒绝非 HTTPS 传输 (aws:SecureTransport = false),确保数据传输安全
     - **验证测试**:
       - ❌ HTTP PUT 请求被拒绝 (403 Forbidden)
@@ -239,7 +246,7 @@
 
 ### FSx for Lustre 文件系统创建
 - [ ] [T008e] [P] FSx for Lustre Stack - `infrastructure/cdk/lib/fsx-stack.ts`,创建 Amazon FSx for Lustre 高性能文件系统:
-  - **文件系统配置**: 创建 FSx for Lustre 文件系统,配置 Persistent_2 部署类型 (持久化存储),选择 500 MB/s/TiB 或 1000 MB/s/TiB 吞吐量级别以满足 ≥5GB/s 单客户端吞吐量要求 (推荐 1000 MB/s/TiB 配合 10 TiB 容量可达 10 GB/s)
+  - **文件系统配置**: 创建 FSx for Lustre 文件系统,配置 Persistent_2 部署类型 (持久化存储),默认使用 500 MB/s/TiB 吞吐量级别 (配合 10 TiB 容量可达 5 GB/s，满足 spec.md ≥5GB/s 基线需求)。成本优化策略：500 MB/s/TiB 相比 1000 MB/s/TiB 节省约 50% 成本 (~$6,500/月)，适用于大多数训练场景 (单任务 GPU ≤8)。性能不达标时可通过调优方案升级到 1000 MB/s/TiB (参见性能验证部分)
   - **容量规划**: 初始容量 ≥10 TiB (支持 spec.md FR-007 ≥10TB 数据集需求),启用自动扩容策略 (使用率 >80% 触发扩容),最大容量 100 TiB
   - **S3 集成**: 配置 S3 Data Repository Association,链接训练数据 S3 存储桶 (T008b 创建),启用自动导入/导出 (ImportPath, ExportPath),配置 AutoImportPolicy (NEW/CHANGED/DELETED 事件自动同步)
   - **网络配置**: 部署到 T008b 创建的 VPC 私有子网,配置安全组 (允许 EKS 节点访问 FSx 端口 988, 1021-1023),启用 VPC 内 DNS 解析
@@ -452,7 +459,7 @@
   - **存储满载处理**: NVMe/FSx 使用率 >90% 时触发紧急迁移至下一层,所有层均满载则告警并暂停新检查点创建 (保留最近 1 个)
   - **迁移失败回退**: 迁移失败时保留原位置检查点,记录失败日志,下次迁移周期重试 (最多 3 次),持续失败则触发告警
   - **完整性保护**: 创建时计算 SHA-256 校验和,恢复前验证完整性,若损坏则自动尝试上一个有效检查点并告警
-  - **S3 生命周期策略**: 配置 S3 生命周期规则,自动删除 30 天前的冷检查点
+  - **S3 生命周期策略**: 配置 S3 生命周期规则，分级存储优化成本：30 天后转换为 Standard-IA（低频访问，节省 50% 成本），90 天后自动删除冷检查点。可通过 IaC 参数配置保留期（默认 90 天），满足合规审计和模型回滚需求
   - **定时任务调度**: 每 10 分钟执行一次迁移检查和执行
   - **职责边界**: T038b 仅负责迁移已创建的检查点,不负责创建检查点 (创建由 T038 负责)
   - **参考**: spec.md FR-011 分层检查点存储策略, Edge Cases (检查点存储满载/检查点损坏处理) (依赖 T038)

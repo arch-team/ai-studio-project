@@ -35,6 +35,61 @@
 | 集群 | Cluster | `HyperPodCluster` | `hyperpod_clusters` | `/clusters` | 自然语言描述、用户界面 |
 | 审计日志 | Audit Log | `AuditLog` | `audit_logs` | `/audit-logs` | 自然语言描述、用户界面 |
 
+### 调度和资源管理术语
+
+| 中文术语 | 英文术语 | 技术说明 | 使用场景 |
+|---------|---------|---------|---------|
+| 任务治理 | Task Governance / HyperPod Task Governance | AWS SageMaker HyperPod 原生资源调度组件，基于 Kueue 开源引擎封装，提供资源配额、优先级调度和抢占策略管理能力。**开发者应使用 HyperPod Task Governance API 而非直接操作 Kueue CRD** | 资源配额配置、训练任务优先级设置、集群资源管理 |
+| Kueue | Kueue (Kubernetes Queueing) | 开源 Kubernetes 作业队列调度引擎，被 HyperPod Task Governance 集成作为底层调度实现。**项目中仅在状态监控和故障诊断场景下通过 kubernetes-client 直接查询 Kueue Workload CRD，所有配置操作通过 Task Governance API 进行** | 底层调度状态查询、高级故障诊断 |
+| Kueue Workload | Kueue Workload CRD | Kueue 的核心资源对象，映射到训练任务（TrainingJob）。每个训练任务提交后，HyperPod Task Governance 自动创建对应的 Workload 对象进行调度 | 状态监控、调度细节查询 |
+| 集群队列 | ClusterQueue | Kueue 集群级别资源池，由 HyperPod Task Governance 管理。定义 GPU/CPU/内存等资源配额和借用策略 | 资源池配置（通过 Task Governance API） |
+| 本地队列 | LocalQueue | Kueue 命名空间级别队列，关联到 ClusterQueue。训练任务提交到 LocalQueue 进行调度 | 命名空间级资源隔离 |
+| 优先级类 | PriorityClass | Kubernetes 优先级资源，定义三级优先级：high/medium/low。用于抢占式调度决策 | 训练任务优先级配置 |
+
+**术语使用原则**:
+1. **用户文档和 API 接口**: 统一使用"HyperPod Task Governance"或简称"Task Governance"
+2. **技术实现文档**: 可同时提及"Task Governance (基于 Kueue)"说明底层技术
+3. **状态监控逻辑**: 明确区分"用户层状态（TrainingJob.status）"和"Kueue 层状态（Workload.conditions）"
+4. **例外场景**: 直接操作 Kueue CRD 需在代码注释中说明理由并标注"绕过 SDK-First 原则，已获治理委员会批准"
+
+**HyperPod Task Governance 功能范围总结**:
+
+| 功能模块 | 对应需求 | 核心能力 | Kueue 底层实现 |
+|---------|---------|---------|---------------|
+| 多租户资源配额 | FR-008 | 按部门/项目分配 GPU/CPU/内存配额，支持资源借用和限制 | ClusterQueue 资源池，LocalQueue 命名空间隔离 |
+| 优先级调度 | FR-004 | 三级优先级体系 (high/medium/low)，高优先级任务优先调度 | PriorityClass 资源，Workload 优先级排序 |
+| 抢占式调度 | FR-004 | 高优先级任务可抢占低优先级任务资源，自动创建检查点 | Preemption 策略，Evicted condition |
+
+**实施原则**: 所有配置操作通过 HyperPod SDK/API 进行，仅在状态监控和故障诊断时通过 kubernetes-client 查询 Kueue CRD（需例外审批）
+
+**Kueue 底层能力说明**:
+
+Kueue 作为 HyperPod Task Governance 的底层调度引擎，提供以下核心能力：
+
+1. **Workload 调度**: 基于优先级和资源配额的任务接纳控制，决定任务何时获得资源
+2. **Queue 管理**: ClusterQueue（集群级资源池）和 LocalQueue（命名空间级队列）的资源隔离和借用策略
+3. **Gang Scheduling**: 保证分布式训练任务的所有 Pod 在同一调度周期内被调度（时间窗口≤60秒）
+4. **Preemption（抢占）**: 高优先级任务可驱逐低优先级任务，释放资源进行重新调度
+
+**开发者交互方式**: 所有 Kueue 能力通过 HyperPod Task Governance API 封装调用，仅在状态监控和故障诊断时通过 kubernetes-client 直接查询 Kueue Workload CRD
+
+**抽象层使用决策指南**:
+
+| 操作类型 | 推荐抽象层 | API/工具 | 使用场景 |
+|---------|-----------|---------|---------|
+| 训练任务提交 | Task Governance | `sagemaker-hyperpod.training.submit_training_job()` | 所有训练任务创建场景 |
+| 任务生命周期管理 | Task Governance | `pause_training_job()`, `resume_training_job()`, `stop_training_job()` | 暂停、恢复、终止训练任务 |
+| 资源配额配置 | Task Governance | HyperPod SDK/API | 设置部门/项目资源配额 |
+| 优先级配置 | Task Governance | HyperPod SDK/API | 设置训练任务优先级 (high/medium/low) |
+| 训练任务状态查询 | Task Governance | `get_training_job_status()` | 获取用户层状态 (Submitted/Running/Completed/Failed) |
+| **Kueue Workload 状态查询** | **Kueue (例外)** | **kubernetes-client** | **细粒度调度状态监控**（需例外审批） |
+| **Kueue 故障诊断** | **Kueue (例外)** | **kubernetes-client** | **调度失败根因分析**（需例外审批） |
+
+**决策原则**:
+1. **默认规则**: 所有操作优先使用 HyperPod Task Governance API
+2. **例外场景**: 仅在状态监控和故障诊断时，且 Task Governance API 无法提供所需信息时，才直接查询 Kueue CRD
+3. **审批要求**: 所有直接操作 Kueue CRD 的代码需在 PR 中说明理由，并在代码注释中标注"绕过 SDK-First 原则，已获治理委员会批准"
+
 ### 命名规范
 
 **1. 自然语言描述** (规范文档、用户界面、日志消息)
@@ -855,6 +910,9 @@ training_job_failures_total{failure_category="..."}
     - 异步记录：MLflow 客户端内部已实现异步上报，用户无需额外处理
 
 - **FR-008**: 系统必须实现多租户隔离，支持按部门/项目分配资源配额
+  - 🔧 **实施约束**: MUST 使用 HyperPod Task Governance API 管理资源配额。
+    通过 HyperPod SDK/API 配置 ClusterQueue（集群级资源池）和 LocalQueue（命名空间级队列），定义 GPU/CPU/内存配额和借用策略。
+    MAY 使用 kubernetes-client 查询 ClusterQueue 资源状态（仅用于监控，需例外审批）
 - **FR-009**: 系统必须提供资源使用统计和成本分析功能，支持按时间、项目和用户维度的数据查询，采用按分钟计费粒度进行成本核算，确保精确的资源使用成本追踪
 - **FR-010**: 系统必须实现自动检查点创建和断点续训功能，支持 5 种检查点触发场景（详见 Training Job State Model 章节的"检查点触发场景映射"），确保训练状态可恢复且故障时平均损失训练进度不超过7.5分钟。系统依赖 HyperPod 的 Auto-Resume 机制和 Health Check Agent 实现节点故障自动检测和训练任务自动恢复
   - 🔧 **实施约束**: MUST 使用 HyperPod Elastic Agent 的检查点管理能力和 Auto-Resume 机制。
@@ -956,7 +1014,7 @@ training_job_failures_total{failure_category="..."}
 
 - **训练任务（TrainingJob）**: 表示一个AI模型训练作业，包含训练配置、资源需求、关联数据集、训练状态和指标数据
 - **数据集（Dataset）**: 表示训练数据集合，包含元数据、版本信息、存储位置和使用权限
-- **资源配额（ResourceQuota）**: 表示分配给特定团队/项目的计算资源限制，包含GPU数量、CPU核心、内存等资源指标和优先级信息(高/中/低三级优先级，映射到 Kueue 的 PriorityClass: high/medium/low)
+- **资源配额（ResourceQuota）**: 表示分配给特定团队/项目的计算资源限制，包含GPU数量、CPU核心、内存等资源指标和优先级信息。**通过 HyperPod Task Governance 管理**，底层映射到 Kueue 的 ClusterQueue/LocalQueue 和 PriorityClass (high/medium/low)
 - **用户（User）**: 系统用户，包含身份信息、所属团队/项目、权限等级和资源使用记录
 - **检查点（Checkpoint）**: 训练过程中保存的模型状态，包含存储位置、创建时间和相关训练指标
 - **模型（Model）**: 训练产出的模型，包含版本信息、性能指标、部署状态和生命周期信息。模型生命周期状态包括：

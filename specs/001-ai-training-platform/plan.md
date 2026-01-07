@@ -94,8 +94,9 @@
 **Constraints**:
 - 平台可用性 99%+ (年度) (SC-003)
 - 数据加密: 静态数据 (S3 SSE-KMS), 传输加密 (TLS 1.2+)
-  - KMS 密钥策略: 使用 AWS 托管密钥 (aws/s3) 或客户托管密钥 (CMK)，按资源类型分离密钥
-  - 密钥轮换: 启用自动密钥轮换 (年度)，符合安全合规要求
+  - KMS 密钥策略: 统一使用 AWS 托管密钥 (aws/s3)，MVP 阶段简化配置
+  - 选择理由: 零管理成本，AWS 自动轮换，满足基本加密合规
+  - 升级路径: 如需跨账户访问或更强审计能力，可迁移到 CMK
 - 审计日志保留期 ≥90天,100%关键操作可追溯 (SC-010, SC-015)
 - 无障碍访问: WCAG 2.1 AA 合规 (Principle XI)
 - 成本约束: 优先使用 HyperPod 托管组件,避免自行实现
@@ -130,11 +131,13 @@
 
 ### SDK 绕过场景 (已记录)
 
-| 场景 | 原因 | 替代方案 |
-|------|------|----------|
-| Kueue Workload 状态监控 | HyperPod SDK 未提供 Kueue 状态详情 API | kubernetes-client |
-| NetworkPolicy 配置 | SDK 未覆盖网络隔离策略 | kubernetes-client |
-| SageMaker Model Registry | 非 HyperPod SDK 适用范围 | boto3 |
+| 场景 | 原因 | 替代方案 | 使用范围 |
+|------|------|----------|----------|
+| Kueue Workload 状态监控 | HyperPod SDK 未提供 Kueue 状态详情 API | kubernetes-client | 只读状态查询、故障诊断 |
+| NetworkPolicy 验证/监控 | SDK 未覆盖网络隔离策略 | kubernetes-client | POC 验证、运行时状态监控 (配置通过 IaC) |
+| SageMaker Model Registry | 非 HyperPod SDK 适用范围 | boto3 | 模型注册、版本管理、元数据查询 |
+
+> **注意**: NetworkPolicy 配置本身在 IaC 层面完成 (tasks.md T008f, `infrastructure/k8s/network-policies/`)，kubernetes-client 仅用于 POC 验证和运行时状态监控，不用于动态创建网络策略。
 
 ## Phase 0: 技术可行性研究
 
