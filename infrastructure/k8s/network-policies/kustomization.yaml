@@ -1,0 +1,30 @@
+# Kustomization for Network Policies and QoS Configuration
+# Implements network isolation and bandwidth management for AI Training Platform
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+metadata:
+  name: network-policies
+  annotations:
+    description: "Network isolation and QoS policies for training workloads"
+
+resources:
+  # Default deny policy for all namespaces
+  - default-deny-policy.yaml
+  # Training namespace network policies
+  - training-network-policy.yaml
+  # Monitoring namespace network policies
+  - monitoring-network-policy.yaml
+  # Spaces namespace network policies
+  - spaces-network-policy.yaml
+  # QoS and bandwidth configuration
+  - qos-config.yaml
+
+commonLabels:
+  app.kubernetes.io/part-of: ai-training-platform
+  app.kubernetes.io/managed-by: kustomize
+  platform.ai/component: network-policies
+
+commonAnnotations:
+  platform.ai/version: "1.0.0"
+  platform.ai/compliance: "FR-021"

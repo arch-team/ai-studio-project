@@ -1,0 +1,202 @@
+# Training Operator Configuration for AI Training Platform
+# Manages PyTorchJob and TFJob CRDs for distributed training
+# Reference: https://github.com/kubeflow/training-operator
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: training-operator-config
+  namespace: hyperpod-system
+  labels:
+    app.kubernetes.io/name: training-operator
+    app.kubernetes.io/component: controller
+data:
+  # Gang scheduling settings
+  gang-scheduler-name: "scheduler-plugins-scheduler"
+  # Enable PyTorch elastic training support
+  enable-pytorch-elastic: "true"
+
+---
+# Service Account for Training Operator
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: training-operator
+  namespace: hyperpod-system
+  labels:
+    app.kubernetes.io/name: training-operator
+
+---
+# ClusterRole for Training Operator
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: training-operator-role
+rules:
+  # Core API resources
+  - apiGroups: [""]
+    resources: ["pods", "services", "endpoints", "events", "configmaps", "secrets", "serviceaccounts"]
+    verbs: ["*"]
+  - apiGroups: [""]
+    resources: ["pods/exec"]
+    verbs: ["create"]
+  # Apps resources
+  - apiGroups: ["apps"]
+    resources: ["deployments", "replicasets", "statefulsets"]
+    verbs: ["*"]
+  # Batch resources
+  - apiGroups: ["batch"]
+    resources: ["jobs"]
+    verbs: ["*"]
+  # Kubeflow training resources
+  - apiGroups: ["kubeflow.org"]
+    resources: ["*"]
+    verbs: ["*"]
+  # Scheduling resources for gang scheduling
+  - apiGroups: ["scheduling.x-k8s.io"]
+    resources: ["podgroups"]
+    verbs: ["*"]
+  # RBAC for creating service accounts
+  - apiGroups: ["rbac.authorization.k8s.io"]
+    resources: ["roles", "rolebindings"]
+    verbs: ["create", "get", "list", "watch"]
+  # Volcano scheduler resources (if using Volcano)
+  - apiGroups: ["scheduling.volcano.sh"]
+    resources: ["podgroups"]
+    verbs: ["*"]
+
+---
+# ClusterRoleBinding for Training Operator
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: training-operator-rolebinding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: training-operator-role
+subjects:
+  - kind: ServiceAccount
+    name: training-operator
+    namespace: hyperpod-system
+
+---
+# PyTorchJob Default Configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: pytorch-job-defaults
+  namespace: hyperpod-system
+  labels:
+    app.kubernetes.io/name: training-operator
+    app.kubernetes.io/component: config
+data:
+  # Default restart policy for training jobs
+  default-restart-policy: OnFailure
+  # Max retries before marking job as failed
+  max-retries: "3"
+  # TTL for completed jobs (cleanup)
+  ttl-seconds-after-finished: "86400"
+  # Enable suspend support for Kueue integration
+  enable-suspend: "true"
+  # Default success policy
+  success-policy: AllWorkers
+
+---
+# Training Job Template for reference
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: pytorch-job-template
+  namespace: hyperpod-system
+  labels:
+    app.kubernetes.io/name: training-operator
+    app.kubernetes.io/component: templates
+data:
+  pytorch-job-template.yaml: |
+    # Example PyTorchJob template for AI Training Platform
+    # This template shows recommended configuration patterns
+    apiVersion: kubeflow.org/v1
+    kind: PyTorchJob
+    metadata:
+      name: ${JOB_NAME}
+      namespace: ${NAMESPACE}
+      labels:
+        app.kubernetes.io/name: pytorch-training
+        platform.ai/job-type: distributed-training
+      annotations:
+        kueue.x-k8s.io/queue-name: ${QUEUE_NAME}
+    spec:
+      elasticPolicy:
+        # Enable elastic training for fault tolerance
+        rdzvBackend: c10d
+        minReplicas: ${MIN_WORKERS}
+        maxReplicas: ${MAX_WORKERS}
+        maxRestarts: 3
+      pytorchReplicaSpecs:
+        Master:
+          replicas: 1
+          restartPolicy: OnFailure
+          template:
+            metadata:
+              labels:
+                platform.ai/role: master
+            spec:
+              containers:
+                - name: pytorch
+                  image: ${TRAINING_IMAGE}
+                  imagePullPolicy: Always
+                  command: ["torchrun"]
+                  args:
+                    - "--nnodes=${NUM_NODES}"
+                    - "--nproc_per_node=${GPUS_PER_NODE}"
+                    - "--rdzv_backend=c10d"
+                    - "--rdzv_endpoint=${MASTER_ADDR}:${MASTER_PORT}"
+                    - "${TRAINING_SCRIPT}"
+                  resources:
+                    limits:
+                      nvidia.com/gpu: ${GPUS_PER_NODE}
+                      memory: "256Gi"
+                    requests:
+                      nvidia.com/gpu: ${GPUS_PER_NODE}
+                      memory: "128Gi"
+                  volumeMounts:
+                    - name: fsx-pv
+                      mountPath: /data
+                    - name: checkpoints
+                      mountPath: /checkpoints
+                    - name: shm
+                      mountPath: /dev/shm
+                  env:
+                    - name: NCCL_DEBUG
+                      value: "INFO"
+                    - name: NCCL_SOCKET_IFNAME
+                      value: "eth0"
+                    - name: FI_EFA_USE_DEVICE_RDMA
+                      value: "1"
+              tolerations:
+                - key: nvidia.com/gpu
+                  operator: Exists
+                  effect: NoSchedule
+              nodeSelector:
+                nvidia.com/gpu: "true"
+              volumes:
+                - name: fsx-pv
+                  persistentVolumeClaim:
+                    claimName: ${FSX_PVC_NAME}
+                - name: checkpoints
+                  persistentVolumeClaim:
+                    claimName: ${CHECKPOINT_PVC_NAME}
+                - name: shm
+                  emptyDir:
+                    medium: Memory
+                    sizeLimit: "64Gi"
+        Worker:
+          replicas: ${NUM_WORKERS}
+          restartPolicy: OnFailure
+          template:
+            # Worker configuration mirrors Master
+            spec:
+              containers:
+                - name: pytorch
+                  # ... (same as master)

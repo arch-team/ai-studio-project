@@ -1,0 +1,531 @@
+"""
+ALB Stack for AI Training Platform.
+
+This stack creates an Application Load Balancer with TLS termination for:
+- Frontend web application
+- Backend API endpoints
+- Grafana monitoring dashboards
+- JupyterLab/VS Code Spaces access
+
+All traffic is encrypted with TLS 1.2+ and HTTP is redirected to HTTPS.
+
+Reference: spec.md FR-018 (Transport layer encryption requirements)
+"""
+
+import aws_cdk as cdk
+from aws_cdk import Duration
+from aws_cdk import aws_certificatemanager as acm
+from aws_cdk import aws_ec2 as ec2
+from aws_cdk import aws_elasticloadbalancingv2 as elbv2
+from aws_cdk import aws_iam as iam
+from aws_cdk import aws_wafv2 as wafv2
+from constructs import Construct
+
+from config import EnvironmentConfig, EnvironmentType
+
+
+class AlbStack(cdk.Stack):
+    """Application Load Balancer Stack with TLS termination.
+
+    This stack creates:
+    - Internet-facing Application Load Balancer
+    - HTTPS listener with ACM certificate
+    - HTTP to HTTPS redirect
+    - WAF integration (optional)
+    - Target groups for backend services
+
+    Attributes:
+        alb: Application Load Balancer
+        https_listener: HTTPS listener with TLS termination
+        dns_name: ALB DNS name for frontend access
+    """
+
+    def __init__(
+        self,
+        scope: Construct,
+        construct_id: str,
+        env_config: EnvironmentConfig,
+        vpc: ec2.IVpc,
+        certificate_arn: str | None = None,
+        enable_waf: bool = False,
+        **kwargs,
+    ) -> None:
+        """Initialize the ALB Stack.
+
+        Args:
+            scope: CDK scope
+            construct_id: Stack identifier
+            env_config: Environment configuration
+            vpc: VPC for ALB deployment
+            certificate_arn: ACM certificate ARN (optional, creates self-signed if not provided)
+            enable_waf: Enable AWS WAF protection
+            **kwargs: Additional stack properties
+        """
+        super().__init__(scope, construct_id, **kwargs)
+
+        self.env_config = env_config
+        self._vpc = vpc
+        self._certificate_arn = certificate_arn
+        self._enable_waf = enable_waf
+
+        # Create security group for ALB
+        self._security_group = self._create_security_group()
+
+        # Create Application Load Balancer
+        self._alb = self._create_alb()
+
+        # Create HTTPS listener
+        self._https_listener = self._create_https_listener()
+
+        # Create HTTP to HTTPS redirect
+        self._create_http_redirect()
+
+        # Create target groups
+        self._create_target_groups()
+
+        # Create WAF (optional)
+        if self._enable_waf:
+            self._create_waf()
+
+        # Create outputs
+        self._create_outputs()
+
+    def _create_security_group(self) -> ec2.SecurityGroup:
+        """Create security group for ALB.
+
+        Allows:
+        - Inbound HTTPS (443) from anywhere
+        - Inbound HTTP (80) from anywhere (for redirect)
+
+        Returns:
+            Security group for ALB
+        """
+        sg = ec2.SecurityGroup(
+            self,
+            "AlbSecurityGroup",
+            vpc=self._vpc,
+            description="Security group for Application Load Balancer",
+            allow_all_outbound=True,
+        )
+
+        # Allow HTTPS from anywhere
+        sg.add_ingress_rule(
+            peer=ec2.Peer.any_ipv4(),
+            connection=ec2.Port.tcp(443),
+            description="Allow HTTPS from internet",
+        )
+
+        # Allow HTTP from anywhere (for redirect to HTTPS)
+        sg.add_ingress_rule(
+            peer=ec2.Peer.any_ipv4(),
+            connection=ec2.Port.tcp(80),
+            description="Allow HTTP from internet (redirect to HTTPS)",
+        )
+
+        cdk.Tags.of(sg).add("Name", f"{self.env_config.resource_prefix}-alb-sg")
+
+        return sg
+
+    def _create_alb(self) -> elbv2.ApplicationLoadBalancer:
+        """Create Application Load Balancer.
+
+        Creates an internet-facing ALB in public subnets.
+
+        Returns:
+            Application Load Balancer
+        """
+        alb = elbv2.ApplicationLoadBalancer(
+            self,
+            "ApplicationLoadBalancer",
+            vpc=self._vpc,
+            internet_facing=True,
+            security_group=self._security_group,
+            vpc_subnets=ec2.SubnetSelection(
+                subnet_type=ec2.SubnetType.PUBLIC,
+            ),
+            load_balancer_name=f"{self.env_config.resource_prefix}-alb",
+            # Enable access logging (optional, requires S3 bucket)
+            # access_log=...,
+            # Enable HTTP/2
+            http2_enabled=True,
+            # Idle timeout
+            idle_timeout=Duration.seconds(60),
+            # Drop invalid header fields for security
+            drop_invalid_header_fields=True,
+        )
+
+        cdk.Tags.of(alb).add("Name", f"{self.env_config.resource_prefix}-alb")
+
+        return alb
+
+    def _get_or_create_certificate(self) -> acm.ICertificate:
+        """Get existing certificate or create a placeholder.
+
+        If certificate_arn is provided, uses the existing certificate.
+        Otherwise, creates a DNS-validated certificate (requires Route53).
+
+        Returns:
+            ACM certificate for HTTPS listener
+        """
+        if self._certificate_arn:
+            return acm.Certificate.from_certificate_arn(
+                self,
+                "ImportedCertificate",
+                certificate_arn=self._certificate_arn,
+            )
+
+        # Create placeholder - in production, use Route53 for DNS validation
+        # or import an existing certificate
+        # For now, we'll create a self-signed certificate reference
+        # that must be replaced with a real certificate before deployment
+
+        # Note: This is a placeholder. In production:
+        # 1. Use Route53 with hosted zone for automatic DNS validation
+        # 2. Or import an existing ACM certificate
+        # 3. Or use certificate from external CA
+
+        # Return a parameter that must be provided at deploy time
+        cert_arn_param = cdk.CfnParameter(
+            self,
+            "CertificateArn",
+            type="String",
+            description="ACM Certificate ARN for HTTPS listener",
+            default="",
+        )
+
+        return acm.Certificate.from_certificate_arn(
+            self,
+            "CertificateFromParam",
+            certificate_arn=cert_arn_param.value_as_string,
+        )
+
+    def _create_https_listener(self) -> elbv2.ApplicationListener:
+        """Create HTTPS listener with TLS 1.2+ termination.
+
+        Security configuration:
+        - TLS 1.2 minimum (TLS 1.0/1.1 disabled)
+        - Strong cipher suites only
+        - Forward secrecy enabled
+
+        Returns:
+            HTTPS listener
+        """
+        certificate = self._get_or_create_certificate()
+
+        listener = self._alb.add_listener(
+            "HttpsListener",
+            port=443,
+            protocol=elbv2.ApplicationProtocol.HTTPS,
+            certificates=[certificate],
+            # Use TLS 1.2 minimum security policy
+            ssl_policy=elbv2.SslPolicy.TLS12,
+            # Default action - return 404 (override with target groups)
+            default_action=elbv2.ListenerAction.fixed_response(
+                status_code=404,
+                content_type="text/plain",
+                message_body="Not Found",
+            ),
+        )
+
+        return listener
+
+    def _create_http_redirect(self) -> elbv2.ApplicationListener:
+        """Create HTTP listener that redirects to HTTPS.
+
+        All HTTP traffic is automatically redirected to HTTPS
+        to ensure encrypted communication.
+
+        Returns:
+            HTTP listener with redirect action
+        """
+        return self._alb.add_listener(
+            "HttpRedirectListener",
+            port=80,
+            protocol=elbv2.ApplicationProtocol.HTTP,
+            default_action=elbv2.ListenerAction.redirect(
+                protocol="HTTPS",
+                port="443",
+                permanent=True,
+            ),
+        )
+
+    def _create_target_groups(self) -> None:
+        """Create target groups for different services.
+
+        Target groups created:
+        - Backend API (port 8000)
+        - Frontend (port 3000)
+        - Grafana (port 3000)
+        """
+        # Backend API target group
+        self._backend_target_group = elbv2.ApplicationTargetGroup(
+            self,
+            "BackendTargetGroup",
+            vpc=self._vpc,
+            port=8000,
+            protocol=elbv2.ApplicationProtocol.HTTP,
+            target_type=elbv2.TargetType.IP,
+            health_check=elbv2.HealthCheck(
+                path="/health",
+                port="8000",
+                protocol=elbv2.Protocol.HTTP,
+                healthy_threshold_count=2,
+                unhealthy_threshold_count=3,
+                interval=Duration.seconds(30),
+                timeout=Duration.seconds(5),
+            ),
+            target_group_name=f"{self.env_config.resource_prefix}-api",
+        )
+
+        # Add backend API rule
+        self._https_listener.add_action(
+            "BackendApiRule",
+            priority=10,
+            conditions=[
+                elbv2.ListenerCondition.path_patterns(["/api/*", "/health"]),
+            ],
+            action=elbv2.ListenerAction.forward([self._backend_target_group]),
+        )
+
+        # Frontend target group
+        self._frontend_target_group = elbv2.ApplicationTargetGroup(
+            self,
+            "FrontendTargetGroup",
+            vpc=self._vpc,
+            port=3000,
+            protocol=elbv2.ApplicationProtocol.HTTP,
+            target_type=elbv2.TargetType.IP,
+            health_check=elbv2.HealthCheck(
+                path="/",
+                port="3000",
+                protocol=elbv2.Protocol.HTTP,
+                healthy_threshold_count=2,
+                unhealthy_threshold_count=3,
+                interval=Duration.seconds(30),
+                timeout=Duration.seconds(5),
+            ),
+            target_group_name=f"{self.env_config.resource_prefix}-frontend",
+        )
+
+        # Add frontend rule (default)
+        self._https_listener.add_action(
+            "FrontendRule",
+            priority=100,
+            conditions=[
+                elbv2.ListenerCondition.path_patterns(["/*"]),
+            ],
+            action=elbv2.ListenerAction.forward([self._frontend_target_group]),
+        )
+
+        # Grafana target group
+        self._grafana_target_group = elbv2.ApplicationTargetGroup(
+            self,
+            "GrafanaTargetGroup",
+            vpc=self._vpc,
+            port=3000,
+            protocol=elbv2.ApplicationProtocol.HTTP,
+            target_type=elbv2.TargetType.IP,
+            health_check=elbv2.HealthCheck(
+                path="/api/health",
+                port="3000",
+                protocol=elbv2.Protocol.HTTP,
+                healthy_threshold_count=2,
+                unhealthy_threshold_count=3,
+                interval=Duration.seconds(30),
+                timeout=Duration.seconds(5),
+            ),
+            target_group_name=f"{self.env_config.resource_prefix}-grafana",
+        )
+
+        # Add Grafana rule
+        self._https_listener.add_action(
+            "GrafanaRule",
+            priority=20,
+            conditions=[
+                elbv2.ListenerCondition.path_patterns(["/grafana/*"]),
+            ],
+            action=elbv2.ListenerAction.forward([self._grafana_target_group]),
+        )
+
+    def _create_waf(self) -> None:
+        """Create AWS WAF WebACL for protection.
+
+        Implements:
+        - Rate limiting
+        - AWS Managed Rules (common threats)
+        - SQL injection protection
+        - XSS protection
+        """
+        # Create WAF WebACL
+        web_acl = wafv2.CfnWebACL(
+            self,
+            "WafWebAcl",
+            name=f"{self.env_config.resource_prefix}-waf",
+            scope="REGIONAL",
+            default_action=wafv2.CfnWebACL.DefaultActionProperty(
+                allow=wafv2.CfnWebACL.AllowActionProperty(),
+            ),
+            visibility_config=wafv2.CfnWebACL.VisibilityConfigProperty(
+                cloud_watch_metrics_enabled=True,
+                metric_name=f"{self.env_config.resource_prefix}-waf",
+                sampled_requests_enabled=True,
+            ),
+            rules=[
+                # Rate limiting rule
+                wafv2.CfnWebACL.RuleProperty(
+                    name="RateLimitRule",
+                    priority=1,
+                    action=wafv2.CfnWebACL.RuleActionProperty(
+                        block=wafv2.CfnWebACL.BlockActionProperty(),
+                    ),
+                    statement=wafv2.CfnWebACL.StatementProperty(
+                        rate_based_statement=wafv2.CfnWebACL.RateBasedStatementProperty(
+                            limit=2000,  # 2000 requests per 5 minutes per IP
+                            aggregate_key_type="IP",
+                        ),
+                    ),
+                    visibility_config=wafv2.CfnWebACL.VisibilityConfigProperty(
+                        cloud_watch_metrics_enabled=True,
+                        metric_name="RateLimitRule",
+                        sampled_requests_enabled=True,
+                    ),
+                ),
+                # AWS Managed Core Rule Set
+                wafv2.CfnWebACL.RuleProperty(
+                    name="AWSManagedRulesCommonRuleSet",
+                    priority=2,
+                    override_action=wafv2.CfnWebACL.OverrideActionProperty(
+                        none={},
+                    ),
+                    statement=wafv2.CfnWebACL.StatementProperty(
+                        managed_rule_group_statement=wafv2.CfnWebACL.ManagedRuleGroupStatementProperty(
+                            vendor_name="AWS",
+                            name="AWSManagedRulesCommonRuleSet",
+                        ),
+                    ),
+                    visibility_config=wafv2.CfnWebACL.VisibilityConfigProperty(
+                        cloud_watch_metrics_enabled=True,
+                        metric_name="AWSManagedRulesCommonRuleSet",
+                        sampled_requests_enabled=True,
+                    ),
+                ),
+                # SQL Injection protection
+                wafv2.CfnWebACL.RuleProperty(
+                    name="AWSManagedRulesSQLiRuleSet",
+                    priority=3,
+                    override_action=wafv2.CfnWebACL.OverrideActionProperty(
+                        none={},
+                    ),
+                    statement=wafv2.CfnWebACL.StatementProperty(
+                        managed_rule_group_statement=wafv2.CfnWebACL.ManagedRuleGroupStatementProperty(
+                            vendor_name="AWS",
+                            name="AWSManagedRulesSQLiRuleSet",
+                        ),
+                    ),
+                    visibility_config=wafv2.CfnWebACL.VisibilityConfigProperty(
+                        cloud_watch_metrics_enabled=True,
+                        metric_name="AWSManagedRulesSQLiRuleSet",
+                        sampled_requests_enabled=True,
+                    ),
+                ),
+            ],
+        )
+
+        # Associate WAF with ALB
+        wafv2.CfnWebACLAssociation(
+            self,
+            "WafAlbAssociation",
+            resource_arn=self._alb.load_balancer_arn,
+            web_acl_arn=web_acl.attr_arn,
+        )
+
+    def _create_outputs(self) -> None:
+        """Create CloudFormation outputs for cross-stack references."""
+        # ALB DNS name
+        cdk.CfnOutput(
+            self,
+            "AlbDnsName",
+            value=self._alb.load_balancer_dns_name,
+            description="ALB DNS name for frontend access",
+            export_name=f"{self.env_config.resource_prefix}-alb-dns",
+        )
+
+        # ALB ARN
+        cdk.CfnOutput(
+            self,
+            "AlbArn",
+            value=self._alb.load_balancer_arn,
+            description="ALB ARN for reference",
+            export_name=f"{self.env_config.resource_prefix}-alb-arn",
+        )
+
+        # HTTPS Listener ARN
+        cdk.CfnOutput(
+            self,
+            "HttpsListenerArn",
+            value=self._https_listener.listener_arn,
+            description="HTTPS Listener ARN",
+            export_name=f"{self.env_config.resource_prefix}-https-listener-arn",
+        )
+
+        # Backend Target Group ARN
+        cdk.CfnOutput(
+            self,
+            "BackendTargetGroupArn",
+            value=self._backend_target_group.target_group_arn,
+            description="Backend API Target Group ARN",
+            export_name=f"{self.env_config.resource_prefix}-backend-tg-arn",
+        )
+
+        # Frontend Target Group ARN
+        cdk.CfnOutput(
+            self,
+            "FrontendTargetGroupArn",
+            value=self._frontend_target_group.target_group_arn,
+            description="Frontend Target Group ARN",
+            export_name=f"{self.env_config.resource_prefix}-frontend-tg-arn",
+        )
+
+        # Security Group ID
+        cdk.CfnOutput(
+            self,
+            "SecurityGroupId",
+            value=self._security_group.security_group_id,
+            description="ALB Security Group ID",
+            export_name=f"{self.env_config.resource_prefix}-alb-sg-id",
+        )
+
+    @property
+    def alb(self) -> elbv2.ApplicationLoadBalancer:
+        """Get Application Load Balancer."""
+        return self._alb
+
+    @property
+    def https_listener(self) -> elbv2.ApplicationListener:
+        """Get HTTPS listener."""
+        return self._https_listener
+
+    @property
+    def security_group(self) -> ec2.SecurityGroup:
+        """Get ALB security group."""
+        return self._security_group
+
+    @property
+    def dns_name(self) -> str:
+        """Get ALB DNS name."""
+        return self._alb.load_balancer_dns_name
+
+    @property
+    def backend_target_group(self) -> elbv2.ApplicationTargetGroup:
+        """Get backend API target group."""
+        return self._backend_target_group
+
+    @property
+    def frontend_target_group(self) -> elbv2.ApplicationTargetGroup:
+        """Get frontend target group."""
+        return self._frontend_target_group
+
+    @property
+    def grafana_target_group(self) -> elbv2.ApplicationTargetGroup:
+        """Get Grafana target group."""
+        return self._grafana_target_group

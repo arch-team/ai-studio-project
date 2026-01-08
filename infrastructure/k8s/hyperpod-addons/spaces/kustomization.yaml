@@ -1,0 +1,29 @@
+# Kustomization for SageMaker Spaces Add-on
+# This kustomization manages the development environment components
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+metadata:
+  name: hyperpod-spaces-addon
+  annotations:
+    description: "SageMaker Spaces Add-on for interactive development environments"
+
+namespace: sagemaker-spaces
+
+resources:
+  # Spaces namespace and RBAC
+  - spaces-namespace.yaml
+  # Spaces controller configuration
+  - spaces-controller.yaml
+  # EFS storage class for persistent storage
+  - efs-storage-class.yaml
+  # Default space templates
+  - space-templates.yaml
+
+commonLabels:
+  app.kubernetes.io/part-of: ai-training-platform
+  app.kubernetes.io/managed-by: kustomize
+
+commonAnnotations:
+  platform.ai/component: spaces
+  platform.ai/version: "1.0.0"

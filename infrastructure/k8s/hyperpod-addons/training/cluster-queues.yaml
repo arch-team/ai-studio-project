@@ -1,0 +1,157 @@
+# Cluster Queues for Kueue
+# Define resource quotas and fair sharing policies
+# Reference: https://kueue.sigs.k8s.io/docs/concepts/cluster_queue/
+---
+# Main Cluster Queue for GPU Training Workloads
+apiVersion: kueue.x-k8s.io/v1beta1
+kind: ClusterQueue
+metadata:
+  name: gpu-training-queue
+  labels:
+    app.kubernetes.io/name: kueue
+    app.kubernetes.io/component: cluster-queue
+    platform.ai/queue-type: training
+spec:
+  # Namespace selector - which namespaces can use this queue
+  namespaceSelector: {}  # All namespaces
+
+  # Queueing strategy
+  queueingStrategy: BestEffortFIFO
+
+  # Preemption configuration
+  preemption:
+    # Allow preemption within the queue
+    withinClusterQueue: LowerPriority
+    # Allow reclaiming resources from lower priority workloads
+    reclaimWithinCohort: LowerPriority
+    # Borrow resources from other queues if available
+    borrowWithinCohort:
+      policy: LowerPriority
+      maxPriorityThreshold: 100
+
+  # Resource groups - GPU flavors
+  resourceGroups:
+    # NVIDIA A100 resources
+    - coveredResources: ["cpu", "memory", "nvidia.com/gpu"]
+      flavors:
+        - name: nvidia-a100-40gb
+          resources:
+            # Quota for A100 GPUs (p4d.24xlarge has 8 GPUs)
+            - name: "nvidia.com/gpu"
+              nominalQuota: 64  # 8 nodes * 8 GPUs
+              borrowingLimit: 32
+              lendingLimit: 16
+            - name: "cpu"
+              nominalQuota: 768  # 8 nodes * 96 vCPUs
+            - name: "memory"
+              nominalQuota: "8Ti"  # 8 nodes * 1152 GiB
+
+    # NVIDIA H100 resources
+    - coveredResources: ["cpu", "memory", "nvidia.com/gpu"]
+      flavors:
+        - name: nvidia-h100-80gb
+          resources:
+            # Quota for H100 GPUs (p5.48xlarge has 8 GPUs)
+            - name: "nvidia.com/gpu"
+              nominalQuota: 64
+              borrowingLimit: 32
+              lendingLimit: 16
+            - name: "cpu"
+              nominalQuota: 1536  # 8 nodes * 192 vCPUs
+            - name: "memory"
+              nominalQuota: "16Ti"
+
+    # AWS Trainium resources
+    - coveredResources: ["cpu", "memory", "aws.amazon.com/neuron"]
+      flavors:
+        - name: aws-trainium
+          resources:
+            # Quota for Trainium chips (trn1.32xlarge has 16 Neuron cores)
+            - name: "aws.amazon.com/neuron"
+              nominalQuota: 64  # 4 nodes * 16 cores
+            - name: "cpu"
+              nominalQuota: 512  # 4 nodes * 128 vCPUs
+            - name: "memory"
+              nominalQuota: "2Ti"
+
+  # Cohort for resource sharing between queues
+  cohort: ai-platform-cohort
+
+  # Admission checks
+  admissionChecks: []
+
+  # Stop policy - what happens when queue is stopped
+  stopPolicy: None
+
+---
+# High Priority Queue for Critical Training Jobs
+apiVersion: kueue.x-k8s.io/v1beta1
+kind: ClusterQueue
+metadata:
+  name: high-priority-training-queue
+  labels:
+    app.kubernetes.io/name: kueue
+    app.kubernetes.io/component: cluster-queue
+    platform.ai/queue-type: high-priority
+spec:
+  namespaceSelector:
+    matchLabels:
+      platform.ai/priority-access: "true"
+
+  queueingStrategy: StrictFIFO
+
+  preemption:
+    withinClusterQueue: Never
+    reclaimWithinCohort: Any
+    borrowWithinCohort:
+      policy: Never
+
+  resourceGroups:
+    - coveredResources: ["cpu", "memory", "nvidia.com/gpu"]
+      flavors:
+        - name: nvidia-h100-80gb
+          resources:
+            - name: "nvidia.com/gpu"
+              nominalQuota: 32  # Reserved for high-priority
+              borrowingLimit: 0
+              lendingLimit: 0
+            - name: "cpu"
+              nominalQuota: 768
+            - name: "memory"
+              nominalQuota: "8Ti"
+
+  cohort: ai-platform-cohort
+
+---
+# Preprocessing Queue for CPU-intensive tasks
+apiVersion: kueue.x-k8s.io/v1beta1
+kind: ClusterQueue
+metadata:
+  name: preprocessing-queue
+  labels:
+    app.kubernetes.io/name: kueue
+    app.kubernetes.io/component: cluster-queue
+    platform.ai/queue-type: preprocessing
+spec:
+  namespaceSelector: {}
+
+  queueingStrategy: BestEffortFIFO
+
+  preemption:
+    withinClusterQueue: LowerPriority
+    reclaimWithinCohort: Never
+    borrowWithinCohort:
+      policy: LowerPriority
+
+  resourceGroups:
+    - coveredResources: ["cpu", "memory"]
+      flavors:
+        - name: cpu-standard
+          resources:
+            - name: "cpu"
+              nominalQuota: 256
+              borrowingLimit: 128
+            - name: "memory"
+              nominalQuota: "1Ti"
+
+  cohort: ai-platform-cohort

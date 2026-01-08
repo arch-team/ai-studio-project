@@ -1,0 +1,278 @@
+# Space Templates for AI Training Platform
+# Pre-configured templates for different development use cases
+---
+# ConfigMap containing space templates
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: space-templates
+  namespace: sagemaker-spaces
+  labels:
+    app.kubernetes.io/name: space-templates
+data:
+  # JupyterLab template for data science
+  jupyter-datascience.yaml: |
+    apiVersion: v1
+    kind: Pod
+    metadata:
+      name: ${SPACE_NAME}
+      namespace: sagemaker-spaces
+      labels:
+        app.kubernetes.io/name: space
+        platform.ai/space-type: jupyter
+        platform.ai/space-template: datascience
+        platform.ai/user: ${USER_ID}
+    spec:
+      serviceAccountName: space-user
+      securityContext:
+        runAsUser: 1000
+        runAsGroup: 100
+        fsGroup: 100
+      containers:
+        - name: jupyter
+          image: public.ecr.aws/sagemaker/jupyter-server:datascience-3.0
+          ports:
+            - name: jupyter
+              containerPort: 8888
+          env:
+            - name: JUPYTER_ENABLE_LAB
+              value: "yes"
+            - name: NB_USER
+              value: "sagemaker-user"
+            - name: NB_UID
+              value: "1000"
+            - name: NB_GID
+              value: "100"
+            - name: CHOWN_HOME
+              value: "yes"
+          resources:
+            requests:
+              cpu: "2"
+              memory: "8Gi"
+            limits:
+              cpu: "4"
+              memory: "16Gi"
+          volumeMounts:
+            - name: home
+              mountPath: /home/sagemaker-user
+            - name: shared-data
+              mountPath: /data/shared
+              readOnly: true
+            - name: fsx-data
+              mountPath: /data/fsx
+          livenessProbe:
+            httpGet:
+              path: /api
+              port: 8888
+            initialDelaySeconds: 30
+            periodSeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /api
+              port: 8888
+            initialDelaySeconds: 5
+            periodSeconds: 10
+      volumes:
+        - name: home
+          persistentVolumeClaim:
+            claimName: ${SPACE_NAME}-home
+        - name: shared-data
+          persistentVolumeClaim:
+            claimName: shared-datasets
+        - name: fsx-data
+          persistentVolumeClaim:
+            claimName: fsx-training-data
+      tolerations:
+        - key: "dedicated"
+          operator: "Equal"
+          value: "spaces"
+          effect: "NoSchedule"
+
+  # JupyterLab template with GPU for model development
+  jupyter-gpu.yaml: |
+    apiVersion: v1
+    kind: Pod
+    metadata:
+      name: ${SPACE_NAME}
+      namespace: sagemaker-spaces
+      labels:
+        app.kubernetes.io/name: space
+        platform.ai/space-type: jupyter
+        platform.ai/space-template: gpu
+        platform.ai/user: ${USER_ID}
+    spec:
+      serviceAccountName: space-user
+      securityContext:
+        runAsUser: 1000
+        runAsGroup: 100
+        fsGroup: 100
+      containers:
+        - name: jupyter
+          image: public.ecr.aws/sagemaker/jupyter-server:pytorch-2.0-gpu
+          ports:
+            - name: jupyter
+              containerPort: 8888
+          env:
+            - name: JUPYTER_ENABLE_LAB
+              value: "yes"
+            - name: NB_USER
+              value: "sagemaker-user"
+            - name: NVIDIA_VISIBLE_DEVICES
+              value: "all"
+            - name: NVIDIA_DRIVER_CAPABILITIES
+              value: "compute,utility"
+          resources:
+            requests:
+              cpu: "4"
+              memory: "32Gi"
+              nvidia.com/gpu: "1"
+            limits:
+              cpu: "8"
+              memory: "64Gi"
+              nvidia.com/gpu: "1"
+          volumeMounts:
+            - name: home
+              mountPath: /home/sagemaker-user
+            - name: shared-data
+              mountPath: /data/shared
+              readOnly: true
+            - name: fsx-data
+              mountPath: /data/fsx
+            - name: shm
+              mountPath: /dev/shm
+      volumes:
+        - name: home
+          persistentVolumeClaim:
+            claimName: ${SPACE_NAME}-home
+        - name: shared-data
+          persistentVolumeClaim:
+            claimName: shared-datasets
+        - name: fsx-data
+          persistentVolumeClaim:
+            claimName: fsx-training-data
+        - name: shm
+          emptyDir:
+            medium: Memory
+            sizeLimit: "16Gi"
+      tolerations:
+        - key: nvidia.com/gpu
+          operator: Exists
+          effect: NoSchedule
+      nodeSelector:
+        nvidia.com/gpu: "true"
+
+  # VS Code Server template
+  vscode-python.yaml: |
+    apiVersion: v1
+    kind: Pod
+    metadata:
+      name: ${SPACE_NAME}
+      namespace: sagemaker-spaces
+      labels:
+        app.kubernetes.io/name: space
+        platform.ai/space-type: vscode
+        platform.ai/space-template: python
+        platform.ai/user: ${USER_ID}
+    spec:
+      serviceAccountName: space-user
+      securityContext:
+        runAsUser: 1000
+        runAsGroup: 100
+        fsGroup: 100
+      containers:
+        - name: code-server
+          image: public.ecr.aws/sagemaker/code-server:python-3.11
+          ports:
+            - name: vscode
+              containerPort: 8080
+          env:
+            - name: PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: ${SPACE_NAME}-auth
+                  key: password
+            - name: PYTHONPATH
+              value: "/home/sagemaker-user/workspace"
+          resources:
+            requests:
+              cpu: "1"
+              memory: "4Gi"
+            limits:
+              cpu: "2"
+              memory: "8Gi"
+          volumeMounts:
+            - name: home
+              mountPath: /home/sagemaker-user
+            - name: shared-data
+              mountPath: /data/shared
+              readOnly: true
+            - name: fsx-data
+              mountPath: /data/fsx
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8080
+            initialDelaySeconds: 30
+            periodSeconds: 30
+      volumes:
+        - name: home
+          persistentVolumeClaim:
+            claimName: ${SPACE_NAME}-home
+        - name: shared-data
+          persistentVolumeClaim:
+            claimName: shared-datasets
+        - name: fsx-data
+          persistentVolumeClaim:
+            claimName: fsx-training-data
+
+---
+# Space Template Custom Resource Definitions (if using custom CRD)
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: space-template-metadata
+  namespace: sagemaker-spaces
+  labels:
+    app.kubernetes.io/name: space-templates
+data:
+  templates.json: |
+    {
+      "templates": [
+        {
+          "name": "jupyter-datascience",
+          "displayName": "JupyterLab - Data Science",
+          "description": "JupyterLab environment for data science with Python, pandas, numpy, scikit-learn",
+          "category": "data-science",
+          "resources": {
+            "cpu": "2-4",
+            "memory": "8-16Gi",
+            "gpu": "none"
+          },
+          "tags": ["jupyter", "python", "data-science", "cpu"]
+        },
+        {
+          "name": "jupyter-gpu",
+          "displayName": "JupyterLab - GPU Development",
+          "description": "JupyterLab with GPU support for PyTorch model development",
+          "category": "ml-development",
+          "resources": {
+            "cpu": "4-8",
+            "memory": "32-64Gi",
+            "gpu": "1"
+          },
+          "tags": ["jupyter", "pytorch", "gpu", "ml"]
+        },
+        {
+          "name": "vscode-python",
+          "displayName": "VS Code - Python",
+          "description": "VS Code Server with Python extension for code development",
+          "category": "development",
+          "resources": {
+            "cpu": "1-2",
+            "memory": "4-8Gi",
+            "gpu": "none"
+          },
+          "tags": ["vscode", "python", "development", "cpu"]
+        }
+      ]
+    }

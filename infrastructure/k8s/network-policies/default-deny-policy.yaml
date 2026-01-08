@@ -1,0 +1,92 @@
+# Default Deny NetworkPolicy
+# Implements zero-trust network security baseline
+# Reference: spec.md FR-021 (Network isolation and QoS)
+---
+# Default deny all ingress traffic in training-jobs namespace
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-all-ingress
+  namespace: training-jobs
+  labels:
+    app.kubernetes.io/name: default-deny
+    platform.ai/policy-type: deny
+spec:
+  podSelector: {}  # Applies to all pods
+  policyTypes:
+    - Ingress
+  # Empty ingress rules = deny all ingress by default
+
+---
+# Default deny all egress traffic in training-jobs namespace
+# Note: This is more restrictive; adjust based on requirements
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-all-egress
+  namespace: training-jobs
+  labels:
+    app.kubernetes.io/name: default-deny
+    platform.ai/policy-type: deny
+spec:
+  podSelector: {}  # Applies to all pods
+  policyTypes:
+    - Egress
+  egress:
+    # Allow DNS resolution (required for all pods)
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+
+---
+# Default deny for sagemaker-spaces namespace
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-all-ingress
+  namespace: sagemaker-spaces
+  labels:
+    app.kubernetes.io/name: default-deny
+    platform.ai/policy-type: deny
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+
+---
+# Default deny egress for sagemaker-spaces namespace
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-all-egress
+  namespace: sagemaker-spaces
+  labels:
+    app.kubernetes.io/name: default-deny
+    platform.ai/policy-type: deny
+spec:
+  podSelector: {}
+  policyTypes:
+    - Egress
+  egress:
+    # Allow DNS resolution
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53

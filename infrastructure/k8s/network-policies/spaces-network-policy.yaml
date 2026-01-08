@@ -1,0 +1,217 @@
+# Spaces Namespace Network Policies
+# Enables development environment access while maintaining isolation
+# Reference: spec.md FR-012 (SageMaker Spaces)
+---
+# Allow Spaces to be accessed via ingress controller
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: spaces-ingress-access
+  namespace: sagemaker-spaces
+  labels:
+    app.kubernetes.io/name: spaces-ingress
+    platform.ai/policy-type: allow
+spec:
+  podSelector:
+    matchLabels:
+      platform.ai/space-type: jupyter
+  policyTypes:
+    - Ingress
+  ingress:
+    # Allow from ingress controller
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: ingress-nginx
+      ports:
+        - protocol: TCP
+          port: 8888  # JupyterLab
+
+---
+# Allow VS Code Spaces to be accessed
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: vscode-spaces-ingress
+  namespace: sagemaker-spaces
+  labels:
+    app.kubernetes.io/name: vscode-spaces-ingress
+    platform.ai/policy-type: allow
+spec:
+  podSelector:
+    matchLabels:
+      platform.ai/space-type: vscode
+  policyTypes:
+    - Ingress
+  ingress:
+    # Allow from ingress controller
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: ingress-nginx
+      ports:
+        - protocol: TCP
+          port: 8080  # VS Code Server
+
+---
+# Allow Spaces to access internet for pip/conda install
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: spaces-internet-egress
+  namespace: sagemaker-spaces
+  labels:
+    app.kubernetes.io/name: spaces-internet
+    platform.ai/policy-type: allow
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: space
+  policyTypes:
+    - Egress
+  egress:
+    # Allow HTTPS to internet (for package managers)
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except:
+              - 10.0.0.0/8     # Except internal VPC
+              - 172.16.0.0/12  # Private ranges
+              - 192.168.0.0/16
+      ports:
+        - protocol: TCP
+          port: 443
+        - protocol: TCP
+          port: 80  # Some repos use HTTP
+
+---
+# Allow Spaces to access AWS services (S3, ECR)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: spaces-aws-services
+  namespace: sagemaker-spaces
+  labels:
+    app.kubernetes.io/name: spaces-aws
+    platform.ai/policy-type: allow
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: space
+  policyTypes:
+    - Egress
+  egress:
+    # Allow access to VPC endpoints
+    - to:
+        - ipBlock:
+            cidr: 10.0.0.0/8
+      ports:
+        - protocol: TCP
+          port: 443  # S3, ECR, CloudWatch
+
+---
+# Allow Spaces to access FSx for Lustre (training data)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: spaces-fsx-access
+  namespace: sagemaker-spaces
+  labels:
+    app.kubernetes.io/name: spaces-fsx
+    platform.ai/policy-type: allow
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: space
+  policyTypes:
+    - Egress
+  egress:
+    # Allow FSx Lustre access
+    - to:
+        - ipBlock:
+            cidr: 10.0.0.0/8  # VPC CIDR
+      ports:
+        - protocol: TCP
+          port: 988   # Lustre client-server
+        - protocol: TCP
+          port: 1021
+        - protocol: TCP
+          port: 1022
+        - protocol: TCP
+          port: 1023
+
+---
+# Allow Spaces to access EFS for persistent storage
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: spaces-efs-access
+  namespace: sagemaker-spaces
+  labels:
+    app.kubernetes.io/name: spaces-efs
+    platform.ai/policy-type: allow
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: space
+  policyTypes:
+    - Egress
+  egress:
+    # Allow EFS access (NFS)
+    - to:
+        - ipBlock:
+            cidr: 10.0.0.0/8
+      ports:
+        - protocol: TCP
+          port: 2049  # NFS
+
+---
+# Allow Spaces Controller to manage space pods
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: spaces-controller-access
+  namespace: sagemaker-spaces
+  labels:
+    app.kubernetes.io/name: spaces-controller
+    platform.ai/policy-type: allow
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: spaces-controller
+  policyTypes:
+    - Egress
+  egress:
+    # Allow to Kubernetes API
+    - to:
+        - ipBlock:
+            cidr: 10.0.0.0/8
+      ports:
+        - protocol: TCP
+          port: 443
+        - protocol: TCP
+          port: 6443  # Kubernetes API
+
+---
+# Isolate Spaces from each other (user separation)
+# Each Space can only communicate with system services, not other Spaces
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: space-isolation
+  namespace: sagemaker-spaces
+  labels:
+    app.kubernetes.io/name: space-isolation
+    platform.ai/policy-type: deny
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: space
+  policyTypes:
+    - Ingress
+  ingress:
+    # Only allow from ingress controller, not from other Spaces
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: ingress-nginx

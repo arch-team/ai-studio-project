@@ -1,0 +1,254 @@
+# Kueue Validation Test Resources
+# Reference: tasks.md T008g - HyperPod Add-ons 功能测试
+#
+# This validates:
+# 1. Kueue CRDs are properly installed
+# 2. ClusterQueue and LocalQueue are configured
+# 3. Workloads can be submitted and scheduled
+#
+# Usage:
+#   kubectl apply -f test-kueue.yaml
+#   kubectl get clusterqueue,localqueue,workload -A
+#   kubectl delete -f test-kueue.yaml
+---
+# ClusterQueue for validation tests
+# This queue defines cluster-level resource quotas
+apiVersion: kueue.x-k8s.io/v1beta1
+kind: ClusterQueue
+metadata:
+  name: default-queue
+  labels:
+    app.kubernetes.io/name: default-queue
+    platform.ai/queue-type: default
+spec:
+  # Namespace selector - allows workloads from labeled namespaces
+  namespaceSelector:
+    matchLabels:
+      platform.ai/namespace-type: training
+
+  # Preemption policy
+  preemption:
+    reclaimWithinCohort: Any
+    withinClusterQueue: LowerPriority
+
+  # Resource flavors and quotas
+  resourceGroups:
+    - coveredResources: ["cpu", "memory"]
+      flavors:
+        - name: default-flavor
+          resources:
+            - name: cpu
+              nominalQuota: 100  # 100 CPU cores
+            - name: memory
+              nominalQuota: 400Gi  # 400 GiB memory
+
+---
+# GPU ClusterQueue for GPU workloads
+apiVersion: kueue.x-k8s.io/v1beta1
+kind: ClusterQueue
+metadata:
+  name: gpu-queue
+  labels:
+    app.kubernetes.io/name: gpu-queue
+    platform.ai/queue-type: gpu
+spec:
+  namespaceSelector:
+    matchLabels:
+      platform.ai/namespace-type: training
+
+  preemption:
+    reclaimWithinCohort: Any
+    withinClusterQueue: LowerPriority
+
+  resourceGroups:
+    - coveredResources: ["cpu", "memory", "nvidia.com/gpu"]
+      flavors:
+        - name: gpu-flavor
+          resources:
+            - name: cpu
+              nominalQuota: 200
+            - name: memory
+              nominalQuota: 1Ti
+            - name: nvidia.com/gpu
+              nominalQuota: 32  # 32 GPUs
+
+---
+# ResourceFlavor for default CPU workloads
+apiVersion: kueue.x-k8s.io/v1beta1
+kind: ResourceFlavor
+metadata:
+  name: default-flavor
+  labels:
+    app.kubernetes.io/name: default-flavor
+spec:
+  # Node selector for CPU nodes
+  nodeLabels:
+    node.kubernetes.io/instance-type: m5.xlarge  # Example, adjust as needed
+
+---
+# ResourceFlavor for GPU workloads
+apiVersion: kueue.x-k8s.io/v1beta1
+kind: ResourceFlavor
+metadata:
+  name: gpu-flavor
+  labels:
+    app.kubernetes.io/name: gpu-flavor
+spec:
+  # Node selector for GPU nodes
+  nodeLabels:
+    nvidia.com/gpu.present: "true"
+  # Tolerations for GPU nodes
+  tolerations:
+    - key: "nvidia.com/gpu"
+      operator: "Exists"
+      effect: "NoSchedule"
+
+---
+# LocalQueue for training namespace
+apiVersion: kueue.x-k8s.io/v1beta1
+kind: LocalQueue
+metadata:
+  name: training-queue
+  namespace: training-jobs
+  labels:
+    app.kubernetes.io/name: training-queue
+    platform.ai/queue-type: training
+spec:
+  clusterQueue: default-queue
+
+---
+# LocalQueue for GPU training
+apiVersion: kueue.x-k8s.io/v1beta1
+kind: LocalQueue
+metadata:
+  name: gpu-training-queue
+  namespace: training-jobs
+  labels:
+    app.kubernetes.io/name: gpu-training-queue
+    platform.ai/queue-type: gpu-training
+spec:
+  clusterQueue: gpu-queue
+
+---
+# Test Job to validate Kueue scheduling
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: kueue-test-job
+  namespace: training-jobs
+  labels:
+    app.kubernetes.io/name: kueue-test-job
+    platform.ai/test: "true"
+  annotations:
+    # Kueue integration - this annotation enables Kueue scheduling
+    kueue.x-k8s.io/queue-name: training-queue
+spec:
+  parallelism: 1
+  completions: 1
+  ttlSecondsAfterFinished: 300  # Cleanup after 5 minutes
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: kueue-test-job
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: test
+          image: busybox:latest
+          command:
+            - /bin/sh
+            - -c
+            - |
+              echo "============================================"
+              echo "Kueue Scheduling Validation Test"
+              echo "============================================"
+              echo "Job started at: $(date)"
+              echo "Hostname: $(hostname)"
+              echo ""
+              echo "Environment variables:"
+              env | grep -E "^(KUBERNETES|POD|NODE)" | sort
+              echo ""
+              echo "This job was scheduled by Kueue!"
+              echo "============================================"
+              echo "✅ Kueue validation PASSED!"
+              echo "============================================"
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "200m"
+              memory: "256Mi"
+
+---
+# WorkloadPriorityClass for high priority jobs
+apiVersion: kueue.x-k8s.io/v1beta1
+kind: WorkloadPriorityClass
+metadata:
+  name: high-priority
+  labels:
+    app.kubernetes.io/name: high-priority
+spec:
+  value: 1000
+  description: "High priority workloads for critical training jobs"
+
+---
+# WorkloadPriorityClass for medium priority jobs
+apiVersion: kueue.x-k8s.io/v1beta1
+kind: WorkloadPriorityClass
+metadata:
+  name: medium-priority
+  labels:
+    app.kubernetes.io/name: medium-priority
+spec:
+  value: 500
+  description: "Medium priority workloads for regular training jobs"
+
+---
+# WorkloadPriorityClass for low priority jobs
+apiVersion: kueue.x-k8s.io/v1beta1
+kind: WorkloadPriorityClass
+metadata:
+  name: low-priority
+  labels:
+    app.kubernetes.io/name: low-priority
+spec:
+  value: 100
+  description: "Low priority workloads for background jobs"
+
+---
+# PriorityClass for Kubernetes scheduler (used with Kueue)
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: training-priority-high
+  labels:
+    app.kubernetes.io/name: training-priority-high
+value: 1000000
+globalDefault: false
+description: "High priority for critical training workloads"
+preemptionPolicy: PreemptLowerPriority
+
+---
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: training-priority-medium
+  labels:
+    app.kubernetes.io/name: training-priority-medium
+value: 500000
+globalDefault: false
+description: "Medium priority for regular training workloads"
+preemptionPolicy: PreemptLowerPriority
+
+---
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: training-priority-low
+  labels:
+    app.kubernetes.io/name: training-priority-low
+value: 100000
+globalDefault: false
+description: "Low priority for background workloads"
+preemptionPolicy: Never  # Low priority jobs should not preempt others

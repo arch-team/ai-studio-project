@@ -1,0 +1,106 @@
+# EFS Storage Configuration for SageMaker Spaces
+# Provides persistent storage for user development environments
+---
+# EFS CSI Driver StorageClass
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: efs-spaces
+  labels:
+    app.kubernetes.io/name: efs-storage
+    app.kubernetes.io/component: storage
+    platform.ai/storage-type: efs
+provisioner: efs.csi.aws.com
+parameters:
+  # Dynamic provisioning with access points
+  provisioningMode: efs-ap
+  # File system ID will be set from environment
+  fileSystemId: "${EFS_FILESYSTEM_ID}"
+  # Directory path for access points
+  directoryPerms: "700"
+  # UID and GID for access points
+  uid: "1000"
+  gid: "100"
+  # Base path for user directories
+  basePath: "/spaces"
+reclaimPolicy: Retain
+volumeBindingMode: Immediate
+allowVolumeExpansion: true
+
+---
+# EFS Storage Class for Shared Data
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: efs-shared
+  labels:
+    app.kubernetes.io/name: efs-storage
+    app.kubernetes.io/component: storage
+    platform.ai/storage-type: efs-shared
+provisioner: efs.csi.aws.com
+parameters:
+  provisioningMode: efs-ap
+  fileSystemId: "${EFS_FILESYSTEM_ID}"
+  directoryPerms: "755"
+  uid: "0"
+  gid: "0"
+  basePath: "/shared"
+reclaimPolicy: Retain
+volumeBindingMode: Immediate
+
+---
+# Default PVC for Space User Home Directory
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: space-home-template
+  namespace: sagemaker-spaces
+  labels:
+    app.kubernetes.io/name: space-storage
+    platform.ai/storage-purpose: user-home
+spec:
+  accessModes:
+    - ReadWriteMany
+  storageClassName: efs-spaces
+  resources:
+    requests:
+      storage: 50Gi
+
+---
+# Shared Datasets PVC
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: shared-datasets
+  namespace: sagemaker-spaces
+  labels:
+    app.kubernetes.io/name: shared-storage
+    platform.ai/storage-purpose: shared-data
+spec:
+  accessModes:
+    - ReadOnlyMany
+  storageClassName: efs-shared
+  resources:
+    requests:
+      storage: 1Ti
+
+---
+# ConfigMap for Storage Configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: storage-config
+  namespace: sagemaker-spaces
+  labels:
+    app.kubernetes.io/name: storage-config
+data:
+  # Default storage size for new spaces
+  default-storage-size: "50Gi"
+  # Maximum storage size per space
+  max-storage-size: "500Gi"
+  # Shared datasets mount path
+  shared-datasets-path: "/data/shared"
+  # User home mount path
+  user-home-path: "/home/sagemaker-user"
+  # FSx mount path for training data
+  fsx-mount-path: "/data/fsx"

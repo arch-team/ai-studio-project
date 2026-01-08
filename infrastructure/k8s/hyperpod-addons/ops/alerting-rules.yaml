@@ -1,0 +1,229 @@
+# Prometheus Alerting Rules for AI Training Platform
+# These rules monitor GPU health, training job status, and cluster resources
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prometheus-alerting-rules
+  namespace: hyperpod-monitoring
+  labels:
+    app.kubernetes.io/name: prometheus
+    app.kubernetes.io/component: alerting
+data:
+  gpu-alerts.yaml: |
+    groups:
+      - name: gpu-health
+        interval: 30s
+        rules:
+          # GPU Utilization Alerts
+          - alert: GPUUtilizationLow
+            expr: avg(DCGM_FI_DEV_GPU_UTIL) by (node) < 20
+            for: 15m
+            labels:
+              severity: warning
+              category: resource
+            annotations:
+              summary: "GPU utilization is low on {{ $labels.node }}"
+              description: "GPU utilization has been below 20% for 15 minutes on {{ $labels.node }}. Current value: {{ $value }}%"
+              runbook_url: "https://docs.ai-platform/alerts/gpu-utilization-low"
+
+          - alert: GPUUtilizationHigh
+            expr: avg(DCGM_FI_DEV_GPU_UTIL) by (node) > 95
+            for: 30m
+            labels:
+              severity: warning
+              category: resource
+            annotations:
+              summary: "GPU utilization is very high on {{ $labels.node }}"
+              description: "GPU utilization has been above 95% for 30 minutes on {{ $labels.node }}. Current value: {{ $value }}%"
+
+          # GPU Memory Alerts
+          - alert: GPUMemoryNearFull
+            expr: (DCGM_FI_DEV_FB_USED / DCGM_FI_DEV_FB_TOTAL) * 100 > 90
+            for: 5m
+            labels:
+              severity: warning
+              category: resource
+            annotations:
+              summary: "GPU memory usage is high on {{ $labels.node }}"
+              description: "GPU {{ $labels.gpu }} memory usage is above 90% on {{ $labels.node }}. Current value: {{ $value }}%"
+
+          - alert: GPUMemoryCritical
+            expr: (DCGM_FI_DEV_FB_USED / DCGM_FI_DEV_FB_TOTAL) * 100 > 98
+            for: 2m
+            labels:
+              severity: critical
+              category: resource
+            annotations:
+              summary: "GPU memory critically low on {{ $labels.node }}"
+              description: "GPU {{ $labels.gpu }} memory usage is above 98% on {{ $labels.node }}. OOM risk imminent."
+
+          # GPU Temperature Alerts
+          - alert: GPUTemperatureWarning
+            expr: DCGM_FI_DEV_GPU_TEMP > 80
+            for: 5m
+            labels:
+              severity: warning
+              category: hardware
+            annotations:
+              summary: "GPU temperature is high on {{ $labels.node }}"
+              description: "GPU {{ $labels.gpu }} temperature is {{ $value }}°C on {{ $labels.node }}. Consider checking cooling."
+
+          - alert: GPUTemperatureCritical
+            expr: DCGM_FI_DEV_GPU_TEMP > 85
+            for: 2m
+            labels:
+              severity: critical
+              category: hardware
+            annotations:
+              summary: "GPU temperature critical on {{ $labels.node }}"
+              description: "GPU {{ $labels.gpu }} temperature is {{ $value }}°C on {{ $labels.node }}. Thermal throttling imminent."
+
+          # ECC Error Alerts
+          - alert: GPUECCErrorsDetected
+            expr: increase(DCGM_FI_DEV_ECC_SBE_VOL_TOTAL[1h]) > 10
+            labels:
+              severity: warning
+              category: hardware
+            annotations:
+              summary: "ECC errors detected on GPU {{ $labels.gpu }}"
+              description: "GPU {{ $labels.gpu }} on {{ $labels.node }} has {{ $value }} single-bit ECC errors in the last hour."
+
+          - alert: GPUECCCriticalErrors
+            expr: increase(DCGM_FI_DEV_ECC_DBE_VOL_TOTAL[1h]) > 0
+            labels:
+              severity: critical
+              category: hardware
+            annotations:
+              summary: "Double-bit ECC errors on GPU {{ $labels.gpu }}"
+              description: "GPU {{ $labels.gpu }} on {{ $labels.node }} has {{ $value }} double-bit ECC errors. Hardware replacement may be needed."
+
+          # GPU XID Errors
+          - alert: GPUXIDError
+            expr: increase(DCGM_FI_DEV_XID_ERRORS[5m]) > 0
+            labels:
+              severity: critical
+              category: hardware
+            annotations:
+              summary: "GPU XID error on {{ $labels.node }}"
+              description: "GPU {{ $labels.gpu }} on {{ $labels.node }} reported XID error. Node may need recovery."
+
+  training-alerts.yaml: |
+    groups:
+      - name: training-jobs
+        interval: 30s
+        rules:
+          # Training Job Alerts
+          - alert: TrainingJobFailed
+            expr: kube_job_status_failed{namespace=~"training-.*"} > 0
+            labels:
+              severity: warning
+              category: training
+            annotations:
+              summary: "Training job {{ $labels.job_name }} failed"
+              description: "Training job {{ $labels.job_name }} in namespace {{ $labels.namespace }} has failed."
+
+          - alert: TrainingJobStuck
+            expr: time() - kube_job_status_start_time{namespace=~"training-.*"} > 86400 and kube_job_status_active > 0
+            labels:
+              severity: warning
+              category: training
+            annotations:
+              summary: "Training job {{ $labels.job_name }} may be stuck"
+              description: "Training job {{ $labels.job_name }} has been running for more than 24 hours."
+
+          # Kueue Queue Alerts
+          - alert: QueueBacklogHigh
+            expr: sum(kueue_pending_workloads) by (cluster_queue) > 10
+            for: 15m
+            labels:
+              severity: warning
+              category: scheduling
+            annotations:
+              summary: "High queue backlog in {{ $labels.cluster_queue }}"
+              description: "Queue {{ $labels.cluster_queue }} has {{ $value }} pending workloads for 15 minutes."
+
+          - alert: QueueWaitTimeHigh
+            expr: histogram_quantile(0.95, sum(rate(kueue_admission_wait_time_seconds_bucket[5m])) by (le, cluster_queue)) > 1800
+            for: 10m
+            labels:
+              severity: warning
+              category: scheduling
+            annotations:
+              summary: "High wait time in queue {{ $labels.cluster_queue }}"
+              description: "P95 wait time in queue {{ $labels.cluster_queue }} exceeds 30 minutes."
+
+          # Checkpoint Alerts
+          - alert: CheckpointNotSaved
+            expr: time() - max(training_checkpoint_timestamp) by (job_name) > 3600
+            for: 10m
+            labels:
+              severity: warning
+              category: training
+            annotations:
+              summary: "No checkpoint saved for job {{ $labels.job_name }}"
+              description: "Training job {{ $labels.job_name }} hasn't saved a checkpoint in over 1 hour."
+
+  cluster-alerts.yaml: |
+    groups:
+      - name: cluster-health
+        interval: 30s
+        rules:
+          # Node Alerts
+          - alert: NodeNotReady
+            expr: kube_node_status_condition{condition="Ready",status="true"} == 0
+            for: 5m
+            labels:
+              severity: critical
+              category: cluster
+            annotations:
+              summary: "Node {{ $labels.node }} is not ready"
+              description: "Kubernetes node {{ $labels.node }} has been in NotReady state for 5 minutes."
+
+          - alert: NodeRecoveryTriggered
+            expr: increase(hyperpod_node_recovery_total[5m]) > 0
+            labels:
+              severity: warning
+              category: cluster
+            annotations:
+              summary: "Node recovery triggered on {{ $labels.node }}"
+              description: "HyperPod elastic agent triggered recovery on node {{ $labels.node }}."
+
+          - alert: NodeMemoryPressure
+            expr: kube_node_status_condition{condition="MemoryPressure",status="true"} == 1
+            for: 5m
+            labels:
+              severity: warning
+              category: cluster
+            annotations:
+              summary: "Node {{ $labels.node }} has memory pressure"
+              description: "Node {{ $labels.node }} is experiencing memory pressure."
+
+          - alert: NodeDiskPressure
+            expr: kube_node_status_condition{condition="DiskPressure",status="true"} == 1
+            for: 5m
+            labels:
+              severity: warning
+              category: cluster
+            annotations:
+              summary: "Node {{ $labels.node }} has disk pressure"
+              description: "Node {{ $labels.node }} is experiencing disk pressure."
+
+          # Pod Alerts
+          - alert: PodCrashLooping
+            expr: increase(kube_pod_container_status_restarts_total{namespace=~"training-.*|hyperpod-.*"}[1h]) > 5
+            labels:
+              severity: warning
+              category: application
+            annotations:
+              summary: "Pod {{ $labels.pod }} is crash looping"
+              description: "Pod {{ $labels.pod }} in namespace {{ $labels.namespace }} has restarted {{ $value }} times in the last hour."
+
+          - alert: PodOOMKilled
+            expr: kube_pod_container_status_last_terminated_reason{reason="OOMKilled"} == 1
+            labels:
+              severity: warning
+              category: resource
+            annotations:
+              summary: "Container OOMKilled in {{ $labels.pod }}"
+              description: "Container {{ $labels.container }} in pod {{ $labels.pod }} was OOMKilled."

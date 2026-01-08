@@ -1,0 +1,89 @@
+# Resource Flavors for Kueue
+# Define GPU types and their characteristics for workload scheduling
+# Reference: https://kueue.sigs.k8s.io/docs/concepts/resource_flavor/
+---
+# NVIDIA A100 GPU Flavor (p4d.24xlarge)
+apiVersion: kueue.x-k8s.io/v1beta1
+kind: ResourceFlavor
+metadata:
+  name: nvidia-a100-40gb
+  labels:
+    app.kubernetes.io/name: kueue
+    app.kubernetes.io/component: resource-flavor
+    platform.ai/gpu-type: a100
+spec:
+  nodeLabels:
+    node.kubernetes.io/instance-type: p4d.24xlarge
+    nvidia.com/gpu.product: NVIDIA-A100-SXM4-40GB
+  nodeTaints:
+    - key: nvidia.com/gpu
+      value: "true"
+      effect: NoSchedule
+  tolerations:
+    - key: nvidia.com/gpu
+      value: "true"
+      effect: NoSchedule
+      operator: Equal
+
+---
+# NVIDIA H100 GPU Flavor (p5.48xlarge)
+apiVersion: kueue.x-k8s.io/v1beta1
+kind: ResourceFlavor
+metadata:
+  name: nvidia-h100-80gb
+  labels:
+    app.kubernetes.io/name: kueue
+    app.kubernetes.io/component: resource-flavor
+    platform.ai/gpu-type: h100
+spec:
+  nodeLabels:
+    node.kubernetes.io/instance-type: p5.48xlarge
+    nvidia.com/gpu.product: NVIDIA-H100-80GB-HBM3
+  nodeTaints:
+    - key: nvidia.com/gpu
+      value: "true"
+      effect: NoSchedule
+  tolerations:
+    - key: nvidia.com/gpu
+      value: "true"
+      effect: NoSchedule
+      operator: Equal
+
+---
+# AWS Trainium Flavor (trn1.32xlarge)
+apiVersion: kueue.x-k8s.io/v1beta1
+kind: ResourceFlavor
+metadata:
+  name: aws-trainium
+  labels:
+    app.kubernetes.io/name: kueue
+    app.kubernetes.io/component: resource-flavor
+    platform.ai/accelerator-type: trainium
+spec:
+  nodeLabels:
+    node.kubernetes.io/instance-type: trn1.32xlarge
+    aws.amazon.com/neuron: "true"
+  nodeTaints:
+    - key: aws.amazon.com/neuron
+      value: "true"
+      effect: NoSchedule
+  tolerations:
+    - key: aws.amazon.com/neuron
+      value: "true"
+      effect: NoSchedule
+      operator: Equal
+
+---
+# CPU-only Flavor for preprocessing and auxiliary tasks
+apiVersion: kueue.x-k8s.io/v1beta1
+kind: ResourceFlavor
+metadata:
+  name: cpu-standard
+  labels:
+    app.kubernetes.io/name: kueue
+    app.kubernetes.io/component: resource-flavor
+    platform.ai/resource-type: cpu
+spec:
+  nodeLabels:
+    node.kubernetes.io/instance-type: m5.4xlarge
+  # No taints for CPU nodes - they accept all workloads

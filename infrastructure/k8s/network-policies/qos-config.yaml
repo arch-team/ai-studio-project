@@ -1,0 +1,260 @@
+# QoS and Bandwidth Configuration
+# Implements resource guarantees and bandwidth limits for training workloads
+# Reference: spec.md FR-021 (Network bandwidth management and QoS)
+---
+# Training Job PodTemplate with QoS Guaranteed class
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: training-job-qos-template
+  namespace: training-jobs
+  labels:
+    app.kubernetes.io/name: qos-config
+    platform.ai/config-type: qos-template
+data:
+  # Template for Guaranteed QoS class (requests == limits)
+  training-pod-template.yaml: |
+    apiVersion: v1
+    kind: Pod
+    metadata:
+      annotations:
+        # Bandwidth annotations (supported by VPC CNI)
+        # Reference: https://github.com/aws/amazon-vpc-cni-k8s
+        kubernetes.io/ingress-bandwidth: "${INGRESS_BANDWIDTH:-10G}"
+        kubernetes.io/egress-bandwidth: "${EGRESS_BANDWIDTH:-10G}"
+        # QoS class annotation (informational)
+        platform.ai/qos-class: "Guaranteed"
+    spec:
+      # Priority class for training workloads
+      priorityClassName: "${PRIORITY_CLASS:-training-priority-medium}"
+      # DNS policy for fast name resolution
+      dnsPolicy: ClusterFirstWithHostNet
+      # Graceful termination for checkpoint saving
+      terminationGracePeriodSeconds: 300
+      containers:
+        - name: training
+          resources:
+            # Guaranteed QoS: requests == limits
+            requests:
+              cpu: "${CPU_REQUEST:-4}"
+              memory: "${MEMORY_REQUEST:-32Gi}"
+              nvidia.com/gpu: "${GPU_REQUEST:-1}"
+            limits:
+              cpu: "${CPU_LIMIT:-4}"
+              memory: "${MEMORY_LIMIT:-32Gi}"
+              nvidia.com/gpu: "${GPU_LIMIT:-1}"
+
+---
+# Resource Quota for training-jobs namespace
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: training-jobs-quota
+  namespace: training-jobs
+  labels:
+    app.kubernetes.io/name: resource-quota
+    platform.ai/quota-type: training
+spec:
+  hard:
+    # CPU limits across all training pods
+    requests.cpu: "500"
+    limits.cpu: "1000"
+    # Memory limits
+    requests.memory: "2Ti"
+    limits.memory: "4Ti"
+    # GPU limits
+    requests.nvidia.com/gpu: "64"
+    limits.nvidia.com/gpu: "64"
+    # Pod count limits
+    pods: "200"
+    # PVC limits
+    persistentvolumeclaims: "100"
+    requests.storage: "50Ti"
+
+---
+# LimitRange for training-jobs namespace
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: training-jobs-limits
+  namespace: training-jobs
+  labels:
+    app.kubernetes.io/name: limit-range
+    platform.ai/limits-type: training
+spec:
+  limits:
+    # Container limits
+    - type: Container
+      # Default resource requests/limits for containers without explicit values
+      default:
+        cpu: "4"
+        memory: "16Gi"
+      defaultRequest:
+        cpu: "2"
+        memory: "8Gi"
+      # Maximum allowed resources per container
+      max:
+        cpu: "96"
+        memory: "768Gi"
+        nvidia.com/gpu: "8"
+      # Minimum required resources per container
+      min:
+        cpu: "500m"
+        memory: "1Gi"
+    # Pod limits
+    - type: Pod
+      # Maximum resources per pod
+      max:
+        cpu: "192"
+        memory: "1536Gi"
+        nvidia.com/gpu: "8"
+
+---
+# ConfigMap for QoS tuning parameters
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: qos-tuning-config
+  namespace: training-jobs
+  labels:
+    app.kubernetes.io/name: qos-tuning
+data:
+  # Network bandwidth limits by priority class
+  bandwidth-config.yaml: |
+    # High priority: Full network bandwidth
+    high:
+      ingress_bandwidth: "25G"
+      egress_bandwidth: "25G"
+      description: "Full EFA bandwidth for critical training jobs"
+
+    # Medium priority: Standard bandwidth
+    medium:
+      ingress_bandwidth: "10G"
+      egress_bandwidth: "10G"
+      description: "Standard bandwidth for regular training jobs"
+
+    # Low priority: Limited bandwidth
+    low:
+      ingress_bandwidth: "5G"
+      egress_bandwidth: "5G"
+      description: "Limited bandwidth for background jobs"
+
+  # NCCL tuning parameters for distributed training
+  nccl-tuning.yaml: |
+    # Environment variables for optimal NCCL performance
+    environment:
+      # Enable verbose logging for debugging
+      NCCL_DEBUG: "WARN"
+      # Use EFA for inter-node communication
+      NCCL_SOCKET_IFNAME: "eth0"
+      # Enable GPU Direct RDMA if available
+      NCCL_NET_GDR_LEVEL: "SYS"
+      # Buffer sizes for optimal throughput
+      NCCL_BUFFSIZE: "16777216"
+      # Number of NCCL threads
+      NCCL_NTHREADS: "512"
+      # Collective algorithm selection
+      NCCL_ALGO: "Ring,Tree"
+      # Protocol selection
+      NCCL_PROTO: "Simple"
+      # AWS EFA specific settings
+      FI_EFA_USE_DEVICE_RDMA: "1"
+      FI_PROVIDER: "efa"
+
+---
+# PodDisruptionBudget for training jobs
+# Ensures training jobs are not disrupted during cluster maintenance
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: training-jobs-pdb
+  namespace: training-jobs
+  labels:
+    app.kubernetes.io/name: pdb
+    platform.ai/protection-type: training
+spec:
+  # Keep at least 90% of training pods running
+  minAvailable: "90%"
+  selector:
+    matchLabels:
+      platform.ai/workload-type: training
+
+---
+# PodDisruptionBudget for high priority jobs (more strict)
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: high-priority-training-pdb
+  namespace: training-jobs
+  labels:
+    app.kubernetes.io/name: high-priority-pdb
+    platform.ai/protection-type: high-priority
+spec:
+  # High priority jobs should not be disrupted
+  minAvailable: "100%"
+  selector:
+    matchLabels:
+      platform.ai/workload-type: training
+      platform.ai/priority: high
+
+---
+# Network latency monitoring configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: network-monitoring-config
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/name: network-monitoring
+data:
+  # Prometheus recording rules for network performance
+  network-rules.yaml: |
+    groups:
+      - name: network_performance
+        interval: 30s
+        rules:
+          # Network latency P99
+          - record: training:network_latency_p99:seconds
+            expr: |
+              histogram_quantile(0.99,
+                sum(rate(network_latency_bucket[5m])) by (le, job)
+              )
+
+          # Network throughput
+          - record: training:network_throughput:bytes_per_second
+            expr: |
+              sum(rate(container_network_receive_bytes_total{namespace="training-jobs"}[5m])) +
+              sum(rate(container_network_transmit_bytes_total{namespace="training-jobs"}[5m]))
+
+          # Network utilization percentage
+          - record: training:network_utilization:ratio
+            expr: |
+              (
+                sum(rate(container_network_receive_bytes_total{namespace="training-jobs"}[5m])) +
+                sum(rate(container_network_transmit_bytes_total{namespace="training-jobs"}[5m]))
+              ) / 25e9  # 25Gbps EFA bandwidth
+
+  # Alert rules for network performance
+  network-alerts.yaml: |
+    groups:
+      - name: network_alerts
+        rules:
+          # High network latency
+          - alert: HighNetworkLatency
+            expr: training:network_latency_p99:seconds > 0.01
+            for: 5m
+            labels:
+              severity: warning
+            annotations:
+              summary: "High network latency detected"
+              description: "Network latency P99 is {{ $value }}s (threshold: 10ms)"
+
+          # Low bandwidth utilization (potential issue)
+          - alert: LowBandwidthUtilization
+            expr: training:network_utilization:ratio < 0.1 and on() kube_pod_status_phase{phase="Running", namespace="training-jobs"} > 0
+            for: 10m
+            labels:
+              severity: info
+            annotations:
+              summary: "Low network bandwidth utilization"
+              description: "Network utilization is only {{ $value | humanizePercentage }} of available bandwidth"

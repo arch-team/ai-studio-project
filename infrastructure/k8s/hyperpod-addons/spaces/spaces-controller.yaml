@@ -1,0 +1,195 @@
+# SageMaker Spaces Controller Configuration
+# Manages lifecycle of user development environments
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: spaces-controller-config
+  namespace: sagemaker-spaces
+  labels:
+    app.kubernetes.io/name: spaces-controller
+data:
+  config.yaml: |
+    # Spaces Controller Configuration
+    controller:
+      # Reconciliation interval
+      reconcile_interval: 30s
+      # Maximum concurrent reconciliations
+      max_concurrent_reconciles: 10
+
+    # Space Default Settings
+    defaults:
+      # Default idle timeout (auto-stop after inactivity)
+      idle_timeout: 2h
+      # Maximum space lifetime
+      max_lifetime: 24h
+      # Default image for JupyterLab
+      jupyter_image: "public.ecr.aws/sagemaker/jupyter-server:latest"
+      # Default image for VS Code
+      vscode_image: "public.ecr.aws/sagemaker/code-server:latest"
+
+    # Resource Defaults
+    resources:
+      jupyter:
+        cpu_request: "2"
+        cpu_limit: "4"
+        memory_request: "8Gi"
+        memory_limit: "16Gi"
+      vscode:
+        cpu_request: "1"
+        cpu_limit: "2"
+        memory_request: "4Gi"
+        memory_limit: "8Gi"
+      gpu:
+        # GPU spaces get more resources
+        cpu_request: "4"
+        cpu_limit: "8"
+        memory_request: "32Gi"
+        memory_limit: "64Gi"
+
+    # Storage Configuration
+    storage:
+      # Use EFS for persistent storage
+      storage_class: efs-spaces
+      # Default home directory size
+      home_size: "50Gi"
+      # Enable shared datasets volume
+      enable_shared_datasets: true
+      shared_datasets_pvc: shared-datasets
+
+    # Security Settings
+    security:
+      # Run as non-root user
+      run_as_non_root: true
+      run_as_user: 1000
+      run_as_group: 100
+      fs_group: 100
+      # Read-only root filesystem
+      read_only_root_filesystem: false
+      # Drop all capabilities
+      drop_capabilities:
+        - ALL
+      # Add only needed capabilities
+      add_capabilities: []
+
+    # Network Settings
+    network:
+      # Enable network policies
+      enable_network_policy: true
+      # Allow egress to internet (for pip install, etc.)
+      allow_internet_egress: true
+      # Allow access to S3
+      allow_s3_access: true
+      # Allow access to ECR
+      allow_ecr_access: true
+
+    # Auto-scaling Settings
+    autoscaling:
+      # Enable vertical pod autoscaler
+      enable_vpa: true
+      # Minimum update interval
+      min_update_interval: 5m
+
+---
+# Service for Spaces Controller
+apiVersion: v1
+kind: Service
+metadata:
+  name: spaces-controller
+  namespace: sagemaker-spaces
+  labels:
+    app.kubernetes.io/name: spaces-controller
+spec:
+  type: ClusterIP
+  ports:
+    - name: http
+      port: 8080
+      targetPort: 8080
+    - name: metrics
+      port: 9090
+      targetPort: 9090
+  selector:
+    app.kubernetes.io/name: spaces-controller
+
+---
+# Spaces Controller Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: spaces-controller
+  namespace: sagemaker-spaces
+  labels:
+    app.kubernetes.io/name: spaces-controller
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: spaces-controller
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: spaces-controller
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9090"
+    spec:
+      serviceAccountName: spaces-controller
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+      containers:
+        - name: controller
+          # Note: This is a placeholder - actual SageMaker Spaces image will be used
+          image: public.ecr.aws/sagemaker/spaces-controller:latest
+          imagePullPolicy: Always
+          args:
+            - "--config=/etc/spaces-controller/config.yaml"
+            - "--enable-leader-election"
+          ports:
+            - name: http
+              containerPort: 8080
+            - name: metrics
+              containerPort: 9090
+          resources:
+            requests:
+              cpu: 200m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          volumeMounts:
+            - name: config
+              mountPath: /etc/spaces-controller
+              readOnly: true
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8080
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            readOnlyRootFilesystem: true
+      volumes:
+        - name: config
+          configMap:
+            name: spaces-controller-config
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchLabels:
+                    app.kubernetes.io/name: spaces-controller
+                topologyKey: kubernetes.io/hostname

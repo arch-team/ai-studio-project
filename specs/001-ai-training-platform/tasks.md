@@ -123,8 +123,8 @@
 - [X] [T008] 初始化项目文档 - 创建 `README.md` (项目概述,快速启动), `CONTRIBUTING.md` (开发规范,提交流程)
 
 ### 基础设施即代码 (IaC)
-- [ ] [T008a] AWS CDK 项目结构 - 创建 `infrastructure/cdk/` 目录结构,初始化 CDK Python 项目 (与后端技术栈一致),配置 `cdk.json` 和 `requirements.txt`,定义 Stack 组织结构 (NetworkStack, DatabaseStack, StorageStack, ComputeStack),配置多环境支持 (dev/staging/prod)
-- [ ] [T008b] AWS CDK 核心 Stacks - 编写以下基础设施 Stacks:
+- [X] [T008a] AWS CDK 项目结构 - 创建 `infrastructure/cdk/` 目录结构,初始化 CDK Python 项目 (与后端技术栈一致),配置 `cdk.json` 和 `requirements.txt`,定义 Stack 组织结构 (NetworkStack, DatabaseStack, StorageStack, ComputeStack),配置多环境支持 (dev/staging/prod)
+- [X] [T008b] AWS CDK 核心 Stacks - 编写以下基础设施 Stacks:
   - **VPC Stack**:
     - **VPC CIDR 配置**: 默认 10.0.0.0/16 (65,536 个 IP 地址),支持通过 CDK 上下文变量配置 (例如 `cdk.json` 中的 `vpcCidr` 参数或 `cdk deploy --context vpcCidr=10.0.0.0/15`)
     - **容量验证**: CDK Stack 实现时需验证 CIDR 容量满足集群扩展需求 (计算公式: 可用节点数 ≈ 私有应用层子网IP数 / 每节点平均IP需求20,目标支持 ≥1000 节点)
@@ -174,13 +174,13 @@
   - **IAM Roles Stack**: EKS 节点角色、应用服务角色 (遵循最小权限原则)
 
 ### HyperPod EKS 集群创建
-- [ ] [T008c-1] [P] HyperPod EKS 集群基础配置 - `infrastructure/cdk/stacks/hyperpod_stack.py`,创建 SageMaker HyperPod with EKS 集群基础:
+- [X] [T008c-1] [P] HyperPod EKS 集群基础配置 - `infrastructure/cdk/stacks/hyperpod_stack.py`,创建 SageMaker HyperPod with EKS 集群基础:
   - **EKS 集群配置**: 版本 EKS 1.32+,配置 VPC 和子网关联 (使用 T008b 创建的 VPC)
   - **EKS Add-ons**: 安装 EBS CSI Driver (≥v1.28.0), FSx CSI Driver (≥v1.9.0), VPC CNI (≥v1.16.0)，详细版本要求参见 plan.md L35-38
   - **输出**: HyperPod 集群 ARN、EKS 集群名称、集群 API Endpoint
   - **依赖**: T008a (CDK 项目结构), T008b (VPC Stack)
   - **参考**: plan.md Constraints "Requires AWS SageMaker HyperPod with EKS infrastructure", spec.md FR-001
-- [ ] [T008c-2] [P] GPU 节点组和 Auto Scaling 配置 - `infrastructure/cdk/stacks/hyperpod_stack.py`,创建 GPU 节点组和扩缩容策略:
+- [X] [T008c-2] [P] GPU 节点组和 Auto Scaling 配置 - `infrastructure/cdk/stacks/hyperpod_stack.py`,创建 GPU 节点组和扩缩容策略:
   - **GPU 节点组**: 创建 GPU 节点组 (p4d.24xlarge, p5.48xlarge, trn1.32xlarge),配置 Auto Scaling Group (最小 2 节点,最大 100 节点)
   - **Auto Scaling 策略**（使用 SageMaker HyperPod Autoscaling 原生能力）:
     - 扩容触发: Kueue 队列中 Pending Workloads 数量 >0 且持续 5 分钟（HyperPod 默认配置）
@@ -210,7 +210,7 @@
   - **输出**: 节点组 ID、Auto Scaling 策略配置参数、AZ 亲和性配置、EFA 网络配置
   - **依赖**: T008c-1 (EKS 集群基础配置), T008b (VPC Stack 部署模式配置)
   - **参考**: spec.md FR-003/FR-004
-- [ ] [T008c-3] [P] IAM 和安全配置 - `infrastructure/cdk/stacks/hyperpod_stack.py`,配置 IAM 角色和安全策略:
+- [X] [T008c-3] [P] IAM 和安全配置 - `infrastructure/cdk/stacks/hyperpod_stack.py`,配置 IAM 角色和安全策略:
   - **IAM 角色配置** (遵循最小权限原则):
     - **EKS 节点角色**: ec2:DescribeInstances, ec2:DescribeNetworkInterfaces, ecr:GetAuthorizationToken, ecr:BatchGetImage, ecr:GetDownloadUrlForLayer, s3:GetObject/PutObject (限定 datasets/models/checkpoints bucket), logs:CreateLogStream/PutLogEvents, sts:AssumeRole
     - **训练任务 Pod IAM 角色**: s3:GetObject/PutObject (限定训练相关 bucket), sagemaker:Describe*/List* (只读), cloudwatch:PutMetricData, logs:CreateLogStream/PutLogEvents
@@ -227,27 +227,27 @@
   - **参考**: spec.md FR-001 (安全要求), AWS EKS IAM 最佳实践, K8s RBAC 文档
 
 ### HyperPod Add-ons 安装
-- [ ] [T008d-1] [P] 训练核心组件安装 - `infrastructure/k8s/hyperpod-addons/training/`,安装训练调度核心组件:
+- [X] [T008d-1] [P] 训练核心组件安装 - `infrastructure/k8s/hyperpod-addons/training/`,安装训练调度核心组件:
   - **Training Operator**: 安装 HyperPod Training Operator (PyTorchJob, TensorFlowJob CRD),配置训练框架支持 (PyTorch DDP/FSDP/DeepSpeed ZeRO),验证 Webhook 就绪
   - **Task Governance (Kueue)**: 安装 Kueue 资源调度器,创建 ClusterQueue 和 LocalQueue,创建三级 Kubernetes PriorityClass 资源 (training-priority-low: 100, training-priority-medium: 500, training-priority-high: 1000，遵循 spec.md FR-004 优先级数值映射),配置 Gang Scheduling (默认 60 秒超时,可配置)
   - **抢占策略**: 完全遵循 Kueue 原生抢占行为,不做自定义扩展。具体参数 (冷却期、借用策略等) 以 HyperPod Task Governance 默认配置为准,参见 [Kueue Preemption Documentation](https://kueue.sigs.k8s.io/docs/concepts/preemption/)
   - **验证测试**: 提交测试 PyTorchJob (single-node hello-world),验证 Job 状态转换为 Succeeded,验证 Kueue Workload 调度生效,验证 Training Operator Webhook 响应 (curl localhost:9443/healthz)
   - **依赖**: T008c-1, T008c-2, T008c-3 (HyperPod EKS 集群完整配置)
   - **参考**: spec.md FR-001 (Training Operator), FR-004 (Kueue)
-- [ ] [T008d-2] [P] 监控和弹性组件安装 - `infrastructure/k8s/hyperpod-addons/ops/`,安装运维监控组件:
+- [X] [T008d-2] [P] 监控和弹性组件安装 - `infrastructure/k8s/hyperpod-addons/ops/`,安装运维监控组件:
   - **Observability Add-on**: 部署 Prometheus + Grafana,配置 Node Exporter, cAdvisor, DCGM Exporter (GPU 指标),配置数据保留期 (30 天),创建预定义 Grafana 仪表盘 (集群健康、训练任务分布、资源利用率)
   - **Elastic Agent**: 配置 HyperPod Elastic Agent,设置检查点管理参数 (默认间隔 10-15 分钟，支持用户通过训练任务配置自定义间隔范围 5-30 分钟),配置 Auto-Resume 策略 (节点故障自动恢复),配置节点故障检测阈值 (PodsReady=False 持续 >30 秒)。Deep Health Check 完全遵循 HyperPod Health Check Agent 原生能力 (GPU/EFA/存储健康检测),参见 [HyperPod Health Checks Documentation](https://docs.aws.amazon.com/sagemaker/latest/dg/sagemaker-hyperpod-operate-health-checks.html)
   - **验证测试**: 查询 Prometheus 指标 (up, node_cpu_seconds_total),访问 Grafana 仪表盘,验证 Elastic Agent Pod Running,验证健康检查日志
   - **依赖**: T008d-1 (需要 Training Operator CRD 用于监控训练任务)
   - **参考**: spec.md FR-007/FR-016 (Observability), FR-010/FR-011 (Elastic Agent)
-- [ ] [T008d-3] [P] 开发环境组件安装 - `infrastructure/k8s/hyperpod-addons/spaces/`,安装 Spaces Add-on:
+- [X] [T008d-3] [P] 开发环境组件安装 - `infrastructure/k8s/hyperpod-addons/spaces/`,安装 Spaces Add-on:
   - **Spaces Add-on**: 安装 Amazon SageMaker Spaces Add-on,配置 JupyterLab 和 VS Code IDE 镜像 (Data Science, PyTorch, TensorFlow),配置 EFS 持久化存储挂载,配置自动保存间隔 (JupyterLab 120 秒, VS Code 1 秒)
   - **验证测试**: 验证 Spaces CRD 注册,检查 Spaces Controller Pod 状态,创建测试 Space (可选,建议在 US5 开发时执行)
   - **依赖**: T008c-1, T008c-2, T008c-3 (HyperPod EKS 集群完整配置,与训练组件无依赖,可并行执行)
   - **参考**: spec.md FR-012/SC-015 (Spaces)
 
 ### FSx for Lustre 文件系统创建
-- [ ] [T008e] [P] FSx for Lustre Stack - `infrastructure/cdk/lib/fsx-stack.ts`,创建 Amazon FSx for Lustre 高性能文件系统:
+- [X] [T008e] [P] FSx for Lustre Stack - `infrastructure/cdk/stacks/fsx_stack.py`,创建 Amazon FSx for Lustre 高性能文件系统:
   - **文件系统配置**: 创建 FSx for Lustre 文件系统,配置 Persistent_2 部署类型 (持久化存储),默认使用 500 MB/s/TiB 吞吐量级别 (配合 10 TiB 容量可达 5 GB/s，满足 spec.md ≥5GB/s 基线需求)。成本优化策略：500 MB/s/TiB 相比 1000 MB/s/TiB 节省约 50% 成本 (~$6,500/月)，适用于大多数训练场景 (单任务 GPU ≤8)。性能不达标时可通过调优方案升级到 1000 MB/s/TiB (参见性能验证部分)
   - **容量规划**: 根据 spec.md NFR-001 FSx 容量规划公式计算初始容量 (公式: MAX(10 TiB, MAX(dataset_size)×1.5, concurrent_jobs×avg_dataset_size×1.2))。建议初始容量配置:小规模训练 18 TiB、中规模训练 48 TiB、大规模训练 144 TiB。启用自动扩容策略 (使用率 >80% 触发扩容，每次扩容增加当前容量 20%，最小增量 10 TiB),最大容量 160 TiB (AWS FSx 单文件系统限制)
   - **S3 集成**: 配置 S3 Data Repository Association,链接训练数据 S3 存储桶 (T008b 创建),启用自动导入/导出 (ImportPath, ExportPath),配置 AutoImportPolicy (NEW/CHANGED/DELETED 事件自动同步)
@@ -265,7 +265,7 @@
   - **输出**: FSx 文件系统 ID、DNS 名称、挂载路径、StorageClass 名称
   - **依赖**: T008a (CDK 项目结构), T008b (VPC Stack, S3 Buckets Stack), T008c-1 (EKS 集群 - 包含 FSx CSI Driver), T008c-2 (GPU 节点组), T008c-3 (IAM 和安全配置), T008d (HyperPod Add-ons - 确保完整环境就绪)
   - **参考**: spec.md Technical Context "FSx for Lustre (训练数据), ≥5GB/s 吞吐量", FR-007 "支持 ≥10TB 数据集", SC-005 "S3 到 FSx 同步时间 <10分钟 (1TB 数据集)"
-- [ ] [T008f] Kubernetes NetworkPolicy 和 QoS 配置 - `infrastructure/k8s/network-policies/`,配置 HyperPod EKS 集群网络隔离和 QoS 策略:
+- [X] [T008f] Kubernetes NetworkPolicy 和 QoS 配置 - `infrastructure/k8s/network-policies/`,配置 HyperPod EKS 集群网络隔离和 QoS 策略:
   - **Pod 级网络隔离**: 使用 Kubernetes NetworkPolicy 实现训练任务 Pod 间的网络命名空间隔离
   - **默认拒绝策略**: 配置 default-deny NetworkPolicy,仅允许必需的流量 (Kueue API, Prometheus metrics, MLflow tracking)
   - **训练任务网络策略**: 为 PyTorchJob Pods 配置专用 NetworkPolicy,允许分布式训练通信 (EFA 网络) 和集群内部服务访问
@@ -277,7 +277,7 @@
   - **参考**: spec.md FR-021 网络带宽管理和 QoS 策略 (依赖 T008c-1/T008c-2/T008c-3 HyperPod EKS 集群, T008d HyperPod Add-ons)
 
 ### ALB 和 TLS 配置
-- [ ] [T008i] [P] ALB Ingress 和 TLS 终止配置 - `infrastructure/cdk/stacks/alb_stack.py`,创建 Application Load Balancer Stack:
+- [X] [T008i] [P] ALB Ingress 和 TLS 终止配置 - `infrastructure/cdk/stacks/alb_stack.py`,创建 Application Load Balancer Stack:
   - **ALB 配置**: 创建面向互联网的 ALB,部署到 T008b 创建的公有子网,配置健康检查和目标组
   - **TLS 终止**: 配置 HTTPS 监听器 (端口 443),绑定 AWS Certificate Manager (ACM) 证书,强制 TLS 1.2+ (禁用 TLS 1.0/1.1)
   - **HTTPS 重定向**: 配置 HTTP (端口 80) 到 HTTPS (端口 443) 自动重定向
@@ -289,7 +289,7 @@
   - **参考**: spec.md FR-018 传输层加密要求, AWS ALB TLS 最佳实践
 
 ### 基础设施验证测试
-- [ ] [T008g] [P] HyperPod 基础设施验证测试 - 执行综合验证套件,确保基础设施就绪:
+- [X] [T008g] [P] HyperPod 基础设施验证测试 - 执行综合验证套件,确保基础设施就绪:
   - **集群健康检查**: 验证 EKS 集群状态 (kubectl cluster-info), 节点 Ready 状态 (所有节点), 控制平面健康 (kube-apiserver, etcd)
   - **GPU 节点验证**: 在 GPU 节点运行 nvidia-smi 测试 Pod, 验证 GPU 可见性和 CUDA 版本, 验证 GPU Operator 正常运行
   - **HyperPod Add-ons 功能测试**:

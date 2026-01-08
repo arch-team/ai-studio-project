@@ -1,0 +1,33 @@
+# Kustomization for HyperPod Operations Add-ons
+# This kustomization manages Observability and Elastic Agent components
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+metadata:
+  name: hyperpod-ops-addons
+  annotations:
+    description: "HyperPod Operations Add-ons including Observability and Elastic Agent"
+
+namespace: hyperpod-monitoring
+
+resources:
+  # Monitoring namespace and RBAC
+  - monitoring-namespace.yaml
+  # Prometheus configuration
+  - prometheus-config.yaml
+  # Grafana dashboards
+  - grafana-dashboards.yaml
+  # HyperPod Elastic Agent configuration
+  - elastic-agent-config.yaml
+  # GPU metrics exporter
+  - dcgm-exporter.yaml
+  # Alerting rules
+  - alerting-rules.yaml
+
+commonLabels:
+  app.kubernetes.io/part-of: ai-training-platform
+  app.kubernetes.io/managed-by: kustomize
+
+commonAnnotations:
+  platform.ai/component: observability
+  platform.ai/version: "1.0.0"

@@ -1,0 +1,33 @@
+# Kustomization for HyperPod Training Add-ons
+# This kustomization manages Training Operator and Kueue components
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+metadata:
+  name: hyperpod-training-addons
+  annotations:
+    description: "HyperPod Training Add-ons including Training Operator and Kueue"
+
+# Namespace for training components
+namespace: hyperpod-system
+
+resources:
+  # Kueue configuration
+  - kueue-config.yaml
+  # Training Operator configuration
+  - training-operator-config.yaml
+  # Resource Flavors for GPU types
+  - resource-flavors.yaml
+  # Cluster Queues for workload management
+  - cluster-queues.yaml
+  # Local Queues for namespace-level scheduling
+  - local-queues.yaml
+
+commonLabels:
+  app.kubernetes.io/part-of: ai-training-platform
+  app.kubernetes.io/managed-by: kustomize
+
+# Common annotations
+commonAnnotations:
+  platform.ai/component: training
+  platform.ai/version: "1.0.0"

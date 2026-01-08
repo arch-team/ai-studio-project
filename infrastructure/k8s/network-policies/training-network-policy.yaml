@@ -1,0 +1,263 @@
+# Training Jobs Network Policies
+# Enables distributed training communication while maintaining isolation
+# Reference: spec.md FR-021 (Network isolation for training workloads)
+---
+# Allow PyTorchJob distributed training communication
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-pytorch-distributed
+  namespace: training-jobs
+  labels:
+    app.kubernetes.io/name: pytorch-distributed
+    platform.ai/policy-type: allow
+    platform.ai/workload-type: training
+spec:
+  podSelector:
+    matchLabels:
+      training.kubeflow.org/job-role: master
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # Allow communication from worker pods in same job
+    - from:
+        - podSelector:
+            matchLabels:
+              training.kubeflow.org/job-role: worker
+      ports:
+        # PyTorch distributed communication ports
+        - protocol: TCP
+          port: 29500  # Master port (torch.distributed)
+        - protocol: TCP
+          port: 29501  # NCCL ring communication
+  egress:
+    # Allow communication to worker pods
+    - to:
+        - podSelector:
+            matchLabels:
+              training.kubeflow.org/job-role: worker
+      ports:
+        - protocol: TCP
+          port: 29500
+        - protocol: TCP
+          port: 29501
+
+---
+# Allow worker pods to communicate with master and each other
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-pytorch-workers
+  namespace: training-jobs
+  labels:
+    app.kubernetes.io/name: pytorch-workers
+    platform.ai/policy-type: allow
+    platform.ai/workload-type: training
+spec:
+  podSelector:
+    matchLabels:
+      training.kubeflow.org/job-role: worker
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # Allow from master pod
+    - from:
+        - podSelector:
+            matchLabels:
+              training.kubeflow.org/job-role: master
+      ports:
+        - protocol: TCP
+          port: 29500
+        - protocol: TCP
+          port: 29501
+    # Allow from other workers (ring all-reduce)
+    - from:
+        - podSelector:
+            matchLabels:
+              training.kubeflow.org/job-role: worker
+      ports:
+        - protocol: TCP
+          port: 29500
+        - protocol: TCP
+          port: 29501
+  egress:
+    # Allow to master pod
+    - to:
+        - podSelector:
+            matchLabels:
+              training.kubeflow.org/job-role: master
+      ports:
+        - protocol: TCP
+          port: 29500
+        - protocol: TCP
+          port: 29501
+    # Allow to other workers
+    - to:
+        - podSelector:
+            matchLabels:
+              training.kubeflow.org/job-role: worker
+      ports:
+        - protocol: TCP
+          port: 29500
+        - protocol: TCP
+          port: 29501
+
+---
+# Allow training pods to access Kueue API
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-kueue-api-access
+  namespace: training-jobs
+  labels:
+    app.kubernetes.io/name: kueue-api-access
+    platform.ai/policy-type: allow
+spec:
+  podSelector:
+    matchLabels:
+      platform.ai/workload-type: training
+  policyTypes:
+    - Egress
+  egress:
+    # Allow access to Kueue controller service
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kueue-system
+          podSelector:
+            matchLabels:
+              control-plane: controller-manager
+      ports:
+        - protocol: TCP
+          port: 8443
+        - protocol: TCP
+          port: 9443
+
+---
+# Allow training pods to send metrics to Prometheus
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-prometheus-scrape
+  namespace: training-jobs
+  labels:
+    app.kubernetes.io/name: prometheus-scrape
+    platform.ai/policy-type: allow
+spec:
+  podSelector:
+    matchLabels:
+      platform.ai/workload-type: training
+  policyTypes:
+    - Ingress
+  ingress:
+    # Allow Prometheus to scrape metrics
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: monitoring
+          podSelector:
+            matchLabels:
+              app: prometheus
+      ports:
+        - protocol: TCP
+          port: 9090  # Metrics port
+
+---
+# Allow training pods to access MLflow tracking server
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-mlflow-access
+  namespace: training-jobs
+  labels:
+    app.kubernetes.io/name: mlflow-access
+    platform.ai/policy-type: allow
+spec:
+  podSelector:
+    matchLabels:
+      platform.ai/workload-type: training
+  policyTypes:
+    - Egress
+  egress:
+    # Allow access to MLflow tracking server
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: mlflow
+          podSelector:
+            matchLabels:
+              app: mlflow-server
+      ports:
+        - protocol: TCP
+          port: 5000
+
+---
+# Allow training pods to access AWS services via VPC endpoints
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-aws-vpc-endpoints
+  namespace: training-jobs
+  labels:
+    app.kubernetes.io/name: aws-endpoints
+    platform.ai/policy-type: allow
+spec:
+  podSelector:
+    matchLabels:
+      platform.ai/workload-type: training
+  policyTypes:
+    - Egress
+  egress:
+    # Allow HTTPS to VPC endpoints (S3, ECR, CloudWatch, STS)
+    - to:
+        - ipBlock:
+            cidr: 10.0.0.0/8  # VPC CIDR range for private endpoints
+      ports:
+        - protocol: TCP
+          port: 443
+    # Allow access to FSx for Lustre
+    - to:
+        - ipBlock:
+            cidr: 10.0.0.0/8  # VPC CIDR
+      ports:
+        - protocol: TCP
+          port: 988   # Lustre client-server
+        - protocol: TCP
+          port: 1021
+        - protocol: TCP
+          port: 1022
+        - protocol: TCP
+          port: 1023
+
+---
+# Allow EFA network traffic for high-performance distributed training
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-efa-traffic
+  namespace: training-jobs
+  labels:
+    app.kubernetes.io/name: efa-traffic
+    platform.ai/policy-type: allow
+    platform.ai/network-type: efa
+spec:
+  podSelector:
+    matchLabels:
+      platform.ai/efa-enabled: "true"
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # Allow all EFA traffic from other EFA-enabled pods
+    - from:
+        - podSelector:
+            matchLabels:
+              platform.ai/efa-enabled: "true"
+  egress:
+    # Allow all EFA traffic to other EFA-enabled pods
+    - to:
+        - podSelector:
+            matchLabels:
+              platform.ai/efa-enabled: "true"

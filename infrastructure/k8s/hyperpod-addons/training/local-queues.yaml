@@ -1,0 +1,119 @@
+# Local Queues for Kueue
+# Namespace-scoped queues that route workloads to ClusterQueues
+# Reference: https://kueue.sigs.k8s.io/docs/concepts/local_queue/
+---
+# Default namespace for training workloads
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: training-jobs
+  labels:
+    app.kubernetes.io/name: training-jobs
+    platform.ai/component: training
+    platform.ai/priority-access: "false"
+
+---
+# High-priority training namespace
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: training-priority
+  labels:
+    app.kubernetes.io/name: training-priority
+    platform.ai/component: training
+    platform.ai/priority-access: "true"
+
+---
+# Local Queue for standard training workloads
+apiVersion: kueue.x-k8s.io/v1beta1
+kind: LocalQueue
+metadata:
+  name: default-training-queue
+  namespace: training-jobs
+  labels:
+    app.kubernetes.io/name: kueue
+    app.kubernetes.io/component: local-queue
+    platform.ai/queue-type: training
+spec:
+  # Route to the main GPU training cluster queue
+  clusterQueue: gpu-training-queue
+
+---
+# Local Queue for high-priority training workloads
+apiVersion: kueue.x-k8s.io/v1beta1
+kind: LocalQueue
+metadata:
+  name: priority-training-queue
+  namespace: training-priority
+  labels:
+    app.kubernetes.io/name: kueue
+    app.kubernetes.io/component: local-queue
+    platform.ai/queue-type: high-priority
+spec:
+  clusterQueue: high-priority-training-queue
+
+---
+# Local Queue for preprocessing in training namespace
+apiVersion: kueue.x-k8s.io/v1beta1
+kind: LocalQueue
+metadata:
+  name: preprocessing-queue
+  namespace: training-jobs
+  labels:
+    app.kubernetes.io/name: kueue
+    app.kubernetes.io/component: local-queue
+    platform.ai/queue-type: preprocessing
+spec:
+  clusterQueue: preprocessing-queue
+
+---
+# Workload Priority Class - High Priority
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: training-high-priority
+  labels:
+    platform.ai/priority-class: high
+value: 100000
+globalDefault: false
+description: "High priority for critical training workloads"
+preemptionPolicy: PreemptLowerPriority
+
+---
+# Workload Priority Class - Normal Priority
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: training-normal-priority
+  labels:
+    platform.ai/priority-class: normal
+value: 50000
+globalDefault: false
+description: "Normal priority for standard training workloads"
+preemptionPolicy: PreemptLowerPriority
+
+---
+# Workload Priority Class - Low Priority (Batch/Preemptible)
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: training-low-priority
+  labels:
+    platform.ai/priority-class: low
+value: 10000
+globalDefault: false
+description: "Low priority for batch and preemptible workloads"
+preemptionPolicy: Never
+
+---
+# Workload Priority Class - Preprocessing
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: preprocessing-priority
+  labels:
+    platform.ai/priority-class: preprocessing
+value: 30000
+globalDefault: false
+description: "Priority for data preprocessing jobs"
+preemptionPolicy: PreemptLowerPriority

@@ -1,0 +1,284 @@
+# Test PyTorchJob for Training Operator Validation
+# Reference: tasks.md T008g - HyperPod Add-ons 功能测试
+#
+# This simple PyTorchJob validates that:
+# 1. Training Operator is properly installed
+# 2. PyTorchJob CRD is registered and functional
+# 3. Kueue can schedule the workload
+# 4. Job transitions to Succeeded state
+#
+# Usage:
+#   kubectl apply -f test-pytorchjob.yaml
+#   kubectl get pytorchjob test-pytorch-hello -n training-jobs -w
+#   kubectl logs -f test-pytorch-hello-master-0 -n training-jobs
+#   kubectl delete -f test-pytorchjob.yaml
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: training-jobs
+  labels:
+    kubernetes.io/metadata.name: training-jobs
+    platform.ai/namespace-type: training
+
+---
+# LocalQueue for test workloads (must reference existing ClusterQueue)
+apiVersion: kueue.x-k8s.io/v1beta1
+kind: LocalQueue
+metadata:
+  name: test-queue
+  namespace: training-jobs
+  labels:
+    app.kubernetes.io/name: test-queue
+spec:
+  clusterQueue: default-queue  # Reference to ClusterQueue created by Kueue setup
+
+---
+# Simple PyTorchJob that prints "Hello from PyTorch"
+apiVersion: kubeflow.org/v1
+kind: PyTorchJob
+metadata:
+  name: test-pytorch-hello
+  namespace: training-jobs
+  labels:
+    app.kubernetes.io/name: test-pytorch-hello
+    platform.ai/workload-type: training
+    platform.ai/test: "true"
+  annotations:
+    # Kueue integration
+    kueue.x-k8s.io/queue-name: test-queue
+    # Test metadata
+    platform.ai/test-purpose: "Training Operator validation"
+spec:
+  pytorchReplicaSpecs:
+    Master:
+      replicas: 1
+      restartPolicy: Never
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: test-pytorch-hello
+            platform.ai/workload-type: training
+        spec:
+          containers:
+            - name: pytorch
+              image: pytorch/pytorch:2.1.0-cuda12.1-cudnn8-runtime
+              command:
+                - python
+                - -c
+                - |
+                  import torch
+                  import os
+                  import socket
+
+                  print("=" * 60)
+                  print("PyTorchJob Validation Test")
+                  print("=" * 60)
+                  print(f"Hostname: {socket.gethostname()}")
+                  print(f"PyTorch Version: {torch.__version__}")
+                  print(f"CUDA Available: {torch.cuda.is_available()}")
+                  if torch.cuda.is_available():
+                      print(f"CUDA Version: {torch.version.cuda}")
+                      print(f"GPU Count: {torch.cuda.device_count()}")
+                      for i in range(torch.cuda.device_count()):
+                          print(f"  GPU {i}: {torch.cuda.get_device_name(i)}")
+                  else:
+                      print("Running on CPU (no GPU detected)")
+
+                  # Simple tensor operation
+                  x = torch.randn(3, 3)
+                  y = torch.randn(3, 3)
+                  z = torch.matmul(x, y)
+                  print(f"\nMatrix multiplication test:")
+                  print(f"  Input shape: {x.shape}")
+                  print(f"  Output shape: {z.shape}")
+                  print(f"  Result sum: {z.sum().item():.4f}")
+
+                  print("\n" + "=" * 60)
+                  print("✅ PyTorchJob validation PASSED!")
+                  print("=" * 60)
+              resources:
+                requests:
+                  cpu: "1"
+                  memory: "2Gi"
+                limits:
+                  cpu: "2"
+                  memory: "4Gi"
+          # Tolerate any taints (for GPU nodes)
+          tolerations:
+            - operator: Exists
+
+---
+# Multi-worker PyTorchJob for distributed training validation
+apiVersion: kubeflow.org/v1
+kind: PyTorchJob
+metadata:
+  name: test-pytorch-distributed
+  namespace: training-jobs
+  labels:
+    app.kubernetes.io/name: test-pytorch-distributed
+    platform.ai/workload-type: training
+    platform.ai/test: "true"
+  annotations:
+    kueue.x-k8s.io/queue-name: test-queue
+    platform.ai/test-purpose: "Distributed training validation"
+spec:
+  pytorchReplicaSpecs:
+    Master:
+      replicas: 1
+      restartPolicy: Never
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: test-pytorch-distributed
+            platform.ai/workload-type: training
+        spec:
+          containers:
+            - name: pytorch
+              image: pytorch/pytorch:2.1.0-cuda12.1-cudnn8-runtime
+              command:
+                - python
+                - -c
+                - |
+                  import torch
+                  import torch.distributed as dist
+                  import os
+                  import socket
+
+                  def init_distributed():
+                      rank = int(os.environ.get('RANK', 0))
+                      world_size = int(os.environ.get('WORLD_SIZE', 1))
+                      master_addr = os.environ.get('MASTER_ADDR', 'localhost')
+                      master_port = os.environ.get('MASTER_PORT', '29500')
+
+                      print(f"[Rank {rank}] Initializing distributed...")
+                      print(f"  World Size: {world_size}")
+                      print(f"  Master: {master_addr}:{master_port}")
+
+                      if world_size > 1:
+                          dist.init_process_group(
+                              backend='gloo',  # Use gloo for CPU, nccl for GPU
+                              rank=rank,
+                              world_size=world_size
+                          )
+                          print(f"[Rank {rank}] Distributed initialized!")
+                      else:
+                          print(f"[Rank {rank}] Single worker mode")
+
+                      return rank, world_size
+
+                  print("=" * 60)
+                  print("Distributed PyTorchJob Validation Test")
+                  print("=" * 60)
+                  print(f"Hostname: {socket.gethostname()}")
+
+                  rank, world_size = init_distributed()
+
+                  # Simple all-reduce test
+                  tensor = torch.ones(1) * (rank + 1)
+                  print(f"[Rank {rank}] Before all-reduce: {tensor.item()}")
+
+                  if world_size > 1:
+                      dist.all_reduce(tensor, op=dist.ReduceOp.SUM)
+                      print(f"[Rank {rank}] After all-reduce: {tensor.item()}")
+                      expected = sum(range(1, world_size + 1))
+                      assert tensor.item() == expected, f"Expected {expected}, got {tensor.item()}"
+
+                  if rank == 0:
+                      print("\n" + "=" * 60)
+                      print("✅ Distributed PyTorchJob validation PASSED!")
+                      print("=" * 60)
+
+                  if world_size > 1:
+                      dist.destroy_process_group()
+              env:
+                - name: PYTHONUNBUFFERED
+                  value: "1"
+              ports:
+                - containerPort: 29500
+                  name: c10d
+              resources:
+                requests:
+                  cpu: "1"
+                  memory: "2Gi"
+                limits:
+                  cpu: "2"
+                  memory: "4Gi"
+          tolerations:
+            - operator: Exists
+    Worker:
+      replicas: 1
+      restartPolicy: Never
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: test-pytorch-distributed
+            platform.ai/workload-type: training
+        spec:
+          containers:
+            - name: pytorch
+              image: pytorch/pytorch:2.1.0-cuda12.1-cudnn8-runtime
+              command:
+                - python
+                - -c
+                - |
+                  import torch
+                  import torch.distributed as dist
+                  import os
+                  import socket
+
+                  def init_distributed():
+                      rank = int(os.environ.get('RANK', 0))
+                      world_size = int(os.environ.get('WORLD_SIZE', 1))
+                      master_addr = os.environ.get('MASTER_ADDR', 'localhost')
+                      master_port = os.environ.get('MASTER_PORT', '29500')
+
+                      print(f"[Rank {rank}] Initializing distributed...")
+                      print(f"  World Size: {world_size}")
+                      print(f"  Master: {master_addr}:{master_port}")
+
+                      if world_size > 1:
+                          dist.init_process_group(
+                              backend='gloo',
+                              rank=rank,
+                              world_size=world_size
+                          )
+                          print(f"[Rank {rank}] Distributed initialized!")
+                      else:
+                          print(f"[Rank {rank}] Single worker mode")
+
+                      return rank, world_size
+
+                  print("=" * 60)
+                  print("Distributed PyTorchJob Worker")
+                  print("=" * 60)
+                  print(f"Hostname: {socket.gethostname()}")
+
+                  rank, world_size = init_distributed()
+
+                  tensor = torch.ones(1) * (rank + 1)
+                  print(f"[Rank {rank}] Before all-reduce: {tensor.item()}")
+
+                  if world_size > 1:
+                      dist.all_reduce(tensor, op=dist.ReduceOp.SUM)
+                      print(f"[Rank {rank}] After all-reduce: {tensor.item()}")
+
+                  print(f"[Rank {rank}] Completed!")
+
+                  if world_size > 1:
+                      dist.destroy_process_group()
+              env:
+                - name: PYTHONUNBUFFERED
+                  value: "1"
+              ports:
+                - containerPort: 29500
+                  name: c10d
+              resources:
+                requests:
+                  cpu: "1"
+                  memory: "2Gi"
+                limits:
+                  cpu: "2"
+                  memory: "4Gi"
+          tolerations:
+            - operator: Exists

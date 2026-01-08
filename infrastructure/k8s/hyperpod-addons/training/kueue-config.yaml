@@ -1,0 +1,143 @@
+# Kueue Configuration for AI Training Platform
+# Kueue provides workload queuing and scheduling for Kubernetes
+# Reference: https://kueue.sigs.k8s.io/docs/concepts/
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: hyperpod-system
+  labels:
+    app.kubernetes.io/name: hyperpod-system
+    app.kubernetes.io/component: training-infrastructure
+
+---
+# Kueue Controller Configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kueue-manager-config
+  namespace: hyperpod-system
+data:
+  controller_manager_config.yaml: |
+    apiVersion: config.kueue.x-k8s.io/v1beta1
+    kind: Configuration
+    health:
+      healthProbeBindAddress: :8081
+    metrics:
+      bindAddress: :8080
+      # Enable Prometheus metrics for HyperPod Observability
+      enableClusterQueueResources: true
+    webhook:
+      port: 9443
+    leaderElection:
+      leaderElect: true
+      resourceName: kueue-leader-election
+    controller:
+      groupKindConcurrency:
+        # Workload concurrency for training jobs
+        Workload.kueue.x-k8s.io: 5
+        LocalQueue.kueue.x-k8s.io: 1
+        ClusterQueue.kueue.x-k8s.io: 1
+        ResourceFlavor.kueue.x-k8s.io: 1
+    integrations:
+      frameworks:
+        # Enable PyTorchJob integration for distributed training
+        - "kubeflow.org/pytorchjob"
+        # Enable TFJob integration (optional)
+        - "kubeflow.org/tfjob"
+        # Enable native Pod integration
+        - "pod"
+        # Enable Job integration
+        - "batch/job"
+      # Pod integration options
+      podOptions:
+        namespaceSelector:
+          matchExpressions:
+            - key: kubernetes.io/metadata.name
+              operator: NotIn
+              values: [kube-system, hyperpod-system]
+    # Fair sharing configuration
+    fairSharing:
+      enable: true
+      preemptionStrategies:
+        - LessThanInitialShare
+        - LessThanOrEqualToFinalShare
+
+---
+# Service Account for Kueue
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: kueue-controller-manager
+  namespace: hyperpod-system
+  labels:
+    app.kubernetes.io/name: kueue
+    app.kubernetes.io/component: controller
+
+---
+# ClusterRole for Kueue
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: kueue-manager-role
+rules:
+  # Core API resources
+  - apiGroups: [""]
+    resources: ["events"]
+    verbs: ["create", "patch", "update"]
+  - apiGroups: [""]
+    resources: ["limitranges"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: [""]
+    resources: ["namespaces"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["delete", "get", "list", "patch", "update", "watch"]
+  - apiGroups: [""]
+    resources: ["pods/status"]
+    verbs: ["get", "patch", "update"]
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["get", "list", "watch"]
+  # Batch resources
+  - apiGroups: ["batch"]
+    resources: ["jobs"]
+    verbs: ["get", "list", "patch", "update", "watch"]
+  - apiGroups: ["batch"]
+    resources: ["jobs/status"]
+    verbs: ["get", "update"]
+  # Kueue resources
+  - apiGroups: ["kueue.x-k8s.io"]
+    resources: ["*"]
+    verbs: ["*"]
+  # Kubeflow training resources
+  - apiGroups: ["kubeflow.org"]
+    resources: ["pytorchjobs", "tfjobs"]
+    verbs: ["get", "list", "patch", "update", "watch"]
+  - apiGroups: ["kubeflow.org"]
+    resources: ["pytorchjobs/status", "tfjobs/status"]
+    verbs: ["get", "update"]
+  # Node resources for scheduling
+  - apiGroups: [""]
+    resources: ["nodes"]
+    verbs: ["get", "list", "watch"]
+  # AdmissionReview resources
+  - apiGroups: ["admissionregistration.k8s.io"]
+    resources: ["mutatingwebhookconfigurations", "validatingwebhookconfigurations"]
+    verbs: ["get", "list", "update", "watch"]
+
+---
+# ClusterRoleBinding for Kueue
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: kueue-manager-rolebinding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: kueue-manager-role
+subjects:
+  - kind: ServiceAccount
+    name: kueue-controller-manager
+    namespace: hyperpod-system

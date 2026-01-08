@@ -1,0 +1,181 @@
+# SageMaker Spaces Namespace and RBAC Configuration
+# This namespace hosts user development spaces (JupyterLab, VS Code)
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: sagemaker-spaces
+  labels:
+    app.kubernetes.io/name: sagemaker-spaces
+    app.kubernetes.io/component: development-environment
+    platform.ai/component: spaces
+    # Enable Kueue scheduling for spaces
+    kueue.x-k8s.io/queue-visibility: "default"
+
+---
+# Service Account for Spaces Controller
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: spaces-controller
+  namespace: sagemaker-spaces
+  labels:
+    app.kubernetes.io/name: spaces-controller
+
+---
+# ClusterRole for Spaces Controller
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: spaces-controller
+rules:
+  # Pod management
+  - apiGroups: [""]
+    resources: ["pods", "pods/exec", "pods/log", "pods/attach"]
+    verbs: ["*"]
+  # Service management
+  - apiGroups: [""]
+    resources: ["services", "endpoints"]
+    verbs: ["*"]
+  # ConfigMap and Secret management
+  - apiGroups: [""]
+    resources: ["configmaps", "secrets"]
+    verbs: ["*"]
+  # PVC management for persistent storage
+  - apiGroups: [""]
+    resources: ["persistentvolumeclaims"]
+    verbs: ["*"]
+  # Events
+  - apiGroups: [""]
+    resources: ["events"]
+    verbs: ["create", "patch"]
+  # Ingress management
+  - apiGroups: ["networking.k8s.io"]
+    resources: ["ingresses"]
+    verbs: ["*"]
+  # SageMaker Spaces CRDs
+  - apiGroups: ["sagemaker.aws"]
+    resources: ["spaces", "spaces/status"]
+    verbs: ["*"]
+
+---
+# ClusterRoleBinding for Spaces Controller
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: spaces-controller
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: spaces-controller
+subjects:
+  - kind: ServiceAccount
+    name: spaces-controller
+    namespace: sagemaker-spaces
+
+---
+# Service Account for User Spaces
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: space-user
+  namespace: sagemaker-spaces
+  labels:
+    app.kubernetes.io/name: space-user
+  annotations:
+    # IRSA annotation - will be updated with actual role ARN
+    eks.amazonaws.com/role-arn: "${SPACES_USER_ROLE_ARN}"
+
+---
+# Role for User Spaces
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: space-user
+  namespace: sagemaker-spaces
+rules:
+  # Read-only access to pods in their own namespace
+  - apiGroups: [""]
+    resources: ["pods", "pods/log"]
+    verbs: ["get", "list", "watch"]
+  # Access to their own PVCs
+  - apiGroups: [""]
+    resources: ["persistentvolumeclaims"]
+    verbs: ["get", "list"]
+  # Access to configmaps for configuration
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    verbs: ["get", "list"]
+
+---
+# RoleBinding for User Spaces
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: space-user
+  namespace: sagemaker-spaces
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: space-user
+subjects:
+  - kind: ServiceAccount
+    name: space-user
+    namespace: sagemaker-spaces
+
+---
+# Resource Quota for Spaces Namespace
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: spaces-quota
+  namespace: sagemaker-spaces
+  labels:
+    app.kubernetes.io/name: spaces-quota
+spec:
+  hard:
+    # Limit total CPU for all spaces
+    requests.cpu: "100"
+    limits.cpu: "200"
+    # Limit total memory for all spaces
+    requests.memory: "400Gi"
+    limits.memory: "800Gi"
+    # Limit GPU allocation for spaces
+    requests.nvidia.com/gpu: "8"
+    limits.nvidia.com/gpu: "8"
+    # Limit total storage
+    requests.storage: "10Ti"
+    persistentvolumeclaims: "100"
+    # Limit number of pods
+    pods: "100"
+
+---
+# LimitRange for individual Spaces
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: spaces-limits
+  namespace: sagemaker-spaces
+  labels:
+    app.kubernetes.io/name: spaces-limits
+spec:
+  limits:
+    - type: Container
+      default:
+        cpu: "4"
+        memory: "16Gi"
+      defaultRequest:
+        cpu: "2"
+        memory: "8Gi"
+      max:
+        cpu: "16"
+        memory: "128Gi"
+        nvidia.com/gpu: "1"
+      min:
+        cpu: "500m"
+        memory: "1Gi"
+    - type: PersistentVolumeClaim
+      max:
+        storage: "500Gi"
+      min:
+        storage: "10Gi"

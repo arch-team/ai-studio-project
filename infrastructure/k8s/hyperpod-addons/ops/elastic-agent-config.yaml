@@ -1,0 +1,256 @@
+# HyperPod Elastic Agent Configuration
+# Manages node health monitoring and automatic recovery
+# Reference: HyperPod Elastic Agent documentation
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: hyperpod-elastic-agent-config
+  namespace: hyperpod-system
+  labels:
+    app.kubernetes.io/name: hyperpod-elastic-agent
+    app.kubernetes.io/component: node-management
+data:
+  config.yaml: |
+    # Elastic Agent Configuration for HyperPod
+    agent:
+      version: "1.0.0"
+      cluster_name: "${CLUSTER_NAME}"
+
+    # Health Monitoring Settings
+    health_monitoring:
+      # Enable deep health checks
+      enabled: true
+
+      # Health check intervals
+      interval:
+        basic: 30s      # Basic health check interval
+        deep: 5m        # Deep health check interval
+        gpu: 1m         # GPU-specific health check interval
+
+      # Deep health check types
+      deep_health_checks:
+        instance_stress: true      # Check for instance stress
+        instance_connectivity: true # Check network connectivity
+        gpu_health: true           # Check GPU health
+        storage_health: true       # Check storage health
+
+      # Thresholds for health determination
+      thresholds:
+        cpu_utilization_critical: 95
+        memory_utilization_critical: 95
+        gpu_utilization_low_warning: 5   # Warn if GPU idle for too long
+        gpu_temperature_warning: 80      # °C
+        gpu_temperature_critical: 85     # °C
+        ecc_errors_warning: 10
+        ecc_errors_critical: 50
+
+    # Node Recovery Settings
+    node_recovery:
+      # Enable automatic node recovery
+      enabled: true
+      mode: "Automatic"
+
+      # Recovery actions
+      actions:
+        # Reboot node on recoverable failures
+        reboot_on_failure: true
+        # Replace node on hardware failures
+        replace_on_hardware_failure: true
+        # Drain workloads before recovery
+        drain_before_recovery: true
+
+      # Cooldown periods
+      cooldown:
+        reboot: 10m     # Minimum time between reboots
+        replace: 30m    # Minimum time between replacements
+
+      # Maximum recovery attempts
+      max_attempts:
+        reboot: 3
+        replace: 2
+
+      # Drain settings
+      drain:
+        timeout: 5m
+        grace_period: 30s
+        ignore_daemonsets: true
+        delete_emptydir_data: false
+
+    # Workload Protection
+    workload_protection:
+      # Protect running training jobs
+      enabled: true
+
+      # Grace period for checkpoint saving
+      checkpoint_grace_period: 5m
+
+      # Preemption handling
+      preemption:
+        # Notify workloads before preemption
+        notify_before_preemption: true
+        notification_lead_time: 2m
+
+    # Logging Configuration
+    logging:
+      level: info
+      format: json
+      outputs:
+        - type: cloudwatch
+          log_group: "/aws/hyperpod/${CLUSTER_NAME}/elastic-agent"
+          log_stream_prefix: "node-"
+        - type: stdout
+
+    # Metrics Configuration
+    metrics:
+      enabled: true
+      port: 9090
+      path: /metrics
+
+    # Integration with Kueue
+    kueue_integration:
+      enabled: true
+      # Mark nodes as unschedulable during recovery
+      cordon_on_recovery: true
+      # Trigger workload requeuing on node failure
+      requeue_on_failure: true
+
+---
+# DaemonSet for Elastic Agent
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: hyperpod-elastic-agent
+  namespace: hyperpod-system
+  labels:
+    app.kubernetes.io/name: hyperpod-elastic-agent
+    app.kubernetes.io/component: node-management
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: hyperpod-elastic-agent
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: hyperpod-elastic-agent
+        app.kubernetes.io/component: node-management
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9090"
+    spec:
+      serviceAccountName: hyperpod-elastic-agent
+      hostPID: true
+      hostNetwork: true
+      # Run on all nodes in the cluster
+      tolerations:
+        - operator: Exists
+      containers:
+        - name: elastic-agent
+          # Note: This is a placeholder image - actual HyperPod image will be used
+          image: public.ecr.aws/sagemaker/hyperpod-elastic-agent:latest
+          imagePullPolicy: Always
+          args:
+            - "--config=/etc/elastic-agent/config.yaml"
+          env:
+            - name: NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: CLUSTER_NAME
+              valueFrom:
+                configMapKeyRef:
+                  name: cluster-info
+                  key: cluster-name
+          ports:
+            - name: metrics
+              containerPort: 9090
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          volumeMounts:
+            - name: config
+              mountPath: /etc/elastic-agent
+              readOnly: true
+            - name: host-root
+              mountPath: /host
+              readOnly: true
+          securityContext:
+            privileged: true
+      volumes:
+        - name: config
+          configMap:
+            name: hyperpod-elastic-agent-config
+        - name: host-root
+          hostPath:
+            path: /
+
+---
+# Service Account for Elastic Agent
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: hyperpod-elastic-agent
+  namespace: hyperpod-system
+  labels:
+    app.kubernetes.io/name: hyperpod-elastic-agent
+
+---
+# ClusterRole for Elastic Agent
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: hyperpod-elastic-agent
+rules:
+  # Node management
+  - apiGroups: [""]
+    resources: ["nodes"]
+    verbs: ["get", "list", "watch", "patch", "update"]
+  - apiGroups: [""]
+    resources: ["nodes/status"]
+    verbs: ["get", "patch", "update"]
+  # Pod management for draining
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list", "watch", "delete"]
+  - apiGroups: [""]
+    resources: ["pods/eviction"]
+    verbs: ["create"]
+  # Events for logging
+  - apiGroups: [""]
+    resources: ["events"]
+    verbs: ["create", "patch"]
+  # ConfigMaps for configuration
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    verbs: ["get", "list", "watch"]
+  # Kueue integration
+  - apiGroups: ["kueue.x-k8s.io"]
+    resources: ["workloads"]
+    verbs: ["get", "list", "watch", "patch"]
+  # SageMaker HyperPod CRDs
+  - apiGroups: ["sagemaker.aws"]
+    resources: ["*"]
+    verbs: ["get", "list", "watch", "update", "patch"]
+
+---
+# ClusterRoleBinding for Elastic Agent
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: hyperpod-elastic-agent
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: hyperpod-elastic-agent
+subjects:
+  - kind: ServiceAccount
+    name: hyperpod-elastic-agent
+    namespace: hyperpod-system

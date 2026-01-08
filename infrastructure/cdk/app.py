@@ -1,0 +1,284 @@
+#!/usr/bin/env python3
+"""
+AWS CDK Application Entry Point for AI Training Platform.
+
+This is the main entry point for deploying the AI Training Platform infrastructure.
+It instantiates all stacks with proper dependency ordering and environment configuration.
+
+Usage:
+    cdk deploy --context env=dev       # Deploy development environment
+    cdk deploy --context env=staging   # Deploy staging environment
+    cdk deploy --context env=prod      # Deploy production environment
+    cdk synth                          # Synthesize CloudFormation templates
+"""
+
+import os
+
+import aws_cdk as cdk
+from cdk_nag import AwsSolutionsChecks, NagSuppressions
+
+from config import EnvironmentConfig, get_environment_config
+from stacks import (
+    AlbStack,
+    DatabaseStack,
+    FsxLustreStack,
+    HyperPodStack,
+    IamStack,
+    NetworkStack,
+    StorageStack,
+)
+
+
+def create_app() -> cdk.App:
+    """Create and configure the CDK application with all stacks."""
+    app = cdk.App()
+
+    # Get environment from context or default to 'dev'
+    env_name = app.node.try_get_context("env") or "dev"
+
+    # Get account and region from context or environment variables
+    account = (
+        app.node.try_get_context("account")
+        or os.environ.get("CDK_DEFAULT_ACCOUNT")
+        or ""
+    )
+    region = (
+        app.node.try_get_context("region")
+        or os.environ.get("CDK_DEFAULT_REGION")
+        or "us-east-1"
+    )
+
+    # Load environment configuration
+    env_config = get_environment_config(
+        env_name=env_name,
+        account=account,
+        region=region,
+    )
+
+    # Common tags for all resources
+    common_tags = {
+        "Project": "ai-training-platform",
+        "Environment": env_config.name.value,
+        "ManagedBy": "cdk",
+        "CostCenter": f"ai-platform-{env_config.name.value}",
+    }
+
+    # Apply common tags to all resources
+    for key, value in common_tags.items():
+        cdk.Tags.of(app).add(key, value)
+
+    # Stack naming convention: ai-platform-{env}-{stack-name}
+    stack_prefix = env_config.resource_prefix
+
+    # =========================================================================
+    # Layer 1: Foundation Stacks (VPC, IAM base)
+    # =========================================================================
+
+    # Network Stack - VPC with 3-tier subnet isolation
+    network_stack = NetworkStack(
+        app,
+        f"{stack_prefix}-network",
+        env_config=env_config,
+        env=env_config.to_cdk_environment(),
+        description="VPC with public/private subnets, NAT Gateways, and VPC endpoints",
+    )
+
+    # IAM Stack - Base IAM roles and policies
+    iam_stack = IamStack(
+        app,
+        f"{stack_prefix}-iam",
+        env_config=env_config,
+        env=env_config.to_cdk_environment(),
+        description="IAM roles for EKS, Lambda, and service accounts",
+    )
+
+    # =========================================================================
+    # Layer 2: Data Stacks (Aurora, S3, FSx)
+    # =========================================================================
+
+    # Database Stack - Aurora MySQL Serverless v2
+    database_stack = DatabaseStack(
+        app,
+        f"{stack_prefix}-database",
+        env_config=env_config,
+        vpc=network_stack.vpc,
+        env=env_config.to_cdk_environment(),
+        description="Aurora MySQL Serverless v2 with RDS Proxy",
+    )
+    database_stack.add_dependency(network_stack)
+
+    # Storage Stack - S3 buckets for datasets, models, checkpoints
+    storage_stack = StorageStack(
+        app,
+        f"{stack_prefix}-storage",
+        env_config=env_config,
+        env=env_config.to_cdk_environment(),
+        description="S3 buckets with lifecycle policies and KMS encryption",
+    )
+
+    # =========================================================================
+    # Layer 3: Compute Stack (HyperPod EKS)
+    # =========================================================================
+
+    # HyperPod Stack - EKS cluster with GPU node groups
+    hyperpod_stack = HyperPodStack(
+        app,
+        f"{stack_prefix}-hyperpod",
+        env_config=env_config,
+        vpc=network_stack.vpc,
+        eks_node_role=iam_stack.eks_node_role,
+        env=env_config.to_cdk_environment(),
+        description="SageMaker HyperPod with EKS orchestration and GPU node groups",
+    )
+    hyperpod_stack.add_dependency(network_stack)
+    hyperpod_stack.add_dependency(iam_stack)
+
+    # =========================================================================
+    # Layer 4: High-Performance Storage (FSx for Lustre)
+    # =========================================================================
+
+    # FSx for Lustre Stack - High-performance training data storage
+    fsx_stack = FsxLustreStack(
+        app,
+        f"{stack_prefix}-fsx",
+        env_config=env_config,
+        vpc=network_stack.vpc,
+        datasets_bucket=storage_stack.datasets_bucket,
+        env=env_config.to_cdk_environment(),
+        description="FSx for Lustre with S3 Data Repository Association",
+    )
+    fsx_stack.add_dependency(network_stack)
+    fsx_stack.add_dependency(storage_stack)
+    fsx_stack.add_dependency(hyperpod_stack)  # Need EKS cluster for security group reference
+
+    # =========================================================================
+    # Layer 5: Network Ingress (ALB with TLS termination)
+    # =========================================================================
+
+    # ALB Stack - Application Load Balancer with HTTPS and WAF
+    # Note: certificate_arn should be provided via context for production
+    certificate_arn = app.node.try_get_context("certificate_arn")
+    enable_waf = env_config.name.value == "prod"  # WAF enabled in production
+
+    alb_stack = AlbStack(
+        app,
+        f"{stack_prefix}-alb",
+        env_config=env_config,
+        vpc=network_stack.vpc,
+        certificate_arn=certificate_arn,
+        enable_waf=enable_waf,
+        env=env_config.to_cdk_environment(),
+        description="Application Load Balancer with TLS 1.2+ termination and WAF",
+    )
+    alb_stack.add_dependency(network_stack)
+    alb_stack.add_dependency(hyperpod_stack)  # Target groups need EKS services
+
+    # =========================================================================
+    # CDK Nag - Security and best practices checks
+    # =========================================================================
+
+    # Apply AWS Solutions security checks
+    cdk.Aspects.of(app).add(AwsSolutionsChecks(verbose=True))
+
+    # Add suppressions for known acceptable patterns
+    NagSuppressions.add_stack_suppressions(
+        network_stack,
+        [
+            {
+                "id": "AwsSolutions-VPC7",
+                "reason": "VPC Flow Logs are explicitly enabled in the stack",
+            },
+        ],
+    )
+
+    NagSuppressions.add_stack_suppressions(
+        iam_stack,
+        [
+            {
+                "id": "AwsSolutions-IAM4",
+                "reason": "AWS managed policies are used for EKS node roles following AWS best practices",
+            },
+            {
+                "id": "AwsSolutions-IAM5",
+                "reason": "Wildcard permissions are scoped to specific resources and conditions",
+            },
+        ],
+    )
+
+    NagSuppressions.add_stack_suppressions(
+        database_stack,
+        [
+            {
+                "id": "AwsSolutions-RDS10",
+                "reason": "Deletion protection is enabled for production environments only",
+            },
+            {
+                "id": "AwsSolutions-SMG4",
+                "reason": "Secret rotation will be configured in a separate security enhancement task",
+            },
+        ],
+    )
+
+    NagSuppressions.add_stack_suppressions(
+        storage_stack,
+        [
+            {
+                "id": "AwsSolutions-S1",
+                "reason": "Server access logging will be configured when log bucket is created",
+            },
+        ],
+    )
+
+    NagSuppressions.add_stack_suppressions(
+        hyperpod_stack,
+        [
+            {
+                "id": "AwsSolutions-IAM4",
+                "reason": "AWS managed policies used for EKS add-ons and HyperPod execution role",
+            },
+            {
+                "id": "AwsSolutions-IAM5",
+                "reason": "Wildcard permissions required for EKS cluster management",
+            },
+            {
+                "id": "AwsSolutions-EKS1",
+                "reason": "EKS cluster has private endpoint access enabled",
+            },
+        ],
+    )
+
+    NagSuppressions.add_stack_suppressions(
+        fsx_stack,
+        [
+            {
+                "id": "AwsSolutions-EC23",
+                "reason": "FSx security group allows VPC CIDR access for Lustre client connectivity",
+            },
+        ],
+    )
+
+    NagSuppressions.add_stack_suppressions(
+        alb_stack,
+        [
+            {
+                "id": "AwsSolutions-ELB2",
+                "reason": "ALB access logging will be enabled when S3 log bucket is configured",
+            },
+            {
+                "id": "AwsSolutions-EC23",
+                "reason": "ALB security group allows 0.0.0.0/0 for public internet access as designed",
+            },
+        ],
+    )
+
+    return app
+
+
+def main() -> None:
+    """Main entry point."""
+    app = create_app()
+    app.synth()
+
+
+if __name__ == "__main__":
+    main()

@@ -1,0 +1,224 @@
+# Monitoring Namespace Network Policies
+# Enables Prometheus scraping and Grafana dashboard access
+# Reference: spec.md FR-007/FR-016 (Observability)
+---
+# Allow Prometheus to scrape metrics from all namespaces
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: prometheus-egress
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/name: prometheus-egress
+    platform.ai/policy-type: allow
+spec:
+  podSelector:
+    matchLabels:
+      app: prometheus
+  policyTypes:
+    - Egress
+  egress:
+    # Allow scraping training-jobs namespace
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: training-jobs
+      ports:
+        - protocol: TCP
+          port: 9090  # Training job metrics
+        - protocol: TCP
+          port: 9400  # DCGM exporter
+    # Allow scraping kube-system
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+      ports:
+        - protocol: TCP
+          port: 9100  # Node exporter
+        - protocol: TCP
+          port: 10250 # Kubelet metrics
+        - protocol: TCP
+          port: 10255 # Kubelet read-only
+    # Allow scraping monitoring namespace itself
+    - to:
+        - podSelector: {}
+      ports:
+        - protocol: TCP
+          port: 9090
+        - protocol: TCP
+          port: 9093  # Alertmanager
+        - protocol: TCP
+          port: 9400  # DCGM exporter
+    # Allow scraping kueue-system
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kueue-system
+      ports:
+        - protocol: TCP
+          port: 8080  # Kueue metrics
+    # Allow scraping sagemaker-spaces
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: sagemaker-spaces
+      ports:
+        - protocol: TCP
+          port: 9090
+
+---
+# Allow Prometheus to receive remote write (if needed)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: prometheus-ingress
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/name: prometheus-ingress
+    platform.ai/policy-type: allow
+spec:
+  podSelector:
+    matchLabels:
+      app: prometheus
+  policyTypes:
+    - Ingress
+  ingress:
+    # Allow Grafana to query Prometheus
+    - from:
+        - podSelector:
+            matchLabels:
+              app: grafana
+      ports:
+        - protocol: TCP
+          port: 9090
+    # Allow Alertmanager to access Prometheus
+    - from:
+        - podSelector:
+            matchLabels:
+              app: alertmanager
+      ports:
+        - protocol: TCP
+          port: 9090
+
+---
+# Allow Grafana dashboard access
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: grafana-ingress
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/name: grafana-ingress
+    platform.ai/policy-type: allow
+spec:
+  podSelector:
+    matchLabels:
+      app: grafana
+  policyTypes:
+    - Ingress
+  ingress:
+    # Allow from ingress controller
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: ingress-nginx
+      ports:
+        - protocol: TCP
+          port: 3000
+
+---
+# Allow Grafana to query data sources
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: grafana-egress
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/name: grafana-egress
+    platform.ai/policy-type: allow
+spec:
+  podSelector:
+    matchLabels:
+      app: grafana
+  policyTypes:
+    - Egress
+  egress:
+    # Allow queries to Prometheus
+    - to:
+        - podSelector:
+            matchLabels:
+              app: prometheus
+      ports:
+        - protocol: TCP
+          port: 9090
+    # Allow queries to CloudWatch (via VPC endpoint)
+    - to:
+        - ipBlock:
+            cidr: 10.0.0.0/8
+      ports:
+        - protocol: TCP
+          port: 443
+
+---
+# Allow Alertmanager to send alerts
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: alertmanager-egress
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/name: alertmanager-egress
+    platform.ai/policy-type: allow
+spec:
+  podSelector:
+    matchLabels:
+      app: alertmanager
+  policyTypes:
+    - Egress
+  egress:
+    # Allow sending alerts to webhook endpoints
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except:
+              - 10.0.0.0/8    # Except internal VPC
+              - 172.16.0.0/12
+              - 192.168.0.0/16
+      ports:
+        - protocol: TCP
+          port: 443
+    # Allow to query Prometheus
+    - to:
+        - podSelector:
+            matchLabels:
+              app: prometheus
+      ports:
+        - protocol: TCP
+          port: 9090
+
+---
+# Allow DCGM exporter to be scraped
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: dcgm-exporter-ingress
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/name: dcgm-exporter-ingress
+    platform.ai/policy-type: allow
+spec:
+  podSelector:
+    matchLabels:
+      app: dcgm-exporter
+  policyTypes:
+    - Ingress
+  ingress:
+    # Allow Prometheus to scrape
+    - from:
+        - podSelector:
+            matchLabels:
+              app: prometheus
+      ports:
+        - protocol: TCP
+          port: 9400
