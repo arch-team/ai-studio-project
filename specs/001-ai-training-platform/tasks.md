@@ -27,7 +27,7 @@
 **关键产物**: SDK 方法签名参考文档、功能缺口分析、备选方案设计(如需)
 
 ### HyperPod SDK 方法验证
-- [ ] [T000] [P] HyperPod SDK 方法名验证 - 查阅 `sagemaker-hyperpod` SDK 官方文档,验证并记录正确的方法签名和参数：
+- [X] [T000] [P] HyperPod SDK 方法名验证 - 查阅 `sagemaker-hyperpod` SDK 官方文档,验证并记录正确的方法签名和参数：
   - **Training 模块**: 训练任务提交、状态查询、暂停/恢复/终止方法的准确方法名和签名
     - **状态信息完整性验证**: 验证 `get_training_job_status()` 返回值是否包含所有必需状态（Submitted/Running/Paused/Preempted/Completed/Failed）和状态转换所需的详细信息（抢占原因、失败分类、检查点路径等）。如状态信息不足以支持 spec.md Training Job State Model 的完整状态转换逻辑，记录缺口到 `docs/hyperpod-sdk-gaps.md` 并触发 T000-fallback
   - **Space 模块**: Space 创建、删除、查询方法的准确方法名和签名
@@ -45,7 +45,7 @@
     - **触发原因记录**: T000 执行者应详细记录触发原因、影响范围和备选方案建议到 `docs/hyperpod-sdk-gaps.md`
   - **参考**: [SageMaker HyperPod SDK Documentation](https://sagemaker-hyperpod-cli.readthedocs.io/)
   - **工作量估算**: 0.5 人日
-- [ ] [T000-fallback] HyperPod SDK 备选方案设计与 POC 验证 (条件任务,仅在 T000 发现 SDK 不可用时执行) - 设计并验证 boto3/kubernetes-client 备选方案:
+- [[X] [T000-fallback] HyperPod SDK 备选方案设计与 POC 验证 (条件任务,仅在 T000 发现 SDK 不可用时执行) - 设计并验证 boto3/kubernetes-client 备选方案:
   - **触发条件**: T000 验证发现 SDK 方法不存在、签名不符或功能不完整
   - **阶段 1: 备选方案分析** (0.5 人日)
     - 评估 boto3 (SageMaker API) 的可行性: 支持的训练任务管理 API、限制和约束
