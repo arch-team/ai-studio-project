@@ -218,7 +218,7 @@ class NetworkStack(cdk.Stack):
             ("SageMakerApi", ec2.InterfaceVpcEndpointAwsService.SAGEMAKER_API),
             ("SageMakerRuntime", ec2.InterfaceVpcEndpointAwsService.SAGEMAKER_RUNTIME),
             # EFS endpoint (required for SageMaker Spaces persistent storage)
-            ("Efs", ec2.InterfaceVpcEndpointAwsService.ELASTIC_FILE_SYSTEM),
+            ("Efs", ec2.InterfaceVpcEndpointAwsService.ELASTIC_FILESYSTEM),
             # SSM endpoints (for Systems Manager access)
             ("Ssm", ec2.InterfaceVpcEndpointAwsService.SSM),
             ("SsmMessages", ec2.InterfaceVpcEndpointAwsService.SSM_MESSAGES),

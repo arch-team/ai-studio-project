@@ -21,6 +21,7 @@ from aws_cdk import aws_eks as eks
 from aws_cdk import aws_iam as iam
 from aws_cdk import aws_s3 as s3
 from aws_cdk import aws_sagemaker as sagemaker
+from aws_cdk.lambda_layer_kubectl_v32 import KubectlV32Layer
 from constructs import Construct
 
 from config import EnvironmentConfig
@@ -137,7 +138,7 @@ class HyperPodStack(cdk.Stack):
             description="Admin role for EKS cluster management",
         )
 
-        # Create EKS cluster
+        # Create EKS cluster with official kubectl layer for K8s 1.32
         cluster = eks.Cluster(
             self,
             "EksCluster",
@@ -150,6 +151,8 @@ class HyperPodStack(cdk.Stack):
             default_capacity=0,  # We'll manage node groups separately
             endpoint_access=eks.EndpointAccess.PRIVATE,
             masters_role=cluster_admin_role,
+            # Official kubectl layer for K8s 1.32
+            kubectl_layer=KubectlV32Layer(self, "KubectlLayer"),
             # Cluster logging
             cluster_logging=[
                 eks.ClusterLoggingTypes.API,
@@ -178,47 +181,28 @@ class HyperPodStack(cdk.Stack):
         - CoreDNS - for DNS resolution
         - kube-proxy - for service networking
         """
-        # Create IAM role for EBS CSI driver
-        ebs_csi_role = iam.Role(
-            self,
-            "EbsCsiDriverRole",
-            role_name=f"{self.env_config.resource_prefix}-ebs-csi-role",
-            assumed_by=iam.FederatedPrincipal(
-                federated=self._eks_cluster.open_id_connect_provider.open_id_connect_provider_arn,
-                conditions={
-                    "StringEquals": {
-                        f"{self._eks_cluster.cluster_open_id_connect_issuer}:sub": "system:serviceaccount:kube-system:ebs-csi-controller-sa",
-                        f"{self._eks_cluster.cluster_open_id_connect_issuer}:aud": "sts.amazonaws.com",
-                    }
-                },
-                assume_role_action="sts:AssumeRoleWithWebIdentity",
-            ),
+        # Create service account for EBS CSI driver using EKS construct
+        # This handles IRSA configuration automatically
+        ebs_csi_sa = self._eks_cluster.add_service_account(
+            "EbsCsiServiceAccount",
+            name="ebs-csi-controller-sa",
+            namespace="kube-system",
         )
-        ebs_csi_role.add_managed_policy(
+        ebs_csi_sa.role.add_managed_policy(
             iam.ManagedPolicy.from_aws_managed_policy_name(
                 "service-role/AmazonEBSCSIDriverPolicy"
             )
         )
 
-        # Create IAM role for FSx CSI driver
-        fsx_csi_role = iam.Role(
-            self,
-            "FsxCsiDriverRole",
-            role_name=f"{self.env_config.resource_prefix}-fsx-csi-role",
-            assumed_by=iam.FederatedPrincipal(
-                federated=self._eks_cluster.open_id_connect_provider.open_id_connect_provider_arn,
-                conditions={
-                    "StringEquals": {
-                        f"{self._eks_cluster.cluster_open_id_connect_issuer}:sub": "system:serviceaccount:kube-system:fsx-csi-controller-sa",
-                        f"{self._eks_cluster.cluster_open_id_connect_issuer}:aud": "sts.amazonaws.com",
-                    }
-                },
-                assume_role_action="sts:AssumeRoleWithWebIdentity",
-            ),
+        # Create service account for FSx CSI driver
+        fsx_csi_sa = self._eks_cluster.add_service_account(
+            "FsxCsiServiceAccount",
+            name="fsx-csi-controller-sa",
+            namespace="kube-system",
         )
-        fsx_csi_role.add_managed_policy(
+        fsx_csi_sa.role.add_managed_policy(
             iam.ManagedPolicy.from_aws_managed_policy_name(
-                "service-role/AmazonFSxCSIDriverPolicy"
+                "AmazonFSxFullAccess"
             )
         )
 
@@ -229,7 +213,7 @@ class HyperPodStack(cdk.Stack):
             addon_name="aws-ebs-csi-driver",
             cluster_name=self._eks_cluster.cluster_name,
             addon_version="v1.28.0-eksbuild.1",
-            service_account_role_arn=ebs_csi_role.role_arn,
+            service_account_role_arn=ebs_csi_sa.role.role_arn,
             resolve_conflicts="OVERWRITE",
         )
 
@@ -240,7 +224,7 @@ class HyperPodStack(cdk.Stack):
             addon_name="aws-fsx-csi-driver",
             cluster_name=self._eks_cluster.cluster_name,
             addon_version="v1.9.0-eksbuild.1",
-            service_account_role_arn=fsx_csi_role.role_arn,
+            service_account_role_arn=fsx_csi_sa.role.role_arn,
             resolve_conflicts="OVERWRITE",
         )
 

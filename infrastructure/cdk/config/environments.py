@@ -128,8 +128,8 @@ class EnvironmentConfig:
             account=account,
             region=region,
             vpc=VpcConfig(
-                deployment_mode=DeploymentMode.SINGLE_AZ,
-                nat_gateways=1,
+                deployment_mode=DeploymentMode.MULTI_AZ,  # Aurora requires at least 2 AZs
+                nat_gateways=1,  # Single NAT for cost savings in dev
             ),
             database=DatabaseConfig(
                 min_acu=0.5,  # Can pause when idle

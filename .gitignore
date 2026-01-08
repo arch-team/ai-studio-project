@@ -114,6 +114,10 @@ junit.xml
 Thumbs.db
 .DS_Store
 
+# CDK
+cdk.out/
+cdk.context.json
+
 # Project specific
 backend/alembic/versions/*.pyc
 frontend/dist/
