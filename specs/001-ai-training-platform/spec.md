@@ -34,6 +34,7 @@
 | 用户 | User | `User` | `users` | `/users` | 自然语言描述、用户界面 |
 | 集群 | Cluster | `HyperPodCluster` | `hyperpod_clusters` | `/clusters` | 自然语言描述、用户界面 |
 | 审计日志 | Audit Log | `AuditLog` | `audit_logs` | `/audit-logs` | 自然语言描述、用户界面 |
+| 在线开发环境 | Space | `Space` | `development_spaces` | `/spaces` | SageMaker Spaces功能，用户界面显示"开发空间 (Space)" |
 
 ### 调度和资源管理术语
 
@@ -93,31 +94,37 @@ Kueue 作为 HyperPod Task Governance 的底层调度引擎，提供以下核心
 ### 命名规范
 
 **1. 自然语言描述** (规范文档、用户界面、日志消息)
-- **中文**: "训练任务"、"数据集"、"检查点"、"资源配额"
-- **英文**: "Training Job"、"Dataset"、"Checkpoint"、"Resource Quota" (首字母大写，空格分隔)
+- **中文**: "训练任务"、"数据集"、"检查点"、"资源配额"、"在线开发环境"或"开发空间"
+- **英文**: "Training Job"、"Dataset"、"Checkpoint"、"Resource Quota"、"Space" (首字母大写，空格分隔)
 - **使用场景**: spec.md 功能需求描述、tasks.md 任务说明、UI 界面文本、用户通知消息
+- **特殊说明 - 在线开发环境术语**:
+  - **文档首次出现**: "在线开发环境 (SageMaker Spaces)" (完整说明)
+  - **文档后续引用**: "Space"或"开发空间" (简化表述)
+  - **UI显示**: "开发空间 (Space)" (中英文结合，用户友好)
+  - **避免使用**: "IDE"、"在线IDE"、"Jupyter环境" (过于宽泛或技术细节)
 
 **2. 代码实现** (Python 类、函数、变量)
-- **类名**: `TrainingJob`、`Dataset`、`Checkpoint`、`ResourceQuota` (PascalCase)
-- **变量/函数**: `training_job`、`dataset`、`checkpoint`、`resource_quota` (snake_case)
-- **常量**: `TRAINING_JOB_STATUS`、`MAX_RETRY_COUNT`、`DEFAULT_PRIORITY` (UPPER_SNAKE_CASE)
-- **模块名**: `training_job_service.py`、`dataset_repository.py` (小写 + 下划线)
+- **类名**: `TrainingJob`、`Dataset`、`Checkpoint`、`ResourceQuota`、`Space` (PascalCase)
+- **变量/函数**: `training_job`、`dataset`、`checkpoint`、`resource_quota`、`space` (snake_case)
+- **常量**: `TRAINING_JOB_STATUS`、`MAX_RETRY_COUNT`、`DEFAULT_PRIORITY`、`SPACE_STATUS` (UPPER_SNAKE_CASE)
+- **模块名**: `training_job_service.py`、`dataset_repository.py`、`space_service.py` (小写 + 下划线)
 
 **3. 数据库** (MySQL 表、列)
-- **表名**: `training_jobs`、`datasets`、`checkpoints`、`resource_quotas` (小写复数 + 下划线)
-- **列名**: `job_name`、`dataset_uri`、`checkpoint_path`、`quota_type` (小写 + 下划线)
-- **索引名**: `idx_training_jobs_status`、`idx_users_email` (小写 + 下划线)
+- **表名**: `training_jobs`、`datasets`、`checkpoints`、`resource_quotas`、`development_spaces` (小写复数 + 下划线)
+- **列名**: `job_name`、`dataset_uri`、`checkpoint_path`、`quota_type`、`space_name` (小写 + 下划线)
+- **索引名**: `idx_training_jobs_status`、`idx_users_email`、`idx_development_spaces_owner_id` (小写 + 下划线)
+- **特殊说明**: Space实体表名使用`development_spaces`而非`spaces`，避免与SQL保留字和通用词冲突
 
 **4. API 接口** (RESTful URL 路径)
-- **资源路径**: `/training-jobs`、`/datasets`、`/checkpoints`、`/resource-quotas` (小写复数 + 短横线)
-- **操作路径**: `/training-jobs/{id}/pause`、`/datasets/{id}/versions` (小写 + 短横线)
-- **查询参数**: `?job_id=123&status=running&owner_id=456` (小写 + 下划线)
+- **资源路径**: `/training-jobs`、`/datasets`、`/checkpoints`、`/resource-quotas`、`/spaces` (小写复数 + 短横线)
+- **操作路径**: `/training-jobs/{id}/pause`、`/datasets/{id}/versions`、`/spaces/{id}/start` (小写 + 短横线)
+- **查询参数**: `?job_id=123&status=running&owner_id=456&space_type=jupyter` (小写 + 下划线)
 
 **5. 前端代码** (TypeScript/React)
-- **接口类型**: `TrainingJob`、`Dataset`、`Checkpoint` (PascalCase)
-- **变量/函数**: `trainingJob`、`dataset`、`checkpoint` (camelCase)
-- **组件名**: `TrainingJobList`、`DatasetUploader`、`CheckpointViewer` (PascalCase)
-- **文件名**: `TrainingJobList.tsx`、`DatasetUploader.tsx` (PascalCase)
+- **接口类型**: `TrainingJob`、`Dataset`、`Checkpoint`、`Space` (PascalCase)
+- **变量/函数**: `trainingJob`、`dataset`、`checkpoint`、`space` (camelCase)
+- **组件名**: `TrainingJobList`、`DatasetUploader`、`CheckpointViewer`、`SpaceManager` (PascalCase)
+- **文件名**: `TrainingJobList.tsx`、`DatasetUploader.tsx`、`SpaceManager.tsx` (PascalCase)
 
 ### 状态和枚举值
 
@@ -258,6 +265,18 @@ POST /api/v1/training-jobs
 GET /api/v1/training-jobs?status=running&owner_id=user123
 ```
 
+### 平台特征术语
+
+| 中文术语 | 英文术语 | 技术定义 | 对应需求 |
+|---------|---------|---------|----------|
+| 企业级 | Enterprise-grade | 满足企业环境下大规模、高可靠、安全合规要求的平台能力，具体包括：(1)多租户资源隔离和配额管理 (2)系统可用性≥99% (3)企业身份系统集成 (SSO/SAML/OIDC) (4)100%关键操作审计追踪 (5)数据加密和细粒度权限控制 (6)支持≥1000并发用户 | FR-008 (多租户), SC-003 (可用性), FR-015 (SSO), FR-017 (审计), FR-018 (加密), SC-007 (规模) |
+
+**术语使用场景**:
+- **对外宣传**: "企业级AI训练平台"强调平台能力符合企业标准
+- **技术验收**: 验收时必须满足上述6项技术要求，缺一不可
+- **销售材料**: 可引用具体 FR 和 SC 编号作为企业级能力证明
+- **避免滥用**: 禁止将"企业级"用于不满足上述要求的功能或组件
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - 算法工程师提交和监控分布式训练任务 (Priority: P1)
@@ -290,6 +309,17 @@ GET /api/v1/training-jobs?status=running&owner_id=user123
 1. **Given** 数据工程师已登录平台，**When** 上传10GB大文件数据集，**Then** 系统支持断点续传并将数据保存到分布式存储
 2. **Given** 现有数据集已存在，**When** 数据工程师创建新版本并标记，**Then** 系统保存新版本并记录版本差异
 3. **Given** 算法工程师创建训练任务，**When** 选择特定版本的数据集，**Then** 系统正确关联数据集并在训练时提供高速访问（单任务数据读取吞吐量≥5GB/s，基于FSx for Lustre单客户端访问能力）
+   - **性能测试方法**: 在训练 Pod 中运行 `fio` 基准测试工具，模拟训练任务从 FSx 挂载点顺序读取数据集文件
+   - **测试命令**: `fio --name=dataset-read --rw=read --bs=1M --iodepth=64 --runtime=60 --numjobs=1 --direct=1 --filename=/fsx/datasets/test-10gb.bin --size=10G`
+   - **测试参数说明**:
+     - `--rw=read`: 顺序读取模式（模拟训练任务加载数据集）
+     - `--bs=1M`: 块大小 1MB（典型训练数据加载块大小）
+     - `--iodepth=64`: 队列深度 64（异步 I/O 并发请求数）
+     - `--runtime=60`: 持续测试 60 秒
+     - `--direct=1`: 绕过操作系统缓存，测试真实存储性能
+   - **通过标准**: 平均读取吞吐量（BW mean）≥5000 MB/s（5GB/s）
+   - **测试任务引用**: 详见 tasks.md T008e "FSx for Lustre 性能验证" 部分的单客户端测试场景
+   - **测试环境要求**: 使用与训练任务相同的实例类型（如 ml.g5.xlarge）确保网络带宽一致性
 
 ---
 
@@ -333,11 +363,17 @@ GET /api/v1/training-jobs?status=running&owner_id=user123
 **Why this priority**: 在线开发环境提供了便捷的实验能力，但作为辅助功能优先级低于核心训练和数据管理功能。
 
 **资源限制说明**:
-- **GPU 类型**: 支持 ml.g5.xlarge (1x NVIDIA A10G) 或 ml.g5.2xlarge (1x NVIDIA A10G) 实例
-- **会话超时**: 空闲 1 小时自动关闭，最长运行时间 8 小时
-- **存储配额**: 每用户 50GB EBS 存储（持久化环境），可访问共享 FSx for Lustre 数据集
-- **并发限制**: 每用户同时运行 1 个开发环境实例
-- **配额计算**: 开发环境资源消耗计入用户资源配额（参见 FR-008）
+- **实例类型选项**:
+  - **ml.g5.xlarge** (默认): 4 vCPU, 16 GB 内存, 1x NVIDIA A10G (24GB 显存)
+  - **ml.g5.2xlarge**: 8 vCPU, 32 GB 内存, 1x NVIDIA A10G (24GB 显存)
+- **默认实例类型**: ml.g5.xlarge (成本优化，适合小规模实验和代码调试)
+- **CPU 配额**: 4 vCPU (ml.g5.xlarge) 或 8 vCPU (ml.g5.2xlarge)，计入用户 CPU 总配额
+- **内存配额**: 16 GB (ml.g5.xlarge) 或 32 GB (ml.g5.2xlarge)，计入用户内存总配额
+- **GPU 配额**: 1x NVIDIA A10G (24GB 显存)，计入用户 GPU 总配额，权重=1.0 (与训练任务 GPU 等价)
+- **存储配额**: 每用户 50GB EBS 持久化存储 (保存笔记本、代码、环境配置) + 共享 FSx for Lustre 数据集只读访问
+- **会话超时**: 空闲 1 小时自动关闭，最长连续运行时间 8 小时 (防止资源浪费)
+- **并发限制**: 每用户同时运行 1 个开发环境实例 (Space)
+- **配额计算**: Space 资源消耗完全计入用户整体资源配额 (FR-008)，GPU/CPU/内存均按实际使用计费
 
 **Independent Test**: 可以通过算法工程师登录在线环境，创建笔记本并运行GPU加速代码来验证。提供独立价值：实现快速实验能力。
 
@@ -824,6 +860,23 @@ training_job_failures_total{failure_category="..."}
   - **恢复优先级**: 被抢占任务保持原优先级重新排队（高优先级被抢占任务优先恢复）
   - **恢复失败处理**: 若连续 3 次恢复失败，任务状态转为 Failed（参见状态模型连续抢占失败逻辑）
   - **优先级机制**: (1)**完全采用SageMaker HyperPod Task Governance (基于 Kueue) 原生优先级规则** (2)三级优先级使用 Kueue PriorityClass: high/medium/low (3)同级任务排序依照HyperPod默认策略(基于提交时间和资源需求) (4)抢占规则遵循HyperPod原生行为,包括冷却期和最大抢占次数限制
+  - **优先级数值映射** (Kueue Priority配置):
+
+    | 逻辑优先级 | Kueue Priority值 | Kubernetes PriorityClass | 使用场景 |
+    |-----------|-----------------|-------------------------|---------|
+    | low       | 100             | training-priority-low   | 基础训练任务、实验性训练 |
+    | medium    | 500             | training-priority-medium| 常规生产任务、模型微调 |
+    | high      | 1000            | training-priority-high  | 紧急任务、关键业务训练 |
+
+    **数值范围说明**:
+    - 使用 0-1000 范围，预留未来扩展空间（如增加 critical=1500 层级）
+    - high=1000 为最高优先级，可抢占 medium 和 low 任务
+    - medium=500 可抢占 low 任务，不可抢占 high 任务
+    - low=100 为最低优先级，可被任何更高优先级任务抢占
+    - 优先级间隔足够大（400-500），便于未来插入新的优先级层级
+    - PriorityClass 名称遵循 `training-priority-{level}` 命名规范
+
+    **配置位置**: Phase 1 IaC 任务 T008d-1 负责创建 Kubernetes PriorityClass 资源
   - 🔧 **实施约束**: MUST 使用 HyperPod Task Governance (Kueue) 的原生抢占机制。
     任务优先级配置：通过 `sagemaker-hyperpod.training` 模块提交训练任务时，在任务配置中指定优先级参数（high/medium/low）。
     抢占状态监控：底层 Kueue Workload 状态驱动抢占流程（详见 Training Job State Model 章节），通过 `get_training_job_status()` 方法获取抢占状态。
@@ -908,6 +961,22 @@ training_job_failures_total{failure_category="..."}
     - 记录频率：推荐每个 epoch 或每 100 steps 记录一次 (避免过于频繁)
     - 批量记录：使用 `mlflow.log_metrics()` 批量记录多个指标 (而非多次调用 `log_metric()`)
     - 异步记录：MLflow 客户端内部已实现异步上报，用户无需额外处理
+
+    **MLflow 集成质量要求**:
+    - **记录成功率**: MLflow API 调用成功率 ≥99.9%（基于 SageMaker Managed MLflow 的高可用性保证，排除网络中断、服务故障等外部因素）
+    - **失败重试机制**: MLflow 客户端自动重试失败的记录操作，重试策略如下:
+      - 最大重试次数: 3 次
+      - 重试间隔: 指数退避 (1s → 2s → 4s)
+      - 可重试错误: 网络超时 (timeout)、临时服务不可用 (503 Service Unavailable)、限流错误 (429 Too Many Requests)
+      - 不可重试错误: 认证失败 (401 Unauthorized)、权限不足 (403 Forbidden)、参数错误 (400 Bad Request)
+    - **记录延迟要求**: 训练脚本调用 `mlflow.log_metric()` 后，指标在 30 秒内（P95）在 MLflow UI 可查询（符合 FR-007 性能要求）
+    - **异常处理策略**: MLflow 记录失败不应影响训练任务继续执行，具体处理如下:
+      - 记录失败时在训练日志中输出警告信息（包含失败原因和重试次数）
+      - 失败的指标数据缓存到本地日志文件（`/tmp/mlflow-backup-{job_id}.jsonl`），供事后手动恢复
+      - 训练任务继续执行，不因 MLflow 记录失败而中断或标记为 Failed
+      - 后台异步重试机制确保最终一致性（在训练任务完成前尝试重新上报缓存数据）
+    - **测试验证**: 通过模拟 MLflow 服务不可用场景（断开网络连接、停止 MLflow Server），验证训练任务仍能正常完成且指标已缓存到本地
+    - **监控指标**: 系统监控 MLflow 记录成功率和重试次数，当成功率 <99% 时触发告警
 
 - **FR-008**: 系统必须实现多租户隔离，支持按部门/项目分配资源配额
   - 🔧 **实施约束**: MUST 使用 HyperPod Task Governance API 管理资源配额。
@@ -1009,6 +1078,208 @@ training_job_failures_total{failure_category="..."}
   - **震荡型训练处理**: 用户可在训练配置中设置 `disable_stall_detection: true` 禁用检测（适用于 GAN/RL 等场景）
 
   触发后发送告警并提供自动/手动终止选项
+
+### Non-Functional Requirements
+
+- **NFR-001**: **FSx for Lustre 容量规划公式** - 系统必须根据以下公式计算 FSx for Lustre 文件系统容量，确保满足训练数据存储和并发访问需求：
+
+  **容量计算公式**:
+  ```
+  FSx 容量 (TiB) = MAX(
+    10 TiB,  # 最低基线容量（符合 spec.md FR-007 ≥10TB 数据集需求）
+    MAX(dataset_size) × 1.5,  # 最大单个数据集容量 + 50% 缓冲（预留数据预处理、增强、临时文件空间）
+    concurrent_jobs × avg_dataset_size × 1.2  # 并发训练任务需求 + 20% 缓冲（考虑多租户并发访问）
+  )
+  ```
+
+  **容量规划示例**:
+  ```
+  场景 1 - 小规模训练:
+  - 最大数据集 = 8 TiB
+  - 并发训练任务 = 3
+  - 平均数据集大小 = 5 TiB
+  → FSx 容量 = MAX(10, 8×1.5, 3×5×1.2) = MAX(10, 12, 18) = 18 TiB
+
+  场景 2 - 中规模训练:
+  - 最大数据集 = 15 TiB
+  - 并发训练任务 = 5
+  - 平均数据集大小 = 8 TiB
+  → FSx 容量 = MAX(10, 15×1.5, 5×8×1.2) = MAX(10, 22.5, 48) = 48 TiB
+
+  场景 3 - 大规模训练:
+  - 最大数据集 = 30 TiB
+  - 并发训练任务 = 10
+  - 平均数据集大小 = 12 TiB
+  → FSx 容量 = MAX(10, 30×1.5, 10×12×1.2) = MAX(10, 45, 144) = 144 TiB（接近 FSx 单文件系统 160 TiB 限制，需考虑多文件系统架构）
+  ```
+
+  **容量调整策略**:
+  - **自动扩容触发**: FSx 使用率 >80% 时触发自动扩容（参见 FR-020）
+  - **扩容增量**: 每次扩容增加当前容量的 20%（最小 10 TiB 增量）
+  - **最大容量限制**: 单个 FSx for Lustre 文件系统最大支持 160 TiB（AWS 服务限制），超出需部署多文件系统架构
+  - **成本优化**: 定期审查数据集使用情况，清理过期数据集版本，避免容量浪费
+
+  **吞吐量验证**:
+  - 默认配置：500 MB/s/TiB 吞吐量级别（成本优化）
+  - 吞吐量计算：容量 (TiB) × 500 MB/s = 总吞吐量
+  - 基线验证：48 TiB × 500 MB/s = 24 GB/s（远超 spec.md FR-007 单任务 ≥5GB/s 基线）
+  - 性能不足时：升级到 1000 MB/s/TiB 吞吐量级别（参见 tasks.md T008e 性能调优方案）
+
+  **实施位置**: Phase 1 IaC 任务 T008e 负责根据此公式配置 FSx 文件系统初始容量
+
+## API Design Standards
+
+### API 版本控制策略
+
+**版本格式**: `/api/v{major}/...` (major 为主版本号，当前系统使用 v1)
+
+**版本号语义**:
+- **主版本号 (major)**: 不兼容变更时递增（删除字段、修改响应结构、修改业务逻辑语义）
+- **次版本号**: 不使用（简化版本管理，避免 URL 路径复杂化）
+- **修订号**: 不使用（后端热修复不影响 API 契约）
+
+**版本升级触发条件**:
+1. **不兼容变更**:
+   - 删除或重命名 API 端点
+   - 删除或重命名请求/响应字段
+   - 修改字段数据类型（如 string → integer）
+   - 修改业务逻辑导致响应语义变化（如错误码含义变更）
+2. **安全漏洞修复**: 修复需要破坏性变更的安全问题
+3. **重大架构重构**: 底层实现完全重写，无法保证兼容性
+
+**版本并存策略**:
+- **并存期**: 新旧版本（如 v1 和 v2）同时支持至少 **6 个月**
+- **废弃通知**: 新版本发布时，旧版本 API 响应包含以下 HTTP 标头:
+  ```
+  Deprecation: true
+  Sunset: Sat, 31 Dec 2024 23:59:59 GMT
+  Link: </api/v2/training-jobs>; rel="successor-version"
+  ```
+- **强制下线**: 并存期结束后，旧版本 API 返回 HTTP 410 Gone 状态码并提供迁移指南链接
+
+**向后兼容性保证**:
+- **同一主版本内** (如 v1.x) 保证向后兼容:
+  - ✅ 允许: 新增 API 端点、新增请求参数（必须为可选）、新增响应字段
+  - ❌ 禁止: 删除或重命名端点、删除或重命名字段、修改字段类型、修改业务逻辑语义
+- **字段演进规则**:
+  - 新增字段必须为可选（nullable 或有默认值）
+  - 已有字段的验证规则只能放宽，不能收紧（如从 maxLength=50 放宽到 maxLength=100）
+- **错误码稳定性**: HTTP 状态码和错误码（如 `INSUFFICIENT_QUOTA`）不得修改语义
+
+**版本协商机制**:
+- **URL 路径指定** (强制): 客户端必须在 URL 中显式指定版本（如 `/api/v1/training-jobs`）
+- **不支持 Accept 标头协商**: 简化服务端实现，避免内容协商复杂性
+- **默认版本**: 不提供默认版本（如 `/api/training-jobs`），强制客户端显式指定版本
+
+**版本文档管理**:
+- **API 文档版本化**: 每个主版本维护独立 OpenAPI 规范文档（`openapi-v1.yaml`, `openapi-v2.yaml`）
+- **变更日志**: 维护 `CHANGELOG.md` 记录每个版本的新增、修改、废弃内容
+- **迁移指南**: 发布新主版本时提供详细迁移指南（`MIGRATION_v1_to_v2.md`）
+
+**实施要求**:
+- Phase 2 所有 API 端点实现 MUST 遵循此版本控制策略（参见 tasks.md T020-T026, T029-T032 等 API 端点任务）
+- API 响应 MUST 包含 `X-API-Version: v1` 标头用于调试和监控
+- 监控系统 MUST 跟踪各版本 API 调用量，支持废弃决策
+
+**版本管理示例**:
+
+```markdown
+场景 1 - 新增可选字段 (向后兼容，保持 v1):
+  变更前: {"job_id": "123", "status": "Running"}
+  变更后: {"job_id": "123", "status": "Running", "priority": "high"}  # 新增可选字段
+  版本: 保持 v1，客户端无需修改
+
+场景 2 - 修改字段类型 (不兼容，升级到 v2):
+  v1: {"gpu_count": "4"}  # 字符串类型
+  v2: {"gpu_count": 4}    # 整数类型
+  处理: 发布 v2，v1 和 v2 并存 6 个月，v1 返回 Deprecation 标头
+
+场景 3 - 删除端点 (不兼容，升级到 v2):
+  v1: DELETE /api/v1/training-jobs/{id}/force-stop
+  v2: 删除此端点，合并到 DELETE /api/v2/training-jobs/{id}?force=true
+  处理: 发布 v2，v1 并存 6 个月后下线
+```
+
+### API 分页标准
+
+**适用范围**: 所有返回列表数据的 GET 端点 MUST 支持分页（如 `/training-jobs`, `/datasets`, `/spaces`）
+
+**请求参数** (查询字符串):
+- **page**: 页码，从 1 开始，默认值 `1`
+  - 类型: 正整数
+  - 验证: 必须 ≥1，超出范围时返回空结果而非错误
+- **page_size**: 每页记录数，默认值 `20`
+  - 类型: 正整数
+  - 范围: 1 ≤ page_size ≤ 100
+  - 验证: 超过 100 时自动截断为 100
+- **示例**: `GET /api/v1/training-jobs?page=2&page_size=50`
+
+**响应格式** (JSON):
+```json
+{
+  "items": [
+    {"id": "job-101", "name": "bert-training", "status": "Running"},
+    {"id": "job-102", "name": "gpt-training", "status": "Completed"}
+  ],
+  "pagination": {
+    "total": 156,          // 符合过滤条件的总记录数
+    "page": 2,             // 当前页码
+    "page_size": 50,       // 当前每页数量
+    "total_pages": 4       // 总页数（向上取整: ceil(total / page_size)）
+  }
+}
+```
+
+**字段说明**:
+- **items**: 当前页的数据数组，类型根据端点而定（训练任务、数据集、空间等）
+- **pagination.total**: 符合过滤条件的总记录数（不是数据库总记录数，而是经过 filter 后的总数）
+- **pagination.page**: 回显请求的页码，用于前端验证
+- **pagination.page_size**: 回显请求的每页数量
+- **pagination.total_pages**: 计算得出的总页数，便于前端渲染分页组件
+
+**边界情况处理**:
+1. **空结果集**: 当 total=0 时
+   ```json
+   {"items": [], "pagination": {"total": 0, "page": 1, "page_size": 20, "total_pages": 0}}
+   ```
+2. **page 超出范围**: 当 page > total_pages 时
+   ```json
+   {"items": [], "pagination": {"total": 156, "page": 10, "page_size": 20, "total_pages": 8}}
+   ```
+   - 返回 HTTP 200 OK（不是 404），items 为空数组，pagination 包含正确的元数据
+3. **无效参数**: 当 page < 1 或 page_size < 1 时
+   - 返回 HTTP 400 Bad Request，错误消息: `"page must be >= 1"` 或 `"page_size must be between 1 and 100"`
+
+**与过滤和排序结合**:
+```
+GET /api/v1/training-jobs?status=Running&owner_id=user123&sort_by=created_at&order=desc&page=1&page_size=20
+```
+- 先应用过滤 (status, owner_id)
+- 再应用排序 (sort_by, order)
+- 最后应用分页 (page, page_size)
+- pagination.total 返回符合过滤条件的记录总数
+
+**性能要求**:
+- 分页查询响应时间 P99 < 500ms（包括过滤和排序）
+- 数据库查询 MUST 使用 LIMIT/OFFSET（避免全表扫描）
+- 大表 MUST 创建适当的索引（如 `idx_training_jobs_created_at` 支持排序）
+
+**前端集成指南**:
+- 使用 AWS Cloudscape `Pagination` 组件实现分页 UI
+- 示例代码参考: `frontend/src/components/DataTable.tsx`
+- 分页组件配置:
+  ```typescript
+  <Pagination
+    currentPageIndex={pagination.page}
+    pagesCount={pagination.total_pages}
+    onChange={({ detail }) => fetchData(detail.currentPageIndex)}
+  />
+  ```
+
+**实施要求**:
+- 所有列表 API 端点 (T022, T029, T031, T044, T054, T061, T082, T088) MUST 遵循此分页标准
+- 后端 API 响应 MUST 包含完整的 pagination 元数据
+- 前端数据表格组件 MUST 支持分页交互
 
 ### Key Entities
 

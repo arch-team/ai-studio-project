@@ -2,7 +2,7 @@
 
 ## 概述
 
-本文档包含企业级AI训练平台的完整实施任务清单,共计 155 个任务,按用户故事和优先级组织。
+本文档包含企业级AI训练平台的完整实施任务清单,共计 159 个任务,按用户故事和优先级组织。
 
 **技术栈**:
 - 后端: Python 3.11, FastAPI 0.109+, SQLAlchemy 2.0+, Alembic, sagemaker-hyperpod SDK (包含 Space 模块), boto3 (AWS SDK for S3/CloudWatch/IAM 等非 HyperPod 服务)
@@ -34,7 +34,9 @@
   - **Cluster 模块**: 集群状态查询、节点列表方法的准确方法名和签名
   - **输出产物**:
     - `docs/hyperpod-sdk-reference.md`: SDK 方法签名参考文档,包含示例代码和参数说明
-    - `docs/hyperpod-sdk-gaps.md`: SDK 功能缺口分析(如有缺口)
+    - `docs/hyperpod-sdk-capability-matrix.md`: SDK 能力矩阵（填充 plan.md 中定义的功能-工具矩阵，每个功能注明最佳实现工具和选型依据）
+    - `docs/technical-decision-guideline.md`: 技术选型决策指南（开发时查阅的 SDK/boto3/CLI/kubectl 选型标准和最佳实践）
+    - `docs/hyperpod-sdk-gaps.md`: SDK 功能缺口分析(如有缺口,列出需要降级使用 boto3/CLI/kubectl 的场景)
   - **风险评估**: 如发现 SDK 方法不可用或签名不符,立即触发 T000-fallback 任务
     - **触发条件说明**:
       - "方法不存在": 核心方法（create/get/pause/resume/terminate）在 SDK 中找不到
@@ -227,7 +229,7 @@
 ### HyperPod Add-ons 安装
 - [ ] [T008d-1] [P] 训练核心组件安装 - `infrastructure/k8s/hyperpod-addons/training/`,安装训练调度核心组件:
   - **Training Operator**: 安装 HyperPod Training Operator (PyTorchJob, TensorFlowJob CRD),配置训练框架支持 (PyTorch DDP/FSDP/DeepSpeed ZeRO),验证 Webhook 就绪
-  - **Task Governance (Kueue)**: 安装 Kueue 资源调度器,创建 ClusterQueue 和 LocalQueue,配置三级优先级 (PriorityClass: high/medium/low，与 spec.md 保持一致),配置 Gang Scheduling (默认 60 秒超时,可配置)
+  - **Task Governance (Kueue)**: 安装 Kueue 资源调度器,创建 ClusterQueue 和 LocalQueue,创建三级 Kubernetes PriorityClass 资源 (training-priority-low: 100, training-priority-medium: 500, training-priority-high: 1000，遵循 spec.md FR-004 优先级数值映射),配置 Gang Scheduling (默认 60 秒超时,可配置)
   - **抢占策略**: 完全遵循 Kueue 原生抢占行为,不做自定义扩展。具体参数 (冷却期、借用策略等) 以 HyperPod Task Governance 默认配置为准,参见 [Kueue Preemption Documentation](https://kueue.sigs.k8s.io/docs/concepts/preemption/)
   - **验证测试**: 提交测试 PyTorchJob (single-node hello-world),验证 Job 状态转换为 Succeeded,验证 Kueue Workload 调度生效,验证 Training Operator Webhook 响应 (curl localhost:9443/healthz)
   - **依赖**: T008c-1, T008c-2, T008c-3 (HyperPod EKS 集群完整配置)
@@ -247,7 +249,7 @@
 ### FSx for Lustre 文件系统创建
 - [ ] [T008e] [P] FSx for Lustre Stack - `infrastructure/cdk/lib/fsx-stack.ts`,创建 Amazon FSx for Lustre 高性能文件系统:
   - **文件系统配置**: 创建 FSx for Lustre 文件系统,配置 Persistent_2 部署类型 (持久化存储),默认使用 500 MB/s/TiB 吞吐量级别 (配合 10 TiB 容量可达 5 GB/s，满足 spec.md ≥5GB/s 基线需求)。成本优化策略：500 MB/s/TiB 相比 1000 MB/s/TiB 节省约 50% 成本 (~$6,500/月)，适用于大多数训练场景 (单任务 GPU ≤8)。性能不达标时可通过调优方案升级到 1000 MB/s/TiB (参见性能验证部分)
-  - **容量规划**: 初始容量 ≥10 TiB (支持 spec.md FR-007 ≥10TB 数据集需求),启用自动扩容策略 (使用率 >80% 触发扩容),最大容量 100 TiB
+  - **容量规划**: 根据 spec.md NFR-001 FSx 容量规划公式计算初始容量 (公式: MAX(10 TiB, MAX(dataset_size)×1.5, concurrent_jobs×avg_dataset_size×1.2))。建议初始容量配置:小规模训练 18 TiB、中规模训练 48 TiB、大规模训练 144 TiB。启用自动扩容策略 (使用率 >80% 触发扩容，每次扩容增加当前容量 20%，最小增量 10 TiB),最大容量 160 TiB (AWS FSx 单文件系统限制)
   - **S3 集成**: 配置 S3 Data Repository Association,链接训练数据 S3 存储桶 (T008b 创建),启用自动导入/导出 (ImportPath, ExportPath),配置 AutoImportPolicy (NEW/CHANGED/DELETED 事件自动同步)
   - **网络配置**: 部署到 T008b 创建的 VPC 私有子网,配置安全组 (允许 EKS 节点访问 FSx 端口 988, 1021-1023),启用 VPC 内 DNS 解析
   - **FSx CSI Driver**: 使用 T008c-1 中已安装的 AWS FSx CSI Driver,创建 StorageClass (provisioner: fsx.csi.aws.com, parameters: dnsname/mountname),配置 PersistentVolume 自动创建
@@ -312,7 +314,7 @@
 
 ---
 
-## Phase 2: Foundational - 基础设施 (20 tasks)
+## Phase 2: Foundational - 基础设施 (23 tasks)
 
 **目标**: 创建核心数据模型、企业级认证系统、审计日志基础设施、客户端封装和安全配置
 
@@ -320,10 +322,20 @@
 - [ ] [T009] 创建 users 表迁移 - `backend/alembic/versions/001_create_users.py`,字段: id (UUID), username, email, iam_identity_id, role (enum), status, resource_quota_id (FK)
 - [ ] [T010] 创建 resource_quotas 表迁移 - `backend/alembic/versions/002_create_resource_quotas.py`,字段: id, name, quota_type, max_cpu_cores, max_gpu_count, max_memory_gb, max_storage_gb
 - [ ] [T010b] 创建 resource_limit_configs 表迁移 - `backend/alembic/versions/002b_create_resource_limit_configs.py`,字段: id, config_name, role (enum: admin/project_manager/engineer/viewer), project_id (FK, nullable), max_gpu_per_job, max_cpu_per_job, max_memory_gb_per_job, max_storage_gb_per_job, max_nodes_per_job, priority_default (enum: high/medium/low), created_at, updated_at
-- [ ] [T010a] 创建 audit_logs 表迁移 - `backend/alembic/versions/003_create_audit_logs.py`,字段: id, user_id (FK), operation_type (enum: create/update/delete/login/logout), resource_type (enum: training_job/dataset/model/user/quota), resource_id, request_data (JSON), response_data (JSON), ip_address, user_agent, status (enum: success/failed), created_at, expires_at (created_at + 90天)
+- [ ] [T010a] 创建 audit_logs 表迁移 - `backend/alembic/versions/003_create_audit_logs.py`,字段: id, user_id (FK), operation_type (enum: create/update/delete/login/logout), resource_type (enum: training_job/dataset/model/user/quota/space), resource_id, request_data (JSON), response_data (JSON), ip_address, user_agent, status (enum: success/failed), created_at, expires_at (created_at + 90天)
+- [ ] [T010c] 创建 development_spaces 表迁移 - `backend/alembic/versions/004_create_development_spaces.py`,字段: id (UUID), space_name (VARCHAR 255), owner_id (FK users), instance_type (enum: ml.t3.medium/ml.t3.large/ml.g4dn.xlarge), space_type (enum: jupyter/vscode/rstudio), status (enum: pending/running/stopped/failed/deleted), storage_size_gb (INT), lifecycle_config_arn (VARCHAR), sagemaker_space_arn (VARCHAR), created_at (TIMESTAMP), updated_at (TIMESTAMP), deleted_at (TIMESTAMP, nullable)
+- [ ] [T010d] 创建训练任务状态转换约束 - `backend/alembic/versions/005_training_job_state_constraints.py`,实现数据库级状态转换验证,防止非法状态转换 (如 Completed → Running):
+  - **状态转换矩阵表**: 创建 `training_job_state_transitions` 表存储合法状态转换规则 (from_status, to_status, is_allowed),根据 spec.md Training Job State Model L533-547 定义的状态转换规则初始化数据
+  - **CHECK 约束**: 在 `training_jobs` 表添加 CHECK 约束验证状态枚举值有效性 (Submitted/Running/Paused/Preempted/Completed/Failed)
+  - **更新触发器**: 创建 BEFORE UPDATE 触发器 `validate_training_job_state_transition`,在状态更新前查询状态转换矩阵表,验证 (OLD.status → NEW.status) 是否合法,非法转换抛出异常并记录到审计日志
+  - **终态保护**: 确保 Completed 和 Failed 状态不可转换到其他状态 (is_terminal=true 标记)
+  - **性能优化**: 为状态转换矩阵表创建复合索引 (from_status, to_status),确保触发器性能开销 <5ms
+  - **测试场景**: 验证合法转换 (Running → Paused)、阻止非法转换 (Completed → Running)、终态保护测试、并发更新一致性测试
+  - **参考**: spec.md Training Job State Model 状态转换规则
 
 ### SQLAlchemy 模型
 - [ ] [T011] 创建 SQLAlchemy User 模型 - `backend/src/models/user.py`,使用 Pydantic v2 schema 验证,关联 resource_quotas
+- [ ] [T011c] 创建 Space 模型 - `backend/src/models/space.py`,包含状态转换验证逻辑 (pending → running → stopped),关联 User (owner_id),支持 SageMaker Spaces ARN 存储,实现资源配额检查方法,提供空间生命周期管理接口 (start/stop/delete)
 - [ ] [T012] 创建 SQLAlchemy ResourceQuota 模型 - `backend/src/models/resource_quota.py`,包含配额验证逻辑
 - [ ] [T012b] 创建 ResourceLimitConfig 模型 - `backend/src/models/resource_limit_config.py`,包含限制验证逻辑,关联 User (通过 role),支持项目级和全局级配置 (project_id nullable),实现默认限制查询方法 (根据 user role + project 查找适用配置),提供配额检查和应用默认限制的服务接口
 - [ ] [T012a] 创建 AuditLog 模型 - `backend/src/models/audit_log.py`,包含自动过期逻辑 (expires_at = created_at + 90天),关联 User,支持操作类型和资源类型枚举,实现审计日志查询优化
@@ -360,15 +372,15 @@
 - [ ] [T020] [P] 配置 TanStack Query - `frontend/src/lib/queryClient.ts`,配置全局 query client,设置重试策略和缓存策略
 
 **并行执行机会**:
-- 数据库迁移: T009 → T010 → T010b → T010a 串行执行 (确保 Alembic 版本号正确)
-- SQLAlchemy 模型: T011, T012, T012b, T012a 可并行 (依赖 T009-T010a 完成)
+- 数据库迁移: T009 → T010 → T010b → T010a → T010c 串行执行 (确保 Alembic 版本号正确)
+- SQLAlchemy 模型: T011, T011c, T012, T012b, T012a 可并行 (依赖 T009-T010c 完成)
 - 认证系统: T013 → T013a, T013b, T013c (可并行) → T016 → T016b (依赖 T012a)
 - 客户端封装: T014, T015 可并行
 - 前端配置: T017, T018, T019, T020 可并行
 
 ---
 
-## Phase 3: US1 (P1) - 训练任务管理 (31 tasks)
+## Phase 3: US1 (P1) - 训练任务管理 (33 tasks)
 
 **用户故事**: 算法工程师提交和监控分布式训练任务,管理模型版本
 
@@ -438,7 +450,7 @@
   - **验证场景 5**: 验证主指标选择逻辑 (Loss → Accuracy → Perplexity 自动选择)
   - **测试工具**: 使用 pytest + MLflow API 模拟指标记录和查询
   - **参考**: spec.md FR-022 停滞检测策略 (依赖 T037c 停滞检测服务)
-- [ ] [T037a] [US1] SageMaker Managed MLflow 集成 - `backend/src/services/mlflow_service.py`,部署 MLflow Tracking Server (使用 SageMaker Managed MLflow 或自建),配置 MLflow Tracking URI 环境变量注入,提供 Python SDK 示例代码 (`backend/examples/mlflow_training_example.py`),文档化指标记录最佳实践 (指标命名规范、记录频率、超参数追踪模式),实现 MLflow 实验查询 API 集成到前端监控页面
+- [ ] [T037a] [US1] SageMaker Managed MLflow 集成 - `backend/src/services/mlflow_service.py`,部署 MLflow Tracking Server (使用 SageMaker Managed MLflow),配置 MLflow Tracking URI 环境变量注入,提供 Python SDK 示例代码 (`backend/examples/mlflow_training_example.py`),文档化指标记录最佳实践 (指标命名规范、记录频率、超参数追踪模式),实现 MLflow 实验查询 API 集成到前端监控页面
 - [ ] [T037b] [US1] Prometheus Pushgateway 部署 (可选) - `infrastructure/monitoring/pushgateway.yaml`,部署 Pushgateway 服务到 EKS 集群 (仅用于实时告警场景),配置 Service 和环境变量 `PROMETHEUS_PUSHGATEWAY_URL` 注入,提供 Python SDK 示例代码 (`backend/examples/prometheus_metrics_example.py`),文档化与 MLflow 的职责分离和使用场景
 - [ ] [T038] [US1] Checkpoint 自动保存逻辑 - `backend/src/services/checkpoint_service.py`,实现 FR-010 定义的 5 种检查点创建触发场景:
   - **(1) 定期自动创建**: 定时任务 (10-15 分钟间隔) 为 Running 状态的训练任务自动创建检查点
@@ -450,7 +462,7 @@
   - **接口设计**: 提供 `create_checkpoint(job_id, trigger_type)` 接口创建检查点,提供 `list_checkpoints(job_id, filters)` 接口供 T038b 查询检查点列表
   - **职责边界**: T038 负责检查点创建和初始保存,不负责后续迁移 (迁移由 T038b 负责)
   - **参考**: spec.md FR-010 检查点触发场景映射
-- [ ] [T038b] [US1] Checkpoint 分层迁移服务 - `backend/src/services/checkpoint_migration_service.py`,实现 FR-011 分层存储迁移策略:
+- [ ] [T038b-1] [US1] Checkpoint 分层迁移服务 - `backend/src/services/checkpoint_migration_service.py`,实现 FR-011 分层存储迁移策略:
   - **依赖接口**: 调用 T038 的 `list_checkpoints(job_id)` 接口获取检查点列表和元数据 (创建时间、序号、存储路径、校验和)
   - **热检查点管理**: 保留最近 3 个检查点在 NVMe 本地存储
   - **温检查点迁移**: 第 4-10 个检查点自动迁移到 FSx for Lustre
@@ -459,18 +471,41 @@
   - **存储满载处理**: NVMe/FSx 使用率 >90% 时触发紧急迁移至下一层,所有层均满载则告警并暂停新检查点创建 (保留最近 1 个)
   - **迁移失败回退**: 迁移失败时保留原位置检查点,记录失败日志,下次迁移周期重试 (最多 3 次),持续失败则触发告警
   - **完整性保护**: 创建时计算 SHA-256 校验和,恢复前验证完整性,若损坏则自动尝试上一个有效检查点并告警
-  - **S3 生命周期策略**: 配置 S3 生命周期规则，分级存储优化成本：30 天后转换为 Standard-IA（低频访问，节省 50% 成本），90 天后自动删除冷检查点。可通过 IaC 参数配置保留期（默认 90 天），满足合规审计和模型回滚需求
   - **定时任务调度**: 每 10 分钟执行一次迁移检查和执行
-  - **职责边界**: T038b 仅负责迁移已创建的检查点,不负责创建检查点 (创建由 T038 负责)
+  - **职责边界**: T038b-1 仅负责迁移已创建的检查点,不负责创建检查点 (创建由 T038 负责)
   - **参考**: spec.md FR-011 分层检查点存储策略, Edge Cases (检查点存储满载/检查点损坏处理) (依赖 T038)
+- [ ] [T038b-2] [US1] S3 Lifecycle Policy IaC 配置 - `infrastructure/cdk/stacks/storage_stack.py`,实现 S3 检查点存储的生命周期自动化管理:
+  - **生命周期规则 1 - 存储类转换**: 配置 S3 Lifecycle Rule,对象创建 30 天后自动转换为 Standard-IA（低频访问，成本节省 ~50%）
+  - **生命周期规则 2 - 自动删除**: 对象创建 90 天后自动删除冷检查点（默认值，可通过 CDK context 参数配置）
+  - **CDK 参数化配置**:
+    - `checkpoint_retention_days` (默认 90): 冷检查点保留天数
+    - `checkpoint_ia_transition_days` (默认 30): 转换为 Standard-IA 的天数
+  - **对象标签过滤**: 仅对标签为 `checkpoint_type=cold` 的对象应用生命周期规则（避免误删热/温检查点）
+  - **成本优化验证**: 在 CDK 部署前估算成本影响（Standard vs Standard-IA vs 删除后的成本对比）
+  - **合规性说明**: 在 IaC 代码注释中文档化保留期选择依据（满足审计要求和模型回滚需求）
+  - **职责边界**: T038b-2 仅负责 S3 基础设施配置,不负责检查点迁移逻辑 (迁移由 T038b-1 负责)
+  - **依赖**: T008b (S3 Buckets Stack,提供 checkpoint bucket 名称和 ARN)
+  - **参考**: spec.md FR-011 S3 生命周期策略要求
 - [ ] [T038a] [US1] SageMaker Model Registry 集成 - `backend/src/services/model_registry_service.py`,封装 SageMaker Model Registry API,自动注册训练完成的模型,管理模型版本生命周期(注册→批准→部署→归档)
+
+### 集成测试
+- [ ] [T038c] [US1] 抢占时序SLA集成测试 - `backend/tests/integration/test_preemption_timing.py`,验证 FR-004 抢占时序保证:
+  - **测试场景 1**: 触发低优先级任务被高优先级任务抢占 (使用 Kueue Priority 配置)
+  - **测试场景 2**: 验证 checkpoint 在抢占触发后 5 分钟内保存完成 (监控 T038 的场景 4 触发时间戳)
+  - **测试场景 3**: 验证被抢占任务的 Pod 在 30 秒内被释放 (调用 Kubernetes API 查询 Pod 状态)
+  - **测试场景 4**: 验证任务状态正确转换为 Preempted (调用 T029 状态同步逻辑验证)
+  - **测试场景 5**: 验证抢占后自动恢复成功 (checkpoint 恢复 + 训练继续)
+  - **测试工具**: 使用 pytest + HyperPod SDK + Kubernetes Python Client
+  - **估算**: 6h (SHOULD, Integration Test)
+  - **依赖**: T022 (checkpoints 表), T024 (Checkpoint 模型), T029 (状态同步), T038 (checkpoint 自动保存逻辑)
+  - **参考**: spec.md FR-004 抢占式调度时序要求
 
 **并行执行机会**:
 - 数据库迁移: T021, T022, T022a 可并行
 - SQLAlchemy 模型: T023, T024, T024a 可并行 (依赖 T021, T022, T022a)
 - 后端 API: T025-T031 可部分并行 (依赖 T023, T024) → T031a, T031b, T031c 可并行 (依赖 T024a)
 - 前端页面: T032-T035 可并行 (依赖 T025-T031) → T035a (依赖 T031a-T031c)
-- 服务逻辑: T036 → {T037, T037a} 可并行 → {T037c, T037b} 可并行 → {T038, T038a} 可并行
+- 服务逻辑: T036 → {T037, T037a} 可并行 → {T037c, T037b} 可并行 → {T038, T038a, T038b-1, T038b-2} 可并行 → T038c (集成测试)
 
 **验收标准**:
 - FR-001: 训练任务提交成功率 >95%
@@ -637,27 +672,27 @@
 **技术选型**: Amazon SageMaker Spaces Add-on (JupyterLab/VS Code IDE)
 
 ### 数据表迁移
-- [ ] [T079] [US5] 在线开发环境表迁移 - `backend/alembic/versions/007_create_dev_environments.py`,字段: id, environment_name, owner_id (FK users), ide_type (enum: jupyterlab/vscode), sagemaker_space_name, sagemaker_space_arn, instance_type (enum: ml.t3.medium/ml.g4dn.xlarge), status (enum: Pending/InService/Stopping/Stopped/Failed), studio_url, created_at, updated_at
+- [ ] [T079] [US5] 在线开发环境表迁移 - `backend/alembic/versions/007_create_dev_environments.py`,字段: id, environment_name, owner_id (FK users), ide_type (enum: jupyterlab/vscode), sagemaker_space_name, sagemaker_space_arn, instance_type (enum: ml.g5.xlarge/ml.g5.2xlarge,默认 ml.g5.xlarge,遵循 spec.md User Story 5 资源配额定义), status (enum: Pending/InService/Stopping/Stopped/Failed), studio_url, created_at, updated_at
 
 ### SQLAlchemy 模型
 - [ ] [T080] [US5] DevEnvironment 模型 - `backend/src/models/dev_environment.py`,包含 SageMaker Space 生命周期管理 (Pending → InService → Stopped),关联 User,存储 Space ARN 和 Studio URL
 
 ### 后端 API 端点
-- [ ] [T081] [US5] POST /ide/sessions 端点实现 - `backend/src/api/ide.py`,验证 IDE 配置,调用 SageMaker Spaces API 创建 Space,配置实例类型 (ml.t3.medium/ml.g4dn.xlarge),返回 SageMaker Studio URL
+- [ ] [T081] [US5] POST /ide/sessions 端点实现 - `backend/src/api/ide.py`,验证 IDE 配置,调用 SageMaker Spaces API 创建 Space,配置实例类型 (ml.g5.xlarge 默认/ml.g5.2xlarge,遵循 spec.md User Story 5 资源配额定义),验证用户配额 (GPU/CPU/内存,计入 FR-008 整体配额),返回 SageMaker Studio URL
 - [ ] [T082] [US5] GET /ide/sessions 端点实现 - 支持分页、过滤 (status, owner_id)、排序 (created_at)
 - [ ] [T083] [US5] GET /ide/sessions/{id} 端点实现 - 返回在线开发环境详情,包含 SageMaker Studio URL、Space 状态、实例类型、资源使用
 - [ ] [T084] [US5] DELETE /ide/sessions/{id} 端点实现 - 调用 SageMaker DeleteSpace API 停止在线开发环境,清理 Space 资源
 
 ### SageMaker Spaces 集成服务
 - [ ] [T085] [US5] SageMaker Spaces 集成 - `backend/src/services/sagemaker_spaces_service.py`,封装 `sagemaker-hyperpod.space` 模块 API,使用 T000 验证的 Space 模块方法实现 Space 创建、删除、查询功能,配置生命周期脚本 (Lifecycle Configuration) 预装常用库,管理 Space 状态转换,参考 `docs/hyperpod-sdk-reference.md`。如 SDK 不支持特定配置,MAY 使用 boto3 调用 SageMaker Spaces API 作为备选,但 MUST 提交例外申请并获得平台治理委员会批准,在代码中注释说明理由 (遵循宪章 Principle I.B) (依赖 T000)
-- [ ] [T085a] [US5] SageMaker Spaces 启动性能配置 - `backend/src/services/sagemaker_lifecycle_service.py`,配置 SageMaker Studio 生命周期脚本,预装常用 Python 库 (pip install pytorch transformers),选择合适的实例类型 (ml.t3.medium 开发/ml.g4dn.xlarge GPU 调试),配置 EFS 持久化存储避免重装,目标启动时间 <3分钟
+- [ ] [T085a] [US5] SageMaker Spaces 启动性能配置 - `backend/src/services/sagemaker_lifecycle_service.py`,配置 SageMaker Studio 生命周期脚本,预装常用 Python 库 (pip install pytorch transformers),选择合适的实例类型 (ml.g5.xlarge 默认/ml.g5.2xlarge 高性能场景,遵循 spec.md User Story 5 资源配额定义),配置 EFS 持久化存储避免重装,目标启动时间 <3分钟
 - [ ] [T085b] [US5] SageMaker Spaces 启动性能监控 - `backend/src/services/sagemaker_metrics_service.py`,集成 CloudWatch Metrics 监控 Space 启动时间,记录 CreateSpace API 调用到 InService 状态的耗时,P95/P99 启动时间统计,启动超时告警 (>3分钟触发)
 - [ ] [T085c] [US5] SageMaker Spaces 启动性能测试 - `backend/tests/test_sagemaker_spaces_performance.py`,端到端启动时间测试 (目标 <3分钟),并发启动压力测试 (≥50 并发 Space),不同实例类型启动时间对比,性能回归测试 (CI/CD 集成)
 - [ ] [T086] [US5] SageMaker Studio 镜像配置 - `backend/src/services/sagemaker_image_service.py`,使用 SageMaker Studio 官方镜像 (Data Science, PyTorch, TensorFlow),支持自定义镜像注册到 SageMaker Image Registry,配置镜像版本管理
 - [ ] [T090] [US5] SageMaker Space 状态同步 - `backend/src/services/sagemaker_sync_service.py`,定时任务 (30秒) 调用 DescribeSpace API 同步状态到数据库,处理 InService/Pending/Failed 状态转换
 
 ### 前端页面组件
-- [ ] [T087] [US5] [P] IDE 启动页面 - `frontend/src/pages/IDE/Launch.tsx`,使用 Cloudscape Form,选择 IDE 类型 (JupyterLab/VS Code)、实例类型 (ml.t3.medium/ml.g4dn.xlarge)、SageMaker Studio 镜像,显示启动进度和预估启动时间
+- [ ] [T087] [US5] [P] IDE 启动页面 - `frontend/src/pages/IDE/Launch.tsx`,使用 Cloudscape Form,选择 IDE 类型 (JupyterLab/VS Code)、实例类型 (ml.g5.xlarge 默认/ml.g5.2xlarge,显示资源规格: CPU/内存/GPU,遵循 spec.md User Story 5 资源配额定义)、SageMaker Studio 镜像,显示启动进度和预估启动时间
 - [ ] [T088] [US5] [P] 在线开发环境列表页面 - `frontend/src/pages/IDE/Sessions.tsx`,使用 Cloudscape Table,显示 SageMaker Space 列表,支持启动/停止/删除操作,显示 Space 状态和启动耗时
 - [ ] [T089] [US5] [P] IDE 嵌入组件 - `frontend/src/components/IDEFrame.tsx`,使用 iframe 嵌入 SageMaker Studio URL (JupyterLab/VS Code),支持全屏模式
 
@@ -845,24 +880,24 @@ Foundational (Phase 2)
 | Phase | 任务数 | 预估工作量 (人时) | 并行后工作量 (人时) | 优先级 |
 |-------|--------|-------------------|---------------------|--------|
 | Phase 1: Setup + IaC | 20 | 46 | 28 | 阻塞性 |
-| Phase 2: Foundational | 20 | 40 | 20 | 阻塞性 |
-| Phase 3: US1 (P1) | 30 | 60 | 30 | Must-Have |
+| Phase 2: Foundational | 23 | 46 | 23 | 阻塞性 |
+| Phase 3: US1 (P1) | 32 | 68 | 37 | Must-Have |
 | Phase 4: US2 (P1) | 14 | 28 | 14 | Must-Have |
 | Phase 5: US3 (P1) | 19 | 38 | 18 | Must-Have |
 | Phase 6: US4 (P2) | 13 | 26 | 15 | Important |
 | Phase 7: US5 (P2) | 15 | 30 | 17 | Important |
 | Phase 8: Polish + GitOps | 24 | 48 | 29 | 质量保障 |
-| **总计** | **155** | **316** | **171** | - |
+| **总计** | **160** | **330** | **181** | - |
 
-**MVP 范围 (Phase 1-5)**: 103 个任务, 实际估算:
-- **纯开发时间**: 110 人时 (并行后)
-- **集成测试和调试**: 44 人时 (40% of 开发时间)
-- **代码审查和返工**: 22 人时 (20%)
-- **文档编写**: 11 人时 (10%)
+**MVP 范围 (Phase 1-5)**: 108 个任务, 实际估算:
+- **纯开发时间**: 120 人时 (并行后)
+- **集成测试和调试**: 48 人时 (40% of 开发时间)
+- **代码审查和返工**: 24 人时 (20%)
+- **文档编写**: 12 人时 (10%)
 - **基础设施部署等待**: 10 人时 (EKS 集群创建、FSx 配置、数据库迁移、验证测试)
-- **小计**: 约 197 人时
-- **风险缓冲** (20%): 40 人时
-- **最终估算**: 约 **240 人时**
+- **小计**: 约 214 人时
+- **风险缓冲** (20%): 43 人时
+- **最终估算**: 约 **257 人时**
 
 **说明**:
 - 估算基于并行开发模式（多团队协作）

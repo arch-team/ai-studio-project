@@ -195,6 +195,113 @@
 - ⚠️ **部分功能缺失**: 触发 T000-fallback,设计混合方案
 - ❌ **SDK 不可用**: 触发治理委员会例外审批流程
 
+---
+
+### SDK 选型决策标准
+
+**目标**: 为每个平台功能确定最佳实现工具，建立开发时的技术选型指导框架。
+
+#### SDK 能力矩阵（T000输出填充）
+
+| 功能类别 | sagemaker-hyperpod SDK | boto3 SageMaker API | AWS CLI | kubectl |
+|---------|------------------------|---------------------|---------|---------|
+| **训练任务 CRUD** | ✅ 首选 | ✅ 可用 | ⚠️ 有限 | ❌ 不推荐 |
+| **实时状态查询** | ✅ 首选 | ⚠️ 需轮询 | ❌ 不支持 | ✅ 备选 |
+| **Checkpoint 管理** | ✅ 首选 | ❌ 不支持 | ❌ 不支持 | ⚠️ 底层操作 |
+| **Space CRUD** | ✅ 首选 | ✅ 可用 | ⚠️ 有限 | ❌ 不适用 |
+| **集群资源监控** | ✅ 首选 | ⚠️ 部分支持 | ❌ 不支持 | ✅ 备选 |
+| **Add-ons 配置** | ⚠️ 有限 | ❌ 不支持 | ❌ 不支持 | ✅ 首选 |
+
+**说明**:
+- ✅ 首选: 功能完整、类型安全、文档齐全
+- ✅ 可用: 功能可实现但需额外封装
+- ⚠️ 有限/部分支持: 仅支持部分场景或需复杂组合
+- ❌ 不支持/不推荐: 功能缺失或违反架构原则
+
+#### 选型决策树（开发时执行）
+
+```
+需要实现功能 X
+    ↓
+[1] HyperPod SDK 提供原生方法？
+    ├─ YES → 使用 SDK (符合 Constitution I.B)
+    │         └─ 示例: Training.submit_job(), Space.create_space()
+    └─ NO  → 进入 [2]
+
+[2] boto3 SageMaker API 提供等效方法？
+    ├─ YES → 使用 boto3 封装
+    │         └─ 注意: 需额外类型检查和错误处理
+    │         └─ 示例: boto3.client('sagemaker').describe_training_job()
+    └─ NO  → 进入 [3]
+
+[3] AWS CLI 可实现且逻辑简单？
+    ├─ YES → 封装 CLI 调用 (subprocess)
+    │         └─ 要求:
+    │            - 必须文档化 CLI 依赖和版本要求
+    │            - 实现异常捕获和输出解析
+    │            - 提供单元测试覆盖
+    └─ NO  → 进入 [4]
+
+[4] 仅 kubectl 可直接操作 K8s 资源？
+    ├─ 场景允许 → 使用 Kubernetes Python Client
+    │               └─ 要求:
+    │                  - 提交架构评审（justify 为何SDK/boto3不可用）
+    │                  - 评估维护成本（K8s API 版本兼容性）
+    │                  - 文档化 CRD/资源结构依赖
+    └─ 场景不允许 → 提交例外审批
+                      └─ 升级至架构委员会评审
+```
+
+#### 选型判断标准
+
+**优先级排序原则** (符合 Constitution I):
+1. **HyperPod SDK 原生方法** (最高优先级)
+   - 理由: 官方支持、类型安全、版本兼容性保证
+   - 示例: `Training.submit_job()`, `Space.create_space()`
+
+2. **boto3 SageMaker API** (次选)
+   - 使用场景: SDK 不支持但 boto3 有对应 API
+   - 注意事项: 需实现额外的类型检查、参数验证、错误处理
+   - 示例: `boto3.client('sagemaker').list_training_jobs()`
+
+3. **AWS CLI 封装** (第三选)
+   - 使用场景: SDK/boto3 都不支持，但 CLI 可实现且逻辑简单
+   - 限制条件:
+     - 必须是只读查询或一次性配置操作
+     - 不涉及高频调用或性能敏感路径
+     - 必须文档化 CLI 版本依赖 (aws-cli ≥2.13.0)
+   - 示例: `aws sagemaker-hyperpod get-cluster-diagnostics`
+
+4. **kubectl / Kubernetes Python Client** (最后手段)
+   - 使用场景: 以上工具都不可用，仅限底层 K8s 资源操作
+   - 强制要求:
+     - 必须通过架构评审（提供 ADR 文档）
+     - 评估 K8s API 版本兼容性风险
+     - 实现完整的异常处理和重试逻辑
+     - 单元测试覆盖率 >90%
+   - 示例场景: HyperPod Add-ons 配置 (Training Operator CRD)
+
+#### T000 验证后的输出要求
+
+在完成 SDK 验证后，T000 任务必须产出以下文档：
+
+1. **`docs/hyperpod-sdk-capability-matrix.md`** (新增)
+   - 填充完整的功能-工具矩阵
+   - 每个功能注明选型依据和代码示例
+   - 标注已知限制和 workaround
+
+2. **`docs/technical-decision-guideline.md`** (新增)
+   - 开发时查阅的选型决策指南
+   - 常见场景的最佳实践
+   - 反模式和应避免的实现方式
+
+3. **`docs/hyperpod-sdk-gaps.md`** (已有)
+   - SDK 功能缺口清单
+   - 需要降级到 boto3/CLI/kubectl 的场景列表
+   - 影响范围和风险评估
+
+---
+
 #### T000-fallback: SDK 备选方案设计与 POC 验证 (条件任务)
 
 **触发条件**: T000 验证发现 SDK 方法不存在、签名不符或功能不完整

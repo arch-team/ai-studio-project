@@ -123,6 +123,7 @@ Version 1.7.0 (2026-01-03):
    - HyperPod Observability Add-on - Prometheus/Grafana 集成
    - HyperPod Elastic Agent - 弹性训练和无检查点训练
    - Amazon SageMaker Spaces Add-on - JupyterLab/VS Code IDE
+   - cert-manager - 证书管理 (Training Operator 必需依赖)
 
 2. **次选**: AWS 托管服务
    - SageMaker Model Registry - 模型版本控制和治理
