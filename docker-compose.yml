@@ -1,79 +1,77 @@
 version: '3.8'
 
 services:
-  # PostgreSQL数据库
-  postgres:
-    image: postgres:16-alpine
-    container_name: ai-platform-postgres
+  # MySQL 8.0 数据库服务 (开发环境)
+  mysql:
+    image: mysql:8.0.28
+    container_name: ai-training-mysql
+    restart: unless-stopped
     environment:
-      POSTGRES_USER: ai_platform
-      POSTGRES_PASSWORD: dev_password
-      POSTGRES_DB: ai_training_platform
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-devpassword}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-ai_training}
+      MYSQL_USER: ${MYSQL_USER:-ai_training}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-ai_training_pass}
     ports:
-      - "5432:5432"
+      - "3306:3306"
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - mysql_data:/var/lib/mysql
+      - ./docker/mysql/init:/docker-entrypoint-initdb.d:ro
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ai_platform"]
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD:-devpassword}"]
       interval: 10s
       timeout: 5s
       retries: 5
+    networks:
+      - ai-training-network
 
-  # Redis缓存
-  redis:
-    image: redis:7-alpine
-    container_name: ai-platform-redis
-    ports:
-      - "6379:6379"
-    volumes:
-      - redis_data:/data
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 3s
-      retries: 5
-
-  # 后端API服务
+  # FastAPI 后端服务
   backend:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    container_name: ai-platform-backend
+    container_name: ai-training-backend
+    restart: unless-stopped
+    environment:
+      - DATABASE_URL=mysql+aiomysql://${MYSQL_USER:-ai_training}:${MYSQL_PASSWORD:-ai_training_pass}@mysql:3306/${MYSQL_DATABASE:-ai_training}
+      - AWS_REGION=${AWS_REGION:-us-east-1}
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID:-}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY:-}
+      - HYPERPOD_CLUSTER_ARN=${HYPERPOD_CLUSTER_ARN:-}
+      - DEBUG=${DEBUG:-true}
     ports:
       - "8000:8000"
-    environment:
-      - DATABASE_URL=postgresql+asyncpg://ai_platform:dev_password@postgres:5432/ai_training_platform
-      - REDIS_URL=redis://redis:6379/0
-      - ENV=development
-      - LOG_LEVEL=DEBUG
     volumes:
       - ./backend:/app
-      - backend_cache:/root/.cache
     depends_on:
-      postgres:
+      mysql:
         condition: service_healthy
-      redis:
-        condition: service_healthy
-    command: uvicorn src.main:app --host 0.0.0.0 --port 8000 --reload
+    networks:
+      - ai-training-network
 
-  # 前端开发服务器
+  # Vite + React 前端服务 (开发模式)
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
-    container_name: ai-platform-frontend
+      target: development
+    container_name: ai-training-frontend
+    restart: unless-stopped
+    environment:
+      - VITE_API_BASE_URL=http://localhost:8000/api/v1
     ports:
-      - "3000:3000"
+      - "5173:5173"
     volumes:
       - ./frontend:/app
       - /app/node_modules
-    environment:
-      - VITE_API_URL=http://localhost:8000
     depends_on:
       - backend
-    command: npm run dev
+    networks:
+      - ai-training-network
 
 volumes:
-  postgres_data:
-  redis_data:
-  backend_cache:
+  mysql_data:
+    driver: local
+
+networks:
+  ai-training-network:
+    driver: bridge

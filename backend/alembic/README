@@ -1,0 +1,47 @@
+# Alembic Migrations
+
+This directory contains database migration scripts managed by Alembic.
+
+## Usage
+
+### Create a new migration
+
+```bash
+cd backend
+alembic revision --autogenerate -m "description of changes"
+```
+
+### Apply migrations
+
+```bash
+# Apply all pending migrations
+alembic upgrade head
+
+# Upgrade to a specific revision
+alembic upgrade <revision_id>
+
+# Downgrade one revision
+alembic downgrade -1
+
+# Downgrade to a specific revision
+alembic downgrade <revision_id>
+```
+
+### View migration history
+
+```bash
+# Show current revision
+alembic current
+
+# Show migration history
+alembic history
+
+# Show pending migrations
+alembic history --indicate-current
+```
+
+## Notes
+
+- Always review auto-generated migrations before applying
+- Test migrations on a development database first
+- Back up production database before applying migrations

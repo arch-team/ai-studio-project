@@ -45,7 +45,7 @@
     - **触发原因记录**: T000 执行者应详细记录触发原因、影响范围和备选方案建议到 `docs/hyperpod-sdk-gaps.md`
   - **参考**: [SageMaker HyperPod SDK Documentation](https://sagemaker-hyperpod-cli.readthedocs.io/)
   - **工作量估算**: 0.5 人日
-- [[X] [T000-fallback] HyperPod SDK 备选方案设计与 POC 验证 (条件任务,仅在 T000 发现 SDK 不可用时执行) - 设计并验证 boto3/kubernetes-client 备选方案:
+- [X] [T000-fallback] HyperPod SDK 备选方案设计与 POC 验证 (条件任务,仅在 T000 发现 SDK 不可用时执行) - 设计并验证 boto3/kubernetes-client 备选方案:
   - **触发条件**: T000 验证发现 SDK 方法不存在、签名不符或功能不完整
   - **阶段 1: 备选方案分析** (0.5 人日)
     - 评估 boto3 (SageMaker API) 的可行性: 支持的训练任务管理 API、限制和约束
@@ -102,25 +102,25 @@
 **前置条件**: Phase 0 SDK 验证完成,方法签名参考文档可用
 
 ### 后端项目结构
-- [ ] [T001] [P] 创建 backend/ 项目结构 - 使用 FastAPI + SQLAlchemy 2.0 异步架构,创建 `backend/src/` 目录结构 (api/, models/, services/, clients/, middleware/)
-- [ ] [T004] [P] 配置 backend/requirements.txt - 添加 fastapi==0.109.0, sqlalchemy==2.0+, alembic, aiomysql, pydantic==2.0+, boto3, sagemaker-hyperpod SDK
+- [X] [T001] [P] 创建 backend/ 项目结构 - 使用 FastAPI + SQLAlchemy 2.0 异步架构,创建 `backend/src/` 目录结构 (api/, models/, services/, clients/, middleware/)
+- [X] [T004] [P] 配置 backend/requirements.txt - 添加 fastapi==0.109.0, sqlalchemy==2.0+, alembic, aiomysql, pydantic==2.0+, boto3, sagemaker-hyperpod SDK
 
 ### 前端项目结构
-- [ ] [T002] [P] 创建 frontend/ 项目结构 - 使用 Vite + React 18 + TypeScript,创建 `frontend/src/` 目录结构 (pages/, components/, layouts/, store/, lib/)
-- [ ] [T005] [P] 配置 frontend/package.json - 添加 react@18, @cloudscape-design/components, zustand, @tanstack/react-query@5, react-router-dom
+- [X] [T002] [P] 创建 frontend/ 项目结构 - 使用 Vite + React 18 + TypeScript,创建 `frontend/src/` 目录结构 (pages/, components/, layouts/, store/, lib/)
+- [X] [T005] [P] 配置 frontend/package.json - 添加 react@18, @cloudscape-design/components, zustand, @tanstack/react-query@5, react-router-dom
 
 ### 开发环境配置
-- [ ] [T003] 创建 Docker Compose 配置 - MySQL 8.0.28 服务,端口 3306,环境变量配置 (`docker-compose.yml`)
-- [ ] [T006] 创建环境变量模板 - `.env.example` 包含 DATABASE_URL, AWS_REGION, HYPERPOD_CLUSTER_ARN 等必需配置
+- [X] [T003] 创建 Docker Compose 配置 - MySQL 8.0.28 服务,端口 3306,环境变量配置 (`docker-compose.yml`)
+- [X] [T006] 创建环境变量模板 - `.env.example` 包含 DATABASE_URL, AWS_REGION, HYPERPOD_CLUSTER_ARN 等必需配置
   - **AWS 凭证配置**: 支持 AWS CLI profile 或环境变量 (AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY)
   - **开发者 IAM 权限**: 需要 SageMaker、EKS、S3、CloudWatch 相关权限 (具体策略在 IaC 中定义)
   - **kubectl 配置**: 通过 `aws eks update-kubeconfig --name <cluster-name> --region <region>` 配置集群访问
 
 ### 数据库迁移系统
-- [ ] [T007] [P] 初始化 Alembic 迁移系统 - 配置 `backend/alembic.ini` 和 `backend/alembic/env.py`,支持 SQLAlchemy 2.0 异步引擎
+- [X] [T007] [P] 初始化 Alembic 迁移系统 - 配置 `backend/alembic.ini` 和 `backend/alembic/env.py`,支持 SQLAlchemy 2.0 异步引擎
 
 ### 项目文档
-- [ ] [T008] 初始化项目文档 - 创建 `README.md` (项目概述,快速启动), `CONTRIBUTING.md` (开发规范,提交流程)
+- [X] [T008] 初始化项目文档 - 创建 `README.md` (项目概述,快速启动), `CONTRIBUTING.md` (开发规范,提交流程)
 
 ### 基础设施即代码 (IaC)
 - [ ] [T008a] AWS CDK 项目结构 - 创建 `infrastructure/cdk/` 目录结构,初始化 CDK Python 项目 (与后端技术栈一致),配置 `cdk.json` 和 `requirements.txt`,定义 Stack 组织结构 (NetworkStack, DatabaseStack, StorageStack, ComputeStack),配置多环境支持 (dev/staging/prod)
