@@ -231,7 +231,9 @@
 [2] boto3 SageMaker API 提供等效方法？
     ├─ YES → 使用 boto3 封装
     │         └─ 注意: 需额外类型检查和错误处理
-    │         └─ 示例: boto3.client('sagemaker').describe_training_job()
+    │         └─ 适用范围: boto3 仅支持 HyperPod 集群管理，不支持训练任务管理
+    │         └─ 示例: boto3.client('sagemaker').describe_cluster()
+    │         └─ ⚠️  不适用: describe_training_job() 等 Training Job API 不适用于 HyperPod
     └─ NO  → 进入 [3]
 
 [3] AWS CLI 可实现且逻辑简单？
@@ -261,8 +263,9 @@
 
 2. **boto3 SageMaker API** (次选)
    - 使用场景: SDK 不支持但 boto3 有对应 API
+   - ⚠️  适用范围: 仅支持 HyperPod 集群管理，不支持训练任务管理
    - 注意事项: 需实现额外的类型检查、参数验证、错误处理
-   - 示例: `boto3.client('sagemaker').list_training_jobs()`
+   - 示例: `boto3.client('sagemaker').list_clusters()`, `describe_cluster()`
 
 3. **AWS CLI 封装** (第三选)
    - 使用场景: SDK/boto3 都不支持，但 CLI 可实现且逻辑简单
@@ -313,14 +316,16 @@
 ##### 阶段 1: 备选方案分析 (0.5 人日)
 
 **boto3 方案评估** (SageMaker API):
-- **适用场景**: 训练任务管理、Model Registry 集成
+- **适用场景**: HyperPod 集群管理、CloudWatch 监控集成
+- ⚠️  **不适用场景**: HyperPod 训练任务管理（创建、查询、控制训练任务）
 - **API 能力调研**:
-  - `create_training_job()`: 支持 HyperPod 集群的参数配置
-  - `describe_training_job()`: 状态查询和监控能力
-  - `stop_training_job()`: 终止任务支持 (暂停/恢复能力待验证)
-- **优势**: AWS 官方支持,稳定可靠,完整的错误处理
-- **劣势**: API 粒度较粗,缺少 HyperPod 特定功能 (如 Gang Scheduling 细粒度控制)
-- **风险**: 暂停/恢复功能可能不支持,需 POC 验证
+  - `describe_cluster()`: 查询集群状态、配置和健康状况
+  - `list_cluster_nodes()`: 列出集群节点及其状态
+  - `update_cluster()`: 更新集群配置（扩缩容、节点组管理）
+  - `delete_cluster()`: 删除集群资源
+- **优势**: AWS 官方支持，稳定可靠，完整的错误处理
+- **劣势**: 不支持训练任务级别的操作
+- **结论**: boto3 仅用于集群管理，训练任务需使用 kubernetes-client 或 HyperPod SDK
 
 **kubernetes-client 方案评估** (直接操作 CRD):
 - **适用场景**: PyTorchJob/TFJob 状态监控、Kueue Workload 查询、NetworkPolicy 配置
@@ -359,29 +364,26 @@
 
 **目标**: 通过实际代码验证备选方案的技术可行性,识别潜在风险
 
-**boto3 POC 验证任务**:
-1. **创建训练任务**:
-   - 使用 `boto3.client('sagemaker').create_training_job()`
-   - 配置 HyperPod 集群 ARN: `ResourceConfig.ClusterArn`
-   - 验证 Gang Scheduling 参数: `ResourceConfig.InstanceGroups` 配置
-   - 预期结果: 成功创建训练任务,返回 JobName
+**boto3 POC 验证任务** (验证集群管理功能):
+1. **查询集群状态**:
+   - 使用 `boto3.client('sagemaker').describe_cluster(ClusterName=...)`
+   - 验证集群状态字段: `ClusterStatus`, `InstanceGroups`, `VpcConfig`
+   - 预期结果: 成功获取集群详细信息
 
-2. **查询任务状态**:
-   - 使用 `describe_training_job(TrainingJobName=...)`
-   - 验证状态字段: `TrainingJobStatus`, `SecondaryStatus`
-   - 查询训练指标: `FinalMetricDataList`
-   - 预期结果: 获取完整的任务状态信息
+2. **列出集群节点**:
+   - 使用 `boto3.client('sagemaker').list_cluster_nodes(ClusterName=...)`
+   - 验证节点状态、实例类型、可用区等信息
+   - 预期结果: 获取集群中所有节点的列表和状态
 
-3. **生命周期控制**:
-   - 暂停: 验证是否支持 `pause_training_job()` (可能不支持)
-   - 恢复: 验证是否支持 `resume_training_job()` (可能不支持)
-   - 终止: 使用 `stop_training_job()`,验证优雅停止机制
-   - 预期结果: 识别支持和不支持的操作,记录限制
+3. **集群监控集成**:
+   - 通过 CloudWatch Metrics 查询集群级别的监控指标
+   - 验证节点健康状态的可观测性
+   - 预期结果: 确认集群管理 API 的完整性
 
-4. **日志和监控**:
-   - 通过 CloudWatch Logs 查询训练日志
-   - 验证 CloudWatch Metrics 集成
-   - 预期结果: 确认日志查询的延迟和完整性
+4. **明确结论**:
+   - boto3 仅用于 HyperPod 集群管理（创建、更新、删除、查询集群）
+   - boto3 不适用于 HyperPod 训练任务管理（创建、查询、控制训练任务）
+   - HyperPod 训练任务需使用 sagemaker-hyperpod SDK 或 kubernetes-client
 
 **kubernetes-client POC 验证任务**:
 1. **PyTorchJob CRD 操作**:

@@ -52,11 +52,11 @@
     - 评估 kubernetes-client (直接操作 CRD) 的可行性: PyTorchJob/TFJob CRD 操作、Kueue Workload 查询
     - 接口设计: 设计统一的客户端抽象层 (`clients/training_client.py`),支持 SDK/boto3/kubernetes-client 多种后端
   - **阶段 2: POC 技术验证** (1 人日)
-    - **boto3 POC 验证**:
-      - 创建 SageMaker Training Job (使用 HyperPod 集群 ARN)
-      - 查询训练任务状态和日志
-      - 暂停/恢复/终止训练任务 (验证是否支持)
-      - 验证 Gang Scheduling 配置方式
+    - **boto3 POC 验证** (验证集群管理功能):
+      - 查询 HyperPod 集群状态: `describe_cluster(ClusterName=...)`
+      - 列出集群节点: `list_cluster_nodes(ClusterName=...)`
+      - 验证集群级别的监控指标获取
+      - 明确结论: boto3 仅用于集群管理，不适用于训练任务管理
     - **kubernetes-client POC 验证**:
       - 使用 kubernetes-client 查询 PyTorchJob CRD 状态
       - 查询 Kueue Workload 状态和优先级
