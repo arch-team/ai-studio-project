@@ -193,51 +193,97 @@ class HyperPodStack(cdk.Stack):
         - VPC CNI (≥v1.16.0) - for pod networking
         - CoreDNS - for DNS resolution
         - kube-proxy - for service networking
+
+        Note: EKS add-ons automatically create their own ServiceAccounts.
+        We only need to create IAM roles for IRSA (IAM Roles for Service Accounts)
+        and reference them via serviceAccountRoleArn in the add-on configuration.
         """
-        # Create service account for EBS CSI driver using EKS construct
-        # This handles IRSA configuration automatically
-        ebs_csi_sa = self._eks_cluster.add_service_account(
-            "EbsCsiServiceAccount",
-            name="ebs-csi-controller-sa",
-            namespace="kube-system",
+        # Use CfnJson to handle dynamic OIDC issuer URL in IAM conditions
+        # This is required because the OIDC issuer URL is a CloudFormation Token
+        # that resolves at deployment time, not synth time
+        oidc_issuer = self._eks_cluster.cluster_open_id_connect_issuer
+
+        # Create CfnJson for EBS CSI driver IRSA conditions
+        ebs_csi_conditions = cdk.CfnJson(
+            self,
+            "EbsCsiConditions",
+            value={
+                f"{oidc_issuer}:aud": "sts.amazonaws.com",
+                f"{oidc_issuer}:sub": "system:serviceaccount:kube-system:ebs-csi-controller-sa",
+            },
         )
-        ebs_csi_sa.role.add_managed_policy(
+
+        # Create IAM role for EBS CSI driver (IRSA)
+        ebs_csi_role = iam.Role(
+            self,
+            "EbsCsiDriverRole",
+            role_name=f"{self.env_config.resource_prefix}-ebs-csi-role",
+            assumed_by=iam.FederatedPrincipal(
+                self._eks_cluster.open_id_connect_provider.open_id_connect_provider_arn,
+                conditions={
+                    "StringEquals": ebs_csi_conditions,
+                },
+                assume_role_action="sts:AssumeRoleWithWebIdentity",
+            ),
+            description="IAM role for EBS CSI driver",
+        )
+        ebs_csi_role.add_managed_policy(
             iam.ManagedPolicy.from_aws_managed_policy_name(
                 "service-role/AmazonEBSCSIDriverPolicy"
             )
         )
 
-        # Create service account for FSx CSI driver
-        fsx_csi_sa = self._eks_cluster.add_service_account(
-            "FsxCsiServiceAccount",
-            name="fsx-csi-controller-sa",
-            namespace="kube-system",
+        # Create CfnJson for FSx CSI driver IRSA conditions
+        fsx_csi_conditions = cdk.CfnJson(
+            self,
+            "FsxCsiConditions",
+            value={
+                f"{oidc_issuer}:aud": "sts.amazonaws.com",
+                f"{oidc_issuer}:sub": "system:serviceaccount:kube-system:fsx-csi-controller-sa",
+            },
         )
-        fsx_csi_sa.role.add_managed_policy(
+
+        # Create IAM role for FSx CSI driver (IRSA)
+        fsx_csi_role = iam.Role(
+            self,
+            "FsxCsiDriverRole",
+            role_name=f"{self.env_config.resource_prefix}-fsx-csi-role",
+            assumed_by=iam.FederatedPrincipal(
+                self._eks_cluster.open_id_connect_provider.open_id_connect_provider_arn,
+                conditions={
+                    "StringEquals": fsx_csi_conditions,
+                },
+                assume_role_action="sts:AssumeRoleWithWebIdentity",
+            ),
+            description="IAM role for FSx CSI driver",
+        )
+        fsx_csi_role.add_managed_policy(
             iam.ManagedPolicy.from_aws_managed_policy_name(
                 "AmazonFSxFullAccess"
             )
         )
 
         # Install EBS CSI Driver add-on (EKS 1.33 compatible)
+        # The add-on will create the ServiceAccount automatically
         eks.CfnAddon(
             self,
             "EbsCsiAddon",
             addon_name="aws-ebs-csi-driver",
             cluster_name=self._eks_cluster.cluster_name,
             addon_version="v1.54.0-eksbuild.1",
-            service_account_role_arn=ebs_csi_sa.role.role_arn,
+            service_account_role_arn=ebs_csi_role.role_arn,
             resolve_conflicts="OVERWRITE",
         )
 
         # Install FSx CSI Driver add-on (EKS 1.33 compatible)
+        # The add-on will create the ServiceAccount automatically
         eks.CfnAddon(
             self,
             "FsxCsiAddon",
             addon_name="aws-fsx-csi-driver",
             cluster_name=self._eks_cluster.cluster_name,
             addon_version="v1.8.0-eksbuild.1",
-            service_account_role_arn=fsx_csi_sa.role.role_arn,
+            service_account_role_arn=fsx_csi_role.role_arn,
             resolve_conflicts="OVERWRITE",
         )
 
