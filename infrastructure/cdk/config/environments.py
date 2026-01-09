@@ -90,7 +90,7 @@ class EksConfig:
         min_nodes: Minimum nodes in auto-scaling group
         max_nodes: Maximum nodes in auto-scaling group
     """
-    kubernetes_version: str = "1.32"
+    kubernetes_version: str = "1.33"
     node_instance_types: tuple = ("p4d.24xlarge", "p5.48xlarge", "trn1.32xlarge")
     min_nodes: int = 2
     max_nodes: int = 100

@@ -15,11 +15,14 @@ Architecture:
 
 from typing import Optional
 
+import os
+
 import aws_cdk as cdk
 from aws_cdk import aws_ec2 as ec2
 from aws_cdk import aws_eks as eks
 from aws_cdk import aws_iam as iam
 from aws_cdk import aws_s3 as s3
+from aws_cdk import aws_s3_deployment as s3deploy
 from aws_cdk import aws_sagemaker as sagemaker
 from aws_cdk.lambda_layer_kubectl_v32 import KubectlV32Layer
 from constructs import Construct
@@ -116,6 +119,16 @@ class HyperPodStack(cdk.Stack):
         cdk.Tags.of(bucket).add("Name", bucket_name)
         cdk.Tags.of(bucket).add("Purpose", "hyperpod-lifecycle-scripts")
 
+        # Deploy lifecycle scripts to S3
+        assets_path = os.path.join(os.path.dirname(__file__), "..", "assets", "lifecycle-scripts")
+        s3deploy.BucketDeployment(
+            self,
+            "DeployLifecycleScripts",
+            sources=[s3deploy.Source.asset(assets_path)],
+            destination_bucket=bucket,
+            destination_key_prefix="lifecycle-scripts",
+        )
+
         return bucket
 
     def _create_eks_cluster(self) -> eks.Cluster:
@@ -206,35 +219,35 @@ class HyperPodStack(cdk.Stack):
             )
         )
 
-        # Install EBS CSI Driver add-on
+        # Install EBS CSI Driver add-on (EKS 1.33 compatible)
         eks.CfnAddon(
             self,
             "EbsCsiAddon",
             addon_name="aws-ebs-csi-driver",
             cluster_name=self._eks_cluster.cluster_name,
-            addon_version="v1.28.0-eksbuild.1",
+            addon_version="v1.54.0-eksbuild.1",
             service_account_role_arn=ebs_csi_sa.role.role_arn,
             resolve_conflicts="OVERWRITE",
         )
 
-        # Install FSx CSI Driver add-on
+        # Install FSx CSI Driver add-on (EKS 1.33 compatible)
         eks.CfnAddon(
             self,
             "FsxCsiAddon",
             addon_name="aws-fsx-csi-driver",
             cluster_name=self._eks_cluster.cluster_name,
-            addon_version="v1.9.0-eksbuild.1",
+            addon_version="v1.8.0-eksbuild.1",
             service_account_role_arn=fsx_csi_sa.role.role_arn,
             resolve_conflicts="OVERWRITE",
         )
 
-        # Install VPC CNI add-on
+        # Install VPC CNI add-on (EKS 1.33 compatible)
         eks.CfnAddon(
             self,
             "VpcCniAddon",
             addon_name="vpc-cni",
             cluster_name=self._eks_cluster.cluster_name,
-            addon_version="v1.18.3-eksbuild.1",
+            addon_version="v1.21.1-eksbuild.1",
             resolve_conflicts="OVERWRITE",
             configuration_values=cdk.Fn.to_json_string(
                 {
@@ -247,21 +260,23 @@ class HyperPodStack(cdk.Stack):
             ),
         )
 
-        # Install CoreDNS add-on
+        # Install CoreDNS add-on (EKS 1.33 compatible)
         eks.CfnAddon(
             self,
             "CoreDnsAddon",
             addon_name="coredns",
             cluster_name=self._eks_cluster.cluster_name,
+            addon_version="v1.12.4-eksbuild.1",
             resolve_conflicts="OVERWRITE",
         )
 
-        # Install kube-proxy add-on
+        # Install kube-proxy add-on (EKS 1.33 compatible)
         eks.CfnAddon(
             self,
             "KubeProxyAddon",
             addon_name="kube-proxy",
             cluster_name=self._eks_cluster.cluster_name,
+            addon_version="v1.33.5-eksbuild.2",
             resolve_conflicts="OVERWRITE",
         )
 
@@ -326,14 +341,26 @@ class HyperPodStack(cdk.Stack):
         # Get security group IDs (use EKS cluster security group)
         security_group_ids = [self._eks_cluster.cluster_security_group_id]
 
+        # Create minimal instance group for cluster validation
+        # Note: HyperPod requires at least one instance group
+        minimal_instance_group = sagemaker.CfnCluster.ClusterInstanceGroupProperty(
+            instance_group_name="controller-group",
+            instance_type="ml.m5.xlarge",  # Cost-effective for validation
+            instance_count=1,
+            life_cycle_config=sagemaker.CfnCluster.ClusterLifeCycleConfigProperty(
+                source_s3_uri=f"s3://{self._lifecycle_scripts_bucket.bucket_name}/lifecycle-scripts",
+                on_create="on_create.sh",
+            ),
+            execution_role=self._hyperpod_execution_role.role_arn,
+        )
+
         # Create HyperPod cluster
         cluster = sagemaker.CfnCluster(
             self,
             "HyperPodCluster",
             cluster_name=f"{self.env_config.resource_prefix}-hyperpod",
-            # Instance groups will be configured separately
-            # Start with empty groups - actual GPU instances added via update
-            instance_groups=[],
+            # Minimal instance group for validation
+            instance_groups=[minimal_instance_group],
             # VPC configuration - same as EKS cluster
             vpc_config=sagemaker.CfnCluster.VpcConfigProperty(
                 security_group_ids=security_group_ids,
