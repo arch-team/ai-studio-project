@@ -124,6 +124,21 @@
 
 ### 基础设施即代码 (IaC)
 - [X] [T008a] AWS CDK 项目结构 - 创建 `infrastructure/cdk/` 目录结构,初始化 CDK Python 项目 (与后端技术栈一致),配置 `cdk.json` 和 `requirements.txt`,定义 Stack 组织结构 (NetworkStack, DatabaseStack, StorageStack, ComputeStack),配置多环境支持 (dev/staging/prod)
+  - **CDK Bootstrap 配置** (状态管理基础):
+    - 执行 `cdk bootstrap aws://{account}/{region}` 初始化 CDKToolkit Stack
+    - **多环境 Bootstrap**: 为 dev/staging/prod 账户分别执行 Bootstrap,使用统一的 qualifier (默认 `hnb659fds`)
+    - **Bootstrap 存储桶验证**: 确认 `cdk-{qualifier}-assets-{account}-{region}` 存储桶已创建
+    - **默认安全配置**: 验证 Bootstrap 存储桶已启用 SSE-S3 加密和版本控制 (CDK 默认行为)
+    - **访问控制**: Bootstrap 角色仅允许 CDK 部署流程访问,禁止直接人工操作
+    - **ECR 仓库**: 验证 `cdk-{qualifier}-container-assets-{account}-{region}` ECR 仓库已创建 (用于 Docker 镜像资产)
+    - **Bootstrap 版本管理**: 记录 Bootstrap 版本号 (`cdk bootstrap --show-template` 获取),升级 CDK 时同步升级 Bootstrap
+    - **验证脚本**: 创建 `infrastructure/scripts/verify-bootstrap.sh` 验证 Bootstrap 状态完整性
+  - **并发部署控制** (状态锁定机制):
+    - **锁定机制**: 依赖 CloudFormation 原生 Stack 操作锁定 (IN_PROGRESS 状态阻止并发操作)
+    - **锁定冲突处理**: 遇到 "Stack is in UPDATE_IN_PROGRESS state" 错误时,等待当前操作完成后重试 (建议等待间隔 30 秒)
+    - **死锁恢复流程**: Stack 卡在 `*_IN_PROGRESS` 状态超过 1 小时,通过 AWS Console 取消 Stack 操作或联系平台管理员介入
+    - **生产环境保护**: 生产环境部署仅允许通过 CI/CD 流水线执行,本地 CLI 禁止直接部署 (`cdk deploy --context env=prod` 需要额外审批凭证)
+    - **部署协调**: 团队成员部署前在 Slack/Teams 频道通知,避免同时操作同一 Stack
 - [X] [T008b] AWS CDK 核心 Stacks - 编写以下基础设施 Stacks:
   - **VPC Stack**:
     - **VPC CIDR 配置**: 默认 10.0.0.0/16 (65,536 个 IP 地址),支持通过 CDK 上下文变量配置 (例如 `cdk.json` 中的 `vpcCidr` 参数或 `cdk deploy --context vpcCidr=10.0.0.0/15`)
