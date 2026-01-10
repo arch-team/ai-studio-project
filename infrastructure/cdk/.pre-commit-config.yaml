@@ -1,0 +1,113 @@
+# =============================================================================
+# Pre-commit Configuration
+# =============================================================================
+# Install: pip install pre-commit && pre-commit install
+# Run manually: pre-commit run --all-files
+# Update hooks: pre-commit autoupdate
+# =============================================================================
+
+default_language_version:
+  python: python3.11
+
+repos:
+  # ==========================================================================
+  # General hooks
+  # ==========================================================================
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.5.0
+    hooks:
+      - id: trailing-whitespace
+        name: Trim trailing whitespace
+      - id: end-of-file-fixer
+        name: Fix end of files
+      - id: check-yaml
+        name: Check YAML syntax
+        args: [--unsafe]  # Allow custom tags
+      - id: check-json
+        name: Check JSON syntax
+      - id: check-toml
+        name: Check TOML syntax
+      - id: check-added-large-files
+        name: Check for large files
+        args: [--maxkb=1000]
+      - id: check-merge-conflict
+        name: Check for merge conflicts
+      - id: detect-private-key
+        name: Detect private keys
+      - id: check-case-conflict
+        name: Check case conflicts
+
+  # ==========================================================================
+  # Python - Ruff (Linting & Formatting)
+  # ==========================================================================
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.3.0
+    hooks:
+      # Linter
+      - id: ruff
+        name: Ruff linter
+        args: [--fix, --exit-non-zero-on-fix]
+      # Formatter
+      - id: ruff-format
+        name: Ruff formatter
+
+  # ==========================================================================
+  # Python - Type Checking (mypy)
+  # ==========================================================================
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v1.8.0
+    hooks:
+      - id: mypy
+        name: Mypy type checker
+        additional_dependencies:
+          - aws-cdk-lib>=2.170.0
+          - constructs>=10.0.0
+          - types-PyYAML
+        args:
+          - --ignore-missing-imports
+          - --no-error-summary
+        pass_filenames: false
+        entry: mypy .
+
+  # ==========================================================================
+  # Security - Detect secrets
+  # ==========================================================================
+  - repo: https://github.com/Yelp/detect-secrets
+    rev: v1.4.0
+    hooks:
+      - id: detect-secrets
+        name: Detect secrets
+        args: [--baseline, .secrets.baseline]
+        exclude: |
+          (?x)^(
+            .*\.lock|
+            .*\.json|
+            cdk\.out/.*
+          )$
+
+  # ==========================================================================
+  # CDK specific checks
+  # ==========================================================================
+  - repo: local
+    hooks:
+      - id: cdk-synth-check
+        name: CDK synth check (dev)
+        entry: bash -c 'cdk synth --context env=dev --quiet > /dev/null 2>&1 || echo "Warning: CDK synth failed, but continuing..."'
+        language: system
+        pass_filenames: false
+        stages: [commit]
+        # Only run on Python files in stacks/ or config/
+        files: ^(stacks|config)/.*\.py$
+
+# =============================================================================
+# Configuration
+# =============================================================================
+ci:
+  autofix_commit_msg: |
+    [pre-commit.ci] auto fixes from pre-commit hooks
+  autofix_prs: true
+  autoupdate_branch: ''
+  autoupdate_commit_msg: '[pre-commit.ci] pre-commit autoupdate'
+  autoupdate_schedule: weekly
+  skip: [mypy, cdk-synth-check]  # Skip heavy checks in CI
+  submodules: false

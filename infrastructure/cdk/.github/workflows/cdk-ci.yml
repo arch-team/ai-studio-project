@@ -1,0 +1,283 @@
+# =============================================================================
+# CDK CI Pipeline - Pull Request Validation
+# =============================================================================
+# This workflow runs on pull requests to validate CDK code quality and synthesis.
+#
+# Stages:
+# 1. Lint: Code style and quality checks (ruff, mypy)
+# 2. Test: Unit and integration tests with coverage
+# 3. Synth: CDK synthesis for all environments
+# 4. Diff: Show infrastructure changes (for review)
+# =============================================================================
+
+name: CDK CI
+
+on:
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - 'infrastructure/cdk/**'
+      - '.github/workflows/cdk-ci.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'infrastructure/cdk/**'
+
+# Cancel in-progress runs for the same PR
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  WORKING_DIRECTORY: infrastructure/cdk
+  PYTHON_VERSION: '3.11'
+  NODE_VERSION: '20'
+
+jobs:
+  # ===========================================================================
+  # Stage 1: Lint - Code Quality Checks
+  # ===========================================================================
+  lint:
+    name: Lint & Type Check
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ${{ env.WORKING_DIRECTORY }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Cache pip dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt', '**/pyproject.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install ruff mypy
+
+      - name: Run ruff linter
+        run: ruff check .
+
+      - name: Run ruff formatter check
+        run: ruff format --check .
+
+      - name: Run mypy type checker
+        run: mypy . --ignore-missing-imports
+
+  # ===========================================================================
+  # Stage 2: Test - Unit and Integration Tests
+  # ===========================================================================
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    needs: lint
+    defaults:
+      run:
+        working-directory: ${{ env.WORKING_DIRECTORY }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Cache pip dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt', '**/pyproject.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest pytest-cov
+
+      - name: Run tests with coverage
+        run: |
+          pytest tests/ \
+            --cov=stacks \
+            --cov=config \
+            --cov-report=xml \
+            --cov-report=term-missing \
+            --junitxml=test-results.xml \
+            -v
+
+      - name: Upload test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-results
+          path: |
+            ${{ env.WORKING_DIRECTORY }}/test-results.xml
+            ${{ env.WORKING_DIRECTORY }}/coverage.xml
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        if: github.event_name == 'pull_request'
+        with:
+          files: ${{ env.WORKING_DIRECTORY }}/coverage.xml
+          flags: cdk-tests
+          fail_ci_if_error: false
+
+  # ===========================================================================
+  # Stage 3: Synth - CDK Synthesis
+  # ===========================================================================
+  synth:
+    name: CDK Synth
+    runs-on: ubuntu-latest
+    needs: test
+    strategy:
+      matrix:
+        environment: [dev, staging, prod]
+    defaults:
+      run:
+        working-directory: ${{ env.WORKING_DIRECTORY }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Cache pip dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt', '**/pyproject.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
+      - name: Install AWS CDK CLI
+        run: npm install -g aws-cdk
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: CDK Synth (${{ matrix.environment }})
+        run: |
+          cdk synth --context env=${{ matrix.environment }} --quiet
+        env:
+          CDK_DEFAULT_ACCOUNT: '123456789012'
+          CDK_DEFAULT_REGION: 'us-east-1'
+
+      - name: Upload CloudFormation templates
+        uses: actions/upload-artifact@v4
+        with:
+          name: cfn-templates-${{ matrix.environment }}
+          path: ${{ env.WORKING_DIRECTORY }}/cdk.out/
+          retention-days: 7
+
+  # ===========================================================================
+  # Stage 4: Diff - Show Infrastructure Changes (PR only)
+  # ===========================================================================
+  diff:
+    name: CDK Diff
+    runs-on: ubuntu-latest
+    needs: synth
+    if: github.event_name == 'pull_request'
+    defaults:
+      run:
+        working-directory: ${{ env.WORKING_DIRECTORY }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+        # Note: This step will be skipped if secrets are not configured
+
+      - name: Install dependencies
+        run: |
+          npm install -g aws-cdk
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: CDK Diff (dev)
+        id: diff
+        run: |
+          echo "## CDK Diff Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Comparing changes against deployed **dev** environment:" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo '```diff' >> $GITHUB_STEP_SUMMARY
+          cdk diff --context env=dev 2>&1 | tee diff-output.txt || true
+          cat diff-output.txt >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+        env:
+          CDK_DEFAULT_ACCOUNT: ${{ secrets.AWS_ACCOUNT_ID || '123456789012' }}
+          CDK_DEFAULT_REGION: 'us-east-1'
+        continue-on-error: true
+
+      - name: Comment PR with diff
+        uses: actions/github-script@v7
+        if: github.event_name == 'pull_request'
+        with:
+          script: |
+            const fs = require('fs');
+            const diffOutput = fs.existsSync('${{ env.WORKING_DIRECTORY }}/diff-output.txt')
+              ? fs.readFileSync('${{ env.WORKING_DIRECTORY }}/diff-output.txt', 'utf8')
+              : 'No diff output available (AWS credentials may not be configured)';
+
+            const body = `## CDK Infrastructure Changes
+
+            <details>
+            <summary>Click to expand diff output</summary>
+
+            \`\`\`diff
+            ${diffOutput.substring(0, 60000)}
+            \`\`\`
+
+            </details>
+
+            > Note: This diff compares against the currently deployed **dev** environment.
+            `;
+
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: body
+            });
