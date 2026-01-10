@@ -76,6 +76,7 @@ class GpuNodeGroupConstruct(Construct):
         node_role: iam.IRole,
         node_group_config: GpuNodeGroupConfig,
         subnets: ec2.SubnetSelection,
+        vpc: ec2.IVpc,
         **kwargs,
     ) -> None:
         """Initialize GPU Node Group construct.
@@ -88,12 +89,14 @@ class GpuNodeGroupConstruct(Construct):
             node_role: IAM role for the nodes
             node_group_config: Node group configuration
             subnets: Subnet selection for node placement
+            vpc: VPC for subnet resolution
             **kwargs: Additional construct properties
         """
         super().__init__(scope, construct_id, **kwargs)
 
         self.env_config = env_config
         self._node_group_config = node_group_config
+        self._vpc = vpc
 
         # Create launch template for GPU instances
         self._launch_template = self._create_launch_template(eks_cluster)
@@ -181,6 +184,10 @@ class GpuNodeGroupConstruct(Construct):
         """
         config = self._node_group_config
 
+        # Select subnets from VPC
+        selected_subnets = self._vpc.select_subnets(**subnets.__dict__)
+        subnet_ids = [subnet.subnet_id for subnet in selected_subnets.subnets]
+
         # Prepare labels with GPU-specific labels
         labels = {
             **config.labels,
@@ -212,6 +219,7 @@ class GpuNodeGroupConstruct(Construct):
             cluster_name=eks_cluster.cluster_name,
             nodegroup_name=f"{self.env_config.resource_prefix}-{config.name}",
             node_role=node_role.role_arn,
+            subnets=subnet_ids,
             # Scaling configuration
             scaling_config=eks.CfnNodegroup.ScalingConfigProperty(
                 min_size=config.min_size,
@@ -262,6 +270,7 @@ def create_default_gpu_node_groups(
     eks_cluster: eks.ICluster,
     node_role: iam.IRole,
     subnets: ec2.SubnetSelection,
+    vpc: ec2.IVpc,
 ) -> list[GpuNodeGroupConstruct]:
     """Create default GPU node groups for the platform.
 
@@ -276,6 +285,7 @@ def create_default_gpu_node_groups(
         eks_cluster: EKS cluster
         node_role: Node IAM role
         subnets: Subnet selection
+        vpc: VPC for subnet resolution
 
     Returns:
         List of created node group constructs
@@ -305,6 +315,7 @@ def create_default_gpu_node_groups(
             node_role=node_role,
             node_group_config=p4d_config,
             subnets=subnets,
+            vpc=vpc,
         )
     )
 
@@ -330,6 +341,7 @@ def create_default_gpu_node_groups(
             node_role=node_role,
             node_group_config=p5_config,
             subnets=subnets,
+            vpc=vpc,
         )
     )
 
@@ -362,6 +374,7 @@ def create_default_gpu_node_groups(
             node_role=node_role,
             node_group_config=trn1_config,
             subnets=subnets,
+            vpc=vpc,
         )
     )
 

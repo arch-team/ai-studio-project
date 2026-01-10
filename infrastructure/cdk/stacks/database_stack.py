@@ -162,7 +162,9 @@ class DatabaseStack(cdk.Stack):
         )
 
         # Create CloudWatch log group for audit logs
-        log_group = logs.LogGroup(
+        # Log group is created but not assigned as Aurora will auto-create it
+        # This explicit creation ensures proper lifecycle management
+        logs.LogGroup(
             self,
             "AuditLogGroup",
             log_group_name=f"/aws/rds/{self.env_config.resource_prefix}/aurora/audit",

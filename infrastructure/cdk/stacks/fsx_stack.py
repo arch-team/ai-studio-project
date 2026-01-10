@@ -338,11 +338,7 @@ class FsxLustreStack(cdk.Stack):
             export_name=f"{self.env_config.resource_prefix}-fsx-dns",
         )
 
-        # Mount Name (constructed from file system ID)
-        mount_name = cdk.Fn.select(
-            1,
-            cdk.Fn.split("/", cdk.Fn.select(0, self._file_system.attr_lustre_mount_name.split("/")))
-        )
+        # Mount Name output (using full Lustre mount name)
         cdk.CfnOutput(
             self,
             "FileSystemMountName",
@@ -443,16 +439,14 @@ class FsxLustreStack(cdk.Stack):
         Args:
             role: IAM role to grant access
         """
-        role.add_to_policy(
-            iam.PolicyStatement(
-                effect=iam.Effect.ALLOW,
-                actions=[
-                    "fsx:DescribeFileSystems",
-                    "fsx:DescribeDataRepositoryAssociations",
-                    "fsx:DescribeDataRepositoryTasks",
-                ],
-                resources=["*"],
-            )
+        iam.Grant.add_to_principal(
+            grantee=role,
+            actions=[
+                "fsx:DescribeFileSystems",
+                "fsx:DescribeDataRepositoryAssociations",
+                "fsx:DescribeDataRepositoryTasks",
+            ],
+            resource_arns=["*"],
         )
 
     def grant_s3_data_sync(self, role: iam.IRole) -> None:
@@ -464,13 +458,11 @@ class FsxLustreStack(cdk.Stack):
             role: IAM role to grant access
         """
         self._datasets_bucket.grant_read_write(role)
-        role.add_to_policy(
-            iam.PolicyStatement(
-                effect=iam.Effect.ALLOW,
-                actions=[
-                    "fsx:CreateDataRepositoryTask",
-                    "fsx:DescribeDataRepositoryTasks",
-                ],
-                resources=[f"arn:aws:fsx:{self.region}:{self.account}:file-system/{self._file_system.ref}"],
-            )
+        iam.Grant.add_to_principal(
+            grantee=role,
+            actions=[
+                "fsx:CreateDataRepositoryTask",
+                "fsx:DescribeDataRepositoryTasks",
+            ],
+            resource_arns=[f"arn:aws:fsx:{self.region}:{self.account}:file-system/{self._file_system.ref}"],
         )

@@ -98,6 +98,7 @@ def create_app() -> cdk.App:
     # =========================================================================
 
     # Database Stack - Aurora MySQL Serverless v2
+    # Enable termination protection for production to prevent accidental deletion
     database_stack = DatabaseStack(
         app,
         f"{stack_prefix}-database",
@@ -105,16 +106,19 @@ def create_app() -> cdk.App:
         vpc=network_stack.vpc,
         env=env_config.to_cdk_environment(),
         description="Aurora MySQL Serverless v2 with RDS Proxy",
+        termination_protection=env_config.name.value == "prod",
     )
     database_stack.add_dependency(network_stack)
 
     # Storage Stack - S3 buckets for datasets, models, checkpoints
+    # Enable termination protection for production to prevent accidental deletion
     storage_stack = StorageStack(
         app,
         f"{stack_prefix}-storage",
         env_config=env_config,
         env=env_config.to_cdk_environment(),
         description="S3 buckets with lifecycle policies and KMS encryption",
+        termination_protection=env_config.name.value == "prod",
     )
 
     # =========================================================================
@@ -159,6 +163,7 @@ def create_app() -> cdk.App:
     # =========================================================================
 
     # FSx for Lustre Stack - High-performance training data storage
+    # Enable termination protection for production to prevent accidental deletion
     fsx_stack = FsxLustreStack(
         app,
         f"{stack_prefix}-fsx",
@@ -167,6 +172,7 @@ def create_app() -> cdk.App:
         datasets_bucket=storage_stack.datasets_bucket,
         env=env_config.to_cdk_environment(),
         description="FSx for Lustre with S3 Data Repository Association",
+        termination_protection=env_config.name.value == "prod",
     )
     fsx_stack.add_dependency(network_stack)
     fsx_stack.add_dependency(storage_stack)

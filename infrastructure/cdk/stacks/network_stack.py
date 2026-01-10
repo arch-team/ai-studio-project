@@ -146,7 +146,7 @@ class NetworkStack(cdk.Stack):
         }
         return az_mapping.get(mode, 3)
 
-    def _validate_subnet_capacity(self, vpc: ec2.Vpc) -> None:
+    def _validate_subnet_capacity(self, _vpc: ec2.Vpc) -> None:
         """Validate subnet capacity meets node scaling requirements.
 
         Target: Support ≥1000 nodes
@@ -154,6 +154,8 @@ class NetworkStack(cdk.Stack):
 
         For /19 subnets: 8,192 IPs × 3 AZs = 24,576 IPs
         Max nodes: 24,576 / 20 ≈ 1,228 nodes ✓
+
+        Note: VPC parameter reserved for future detailed capacity validation.
         """
         # Add annotation for capacity validation
         cdk.Annotations.of(self).add_info(
