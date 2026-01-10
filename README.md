@@ -15,31 +15,30 @@
 
 ### 后端
 - Python 3.11+
-- FastAPI
+- FastAPI 0.109+
 - SQLAlchemy 2.0 (异步ORM)
 - Alembic (数据库迁移)
-- PostgreSQL
-- Redis
+- MySQL 8.0 / Amazon Aurora MySQL (生产环境)
 - AWS SDK (Boto3)
-- Kubernetes Python Client
+- SageMaker HyperPod SDK
 
 ### 前端
-- TypeScript
+- TypeScript 5.3+
 - React 18
 - React Router v6
 - Zustand (状态管理)
-- TanStack Query
-- Vite
-- Recharts (图表)
+- TanStack Query v5
+- Vite 5.0+
+- AWS Cloudscape Design System (UI组件库)
 
 ### 基础设施
+- AWS CDK (Python) - IaC
 - AWS SageMaker HyperPod with EKS
 - HyperPod Training Operator
 - HyperPod Task Governance (Kueue)
 - HyperPod Observability Add-on
-- Amazon FSx for Lustre
-- Amazon S3
-- Amazon EFS
+- Amazon FSx for Lustre (高性能训练存储)
+- Amazon S3 (模型制品/检查点)
 
 ## 快速开始
 
@@ -89,7 +88,7 @@ npm run dev
 ```
 
 4. **访问应用**
-- 前端: http://localhost:3000
+- 前端: http://localhost:5173
 - 后端API: http://localhost:8000
 - API文档: http://localhost:8000/docs
 
@@ -112,28 +111,27 @@ alembic downgrade -1
 
 ```
 .
-├── backend/                 # 后端服务
+├── backend/                 # 后端服务 (FastAPI)
 │   ├── src/                # 源代码
-│   │   ├── api/           # API层
-│   │   ├── models/        # 数据模型
+│   │   ├── api/           # API路由
+│   │   ├── models/        # SQLAlchemy模型
+│   │   ├── schemas/       # Pydantic模式
 │   │   ├── services/      # 业务逻辑
-│   │   └── config/        # 配置
-│   ├── k8s/               # Kubernetes资源
+│   │   └── core/          # 核心配置
 │   ├── alembic/           # 数据库迁移
-│   ├── tests/             # 测试
 │   └── requirements.txt   # Python依赖
-├── frontend/               # 前端应用
-│   ├── src/               # 源代码
-│   │   ├── components/    # React组件
-│   │   ├── pages/         # 页面
-│   │   ├── services/      # API客户端
-│   │   └── types/         # TypeScript类型
-│   └── package.json       # Node依赖
-├── infra/                  # 基础设施代码
-│   ├── cdk/               # AWS CDK
-│   ├── helm/              # Helm charts
-│   └── argocd/            # ArgoCD配置
-├── specs/                  # 功能规范
+├── frontend/               # 前端应用 (React + Vite)
+│   └── src/
+│       ├── pages/         # 页面组件
+│       ├── layouts/       # 布局组件
+│       ├── hooks/         # 自定义Hooks
+│       ├── store/         # Zustand状态
+│       └── types/         # TypeScript类型
+├── infrastructure/         # 基础设施代码
+│   ├── cdk/               # AWS CDK (Python)
+│   └── k8s/               # Kubernetes资源
+├── specs/                  # 功能规范文档
+├── claudedocs/            # 项目文档
 └── docker-compose.yml      # 本地开发配置
 ```
 
@@ -190,13 +188,15 @@ aws eks update-kubeconfig --name <cluster-name> --region <region>
 
 2. **使用Helm部署**
 ```bash
-cd infra/helm
+cd infrastructure/k8s
 helm install ai-platform ./ai-platform -n ai-training-platform --create-namespace
 ```
 
-3. **使用ArgoCD部署（GitOps）**
+3. **使用CDK部署基础设施**
 ```bash
-kubectl apply -f infra/argocd/applications/
+cd infrastructure/cdk
+source .venv/bin/activate
+cdk deploy --context env=dev
 ```
 
 ## 监控和日志
