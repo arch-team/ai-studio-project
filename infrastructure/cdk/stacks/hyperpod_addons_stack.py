@@ -25,9 +25,18 @@ Reference:
 import aws_cdk as cdk
 from aws_cdk import aws_eks as eks
 from aws_cdk import aws_iam as iam
+from constructs import Construct
 
 from config import EnvironmentConfig
-from constructs import Construct
+from config.constants import (
+    EKS_ADDON_NAMES,
+    K8S_NAMESPACES,
+    MANAGED_POLICIES,
+    SERVICE_ACCOUNTS,
+)
+from utils.iam_helpers import create_pod_identity_role
+from utils.outputs import create_output
+from utils.tagging import apply_component_tag, create_addon_tags
 
 
 class HyperPodAddonsStack(cdk.Stack):
@@ -51,12 +60,6 @@ class HyperPodAddonsStack(cdk.Stack):
         task_governance_addon: The Task Governance (Kueue) EKS add-on
         observability_addon: The Observability (Prometheus + Grafana) EKS add-on
     """
-
-    # Official HyperPod EKS Add-on names
-    # Reference: https://docs.aws.amazon.com/eks/latest/userguide/workloads-add-ons-available-eks.html
-    TRAINING_OPERATOR_ADDON = "amazon-sagemaker-hyperpod-training-operator"
-    TASK_GOVERNANCE_ADDON = "amazon-sagemaker-hyperpod-taskgovernance"  # Note: no hyphen
-    OBSERVABILITY_ADDON = "amazon-sagemaker-hyperpod-observability"
 
     def __init__(
         self,
@@ -108,46 +111,16 @@ class HyperPodAddonsStack(cdk.Stack):
         This role is assumed by the Training Operator controller manager pod
         via EKS Pod Identity to access SageMaker APIs for node health checks.
 
-        EKS Pod Identity requires trust policy with both sts:AssumeRole and sts:TagSession.
-
         Reference: https://docs.aws.amazon.com/sagemaker/latest/dg/sagemaker-eks-operator-install.html
         """
-        # Create custom assume role policy for EKS Pod Identity
-        # Must include both sts:AssumeRole and sts:TagSession actions
-        assume_role_policy = iam.PolicyDocument(
-            statements=[
-                iam.PolicyStatement(
-                    effect=iam.Effect.ALLOW,
-                    principals=[iam.ServicePrincipal("pods.eks.amazonaws.com")],
-                    actions=["sts:AssumeRole", "sts:TagSession"],
-                )
-            ]
-        )
-
-        role = iam.Role(
-            self,
-            "TrainingOperatorRole",
-            role_name=f"{self.env_config.resource_prefix}-training-operator-role",
-            assumed_by=iam.ServicePrincipal("pods.eks.amazonaws.com"),  # Placeholder, overridden below
+        return create_pod_identity_role(
+            scope=self,
+            construct_id="TrainingOperatorRole",
+            env_config=self.env_config,
+            role_name_suffix="training-operator-role",
             description="IAM role for HyperPod Training Operator Pod Identity",
+            managed_policies=[MANAGED_POLICIES.HYPERPOD_TRAINING_OPERATOR],
         )
-
-        # Override the assume role policy with our custom one that includes sts:TagSession
-        cfn_role = role.node.default_child
-        cfn_role.assume_role_policy_document = assume_role_policy.to_json()
-
-        # Attach the managed policy for Training Operator
-        role.add_managed_policy(
-            iam.ManagedPolicy.from_aws_managed_policy_name(
-                "AmazonSageMakerHyperPodTrainingOperatorAccess"
-            )
-        )
-
-        cdk.Tags.of(role).add(
-            "Name", f"{self.env_config.resource_prefix}-training-operator-role"
-        )
-
-        return role
 
     def _create_training_operator_pod_identity(self) -> eks.CfnPodIdentityAssociation:
         """Create EKS Pod Identity Association for Training Operator.
@@ -159,15 +132,15 @@ class HyperPodAddonsStack(cdk.Stack):
             self,
             "TrainingOperatorPodIdentity",
             cluster_name=self._eks_cluster.cluster_name,
-            namespace="aws-hyperpod",
-            service_account="hp-training-operator-controller-manager",
+            namespace=K8S_NAMESPACES.HYPERPOD,
+            service_account=SERVICE_ACCOUNTS.TRAINING_OPERATOR,
             role_arn=self._training_operator_role.role_arn,
         )
 
         # Ensure association is created after the add-on (which creates the ServiceAccount)
         association.add_dependency(self._training_operator_addon)
 
-        cdk.Tags.of(association).add("Component", "training-operator")
+        apply_component_tag(association, "training-operator")
 
         return association
 
@@ -185,14 +158,10 @@ class HyperPodAddonsStack(cdk.Stack):
         addon = eks.CfnAddon(
             self,
             "TrainingOperatorAddon",
-            addon_name=self.TRAINING_OPERATOR_ADDON,
+            addon_name=EKS_ADDON_NAMES.TRAINING_OPERATOR,
             cluster_name=self._eks_cluster.cluster_name,
             resolve_conflicts="OVERWRITE",
-            tags=[
-                cdk.CfnTag(key="Name", value=f"{self.env_config.resource_prefix}-training-operator"),
-                cdk.CfnTag(key="Component", value="training-operator"),
-                cdk.CfnTag(key="ManagedBy", value="cdk"),
-            ],
+            tags=create_addon_tags(self.env_config, "training-operator", "training-operator"),
         )
 
         # Add description tag
@@ -218,14 +187,10 @@ class HyperPodAddonsStack(cdk.Stack):
         addon = eks.CfnAddon(
             self,
             "TaskGovernanceAddon",
-            addon_name=self.TASK_GOVERNANCE_ADDON,
+            addon_name=EKS_ADDON_NAMES.TASK_GOVERNANCE,
             cluster_name=self._eks_cluster.cluster_name,
             resolve_conflicts="OVERWRITE",
-            tags=[
-                cdk.CfnTag(key="Name", value=f"{self.env_config.resource_prefix}-task-governance"),
-                cdk.CfnTag(key="Component", value="task-governance"),
-                cdk.CfnTag(key="ManagedBy", value="cdk"),
-            ],
+            tags=create_addon_tags(self.env_config, "task-governance", "task-governance"),
         )
 
         # Ensure Task Governance is installed after Training Operator
@@ -257,14 +222,10 @@ class HyperPodAddonsStack(cdk.Stack):
         addon = eks.CfnAddon(
             self,
             "ObservabilityAddon",
-            addon_name=self.OBSERVABILITY_ADDON,
+            addon_name=EKS_ADDON_NAMES.OBSERVABILITY,
             cluster_name=self._eks_cluster.cluster_name,
             resolve_conflicts="OVERWRITE",
-            tags=[
-                cdk.CfnTag(key="Name", value=f"{self.env_config.resource_prefix}-observability"),
-                cdk.CfnTag(key="Component", value="observability"),
-                cdk.CfnTag(key="ManagedBy", value="cdk"),
-            ],
+            tags=create_addon_tags(self.env_config, "observability", "observability"),
         )
 
         # Ensure Observability is installed after Training Operator
@@ -281,29 +242,29 @@ class HyperPodAddonsStack(cdk.Stack):
     def _create_outputs(self) -> None:
         """Create CloudFormation outputs for cross-stack references."""
         # T008d-1 outputs
-        cdk.CfnOutput(
+        create_output(
             self,
             "TrainingOperatorAddonName",
-            value=self._training_operator_addon.addon_name,
-            description="HyperPod Training Operator add-on name",
+            self._training_operator_addon.addon_name,
+            "HyperPod Training Operator add-on name",
             export_name=f"{self.env_config.resource_prefix}-training-operator-addon",
         )
 
-        cdk.CfnOutput(
+        create_output(
             self,
             "TaskGovernanceAddonName",
-            value=self._task_governance_addon.addon_name,
-            description="HyperPod Task Governance add-on name - includes PriorityClass config",
+            self._task_governance_addon.addon_name,
+            "HyperPod Task Governance add-on name - includes PriorityClass config",
             export_name=f"{self.env_config.resource_prefix}-task-governance-addon",
         )
 
         # T008d-2 outputs (only if Observability is enabled)
         if self._observability_addon is not None:
-            cdk.CfnOutput(
+            create_output(
                 self,
                 "ObservabilityAddonName",
-                value=self._observability_addon.addon_name,
-                description="HyperPod Observability add-on name - Amazon Managed Prometheus and Grafana",
+                self._observability_addon.addon_name,
+                "HyperPod Observability add-on name - Amazon Managed Prometheus and Grafana",
                 export_name=f"{self.env_config.resource_prefix}-observability-addon",
             )
         else:

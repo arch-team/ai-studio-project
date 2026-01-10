@@ -21,9 +21,18 @@ from aws_cdk import aws_iam as iam
 from aws_cdk import aws_s3 as s3
 from aws_cdk import aws_s3_deployment as s3deploy
 from aws_cdk import aws_sagemaker as sagemaker
+from constructs import Construct
 
 from config import EnvironmentConfig
-from constructs import Construct
+from config.constants import (
+    INSTANCE_GROUPS,
+    MANAGED_POLICIES,
+    SAGEMAKER_INSTANCES,
+    TAG_KEYS,
+)
+from utils.iam_helpers import add_policy_statement, create_tagged_role
+from utils.outputs import create_output
+from utils.tagging import apply_standard_tags, create_cfn_tags
 
 
 class SagemakerHyperPodStack(cdk.Stack):
@@ -96,12 +105,11 @@ class SagemakerHyperPodStack(cdk.Stack):
             versioned=True,
             block_public_access=s3.BlockPublicAccess.BLOCK_ALL,
             enforce_ssl=True,
-            # Use protection config for removal policy
             removal_policy=self.env_config.protection.removal_policy,
             auto_delete_objects=not self.env_config.protection.retain_on_delete,
         )
 
-        cdk.Tags.of(bucket).add("Name", bucket_name)
+        cdk.Tags.of(bucket).add(TAG_KEYS.NAME, bucket_name)
         cdk.Tags.of(bucket).add("Purpose", "hyperpod-lifecycle-scripts")
 
         # Deploy lifecycle scripts to S3
@@ -127,109 +135,115 @@ class SagemakerHyperPodStack(cdk.Stack):
         - Communicate with EKS API
         - Access VPC/subnet information (required for EKS orchestration)
         """
-        role = iam.Role(
-            self,
-            "HyperPodExecutionRole",
-            role_name=f"{self.env_config.resource_prefix}-hyperpod-execution-role",
-            assumed_by=iam.ServicePrincipal("sagemaker.amazonaws.com"),
+        role = create_tagged_role(
+            scope=self,
+            construct_id="HyperPodExecutionRole",
+            env_config=self.env_config,
+            role_name_suffix="hyperpod-execution-role",
             description="Execution role for SageMaker HyperPod cluster instances",
-        )
-
-        # Attach the managed HyperPod policy
-        role.add_managed_policy(
-            iam.ManagedPolicy.from_aws_managed_policy_name(
-                "AmazonSageMakerClusterInstanceRolePolicy"
-            )
+            assumed_by=iam.ServicePrincipal("sagemaker.amazonaws.com"),
+            managed_policies=[MANAGED_POLICIES.SAGEMAKER_CLUSTER_INSTANCE],
         )
 
         # Add S3 access for lifecycle scripts bucket
         self._lifecycle_scripts_bucket.grant_read(role)
 
         # Add EKS permissions for HyperPod to interact with the cluster
-        role.add_to_policy(
-            iam.PolicyStatement(
-                sid="EksClusterAccess",
-                effect=iam.Effect.ALLOW,
-                actions=[
-                    "eks:DescribeCluster",
-                    "eks:ListNodegroups",
-                    "eks:DescribeNodegroup",
-                ],
-                resources=[self._eks_cluster.cluster_arn],
-            )
+        add_policy_statement(
+            role,
+            sid="EksClusterAccess",
+            actions=[
+                "eks:DescribeCluster",
+                "eks:ListNodegroups",
+                "eks:DescribeNodegroup",
+            ],
+            resources=[self._eks_cluster.cluster_arn],
         )
 
         # Add EC2 permissions required for EKS-orchestrated HyperPod
-        # These permissions are required for HyperPod to retrieve subnet info
-        # and manage network interfaces in customer VPC
         # Reference: https://docs.aws.amazon.com/sagemaker/latest/dg/sagemaker-hyperpod-prerequisites-iam.html
-        role.add_to_policy(
-            iam.PolicyStatement(
-                sid="Ec2NetworkAccess",
-                effect=iam.Effect.ALLOW,
-                actions=[
-                    "ec2:AssignPrivateIpAddresses",
-                    "ec2:AttachNetworkInterface",
-                    "ec2:CreateNetworkInterface",
-                    "ec2:CreateNetworkInterfacePermission",
-                    "ec2:DeleteNetworkInterface",
-                    "ec2:DeleteNetworkInterfacePermission",
-                    "ec2:DescribeInstances",
-                    "ec2:DescribeInstanceTypes",
-                    "ec2:DescribeNetworkInterfaces",
-                    "ec2:DescribeTags",
-                    "ec2:DescribeVpcs",
-                    "ec2:DescribeDhcpOptions",
-                    "ec2:DescribeSubnets",
-                    "ec2:DescribeSecurityGroups",
-                    "ec2:DetachNetworkInterface",
-                    "ec2:ModifyNetworkInterfaceAttribute",
-                    "ec2:UnassignPrivateIpAddresses",
-                ],
-                resources=["*"],
-            )
+        add_policy_statement(
+            role,
+            sid="Ec2NetworkAccess",
+            actions=[
+                "ec2:AssignPrivateIpAddresses",
+                "ec2:AttachNetworkInterface",
+                "ec2:CreateNetworkInterface",
+                "ec2:CreateNetworkInterfacePermission",
+                "ec2:DeleteNetworkInterface",
+                "ec2:DeleteNetworkInterfacePermission",
+                "ec2:DescribeInstances",
+                "ec2:DescribeInstanceTypes",
+                "ec2:DescribeNetworkInterfaces",
+                "ec2:DescribeTags",
+                "ec2:DescribeVpcs",
+                "ec2:DescribeDhcpOptions",
+                "ec2:DescribeSubnets",
+                "ec2:DescribeSecurityGroups",
+                "ec2:DetachNetworkInterface",
+                "ec2:ModifyNetworkInterfaceAttribute",
+                "ec2:UnassignPrivateIpAddresses",
+            ],
+            resources=["*"],
         )
 
         # Add EC2 CreateTags permission for network interfaces
-        role.add_to_policy(
-            iam.PolicyStatement(
-                sid="Ec2CreateTags",
-                effect=iam.Effect.ALLOW,
-                actions=["ec2:CreateTags"],
-                resources=["arn:aws:ec2:*:*:network-interface/*"],
-            )
+        add_policy_statement(
+            role,
+            sid="Ec2CreateTags",
+            actions=["ec2:CreateTags"],
+            resources=["arn:aws:ec2:*:*:network-interface/*"],
         )
 
         # Add ECR permissions for pulling container images
-        role.add_to_policy(
-            iam.PolicyStatement(
-                sid="EcrAccess",
-                effect=iam.Effect.ALLOW,
-                actions=[
-                    "ecr:BatchCheckLayerAvailability",
-                    "ecr:BatchGetImage",
-                    "ecr:GetAuthorizationToken",
-                    "ecr:GetDownloadUrlForLayer",
-                ],
-                resources=["*"],
-            )
+        add_policy_statement(
+            role,
+            sid="EcrAccess",
+            actions=[
+                "ecr:BatchCheckLayerAvailability",
+                "ecr:BatchGetImage",
+                "ecr:GetAuthorizationToken",
+                "ecr:GetDownloadUrlForLayer",
+            ],
+            resources=["*"],
         )
 
         # Add EKS Pod Identity permission (optional but recommended)
-        role.add_to_policy(
-            iam.PolicyStatement(
-                sid="EksPodIdentity",
-                effect=iam.Effect.ALLOW,
-                actions=["eks-auth:AssumeRoleForPodIdentity"],
-                resources=["*"],
-            )
-        )
-
-        cdk.Tags.of(role).add(
-            "Name", f"{self.env_config.resource_prefix}-hyperpod-execution-role"
+        add_policy_statement(
+            role,
+            sid="EksPodIdentity",
+            actions=["eks-auth:AssumeRoleForPodIdentity"],
+            resources=["*"],
         )
 
         return role
+
+    def _create_instance_group(
+        self,
+        name: str,
+        instance_type: str,
+        instance_count: int = 1,
+    ) -> sagemaker.CfnCluster.ClusterInstanceGroupProperty:
+        """Create a HyperPod instance group configuration.
+
+        Args:
+            name: Instance group name
+            instance_type: SageMaker instance type (e.g., ml.m5.xlarge)
+            instance_count: Number of instances
+
+        Returns:
+            ClusterInstanceGroupProperty for the instance group
+        """
+        return sagemaker.CfnCluster.ClusterInstanceGroupProperty(
+            instance_group_name=name,
+            instance_type=instance_type,
+            instance_count=instance_count,
+            life_cycle_config=sagemaker.CfnCluster.ClusterLifeCycleConfigProperty(
+                source_s3_uri=f"s3://{self._lifecycle_scripts_bucket.bucket_name}/lifecycle-scripts",
+                on_create="on_create.sh",
+            ),
+            execution_role=self._hyperpod_execution_role.role_arn,
+        )
 
     def _create_hyperpod_cluster(self) -> sagemaker.CfnCluster:
         """Create SageMaker HyperPod cluster with EKS orchestration.
@@ -244,96 +258,72 @@ class SagemakerHyperPodStack(cdk.Stack):
         # Get security group IDs (use EKS cluster security group)
         security_group_ids = [self._eks_cluster.cluster_security_group_id]
 
-        # Create minimal instance group for cluster controller
-        # Note: HyperPod requires at least one instance group
-        controller_instance_group = sagemaker.CfnCluster.ClusterInstanceGroupProperty(
-            instance_group_name="controller-group",
-            instance_type="ml.m5.xlarge",  # Cost-effective for controller
+        # Create instance groups using helper method
+        controller_group = self._create_instance_group(
+            name=INSTANCE_GROUPS.CONTROLLER,
+            instance_type=SAGEMAKER_INSTANCES.CONTROLLER,
             instance_count=1,
-            life_cycle_config=sagemaker.CfnCluster.ClusterLifeCycleConfigProperty(
-                source_s3_uri=f"s3://{self._lifecycle_scripts_bucket.bucket_name}/lifecycle-scripts",
-                on_create="on_create.sh",
-            ),
-            execution_role=self._hyperpod_execution_role.role_arn,
         )
 
-        # Create larger instance group for system add-ons and workloads
         # ml.m5.4xlarge supports ~234 pods (8 ENIs × 30 IPs per ENI)
-        # This is much larger than ml.m5.xlarge's ~14 pods limit
-        system_instance_group = sagemaker.CfnCluster.ClusterInstanceGroupProperty(
-            instance_group_name="system-group",
-            instance_type="ml.m5.4xlarge",  # Large instance for high pods capacity (~234 pods)
+        system_group = self._create_instance_group(
+            name=INSTANCE_GROUPS.SYSTEM,
+            instance_type=SAGEMAKER_INSTANCES.SYSTEM,
             instance_count=1,
-            life_cycle_config=sagemaker.CfnCluster.ClusterLifeCycleConfigProperty(
-                source_s3_uri=f"s3://{self._lifecycle_scripts_bucket.bucket_name}/lifecycle-scripts",
-                on_create="on_create.sh",
-            ),
-            execution_role=self._hyperpod_execution_role.role_arn,
         )
 
-        # Create HyperPod cluster
+        # Create HyperPod cluster with standard tags + SageMaker=true
         cluster = sagemaker.CfnCluster(
             self,
             "HyperPodCluster",
             cluster_name=f"{self.env_config.resource_prefix}-hyperpod",
-            # Instance groups: controller + system nodes
-            instance_groups=[controller_instance_group, system_instance_group],
-            # VPC configuration - same as EKS cluster
+            instance_groups=[controller_group, system_group],
             vpc_config=sagemaker.CfnCluster.VpcConfigProperty(
                 security_group_ids=security_group_ids,
                 subnets=private_subnet_ids,
             ),
-            # EKS orchestrator configuration
             orchestrator=sagemaker.CfnCluster.OrchestratorProperty(
                 eks=sagemaker.CfnCluster.ClusterOrchestratorEksConfigProperty(
                     cluster_arn=self._eks_cluster.cluster_arn,
                 )
             ),
-            # Enable automatic node recovery
             node_recovery="Automatic",
-            # Tags - SageMaker=true is required by AmazonSageMakerHyperPodTrainingOperatorAccess policy
-            tags=[
-                cdk.CfnTag(
-                    key="Name", value=f"{self.env_config.resource_prefix}-hyperpod"
-                ),
-                cdk.CfnTag(key="Environment", value=self.env_config.name.value),
-                cdk.CfnTag(key="ManagedBy", value="cdk"),
-                cdk.CfnTag(key="SageMaker", value="true"),  # Required for Training Operator
-            ],
+            # SageMaker=true is required by AmazonSageMakerHyperPodTrainingOperatorAccess policy
+            tags=create_cfn_tags(
+                self.env_config,
+                "hyperpod",
+                additional_tags={TAG_KEYS.SAGEMAKER: "true"},
+            ),
         )
 
-        # Ensure HyperPod cluster is created after the IAM role and its policies are fully created
-        # This prevents "Unable to retrieve subnets" error due to IAM propagation delay
+        # Ensure HyperPod cluster is created after the IAM role
         cluster.node.add_dependency(self._hyperpod_execution_role)
 
         return cluster
 
     def _create_outputs(self) -> None:
         """Create CloudFormation outputs for cross-stack references."""
-        # HyperPod Cluster outputs
-        cdk.CfnOutput(
+        create_output(
             self,
             "HyperPodClusterArn",
-            value=self._hyperpod_cluster.attr_cluster_arn,
-            description="SageMaker HyperPod cluster ARN",
+            self._hyperpod_cluster.attr_cluster_arn,
+            "SageMaker HyperPod cluster ARN",
             export_name=f"{self.env_config.resource_prefix}-hyperpod-arn",
         )
 
-        # Lifecycle scripts bucket
-        cdk.CfnOutput(
+        create_output(
             self,
             "LifecycleScriptsBucketName",
-            value=self._lifecycle_scripts_bucket.bucket_name,
-            description="S3 bucket for HyperPod lifecycle scripts",
+            self._lifecycle_scripts_bucket.bucket_name,
+            "S3 bucket for HyperPod lifecycle scripts",
             export_name=f"{self.env_config.resource_prefix}-lifecycle-bucket",
         )
 
-        # Execution role
-        cdk.CfnOutput(
+        create_output(
             self,
             "HyperPodExecutionRoleArn",
-            value=self._hyperpod_execution_role.role_arn,
-            description="HyperPod execution role ARN",
+            self._hyperpod_execution_role.role_arn,
+            "HyperPod execution role ARN",
             export_name=f"{self.env_config.resource_prefix}-hyperpod-execution-role-arn",
         )
 
