@@ -119,7 +119,41 @@ class DatabaseStack(cdk.Stack):
         )
 
     def _create_parameter_group(self) -> rds.ParameterGroup:
-        """Create cluster parameter group with optimized settings."""
+        """创建数据库参数组，按功能分类配置。"""
+
+        # 性能优化参数
+        performance_params = {
+            "innodb_buffer_pool_size": "{DBInstanceClassMemory*3/4}",
+            "max_connections": "LEAST({DBInstanceClassMemory/9531392},5000)",
+        }
+
+        # 字符集配置（UTF-8 支持）
+        charset_params = {
+            "character_set_server": "utf8mb4",
+            "character_set_client": "utf8mb4",
+            "collation_server": "utf8mb4_unicode_ci",
+        }
+
+        # 查询日志配置（开发环境启用，生产环境禁用）
+        is_dev = self.env_config.name.value == "dev"
+        query_log_params = {
+            "slow_query_log": "1" if is_dev else "0",
+            "long_query_time": "2",
+        }
+
+        # 时区配置
+        timezone_params = {
+            "time_zone": "UTC",
+        }
+
+        # 合并所有参数
+        all_parameters = {
+            **performance_params,
+            **charset_params,
+            **query_log_params,
+            **timezone_params,
+        }
+
         return rds.ParameterGroup(
             self,
             "ParameterGroup",
@@ -127,20 +161,7 @@ class DatabaseStack(cdk.Stack):
                 version=rds.AuroraMysqlEngineVersion.VER_3_04_0
             ),
             description="Parameter group for AI Training Platform Aurora MySQL",
-            parameters={
-                # Performance optimizations
-                "innodb_buffer_pool_size": "{DBInstanceClassMemory*3/4}",
-                "max_connections": "LEAST({DBInstanceClassMemory/9531392},5000)",
-                # Character set for UTF-8 support
-                "character_set_server": "utf8mb4",
-                "character_set_client": "utf8mb4",
-                "collation_server": "utf8mb4_unicode_ci",
-                # Query logging for debugging (disable in production)
-                "slow_query_log": "1",
-                "long_query_time": "2",
-                # Timezone
-                "time_zone": "UTC",
-            },
+            parameters=all_parameters,
         )
 
     def _create_aurora_cluster(self) -> rds.DatabaseCluster:
@@ -271,62 +292,53 @@ class DatabaseStack(cdk.Stack):
         return proxy
 
     def _create_outputs(self) -> None:
-        """Create CloudFormation outputs for cross-stack references."""
-        # Cluster endpoint
-        cdk.CfnOutput(
+        """创建 CloudFormation 输出用于跨 Stack 引用。"""
+        from utils import create_output, create_outputs_batch
+
+        # 批量创建基础输出
+        create_outputs_batch(
             self,
-            "ClusterEndpoint",
-            value=self._cluster.cluster_endpoint.hostname,
-            description="Aurora cluster writer endpoint",
-            export_name=f"{self.env_config.resource_prefix}-aurora-endpoint",
+            [
+                (
+                    "ClusterEndpoint",
+                    self._cluster.cluster_endpoint.hostname,
+                    "Aurora cluster writer endpoint",
+                ),
+                (
+                    "ReaderEndpoint",
+                    self._cluster.cluster_read_endpoint.hostname,
+                    "Aurora cluster reader endpoint",
+                ),
+                (
+                    "Port",
+                    str(self._cluster.cluster_endpoint.port),
+                    "Aurora cluster port",
+                ),
+                (
+                    "SecurityGroupId",
+                    self._security_group.security_group_id,
+                    "Aurora security group ID",
+                ),
+            ],
         )
 
-        # Reader endpoint
-        cdk.CfnOutput(
-            self,
-            "ReaderEndpoint",
-            value=self._cluster.cluster_read_endpoint.hostname,
-            description="Aurora cluster reader endpoint",
-            export_name=f"{self.env_config.resource_prefix}-aurora-reader-endpoint",
-        )
-
-        # Port
-        cdk.CfnOutput(
-            self,
-            "Port",
-            value=str(self._cluster.cluster_endpoint.port),
-            description="Aurora cluster port",
-            export_name=f"{self.env_config.resource_prefix}-aurora-port",
-        )
-
-        # Secret ARN
+        # 条件输出 - Secret ARN
         if self._secret:
-            cdk.CfnOutput(
+            create_output(
                 self,
                 "SecretArn",
-                value=self._secret.secret_arn,
-                description="Secrets Manager secret ARN for database credentials",
-                export_name=f"{self.env_config.resource_prefix}-aurora-secret-arn",
+                self._secret.secret_arn,
+                "Secrets Manager secret ARN for database credentials",
             )
 
-        # Proxy endpoint (if enabled)
+        # 条件输出 - RDS Proxy endpoint
         if self._proxy:
-            cdk.CfnOutput(
+            create_output(
                 self,
                 "ProxyEndpoint",
-                value=self._proxy.endpoint,
-                description="RDS Proxy endpoint",
-                export_name=f"{self.env_config.resource_prefix}-aurora-proxy-endpoint",
+                self._proxy.endpoint,
+                "RDS Proxy endpoint",
             )
-
-        # Security group ID
-        cdk.CfnOutput(
-            self,
-            "SecurityGroupId",
-            value=self._security_group.security_group_id,
-            description="Aurora security group ID",
-            export_name=f"{self.env_config.resource_prefix}-aurora-sg-id",
-        )
 
     @property
     def cluster(self) -> rds.DatabaseCluster:

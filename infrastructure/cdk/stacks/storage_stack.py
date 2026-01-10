@@ -20,6 +20,7 @@ from aws_cdk import aws_s3 as s3
 
 from config import EnvironmentConfig
 from constructs import Construct
+from utils import LifecycleRuleBuilder
 
 
 class StorageStack(cdk.Stack):
@@ -138,41 +139,27 @@ class StorageStack(cdk.Stack):
         return bucket
 
     def _create_datasets_bucket(self) -> s3.Bucket:
-        """Create S3 bucket for training datasets.
+        """创建训练数据集 S3 bucket。
 
-        Lifecycle policy:
-        - Move infrequently accessed data to Standard-IA after 90 days
-        - Move to Glacier after 365 days (long-term archival)
+        生命周期策略:
+        - 90 天后转换到 Standard-IA
+        - 365 天后转换到 Glacier（长期归档）
+        - 7 天后删除未完成的分片上传
+        - 90 天后删除旧版本
         """
         bucket_name = f"{self.env_config.resource_prefix}-datasets"
+        builder = LifecycleRuleBuilder()
 
         lifecycle_rules = [
-            s3.LifecycleRule(
-                id="TransitionToIA",
-                enabled=True,
-                transitions=[
-                    s3.Transition(
-                        storage_class=s3.StorageClass.INFREQUENT_ACCESS,
-                        transition_after=Duration.days(90),
-                    ),
-                    s3.Transition(
-                        storage_class=s3.StorageClass.GLACIER,
-                        transition_after=Duration.days(365),
-                    ),
+            builder.transition_rule(
+                "TransitionToIA",
+                [
+                    (s3.StorageClass.INFREQUENT_ACCESS, 90),
+                    (s3.StorageClass.GLACIER, 365),
                 ],
             ),
-            # Delete incomplete multipart uploads after 7 days
-            s3.LifecycleRule(
-                id="AbortIncompleteMultipartUpload",
-                enabled=True,
-                abort_incomplete_multipart_upload_after=Duration.days(7),
-            ),
-            # Delete old versions after 90 days
-            s3.LifecycleRule(
-                id="ExpireOldVersions",
-                enabled=True,
-                noncurrent_version_expiration=Duration.days(90),
-            ),
+            builder.incomplete_multipart_rule(days=7),
+            builder.old_versions_rule(days=90),
         ]
 
         bucket = self._create_base_bucket(
@@ -197,38 +184,24 @@ class StorageStack(cdk.Stack):
         return bucket
 
     def _create_models_bucket(self) -> s3.Bucket:
-        """Create S3 bucket for trained model artifacts.
+        """创建模型制品 S3 bucket。
 
-        Lifecycle policy:
-        - Keep models in Standard for 180 days
-        - Move to Standard-IA after 180 days
-        - Never delete (models are valuable artifacts)
+        生命周期策略:
+        - 180 天后转换到 Standard-IA
+        - 永不删除（模型是宝贵资产）
+        - 7 天后删除未完成的分片上传
+        - 365 天后删除旧版本（保留模型版本历史）
         """
         bucket_name = f"{self.env_config.resource_prefix}-models"
+        builder = LifecycleRuleBuilder()
 
         lifecycle_rules = [
-            s3.LifecycleRule(
-                id="TransitionToIA",
-                enabled=True,
-                transitions=[
-                    s3.Transition(
-                        storage_class=s3.StorageClass.INFREQUENT_ACCESS,
-                        transition_after=Duration.days(180),
-                    ),
-                ],
+            builder.transition_rule(
+                "TransitionToIA",
+                [(s3.StorageClass.INFREQUENT_ACCESS, 180)],
             ),
-            # Delete incomplete multipart uploads after 7 days
-            s3.LifecycleRule(
-                id="AbortIncompleteMultipartUpload",
-                enabled=True,
-                abort_incomplete_multipart_upload_after=Duration.days(7),
-            ),
-            # Keep old versions for 365 days (model versioning)
-            s3.LifecycleRule(
-                id="ExpireOldVersions",
-                enabled=True,
-                noncurrent_version_expiration=Duration.days(365),
-            ),
+            builder.incomplete_multipart_rule(days=7),
+            builder.old_versions_rule(days=365),
         ]
 
         return self._create_base_bucket(
@@ -239,48 +212,29 @@ class StorageStack(cdk.Stack):
         )
 
     def _create_checkpoints_bucket(self) -> s3.Bucket:
-        """Create S3 bucket for training checkpoints.
+        """创建训练检查点 S3 bucket。
 
-        Lifecycle policy (based on env_config.storage settings):
-        - Transition to Standard-IA after checkpoint_ia_transition_days
-        - Expire after checkpoint_retention_days
-        - Aggressive cleanup of old versions (checkpoints are temporary)
+        生命周期策略（基于 env_config.storage 配置）:
+        - checkpoint_ia_transition_days 天后转换到 Standard-IA
+        - checkpoint_retention_days 天后过期删除
+        - 3 天后删除未完成的分片上传（检查点频繁写入）
+        - 7 天后删除旧版本（检查点可替换）
         """
         bucket_name = f"{self.env_config.resource_prefix}-checkpoints"
         storage_config = self.env_config.storage
+        builder = LifecycleRuleBuilder()
 
         lifecycle_rules = [
-            # Transition checkpoints to IA for cost optimization
-            s3.LifecycleRule(
-                id="TransitionToIA",
-                enabled=True,
-                transitions=[
-                    s3.Transition(
-                        storage_class=s3.StorageClass.INFREQUENT_ACCESS,
-                        transition_after=Duration.days(
-                            storage_config.checkpoint_ia_transition_days
-                        ),
-                    ),
-                ],
+            builder.transition_rule(
+                "TransitionToIA",
+                [(s3.StorageClass.INFREQUENT_ACCESS, storage_config.checkpoint_ia_transition_days)],
             ),
-            # Expire old checkpoints
-            s3.LifecycleRule(
-                id="ExpireCheckpoints",
-                enabled=True,
-                expiration=Duration.days(storage_config.checkpoint_retention_days),
+            builder.expiration_rule(
+                "ExpireCheckpoints",
+                storage_config.checkpoint_retention_days,
             ),
-            # Delete incomplete multipart uploads after 3 days
-            s3.LifecycleRule(
-                id="AbortIncompleteMultipartUpload",
-                enabled=True,
-                abort_incomplete_multipart_upload_after=Duration.days(3),
-            ),
-            # Delete old versions quickly (checkpoints are replaceable)
-            s3.LifecycleRule(
-                id="ExpireOldVersions",
-                enabled=True,
-                noncurrent_version_expiration=Duration.days(7),
-            ),
+            builder.incomplete_multipart_rule(days=3),
+            builder.old_versions_rule(days=7),
         ]
 
         return self._create_base_bucket(
@@ -291,53 +245,47 @@ class StorageStack(cdk.Stack):
         )
 
     def _create_outputs(self) -> None:
-        """Create CloudFormation outputs for cross-stack references."""
-        # Datasets bucket
-        cdk.CfnOutput(
-            self,
-            "DatasetsBucketName",
-            value=self._datasets_bucket.bucket_name,
-            description="S3 bucket name for training datasets",
-            export_name=f"{self.env_config.resource_prefix}-datasets-bucket",
-        )
-        cdk.CfnOutput(
-            self,
-            "DatasetsBucketArn",
-            value=self._datasets_bucket.bucket_arn,
-            description="S3 bucket ARN for training datasets",
-            export_name=f"{self.env_config.resource_prefix}-datasets-bucket-arn",
-        )
+        """创建 CloudFormation 输出用于跨 Stack 引用。"""
+        from utils import create_outputs_batch
 
-        # Models bucket
-        cdk.CfnOutput(
+        # 批量创建 S3 bucket 输出
+        create_outputs_batch(
             self,
-            "ModelsBucketName",
-            value=self._models_bucket.bucket_name,
-            description="S3 bucket name for model artifacts",
-            export_name=f"{self.env_config.resource_prefix}-models-bucket",
-        )
-        cdk.CfnOutput(
-            self,
-            "ModelsBucketArn",
-            value=self._models_bucket.bucket_arn,
-            description="S3 bucket ARN for model artifacts",
-            export_name=f"{self.env_config.resource_prefix}-models-bucket-arn",
-        )
-
-        # Checkpoints bucket
-        cdk.CfnOutput(
-            self,
-            "CheckpointsBucketName",
-            value=self._checkpoints_bucket.bucket_name,
-            description="S3 bucket name for training checkpoints",
-            export_name=f"{self.env_config.resource_prefix}-checkpoints-bucket",
-        )
-        cdk.CfnOutput(
-            self,
-            "CheckpointsBucketArn",
-            value=self._checkpoints_bucket.bucket_arn,
-            description="S3 bucket ARN for training checkpoints",
-            export_name=f"{self.env_config.resource_prefix}-checkpoints-bucket-arn",
+            [
+                # Datasets bucket
+                (
+                    "DatasetsBucketName",
+                    self._datasets_bucket.bucket_name,
+                    "S3 bucket name for training datasets",
+                ),
+                (
+                    "DatasetsBucketArn",
+                    self._datasets_bucket.bucket_arn,
+                    "S3 bucket ARN for training datasets",
+                ),
+                # Models bucket
+                (
+                    "ModelsBucketName",
+                    self._models_bucket.bucket_name,
+                    "S3 bucket name for model artifacts",
+                ),
+                (
+                    "ModelsBucketArn",
+                    self._models_bucket.bucket_arn,
+                    "S3 bucket ARN for model artifacts",
+                ),
+                # Checkpoints bucket
+                (
+                    "CheckpointsBucketName",
+                    self._checkpoints_bucket.bucket_name,
+                    "S3 bucket name for training checkpoints",
+                ),
+                (
+                    "CheckpointsBucketArn",
+                    self._checkpoints_bucket.bucket_arn,
+                    "S3 bucket ARN for training checkpoints",
+                ),
+            ],
         )
 
     @property

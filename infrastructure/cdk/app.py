@@ -15,7 +15,7 @@ Usage:
 import os
 
 import aws_cdk as cdk
-from cdk_nag import AwsSolutionsChecks, NagSuppressions
+from cdk_nag import AwsSolutionsChecks
 
 from aspects import apply_standard_tags
 from config import get_environment_config
@@ -29,6 +29,7 @@ from stacks import (
     SagemakerHyperPodStack,
     StorageStack,
 )
+from utils import apply_nag_suppressions
 
 
 def create_app() -> cdk.App:
@@ -202,152 +203,8 @@ def create_app() -> cdk.App:
     if env_config.name.value != "dev":
         cdk.Aspects.of(app).add(AwsSolutionsChecks(verbose=True))
 
-    # Add suppressions for known acceptable patterns
-    NagSuppressions.add_stack_suppressions(
-        network_stack,
-        [
-            {
-                "id": "AwsSolutions-VPC7",
-                "reason": "VPC Flow Logs are explicitly enabled in the stack",
-            },
-            {
-                "id": "AwsSolutions-EC23",
-                "reason": "VPC endpoint security group uses Fn::GetAtt for CIDR which CDK Nag cannot validate",
-            },
-        ],
-    )
-
-    NagSuppressions.add_stack_suppressions(
-        iam_stack,
-        [
-            {
-                "id": "AwsSolutions-IAM4",
-                "reason": "AWS managed policies are used for EKS node roles following AWS best practices",
-            },
-            {
-                "id": "AwsSolutions-IAM5",
-                "reason": "Wildcard permissions are scoped to specific resources and conditions",
-            },
-        ],
-    )
-
-    NagSuppressions.add_stack_suppressions(
-        database_stack,
-        [
-            {
-                "id": "AwsSolutions-RDS10",
-                "reason": "Deletion protection is enabled for production environments only",
-            },
-            {
-                "id": "AwsSolutions-RDS11",
-                "reason": "Using default port is acceptable for dev environment; production will use custom port",
-            },
-            {
-                "id": "AwsSolutions-RDS14",
-                "reason": "Backtrack is not required for dev environment; will be enabled for production",
-            },
-            {
-                "id": "AwsSolutions-SMG4",
-                "reason": "Secret rotation will be configured in a separate security enhancement task",
-            },
-            {
-                "id": "AwsSolutions-IAM4",
-                "reason": "AWS managed policies used for Lambda log retention custom resource",
-            },
-            {
-                "id": "AwsSolutions-IAM5",
-                "reason": "Wildcard permissions required for Lambda log retention custom resource",
-            },
-        ],
-    )
-
-    NagSuppressions.add_stack_suppressions(
-        storage_stack,
-        [
-            {
-                "id": "AwsSolutions-S1",
-                "reason": "Server access logging will be configured when log bucket is created",
-            },
-        ],
-    )
-
-    # Suppressions for EKS Stack
-    NagSuppressions.add_stack_suppressions(
-        eks_stack,
-        [
-            {
-                "id": "AwsSolutions-IAM4",
-                "reason": "AWS managed policies used for EKS add-ons and CDK custom resources",
-            },
-            {
-                "id": "AwsSolutions-IAM5",
-                "reason": "Wildcard permissions required for EKS cluster management and CDK custom resources",
-            },
-            {
-                "id": "AwsSolutions-EKS1",
-                "reason": "EKS cluster has private endpoint access enabled",
-            },
-            {
-                "id": "AwsSolutions-L1",
-                "reason": "Lambda runtime version is managed by CDK construct library for EKS and kubectl providers",
-            },
-            {
-                "id": "AwsSolutions-SF1",
-                "reason": "Step Function logging is managed by CDK EKS construct; acceptable for dev environment",
-            },
-            {
-                "id": "AwsSolutions-SF2",
-                "reason": "X-Ray tracing is managed by CDK EKS construct; acceptable for dev environment",
-            },
-        ],
-    )
-
-    # Suppressions for SageMaker HyperPod Stack
-    NagSuppressions.add_stack_suppressions(
-        sagemaker_hyperpod_stack,
-        [
-            {
-                "id": "AwsSolutions-IAM4",
-                "reason": "AWS managed policies used for HyperPod execution role",
-            },
-            {
-                "id": "AwsSolutions-IAM5",
-                "reason": "Wildcard permissions required for EC2 network access and ECR operations",
-            },
-            {
-                "id": "AwsSolutions-S1",
-                "reason": "Lifecycle scripts bucket access logging will be configured in production",
-            },
-            {
-                "id": "AwsSolutions-L1",
-                "reason": "Lambda runtime version is managed by CDK construct library for S3 deployment",
-            },
-        ],
-    )
-
-    NagSuppressions.add_stack_suppressions(
-        fsx_stack,
-        [
-            {
-                "id": "AwsSolutions-EC23",
-                "reason": "FSx security group allows VPC CIDR access for Lustre client connectivity",
-            },
-        ],
-    )
-
-    NagSuppressions.add_stack_suppressions(
-        alb_stack,
-        [
-            {
-                "id": "AwsSolutions-ELB2",
-                "reason": "ALB access logging will be enabled when S3 log bucket is configured",
-            },
-            {
-                "id": "AwsSolutions-EC23",
-                "reason": "ALB security group allows 0.0.0.0/0 for public internet access as designed",
-            },
-        ],
-    )
+    # Apply all Nag suppressions (centrally managed in utils/nag_suppressions.py)
+    apply_nag_suppressions(app)
 
     return app
 

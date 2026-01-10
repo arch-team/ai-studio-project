@@ -215,83 +215,117 @@ class EnvironmentConfig:
         return f"ai-platform-{self.name.value}"
 
     @classmethod
-    def for_dev(cls, account: str, region: str = "us-east-1") -> "EnvironmentConfig":
-        """Factory method for development environment."""
+    def _create_environment(
+        cls,
+        name: EnvironmentType,
+        account: str,
+        region: str,
+        *,
+        vpc_nat_gateways: int,
+        vpc_deployment_mode: DeploymentMode,
+        db_min_acu: float,
+        db_max_acu: float,
+        db_backup_days: int,
+        fsx_storage_gib: int,
+        fsx_throughput: int,
+        eks_min_nodes: int,
+        eks_max_nodes: int,
+    ) -> "EnvironmentConfig":
+        """通用的环境配置创建方法。
+
+        Args:
+            name: 环境类型
+            account: AWS 账户 ID
+            region: AWS 区域
+            vpc_nat_gateways: NAT Gateway 数量
+            vpc_deployment_mode: VPC 部署模式
+            db_min_acu: 数据库最小 ACU
+            db_max_acu: 数据库最大 ACU
+            db_backup_days: 备份保留天数
+            fsx_storage_gib: FSx 存储容量 (GiB)
+            fsx_throughput: FSx 吞吐量 (MB/s/TiB)
+            eks_min_nodes: EKS 最小节点数
+            eks_max_nodes: EKS 最大节点数
+
+        Returns:
+            配置好的 EnvironmentConfig 实例
+        """
         return cls(
-            name=EnvironmentType.DEV,
+            name=name,
             account=account,
             region=region,
             vpc=VpcConfig(
-                deployment_mode=DeploymentMode.MULTI_AZ,  # Aurora requires at least 2 AZs
-                nat_gateways=1,  # Single NAT for cost savings in dev
+                deployment_mode=vpc_deployment_mode,
+                nat_gateways=vpc_nat_gateways,
             ),
             database=DatabaseConfig(
-                min_acu=0.5,  # Can pause when idle
-                max_acu=8.0,
+                min_acu=db_min_acu,
+                max_acu=db_max_acu,
+                backup_retention_days=db_backup_days,
             ),
             storage=StorageConfig(
-                fsx_storage_capacity_gib=10 * 1024,  # 10 TiB minimum
-                fsx_throughput_per_tb=500,
+                fsx_storage_capacity_gib=fsx_storage_gib,
+                fsx_throughput_per_tb=fsx_throughput,
             ),
             eks=EksConfig(
-                min_nodes=1,
-                max_nodes=10,
+                min_nodes=eks_min_nodes,
+                max_nodes=eks_max_nodes,
             ),
-            protection=ProtectionConfig.for_dev(),
+            protection=getattr(ProtectionConfig, f"for_{name.value}")(),
+        )
+
+    @classmethod
+    def for_dev(cls, account: str, region: str = "us-east-1") -> "EnvironmentConfig":
+        """开发环境的工厂方法 - 成本优化配置。"""
+        return cls._create_environment(
+            name=EnvironmentType.DEV,
+            account=account,
+            region=region,
+            vpc_nat_gateways=1,  # 单 NAT 节省成本
+            vpc_deployment_mode=DeploymentMode.MULTI_AZ,  # Aurora 需要至少 2 个 AZ
+            db_min_acu=0.5,  # 可暂停节省成本
+            db_max_acu=8.0,
+            db_backup_days=7,
+            fsx_storage_gib=10 * 1024,  # 10 TiB 最小值
+            fsx_throughput=500,
+            eks_min_nodes=1,
+            eks_max_nodes=10,
         )
 
     @classmethod
     def for_staging(cls, account: str, region: str = "us-east-1") -> "EnvironmentConfig":
-        """Factory method for staging environment."""
-        return cls(
+        """预发布环境的工厂方法 - 中等规模配置。"""
+        return cls._create_environment(
             name=EnvironmentType.STAGING,
             account=account,
             region=region,
-            vpc=VpcConfig(
-                deployment_mode=DeploymentMode.MULTI_AZ,
-                nat_gateways=2,
-            ),
-            database=DatabaseConfig(
-                min_acu=1.0,
-                max_acu=16.0,
-            ),
-            storage=StorageConfig(
-                fsx_storage_capacity_gib=20 * 1024,  # 20 TiB
-                fsx_throughput_per_tb=500,
-            ),
-            eks=EksConfig(
-                min_nodes=2,
-                max_nodes=50,
-            ),
-            protection=ProtectionConfig.for_staging(),
+            vpc_nat_gateways=2,
+            vpc_deployment_mode=DeploymentMode.MULTI_AZ,
+            db_min_acu=1.0,
+            db_max_acu=16.0,
+            db_backup_days=7,
+            fsx_storage_gib=20 * 1024,  # 20 TiB
+            fsx_throughput=500,
+            eks_min_nodes=2,
+            eks_max_nodes=50,
         )
 
     @classmethod
     def for_prod(cls, account: str, region: str = "us-east-1") -> "EnvironmentConfig":
-        """Factory method for production environment."""
-        return cls(
+        """生产环境的工厂方法 - 高可用和性能优化配置。"""
+        return cls._create_environment(
             name=EnvironmentType.PROD,
             account=account,
             region=region,
-            vpc=VpcConfig(
-                deployment_mode=DeploymentMode.HYBRID,  # Cost-optimized HA
-                nat_gateways=2,
-            ),
-            database=DatabaseConfig(
-                min_acu=2.0,  # Always warm for no cold start
-                max_acu=16.0,
-                backup_retention_days=14,
-            ),
-            storage=StorageConfig(
-                fsx_storage_capacity_gib=100 * 1024,  # 100 TiB
-                fsx_throughput_per_tb=500,  # Can upgrade to 1000 if needed
-                checkpoint_retention_days=90,
-            ),
-            eks=EksConfig(
-                min_nodes=2,
-                max_nodes=100,
-            ),
-            protection=ProtectionConfig.for_prod(),
+            vpc_nat_gateways=2,
+            vpc_deployment_mode=DeploymentMode.HYBRID,  # 成本优化的高可用
+            db_min_acu=2.0,  # 始终保持温暖，无冷启动
+            db_max_acu=16.0,
+            db_backup_days=14,
+            fsx_storage_gib=100 * 1024,  # 100 TiB
+            fsx_throughput=500,  # 可根据需要升级到 1000
+            eks_min_nodes=2,
+            eks_max_nodes=100,
         )
 
 

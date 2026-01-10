@@ -136,86 +136,90 @@ class EksStack(cdk.Stack):
 
         return cluster
 
-    def _install_eks_addons(self) -> None:
-        """Install required EKS add-ons for HyperPod.
+    def _create_irsa_role(
+        self,
+        role_id: str,
+        role_name: str,
+        service_account: str,
+        managed_policy_name: str,
+        description: str,
+    ) -> iam.Role:
+        """创建 IRSA（IAM Roles for Service Accounts）角色。
 
-        Required add-ons:
-        - EBS CSI Driver (≥v1.28.0) - for persistent volumes
-        - FSx CSI Driver (≥v1.9.0) - for Lustre storage
-        - VPC CNI (≥v1.16.0) - for pod networking
-        - CoreDNS - for DNS resolution
-        - kube-proxy - for service networking
+        Args:
+            role_id: CDK Construct ID
+            role_name: IAM 角色名称
+            service_account: Kubernetes ServiceAccount 名称
+            managed_policy_name: AWS 托管策略名称
+            description: 角色描述
 
-        Note: EKS add-ons automatically create their own ServiceAccounts.
-        We only need to create IAM roles for IRSA (IAM Roles for Service Accounts)
-        and reference them via serviceAccountRoleArn in the add-on configuration.
+        Returns:
+            配置好的 IAM Role
         """
-        # Use CfnJson to handle dynamic OIDC issuer URL in IAM conditions
-        # This is required because the OIDC issuer URL is a CloudFormation Token
-        # that resolves at deployment time, not synth time
         oidc_issuer = self._eks_cluster.cluster_open_id_connect_issuer
 
-        # Create CfnJson for EBS CSI driver IRSA conditions
-        ebs_csi_conditions = cdk.CfnJson(
+        # 创建条件
+        conditions = cdk.CfnJson(
             self,
-            "EbsCsiConditions",
+            f"{role_id}Conditions",
             value={
                 f"{oidc_issuer}:aud": "sts.amazonaws.com",
-                f"{oidc_issuer}:sub": "system:serviceaccount:kube-system:ebs-csi-controller-sa",
+                f"{oidc_issuer}:sub": f"system:serviceaccount:kube-system:{service_account}",
             },
         )
 
-        # Create IAM role for EBS CSI driver (IRSA)
-        ebs_csi_role = iam.Role(
+        # 创建角色
+        role = iam.Role(
             self,
-            "EbsCsiDriverRole",
-            role_name=f"{self.env_config.resource_prefix}-ebs-csi-role",
+            role_id,
+            role_name=role_name,
             assumed_by=iam.FederatedPrincipal(
                 self._eks_cluster.open_id_connect_provider.open_id_connect_provider_arn,
                 conditions={
-                    "StringEquals": ebs_csi_conditions,
+                    "StringEquals": conditions,
                 },
                 assume_role_action="sts:AssumeRoleWithWebIdentity",
             ),
+            description=description,
+        )
+
+        role.add_managed_policy(
+            iam.ManagedPolicy.from_aws_managed_policy_name(managed_policy_name)
+        )
+
+        return role
+
+    def _install_eks_addons(self) -> None:
+        """安装 EKS 必需的插件。
+
+        必需插件：
+        - EBS CSI Driver (≥v1.28.0) - 持久化卷
+        - FSx CSI Driver (≥v1.9.0) - Lustre 存储
+        - VPC CNI (≥v1.16.0) - Pod 网络
+        - CoreDNS - DNS 解析
+        - kube-proxy - Service 网络
+
+        注意：EKS 插件会自动创建 ServiceAccount，我们只需创建 IRSA 角色。
+        """
+        # 创建 EBS CSI Driver IRSA 角色
+        ebs_csi_role = self._create_irsa_role(
+            role_id="EbsCsiDriverRole",
+            role_name=f"{self.env_config.resource_prefix}-ebs-csi-role",
+            service_account="ebs-csi-controller-sa",
+            managed_policy_name="service-role/AmazonEBSCSIDriverPolicy",
             description="IAM role for EBS CSI driver",
         )
-        ebs_csi_role.add_managed_policy(
-            iam.ManagedPolicy.from_aws_managed_policy_name(
-                "service-role/AmazonEBSCSIDriverPolicy"
-            )
-        )
 
-        # Create CfnJson for FSx CSI driver IRSA conditions
-        fsx_csi_conditions = cdk.CfnJson(
-            self,
-            "FsxCsiConditions",
-            value={
-                f"{oidc_issuer}:aud": "sts.amazonaws.com",
-                f"{oidc_issuer}:sub": "system:serviceaccount:kube-system:fsx-csi-controller-sa",
-            },
-        )
-
-        # Create IAM role for FSx CSI driver (IRSA)
-        fsx_csi_role = iam.Role(
-            self,
-            "FsxCsiDriverRole",
+        # 创建 FSx CSI Driver IRSA 角色
+        fsx_csi_role = self._create_irsa_role(
+            role_id="FsxCsiDriverRole",
             role_name=f"{self.env_config.resource_prefix}-fsx-csi-role",
-            assumed_by=iam.FederatedPrincipal(
-                self._eks_cluster.open_id_connect_provider.open_id_connect_provider_arn,
-                conditions={
-                    "StringEquals": fsx_csi_conditions,
-                },
-                assume_role_action="sts:AssumeRoleWithWebIdentity",
-            ),
+            service_account="fsx-csi-controller-sa",
+            managed_policy_name="AmazonFSxFullAccess",
             description="IAM role for FSx CSI driver",
         )
-        fsx_csi_role.add_managed_policy(
-            iam.ManagedPolicy.from_aws_managed_policy_name(
-                "AmazonFSxFullAccess"
-            )
-        )
 
-        # Get addon versions from config (centralized version management)
+        # 获取插件版本（集中式版本管理）
         addon_versions = self.env_config.eks.addon_versions
 
         # Install EBS CSI Driver add-on
@@ -387,62 +391,49 @@ class EksStack(cdk.Stack):
         )
 
     def _create_outputs(self) -> None:
-        """Create CloudFormation outputs for cross-stack references."""
-        # EKS Cluster outputs
-        cdk.CfnOutput(
-            self,
-            "EksClusterName",
-            value=self._eks_cluster.cluster_name,
-            description="EKS cluster name",
-            export_name=f"{self.env_config.resource_prefix}-eks-cluster-name",
-        )
+        """创建 CloudFormation 输出用于跨 Stack 引用。"""
+        from utils import create_outputs_batch
 
-        cdk.CfnOutput(
+        # 批量创建 EKS 集群输出
+        create_outputs_batch(
             self,
-            "EksClusterArn",
-            value=self._eks_cluster.cluster_arn,
-            description="EKS cluster ARN",
-            export_name=f"{self.env_config.resource_prefix}-eks-cluster-arn",
-        )
-
-        cdk.CfnOutput(
-            self,
-            "EksClusterEndpoint",
-            value=self._eks_cluster.cluster_endpoint,
-            description="EKS cluster API endpoint",
-            export_name=f"{self.env_config.resource_prefix}-eks-endpoint",
-        )
-
-        cdk.CfnOutput(
-            self,
-            "EksClusterSecurityGroupId",
-            value=self._eks_cluster.cluster_security_group_id,
-            description="EKS cluster security group ID",
-            export_name=f"{self.env_config.resource_prefix}-eks-sg-id",
-        )
-
-        cdk.CfnOutput(
-            self,
-            "EksOidcProviderArn",
-            value=self._eks_cluster.open_id_connect_provider.open_id_connect_provider_arn,
-            description="EKS OIDC provider ARN for IRSA",
-            export_name=f"{self.env_config.resource_prefix}-eks-oidc-arn",
-        )
-
-        # Output kubeconfig command
-        cdk.CfnOutput(
-            self,
-            "KubeconfigCommand",
-            value=f"aws eks update-kubeconfig --name {self._eks_cluster.cluster_name} --region {self.env_config.region}",
-            description="Command to configure kubectl",
-        )
-
-        # Output Helm Chart installation status
-        cdk.CfnOutput(
-            self,
-            "HelmChartStatus",
-            value="HyperPod Helm Chart automatically installed via CDK",
-            description="HyperPod Helm Chart is automatically installed during stack deployment",
+            [
+                (
+                    "EksClusterName",
+                    self._eks_cluster.cluster_name,
+                    "EKS cluster name",
+                ),
+                (
+                    "EksClusterArn",
+                    self._eks_cluster.cluster_arn,
+                    "EKS cluster ARN",
+                ),
+                (
+                    "EksClusterEndpoint",
+                    self._eks_cluster.cluster_endpoint,
+                    "EKS cluster API endpoint",
+                ),
+                (
+                    "EksClusterSecurityGroupId",
+                    self._eks_cluster.cluster_security_group_id,
+                    "EKS cluster security group ID",
+                ),
+                (
+                    "EksOidcProviderArn",
+                    self._eks_cluster.open_id_connect_provider.open_id_connect_provider_arn,
+                    "EKS OIDC provider ARN for IRSA",
+                ),
+                (
+                    "KubeconfigCommand",
+                    f"aws eks update-kubeconfig --name {self._eks_cluster.cluster_name} --region {self.env_config.region}",
+                    "Command to configure kubectl",
+                ),
+                (
+                    "HelmChartStatus",
+                    "HyperPod Helm Chart automatically installed via CDK",
+                    "HyperPod Helm Chart is automatically installed during stack deployment",
+                ),
+            ],
         )
 
     @property
