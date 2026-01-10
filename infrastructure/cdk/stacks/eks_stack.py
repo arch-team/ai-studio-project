@@ -348,7 +348,7 @@ class EksStack(cdk.Stack):
             version="v1.17.2",  # Latest stable version as of 2025
             create_namespace=True,
             wait=True,  # Wait for cert-manager to be ready before proceeding
-            timeout=cdk.Duration.minutes(15),  # Fargate pods may take longer to start
+            timeout=cdk.Duration.minutes(15),  # Allow time for Helm chart installation
             values={
                 # Install CRDs with Helm (recommended approach)
                 "crds": {

@@ -213,3 +213,5 @@ Training Operator 需要在带有 sagemaker.amazonaws.com/compute-type: hyperpod
 
 
 完善一下cdk项目，
+
+使用code-simplifier插件帮我优化当前项目中的代码，这个项目是使用AWS CDK实现的IaC项目

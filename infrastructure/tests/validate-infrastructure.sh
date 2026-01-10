@@ -25,7 +25,7 @@ REPORT_FILE="${SCRIPT_DIR}/infrastructure-validation-report.md"
 TIMESTAMP=$(date +"%Y-%m-%d %H:%M:%S UTC")
 CLUSTER_NAME="${CLUSTER_NAME:-ai-platform-hyperpod}"
 NAMESPACE_TRAINING="${NAMESPACE_TRAINING:-training-jobs}"
-NAMESPACE_MONITORING="${NAMESPACE_MONITORING:-monitoring}"
+NAMESPACE_MONITORING="${NAMESPACE_MONITORING:-hyperpod-observability}"
 NAMESPACE_KUEUE="${NAMESPACE_KUEUE:-kueue-system}"
 NAMESPACE_SPACES="${NAMESPACE_SPACES:-sagemaker-spaces}"
 
@@ -346,32 +346,40 @@ test_hyperpod_addons() {
         record_test "ClusterQueue Active" "FAIL" "No active ClusterQueues"
     fi
 
-    # Test 6: Prometheus (Observability)
-    local prometheus_pods
-    prometheus_pods=$(kubectl get pods -n "$NAMESPACE_MONITORING" -l app=prometheus --field-selector=status.phase=Running --no-headers 2>/dev/null | wc -l | tr -d ' ' || echo "0")
-    if [[ "$prometheus_pods" -gt 0 ]]; then
-        record_test "Prometheus running" "PASS"
+    # Test 6: Observability (HyperPod Observability Add-on)
+    local observability_pods
+    # Check for HyperPod Observability components (central collector, node collectors)
+    observability_pods=$(kubectl get pods -n "$NAMESPACE_MONITORING" -l app.kubernetes.io/managed-by=hyperpod-observability-operator --field-selector=status.phase=Running --no-headers 2>/dev/null | wc -l | xargs)
+    if [[ "$observability_pods" -gt 0 ]]; then
+        record_test "HyperPod Observability running ($observability_pods pods)" "PASS"
     else
-        # Check alternative labels
-        prometheus_pods=$(kubectl get pods -n "$NAMESPACE_MONITORING" -l app.kubernetes.io/name=prometheus --field-selector=status.phase=Running --no-headers 2>/dev/null | wc -l | tr -d ' ' || echo "0")
-        if [[ "$prometheus_pods" -gt 0 ]]; then
-            record_test "Prometheus running" "PASS"
+        # Check alternative: central collector
+        observability_pods=$(kubectl get pods -n "$NAMESPACE_MONITORING" -l app=hyperpod-observability-otel-collector --field-selector=status.phase=Running --no-headers 2>/dev/null | wc -l | xargs)
+        if [[ "$observability_pods" -gt 0 ]]; then
+            record_test "HyperPod Observability running ($observability_pods pods)" "PASS"
         else
-            record_test "Prometheus running" "FAIL" "Prometheus pods not found"
+            # Fallback to standard Prometheus check
+            observability_pods=$(kubectl get pods -n "$NAMESPACE_MONITORING" -l app=prometheus --field-selector=status.phase=Running --no-headers 2>/dev/null | wc -l | xargs)
+            if [[ "$observability_pods" -gt 0 ]]; then
+                record_test "Prometheus running ($observability_pods pods)" "PASS"
+            else
+                record_test "Observability running" "FAIL" "No observability pods found"
+            fi
         fi
     fi
 
-    # Test 7: Grafana
-    local grafana_pods
-    grafana_pods=$(kubectl get pods -n "$NAMESPACE_MONITORING" -l app=grafana --field-selector=status.phase=Running --no-headers 2>/dev/null | wc -l | tr -d ' ' || echo "0")
-    if [[ "$grafana_pods" -gt 0 ]]; then
-        record_test "Grafana running" "PASS"
+    # Test 7: Node Exporter (metrics collection)
+    local node_exporter_pods
+    node_exporter_pods=$(kubectl get pods -n "$NAMESPACE_MONITORING" -l app.kubernetes.io/name=prometheus-node-exporter --field-selector=status.phase=Running --no-headers 2>/dev/null | wc -l | xargs)
+    if [[ "$node_exporter_pods" -gt 0 ]]; then
+        record_test "Node Exporter running ($node_exporter_pods pods)" "PASS"
     else
-        grafana_pods=$(kubectl get pods -n "$NAMESPACE_MONITORING" -l app.kubernetes.io/name=grafana --field-selector=status.phase=Running --no-headers 2>/dev/null | wc -l | tr -d ' ' || echo "0")
-        if [[ "$grafana_pods" -gt 0 ]]; then
-            record_test "Grafana running" "PASS"
+        # Check for HyperPod node collectors
+        node_exporter_pods=$(kubectl get pods -n "$NAMESPACE_MONITORING" -l app=hyperpod-observability-node-collector --field-selector=status.phase=Running --no-headers 2>/dev/null | wc -l | xargs)
+        if [[ "$node_exporter_pods" -gt 0 ]]; then
+            record_test "Node Collector running ($node_exporter_pods pods)" "PASS"
         else
-            record_test "Grafana running" "FAIL" "Grafana pods not found"
+            record_test "Node Exporter/Collector running" "FAIL" "No node metrics collectors found"
         fi
     fi
 

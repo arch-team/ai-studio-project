@@ -1,7 +1,7 @@
 # HyperPod Infrastructure Validation Report
 
 **Reference**: tasks.md T008g - HyperPod 基础设施验证测试
-**Generated**: 2026-01-11 02:04:43 CST
+**Generated**: 2026-01-11 01:58:17 CST
 **Cluster Context**: arn:aws:eks:us-east-1:897473508751:cluster/ai-platform-dev-eks
 
 ---
@@ -44,8 +44,8 @@
 
 ```
 hyperpod-i-02102dac3f2b8d8a1   Ready   <none>   12h   v1.33.5-eks-113cf36   10.0.110.140   <none>   Amazon Linux 2023.9.20251110   6.1.158-178.288.amzn2023.x86_64   containerd://1.7.27
-hyperpod-i-063bb8c4e81ebaca9   Ready   <none>   74m   v1.33.5-eks-113cf36   10.0.138.42    <none>   Amazon Linux 2023.9.20251110   6.1.158-178.288.amzn2023.x86_64   containerd://1.7.27
-ip-10-0-118-93.ec2.internal    Ready   <none>   96m   v1.33.5-eks-ecaa3a6   10.0.118.93    <none>   Amazon Linux 2023.9.20251208   6.12.58-82.121.amzn2023.x86_64    containerd://2.1.5
+hyperpod-i-063bb8c4e81ebaca9   Ready   <none>   68m   v1.33.5-eks-113cf36   10.0.138.42    <none>   Amazon Linux 2023.9.20251110   6.1.158-178.288.amzn2023.x86_64   containerd://1.7.27
+ip-10-0-118-93.ec2.internal    Ready   <none>   89m   v1.33.5-eks-ecaa3a6   10.0.118.93    <none>   Amazon Linux 2023.9.20251208   6.12.58-82.121.amzn2023.x86_64    containerd://2.1.5
 ```
 
 ### HyperPod Add-ons Status
@@ -164,11 +164,9 @@ Test logs are available in: `/Users/jinhuasu/Project_Workspace/Anker-Projects/ml
 - -rw-r--r--@ 1 jinhuasu  staff  2780 Jan 10 23:11 /Users/jinhuasu/Project_Workspace/Anker-Projects/ml-platform-research/llm-platform-solution/ai-studio-project/infrastructure/tests/reports/cluster-health-20260110_231116.log
 - -rw-r--r--@ 1 jinhuasu  staff  1513 Jan 10 23:21 /Users/jinhuasu/Project_Workspace/Anker-Projects/ml-platform-research/llm-platform-solution/ai-studio-project/infrastructure/tests/reports/cluster-health-20260110_232135.log
 - -rw-r--r--@ 1 jinhuasu  staff  1513 Jan 11 01:58 /Users/jinhuasu/Project_Workspace/Anker-Projects/ml-platform-research/llm-platform-solution/ai-studio-project/infrastructure/tests/reports/cluster-health-20260111_015749.log
-- -rw-r--r--@ 1 jinhuasu  staff  1513 Jan 11 02:04 /Users/jinhuasu/Project_Workspace/Anker-Projects/ml-platform-research/llm-platform-solution/ai-studio-project/infrastructure/tests/reports/cluster-health-20260111_020415.log
 - -rw-r--r--@ 1 jinhuasu  staff   550 Jan 10 22:49 /Users/jinhuasu/Project_Workspace/Anker-Projects/ml-platform-research/llm-platform-solution/ai-studio-project/infrastructure/tests/reports/hyperpod-addons-20260110_224900.log
 - -rw-r--r--@ 1 jinhuasu  staff   550 Jan 10 23:02 /Users/jinhuasu/Project_Workspace/Anker-Projects/ml-platform-research/llm-platform-solution/ai-studio-project/infrastructure/tests/reports/hyperpod-addons-20260110_230252.log
 - -rw-r--r--@ 1 jinhuasu  staff   550 Jan 10 23:07 /Users/jinhuasu/Project_Workspace/Anker-Projects/ml-platform-research/llm-platform-solution/ai-studio-project/infrastructure/tests/reports/hyperpod-addons-20260110_230703.log
 - -rw-r--r--@ 1 jinhuasu  staff   550 Jan 10 23:11 /Users/jinhuasu/Project_Workspace/Anker-Projects/ml-platform-research/llm-platform-solution/ai-studio-project/infrastructure/tests/reports/hyperpod-addons-20260110_231116.log
 - -rw-r--r--@ 1 jinhuasu  staff   550 Jan 10 23:21 /Users/jinhuasu/Project_Workspace/Anker-Projects/ml-platform-research/llm-platform-solution/ai-studio-project/infrastructure/tests/reports/hyperpod-addons-20260110_232135.log
 - -rw-r--r--@ 1 jinhuasu  staff   550 Jan 11 01:58 /Users/jinhuasu/Project_Workspace/Anker-Projects/ml-platform-research/llm-platform-solution/ai-studio-project/infrastructure/tests/reports/hyperpod-addons-20260111_015749.log
-- -rw-r--r--@ 1 jinhuasu  staff   550 Jan 11 02:04 /Users/jinhuasu/Project_Workspace/Anker-Projects/ml-platform-research/llm-platform-solution/ai-studio-project/infrastructure/tests/reports/hyperpod-addons-20260111_020415.log
