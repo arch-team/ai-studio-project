@@ -57,7 +57,7 @@ class AlbStack(cdk.Stack):
             construct_id: Stack identifier
             env_config: Environment configuration
             vpc: VPC for ALB deployment
-            certificate_arn: ACM certificate ARN (optional, creates self-signed if not provided)
+            certificate_arn: ACM certificate ARN (optional, HTTP-only mode in dev if not provided)
             enable_waf: Enable AWS WAF protection
             **kwargs: Additional stack properties
         """
@@ -68,17 +68,27 @@ class AlbStack(cdk.Stack):
         self._certificate_arn = certificate_arn
         self._enable_waf = enable_waf
 
+        # Determine if HTTPS should be enabled
+        # In dev environment, if no certificate is provided, use HTTP-only mode
+        self._https_enabled = bool(certificate_arn) or env_config.name != EnvironmentType.DEV
+
         # Create security group for ALB
         self._security_group = self._create_security_group()
 
         # Create Application Load Balancer
         self._alb = self._create_alb()
 
-        # Create HTTPS listener
-        self._https_listener = self._create_https_listener()
+        # Initialize listener references
+        self._https_listener: elbv2.ApplicationListener | None = None
 
-        # Create HTTP to HTTPS redirect
-        self._create_http_redirect()
+        if self._https_enabled and certificate_arn:
+            # Create HTTPS listener
+            self._https_listener = self._create_https_listener()
+            # Create HTTP to HTTPS redirect
+            self._create_http_redirect()
+        else:
+            # Dev mode without certificate - create HTTP listener
+            self._http_listener = self._create_http_listener()
 
         # Create target groups
         self._create_target_groups()
@@ -249,6 +259,29 @@ class AlbStack(cdk.Stack):
             ),
         )
 
+    def _create_http_listener(self) -> elbv2.ApplicationListener:
+        """Create HTTP-only listener for dev environment without certificate.
+
+        This is used in dev environment when no ACM certificate is provided.
+        WARNING: This is NOT secure for production use!
+
+        Returns:
+            HTTP listener (not redirecting, actually serving traffic)
+        """
+        listener = self._alb.add_listener(
+            "HttpListener",
+            port=80,
+            protocol=elbv2.ApplicationProtocol.HTTP,
+            # Default action - return 404 (override with target groups)
+            default_action=elbv2.ListenerAction.fixed_response(
+                status_code=404,
+                content_type="text/plain",
+                message_body="Not Found",
+            ),
+        )
+
+        return listener
+
     def _create_target_groups(self) -> None:
         """Create target groups for different services.
 
@@ -257,6 +290,9 @@ class AlbStack(cdk.Stack):
         - Frontend (port 3000)
         - Grafana (port 3000)
         """
+        # Get the active listener (HTTPS if available, otherwise HTTP)
+        active_listener = self._https_listener if self._https_listener else self._http_listener
+
         # Backend API target group
         self._backend_target_group = elbv2.ApplicationTargetGroup(
             self,
@@ -278,7 +314,7 @@ class AlbStack(cdk.Stack):
         )
 
         # Add backend API rule
-        self._https_listener.add_action(
+        active_listener.add_action(
             "BackendApiRule",
             priority=10,
             conditions=[
@@ -308,7 +344,7 @@ class AlbStack(cdk.Stack):
         )
 
         # Add frontend rule (default)
-        self._https_listener.add_action(
+        active_listener.add_action(
             "FrontendRule",
             priority=100,
             conditions=[
@@ -338,7 +374,7 @@ class AlbStack(cdk.Stack):
         )
 
         # Add Grafana rule
-        self._https_listener.add_action(
+        active_listener.add_action(
             "GrafanaRule",
             priority=20,
             conditions=[
@@ -459,14 +495,30 @@ class AlbStack(cdk.Stack):
             export_name=f"{self.env_config.resource_prefix}-alb-arn",
         )
 
-        # HTTPS Listener ARN
-        cdk.CfnOutput(
-            self,
-            "HttpsListenerArn",
-            value=self._https_listener.listener_arn,
-            description="HTTPS Listener ARN",
-            export_name=f"{self.env_config.resource_prefix}-https-listener-arn",
-        )
+        # HTTPS Listener ARN (only if HTTPS is enabled)
+        if self._https_listener:
+            cdk.CfnOutput(
+                self,
+                "HttpsListenerArn",
+                value=self._https_listener.listener_arn,
+                description="HTTPS Listener ARN",
+                export_name=f"{self.env_config.resource_prefix}-https-listener-arn",
+            )
+        else:
+            # Output HTTP listener info for dev environment
+            cdk.CfnOutput(
+                self,
+                "HttpListenerArn",
+                value=self._http_listener.listener_arn,
+                description="HTTP Listener ARN (dev environment - no TLS)",
+                export_name=f"{self.env_config.resource_prefix}-http-listener-arn",
+            )
+            cdk.CfnOutput(
+                self,
+                "HttpOnlyWarning",
+                value="WARNING: This ALB uses HTTP only (no TLS). Not suitable for production!",
+                description="Security warning for HTTP-only configuration",
+            )
 
         # Backend Target Group ARN
         cdk.CfnOutput(
@@ -501,9 +553,19 @@ class AlbStack(cdk.Stack):
         return self._alb
 
     @property
-    def https_listener(self) -> elbv2.ApplicationListener:
-        """Get HTTPS listener."""
+    def https_listener(self) -> elbv2.ApplicationListener | None:
+        """Get HTTPS listener (None in HTTP-only dev mode)."""
         return self._https_listener
+
+    @property
+    def http_listener(self) -> elbv2.ApplicationListener | None:
+        """Get HTTP listener (only in HTTP-only dev mode)."""
+        return getattr(self, "_http_listener", None)
+
+    @property
+    def active_listener(self) -> elbv2.ApplicationListener:
+        """Get the active listener (HTTPS if available, otherwise HTTP)."""
+        return self._https_listener if self._https_listener else self._http_listener
 
     @property
     def security_group(self) -> ec2.SecurityGroup:

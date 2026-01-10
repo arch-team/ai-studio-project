@@ -288,6 +288,10 @@ class SagemakerHyperPodStack(cdk.Stack):
             ],
         )
 
+        # Ensure HyperPod cluster is created after the IAM role and its policies are fully created
+        # This prevents "Unable to retrieve subnets" error due to IAM propagation delay
+        cluster.node.add_dependency(self._hyperpod_execution_role)
+
         return cluster
 
     def _create_outputs(self) -> None:

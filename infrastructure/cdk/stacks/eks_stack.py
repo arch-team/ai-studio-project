@@ -2,7 +2,7 @@
 EKS Stack for AI Training Platform.
 
 This stack creates Amazon EKS cluster as the foundation for HyperPod:
-- Amazon EKS cluster with Kubernetes 1.32+
+- Amazon EKS cluster with Kubernetes 1.33+
 - EKS add-ons (EBS CSI, FSx CSI, VPC CNI, CoreDNS, kube-proxy)
 - IAM roles for IRSA (IAM Roles for Service Accounts)
 - HyperPod Helm Chart dependencies (auto-installed)
@@ -22,7 +22,7 @@ from aws_cdk import aws_ec2 as ec2
 from aws_cdk import aws_eks as eks
 from aws_cdk import aws_iam as iam
 from aws_cdk import aws_s3_assets as s3_assets
-from aws_cdk.lambda_layer_kubectl_v32 import KubectlV32Layer
+from aws_cdk.lambda_layer_kubectl_v33 import KubectlV33Layer
 from constructs import Construct
 
 from config import EnvironmentConfig
@@ -35,7 +35,7 @@ class EksStack(cdk.Stack):
     """Amazon EKS Stack for HyperPod orchestration.
 
     This stack creates:
-    - Amazon EKS cluster (K8s 1.32+)
+    - Amazon EKS cluster (K8s 1.33+)
     - Required EKS add-ons (EBS CSI, FSx CSI, VPC CNI, CoreDNS, kube-proxy)
     - IAM roles for IRSA
     - HyperPod Helm Chart dependencies (health-monitoring-agent, device plugins, etc.)
@@ -88,7 +88,7 @@ class EksStack(cdk.Stack):
         """Create Amazon EKS cluster for HyperPod orchestration.
 
         Creates EKS cluster with:
-        - Kubernetes version 1.32
+        - Kubernetes version 1.33
         - API and API_AND_CONFIG_MAP authentication modes
         - Private endpoint access
         - Cluster logging enabled
@@ -104,7 +104,7 @@ class EksStack(cdk.Stack):
             description="Admin role for EKS cluster management",
         )
 
-        # Create EKS cluster with official kubectl layer for K8s 1.32
+        # Create EKS cluster with official kubectl layer for K8s 1.33
         cluster = eks.Cluster(
             self,
             "EksCluster",
@@ -117,8 +117,8 @@ class EksStack(cdk.Stack):
             default_capacity=0,  # We'll manage node groups separately
             endpoint_access=eks.EndpointAccess.PRIVATE,
             masters_role=cluster_admin_role,
-            # Official kubectl layer for K8s 1.32
-            kubectl_layer=KubectlV32Layer(self, "KubectlLayer"),
+            # Official kubectl layer for K8s 1.33
+            kubectl_layer=KubectlV33Layer(self, "KubectlLayer"),
             # Cluster logging
             cluster_logging=[
                 eks.ClusterLoggingTypes.API,
@@ -314,12 +314,16 @@ class EksStack(cdk.Stack):
 
         # Install HyperPod Helm Chart using the EKS cluster's addHelmChart method
         # Note: We use chart_asset to install from the local packaged chart
+        # Increase timeout to 15 minutes for complex chart with many dependencies
+        # Skip CRDs if they already exist from previous installations
         self._eks_cluster.add_helm_chart(
             "HyperPodDependencies",
             chart_asset=helm_chart_asset,
             namespace="kube-system",
             release="hyperpod-dependencies",
-            wait=True,
+            wait=False,  # Don't wait for pods to be ready (no nodes yet)
+            timeout=cdk.Duration.minutes(15),
+            skip_crds=True,  # Skip CRDs that may already exist
             # Custom values for HyperPod configuration
             values={
                 # Global settings

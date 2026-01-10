@@ -2,6 +2,10 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Response Language
+**所有对话和文档必须（Must）使用中文。**
+**除非有特殊说明,请用中文回答。** (Unless otherwise specified, please respond in Chinese.)
+
 ## Project Overview
 
 AWS CDK (Python) infrastructure for AI Training Platform, featuring SageMaker HyperPod with EKS orchestration for large-scale GPU training workloads.
@@ -37,13 +41,11 @@ pytest -m unit                     # Run only unit tests
 ### Stack Layering (Dependency Order)
 
 ```
-Layer 1 (Foundation):  NetworkStack → IamStack
+Layer 1 (Foundation):  NetworkStack, IamStack (parallel)
                             ↓
-Layer 2 (Data):        DatabaseStack, StorageStack
+Layer 2 (Data):        DatabaseStack, StorageStack (parallel)
                             ↓
-Layer 3a (Compute):    EksStack (EKS cluster + add-ons)
-                            ↓
-        [Manual Step: Install HyperPod Helm Chart]
+Layer 3a (Compute):    EksStack (EKS cluster + add-ons + Helm Chart auto-install)
                             ↓
 Layer 3b (HyperPod):   SagemakerHyperPodStack
                             ↓
@@ -59,21 +61,15 @@ Layer 5 (Ingress):     AlbStack
 - `stacks/` - Individual stack implementations
 - `custom_constructs/` - Reusable L2/L3 constructs (e.g., GpuNodeGroupConstruct)
 
-### Two-Phase HyperPod Deployment
+### HyperPod Deployment
 
-HyperPod requires Helm chart installation between EKS and HyperPod stack deployment:
+EksStack automatically installs the HyperPod Helm Chart during deployment. The deployment flow is:
 
-1. Deploy `EksStack` first
-2. Configure kubectl and install HyperPod Helm Chart:
-   ```bash
-   git clone https://github.com/aws/sagemaker-hyperpod-cli.git
-   cd sagemaker-hyperpod-cli/helm_chart
-   helm dependencies update HyperPodHelmChart
-   helm install hyperpod-dependencies HyperPodHelmChart --namespace kube-system
-   ```
+1. **前置条件**: 首次部署前运行 `./scripts/setup_helm_chart.sh` 下载 Helm Chart
+2. Deploy `EksStack` (includes automatic Helm Chart installation via `addHelmChart()`)
 3. Deploy `SagemakerHyperPodStack`
 
-The legacy `HyperPodStack` combines both but doesn't support proper Helm sequencing.
+Note: The Helm Chart is bundled in `helm_charts/HyperPodHelmChart/` and deployed via CDK's `addHelmChart()` method with 15 分钟超时设置。
 
 ### Environment Configuration
 

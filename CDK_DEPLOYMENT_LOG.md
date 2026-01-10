@@ -5,16 +5,16 @@ NetworkStack → IamStack → DatabaseStack → StorageStack → EksStack → Sa
 
 ## 部署状态汇总
 
-| Stack | 状态 | 时间 | 备注 |
-|-------|------|------|------|
-| NetworkStack | ✅ CREATE_COMPLETE | 已部署 | - |
-| IamStack | ✅ CREATE_COMPLETE | 已部署 | - |
-| DatabaseStack | ✅ CREATE_COMPLETE | 已部署 | - |
-| StorageStack | ✅ CREATE_COMPLETE | 已部署 | - |
-| EksStack | ⏳ 待部署 | - | 包含 Helm Chart 自动安装 |
-| SagemakerHyperPodStack | ⏳ 待部署 | - | 依赖 EksStack |
-| FsxLustreStack | ⏳ 待部署 | - | 依赖 EksStack |
-| AlbStack | ⏳ 待部署 | - | 依赖 FsxLustreStack |
+| Stack | 状态 | 部署时间 | 备注 |
+|-------|------|----------|------|
+| NetworkStack | ✅ CREATE_COMPLETE | 已部署 | VPC + 子网 + NAT Gateway |
+| IamStack | ✅ CREATE_COMPLETE | 已部署 | EKS Node Role + Service Roles |
+| DatabaseStack | ✅ CREATE_COMPLETE | 已部署 | Aurora MySQL Serverless v2 |
+| StorageStack | ✅ CREATE_COMPLETE | 已部署 | S3 Buckets |
+| EksStack | ✅ CREATE_COMPLETE | 2025-01-10 | K8s 1.33 + Add-ons + Helm Chart |
+| SagemakerHyperPodStack | ✅ CREATE_COMPLETE | 2025-01-10 | HyperPod 集群 |
+| FsxLustreStack | ✅ CREATE_COMPLETE | 2025-01-10 | 12 TiB FSx Lustre |
+| AlbStack | ✅ CREATE_COMPLETE | 2025-01-10 | HTTP-only (dev 环境) |
 
 ---
 
@@ -110,6 +110,108 @@ CDK 直接部署 HyperPodCluster 时，这些依赖不会自动安装。
 
 ---
 
+### 问题 4: Helm Chart 安装超时
+
+**时间**: Iteration 7 部署
+
+**错误现象**:
+```
+UPGRADE FAILED: context deadline exceeded
+```
+
+**错误原因**:
+CDK HelmChart 默认超时为 5 分钟，对于包含多个子 chart 的 HyperPod Helm Chart 来说不够。
+
+**解决方案**:
+在 `add_helm_chart()` 中添加 `timeout=cdk.Duration.minutes(15)` 参数：
+```python
+self._eks_cluster.add_helm_chart(
+    "HyperPodDependencies",
+    ...
+    timeout=cdk.Duration.minutes(15),
+)
+```
+
+---
+
+### 问题 5: Helm Release 锁定状态
+
+**时间**: Iteration 7 部署
+
+**错误现象**:
+```
+UPGRADE FAILED: another operation (install/upgrade/rollback) is in progress
+```
+
+**错误原因**:
+前一次 Helm 操作失败或超时，导致 release 处于锁定状态。Helm 在 Kubernetes secrets 中保存 release 状态。
+
+**解决方案**:
+1. 删除卡住的 Helm release secrets：
+```bash
+kubectl delete secrets -n kube-system \
+  sh.helm.release.v1.hyperpod-dependencies.v1 \
+  sh.helm.release.v1.hyperpod-dependencies.v2 \
+  sh.helm.release.v1.hyperpod-dependencies.v3
+```
+
+2. 防止未来发生：在 `add_helm_chart()` 中添加：
+```python
+wait=False,      # 不等待 pod ready（因为还没有节点）
+skip_crds=True,  # 跳过已存在的 CRDs
+```
+
+---
+
+### 问题 6: HyperPod IAM 角色传播延迟
+
+**时间**: Iteration 7 部署
+
+**错误现象**:
+```
+Unable to retrieve subnets. Please ensure that the execution role allows...
+```
+（IAM 角色权限正确配置，但 HyperPod 仍然报错）
+
+**错误原因**:
+IAM 角色和策略的更改需要时间传播。当 CloudFormation 创建 HyperPod 集群时，IAM 角色的策略可能还没有完全传播。
+
+**解决方案**:
+在 `sagemaker_hyperpod_stack.py` 中添加显式依赖：
+```python
+# Ensure HyperPod cluster is created after the IAM role and its policies are fully created
+# This prevents "Unable to retrieve subnets" error due to IAM propagation delay
+cluster.node.add_dependency(self._hyperpod_execution_role)
+```
+
+---
+
+### 问题 7: ALB HTTPS 证书缺失
+
+**时间**: Iteration 7 部署
+
+**错误现象**:
+```
+Certificate ARN '' is not valid (Service: ElasticLoadBalancingV2)
+```
+
+**错误原因**:
+AlbStack 需要 ACM 证书 ARN 用于 HTTPS Listener，但 dev 环境没有提供证书。
+
+**解决方案**:
+修改 `alb_stack.py` 支持 HTTP-only 模式（仅限 dev 环境）：
+1. 添加 `_https_enabled` 标志检测是否需要 HTTPS
+2. 创建 `_create_http_listener()` 方法用于 HTTP-only 模式
+3. 根据环境选择创建 HTTPS + HTTP redirect 或 HTTP-only listener
+4. 输出安全警告提醒 HTTP-only 不适合生产环境
+
+**注意**: 生产环境必须提供 ACM 证书 ARN：
+```bash
+cdk deploy ai-platform-prod-alb --context certificate_arn=arn:aws:acm:...
+```
+
+---
+
 ## 迭代记录
 
 ### Iteration 1
@@ -146,7 +248,7 @@ CDK 直接部署 HyperPodCluster 时，这些依赖不会自动安装。
 - CDK synth 验证成功，新 stacks 已添加
 - 下一步：部署 EksStack，然后安装 Helm Chart，再部署 SagemakerHyperPodStack
 
-### Iteration 6 (当前) - CDK HelmChart 自动化
+### Iteration 6 - CDK HelmChart 自动化
 - 实现 CDK HelmChart + chartAsset 自动化部署方案
 - 创建 `scripts/setup_helm_chart.sh` - 自动下载 HyperPod Helm Chart
 - 修改 `EksStack` 添加 `_install_hyperpod_helm_chart()` 方法
@@ -162,38 +264,78 @@ CDK 直接部署 HyperPodCluster 时，这些依赖不会自动安装。
   - ✅ neuron-device-plugin
   - ✅ aws-efa-k8s-device-plugin
 - CDK synth 验证成功
-- 下一步：运行 `./scripts/setup_helm_chart.sh`，然后部署 `ai-platform-dev-eks`
 
-## 部署新架构 (自动化版本)
+### Iteration 7 (当前) - 全部 Stack 部署完成 ✅
 
-新的部署顺序：
-1. NetworkStack ✅ (已部署)
-2. IamStack ✅ (已部署)
-3. DatabaseStack ✅ (已部署)
-4. StorageStack ✅ (已部署)
-5. **EksStack** ⏳ (待部署) - 包含 Helm Chart 自动安装
-6. **SagemakerHyperPodStack** ⏳ (待部署)
-7. FsxLustreStack ⏳ (待部署)
-8. AlbStack ⏳ (待部署)
+**部署过程**:
 
-### 部署步骤
+1. **EksStack 部署** - 遇到 Helm Chart 超时和锁定问题
+   - 问题 4: 添加 `timeout=cdk.Duration.minutes(15)`
+   - 问题 5: 删除锁定的 secrets，添加 `wait=False` 和 `skip_crds=True`
+   - 配置 kubectl 访问权限
+   - ✅ 部署成功
+
+2. **SagemakerHyperPodStack 部署** - 遇到 IAM 传播延迟问题
+   - 问题 6: 添加 `cluster.node.add_dependency(self._hyperpod_execution_role)`
+   - ✅ 部署成功
+
+3. **FsxLustreStack 部署**
+   - ✅ 部署成功 (12 TiB FSx Lustre，~20 分钟)
+
+4. **AlbStack 部署** - 遇到 HTTPS 证书缺失问题
+   - 问题 7: 修改支持 HTTP-only 模式 (dev 环境)
+   - ✅ 部署成功
+
+**部署输出**:
+
+| 资源 | 值 |
+|------|-----|
+| EKS Cluster | ai-platform-dev-eks |
+| HyperPod Cluster | ai-platform-dev-hyperpod |
+| FSx File System | fs-070fe86bfe83262c1 |
+| FSx DNS Name | fs-070fe86bfe83262c1.fsx.us-east-1.amazonaws.com |
+| FSx Mount Name | socgvamv |
+| ALB DNS Name | ai-platform-dev-alb-1343863355.us-east-1.elb.amazonaws.com |
+
+---
+
+## 部署指南
+
+### 首次部署 (完整流程)
 
 ```bash
-# 1. 首次部署前，下载 HyperPod Helm Chart
 cd infrastructure/cdk
+
+# 1. 激活虚拟环境
+source .venv/bin/activate
+
+# 2. 下载 HyperPod Helm Chart (首次部署必需)
 ./scripts/setup_helm_chart.sh
 
-# 2. 部署 EKS Stack (包含 Helm Chart 自动安装)
-cdk deploy ai-platform-dev-eks
-
-# 3. 部署 SageMaker HyperPod Stack
-cdk deploy ai-platform-dev-sagemaker-hyperpod
-
-# 4. 部署其他 Stacks
-cdk deploy ai-platform-dev-fsx ai-platform-dev-alb
+# 3. 部署所有 Stacks
+cdk deploy --all --require-approval never
 ```
 
-### Helm Chart 更新步骤 (当需要更新 Helm Chart 时)
+### 单独部署特定 Stack
+
+```bash
+# 部署 EKS Stack (包含 Helm Chart)
+cdk deploy ai-platform-dev-eks
+
+# 部署 HyperPod Stack
+cdk deploy ai-platform-dev-sagemaker-hyperpod
+
+# 部署 FSx Lustre Stack
+cdk deploy ai-platform-dev-fsx
+
+# 部署 ALB Stack (dev 环境 HTTP-only)
+cdk deploy ai-platform-dev-alb
+
+# 部署 ALB Stack (生产环境需要证书)
+cdk deploy ai-platform-prod-alb --context certificate_arn=arn:aws:acm:...
+```
+
+### Helm Chart 更新
 
 ```bash
 # 重新运行下载脚本获取最新版本
@@ -201,4 +343,20 @@ cdk deploy ai-platform-dev-fsx ai-platform-dev-alb
 
 # 重新部署 EKS Stack
 cdk deploy ai-platform-dev-eks
+```
+
+### 配置 kubectl 访问
+
+```bash
+# 配置 kubeconfig
+aws eks update-kubeconfig --name ai-platform-dev-eks --region us-east-1
+
+# 添加 IAM 用户访问权限 (如需要)
+aws eks create-access-entry --cluster-name ai-platform-dev-eks \
+  --principal-arn arn:aws:iam::ACCOUNT:user/USERNAME --type STANDARD
+
+aws eks associate-access-policy --cluster-name ai-platform-dev-eks \
+  --principal-arn arn:aws:iam::ACCOUNT:user/USERNAME \
+  --policy-arn arn:aws:eks::aws:cluster-access-policy/AmazonEKSClusterAdminPolicy \
+  --access-scope type=cluster
 ```

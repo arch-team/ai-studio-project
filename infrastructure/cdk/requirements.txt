@@ -2,6 +2,9 @@
 aws-cdk-lib>=2.170.0
 constructs>=10.0.0
 
+# Kubectl Lambda Layer for EKS 1.33
+aws-cdk.lambda-layer-kubectl-v33>=2.0.0
+
 # CDK Nag for security and best practices checks
 cdk-nag>=2.28.0
 
