@@ -1,17 +1,21 @@
 #!/bin/bash
 # HyperPod Add-ons Verification Script
 # Reference: T008d-1 - Training core components installation
-#            T008d-2 - Monitoring and elastic components installation
+#            T008d-2 - Monitoring components installation
 #
 # This script verifies:
 # T008d-1:
 # 1. Training Operator: PyTorchJob CRD, Webhook readiness
 # 2. Task Governance (Kueue): ClusterQueue, LocalQueue, Gang Scheduling
-# 3. PriorityClass: Three-tier configuration per spec.md FR-004
+# 3. PriorityClass: Three-tier configuration per spec.md FR-004 (auto-managed by Task Governance)
 #
 # T008d-2:
 # 4. Observability: Prometheus, Grafana, Node Exporter, DCGM Exporter
-# 5. Elastic Agent: Checkpoint management, Auto-Resume, Deep Health Check
+#
+# Note: Elastic Agent (checkpoint management, auto-resume) is NOT an EKS add-on.
+# It is a Python package installed in training container images via:
+#   pip install hyperpod-elastic-agent
+# See: https://docs.aws.amazon.com/sagemaker/latest/dg/sagemaker-eks-operator-install.html
 #
 # Prerequisites:
 # - kubectl configured to access the EKS cluster
@@ -326,66 +330,38 @@ verify_observability() {
 }
 
 # ==============================================================================
-# Elastic Agent Verification (T008d-2)
+# Elastic Agent Information (NOT an EKS Add-on)
 # ==============================================================================
 
 verify_elastic_agent() {
-    log_info "========== Elastic Agent Verification (T008d-2) =========="
+    log_info "========== Elastic Agent Information =========="
     log_info "Reference: spec.md FR-010/FR-011"
+    log_info ""
+    log_warn "IMPORTANT: HyperPod Elastic Agent is NOT an EKS add-on!"
+    log_info ""
+    log_info "Elastic Agent provides:"
+    log_info "  - Checkpoint management (auto-save at configurable intervals)"
+    log_info "  - Auto-Resume (recover from node failures)"
+    log_info "  - Deep Health Check integration"
+    log_info ""
+    log_info "Installation method:"
+    log_info "  pip install hyperpod-elastic-agent"
+    log_info ""
+    log_info "It must be installed in your training container images, not as a cluster add-on."
+    log_info "See: https://docs.aws.amazon.com/sagemaker/latest/dg/sagemaker-eks-operator-install.html"
+    log_info ""
 
-    # Check Elastic Agent deployment
-    log_info "Checking Elastic Agent deployment..."
-    ELASTIC_AGENT_PODS=$(kubectl get pods -A -l app.kubernetes.io/name=elastic-agent 2>/dev/null | grep -c Running || echo "0")
-    if [[ "$ELASTIC_AGENT_PODS" -gt 0 ]]; then
-        log_success "Elastic Agent is running ($ELASTIC_AGENT_PODS pods)"
-    else
-        # Try different label selectors (HyperPod naming)
-        ELASTIC_AGENT_PODS=$(kubectl get pods -A -l component=elastic-agent 2>/dev/null | grep -c Running || echo "0")
-        if [[ "$ELASTIC_AGENT_PODS" -gt 0 ]]; then
-            log_success "Elastic Agent is running ($ELASTIC_AGENT_PODS pods)"
-        else
-            log_warn "Elastic Agent pods not found (may use different naming)"
+    # Check for HyperPod Health Monitoring (this IS part of the cluster)
+    log_info "Checking HyperPod cluster health monitoring..."
+    HYPERPOD_PODS=$(kubectl get pods -A 2>/dev/null | grep -i "hyperpod\|sagemaker" | grep -c Running || echo "0")
+    if [[ "$HYPERPOD_PODS" -gt 0 ]]; then
+        log_success "Found $HYPERPOD_PODS HyperPod-related running pods"
+        if [[ "$VERBOSE" == "--verbose" ]]; then
+            log_info "HyperPod-related pods:"
+            kubectl get pods -A 2>/dev/null | grep -i "hyperpod\|sagemaker"
         fi
-    fi
-
-    # Check Health Monitoring Agent (part of HyperPod)
-    log_info "Checking Health Monitoring Agent..."
-    HEALTH_AGENT_PODS=$(kubectl get pods -A -l app.kubernetes.io/name=health-monitoring-agent 2>/dev/null | grep -c Running || echo "0")
-    if [[ "$HEALTH_AGENT_PODS" -gt 0 ]]; then
-        log_success "Health Monitoring Agent is running ($HEALTH_AGENT_PODS pods)"
     else
-        log_warn "Health Monitoring Agent pods not found"
-    fi
-
-    # Check Deep Health Check CRD (if available)
-    log_info "Checking Deep Health Check CRD..."
-    if kubectl get crd healthchecks.sagemaker.aws.amazon.com &> /dev/null; then
-        log_success "Deep Health Check CRD is registered"
-    else
-        log_warn "Deep Health Check CRD not found (may use different naming)"
-    fi
-
-    # Check Job Auto-Restart controller
-    log_info "Checking Job Auto-Restart controller..."
-    AUTO_RESTART_PODS=$(kubectl get pods -A -l app.kubernetes.io/name=job-auto-restart 2>/dev/null | grep -c Running || echo "0")
-    if [[ "$AUTO_RESTART_PODS" -gt 0 ]]; then
-        log_success "Job Auto-Restart controller is running ($AUTO_RESTART_PODS pods)"
-    else
-        log_warn "Job Auto-Restart controller not found"
-    fi
-
-    # Check for checkpoint-related ConfigMaps
-    log_info "Checking checkpoint configuration..."
-    CHECKPOINT_CM=$(kubectl get configmap -A -l component=checkpoint 2>/dev/null | grep -v "NAMESPACE" | wc -l || echo "0")
-    if [[ "$CHECKPOINT_CM" -gt 0 ]]; then
-        log_success "Found $CHECKPOINT_CM checkpoint-related ConfigMap(s)"
-    else
-        log_info "No dedicated checkpoint ConfigMaps found (may be integrated in agent config)"
-    fi
-
-    if [[ "$VERBOSE" == "--verbose" ]]; then
-        log_info "Listing all HyperPod-related pods..."
-        kubectl get pods -A | grep -i "hyperpod\|elastic\|health\|checkpoint" || log_info "  No matching pods found"
+        log_info "No HyperPod-specific pods found (normal for fresh clusters)"
     fi
 }
 
@@ -485,6 +461,7 @@ main() {
     verify_observability
 
     echo ""
+    echo "==================== Elastic Agent Info ===================="
     verify_elastic_agent
 
     echo ""
