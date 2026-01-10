@@ -169,7 +169,7 @@ class DatabaseStack(cdk.Stack):
             "AuditLogGroup",
             log_group_name=f"/aws/rds/{self.env_config.resource_prefix}/aurora/audit",
             retention=logs.RetentionDays.ONE_MONTH,
-            removal_policy=cdk.RemovalPolicy.DESTROY,
+            removal_policy=self.env_config.protection.removal_policy,
         )
 
         # Create Aurora Serverless v2 cluster
@@ -220,14 +220,10 @@ class DatabaseStack(cdk.Stack):
             cloudwatch_logs_retention=logs.RetentionDays.ONE_MONTH,
             # Parameter group
             parameter_group=self._parameter_group,
-            # Removal policy (RETAIN for production, DESTROY for dev)
-            removal_policy=(
-                cdk.RemovalPolicy.RETAIN
-                if self.env_config.name.value == "prod"
-                else cdk.RemovalPolicy.DESTROY
-            ),
-            # Deletion protection for production
-            deletion_protection=self.env_config.name.value == "prod",
+            # Removal policy (from protection config)
+            removal_policy=self.env_config.protection.removal_policy,
+            # Deletion protection (from protection config)
+            deletion_protection=self.env_config.protection.enable_deletion_protection,
         )
 
         # Store secret reference

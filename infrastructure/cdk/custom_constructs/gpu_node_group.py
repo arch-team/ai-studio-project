@@ -8,6 +8,7 @@ This construct creates GPU node groups for SageMaker HyperPod with:
 - Topology spread constraints
 """
 
+from dataclasses import dataclass, field
 
 import aws_cdk as cdk
 from aws_cdk import aws_ec2 as ec2
@@ -18,39 +19,32 @@ from config import EnvironmentConfig
 from constructs import Construct
 
 
+@dataclass(frozen=True)
 class GpuNodeGroupConfig:
     """Configuration for a GPU node group.
 
+    This is an immutable configuration class following the project's
+    dataclass pattern for type safety and consistency.
+
     Attributes:
         name: Node group name
-        instance_types: List of GPU instance types
+        instance_types: Tuple of GPU instance types
         min_size: Minimum number of nodes
         max_size: Maximum number of nodes
         desired_size: Desired number of nodes
         disk_size: Root volume size in GB
-        labels: Kubernetes labels for the nodes
-        taints: Kubernetes taints for the nodes
+        labels: Kubernetes labels for the nodes (immutable mapping)
+        taints: Kubernetes taints for the nodes (immutable tuple)
     """
 
-    def __init__(
-        self,
-        name: str,
-        instance_types: list[str],
-        min_size: int = 0,
-        max_size: int = 10,
-        desired_size: int = 0,
-        disk_size: int = 500,
-        labels: dict[str, str] | None = None,
-        taints: list[dict[str, str]] | None = None,
-    ) -> None:
-        self.name = name
-        self.instance_types = instance_types
-        self.min_size = min_size
-        self.max_size = max_size
-        self.desired_size = desired_size
-        self.disk_size = disk_size
-        self.labels = labels or {}
-        self.taints = taints or []
+    name: str
+    instance_types: tuple[str, ...]
+    min_size: int = 0
+    max_size: int = 10
+    desired_size: int = 0
+    disk_size: int = 500
+    labels: dict[str, str] = field(default_factory=dict)
+    taints: tuple[dict[str, str], ...] = ()
 
 
 class GpuNodeGroupConstruct(Construct):
@@ -227,7 +221,7 @@ class GpuNodeGroupConstruct(Construct):
                 desired_size=config.desired_size,
             ),
             # Instance configuration
-            instance_types=config.instance_types,
+            instance_types=list(config.instance_types),
             ami_type="AL2_x86_64_GPU",  # GPU-optimized Amazon Linux 2
             capacity_type="ON_DEMAND",  # GPU instances are typically on-demand
             # Launch template for custom configuration
@@ -296,7 +290,7 @@ def create_default_gpu_node_groups(
     # P4d node group (NVIDIA A100)
     p4d_config = GpuNodeGroupConfig(
         name="p4d-gpu",
-        instance_types=["p4d.24xlarge"],
+        instance_types=("p4d.24xlarge",),
         min_size=0,
         max_size=eks_config.max_nodes // 3,
         desired_size=0,
@@ -322,7 +316,7 @@ def create_default_gpu_node_groups(
     # P5 node group (NVIDIA H100)
     p5_config = GpuNodeGroupConfig(
         name="p5-gpu",
-        instance_types=["p5.48xlarge"],
+        instance_types=("p5.48xlarge",),
         min_size=0,
         max_size=eks_config.max_nodes // 3,
         desired_size=0,
@@ -348,7 +342,7 @@ def create_default_gpu_node_groups(
     # Trn1 node group (AWS Trainium)
     trn1_config = GpuNodeGroupConfig(
         name="trn1-neuron",
-        instance_types=["trn1.32xlarge"],
+        instance_types=("trn1.32xlarge",),
         min_size=0,
         max_size=eks_config.max_nodes // 3,
         desired_size=0,
@@ -357,13 +351,13 @@ def create_default_gpu_node_groups(
             "aws.amazon.com/neuron": "true",
             "node.kubernetes.io/instance-type": "trn1.32xlarge",
         },
-        taints=[
+        taints=(
             {
                 "key": "aws.amazon.com/neuron",
                 "value": "true",
                 "effect": "NO_SCHEDULE",
-            }
-        ],
+            },
+        ),
     )
     node_groups.append(
         GpuNodeGroupConstruct(

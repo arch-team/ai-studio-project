@@ -115,6 +115,8 @@ jobs:
           pytest tests/ \
             --cov=stacks \
             --cov=config \
+            --cov=aspects \
+            --cov=custom_constructs \
             --cov-report=xml \
             --cov-report=term-missing \
             --junitxml=test-results.xml \

@@ -96,12 +96,9 @@ class SagemakerHyperPodStack(cdk.Stack):
             versioned=True,
             block_public_access=s3.BlockPublicAccess.BLOCK_ALL,
             enforce_ssl=True,
-            removal_policy=(
-                cdk.RemovalPolicy.RETAIN
-                if self.env_config.name.value == "prod"
-                else cdk.RemovalPolicy.DESTROY
-            ),
-            auto_delete_objects=self.env_config.name.value != "prod",
+            # Use protection config for removal policy
+            removal_policy=self.env_config.protection.removal_policy,
+            auto_delete_objects=not self.env_config.protection.retain_on_delete,
         )
 
         cdk.Tags.of(bucket).add("Name", bucket_name)

@@ -10,12 +10,16 @@ Tests cover:
 
 import pytest
 
+import aws_cdk as cdk
+
 from config import (
     DatabaseConfig,
     DeploymentMode,
+    EksAddonVersions,
     EksConfig,
     EnvironmentConfig,
     EnvironmentType,
+    ProtectionConfig,
     StorageConfig,
     VpcConfig,
     get_environment_config,
@@ -106,6 +110,98 @@ class TestEksConfig:
         assert "p5.48xlarge" in config.node_instance_types
         assert config.min_nodes == 2
         assert config.max_nodes == 100
+
+    def test_addon_versions_included(self) -> None:
+        """Verify addon versions are included in EKS config."""
+        config = EksConfig()
+        assert config.addon_versions is not None
+        assert config.addon_versions.ebs_csi.startswith("v")
+        assert config.addon_versions.vpc_cni.startswith("v")
+
+
+class TestEksAddonVersions:
+    """Tests for EKS Add-on versions configuration."""
+
+    def test_default_values(self) -> None:
+        """Verify default addon versions."""
+        versions = EksAddonVersions()
+        assert versions.ebs_csi == "v1.54.0-eksbuild.1"
+        assert versions.fsx_csi == "v1.8.0-eksbuild.1"
+        assert versions.vpc_cni == "v1.21.1-eksbuild.1"
+        assert versions.coredns == "v1.12.4-eksbuild.1"
+        assert versions.kube_proxy == "v1.33.5-eksbuild.2"
+
+    def test_k8s_133_factory(self) -> None:
+        """Verify K8s 1.33 factory method returns correct versions."""
+        versions = EksAddonVersions.for_k8s_1_33()
+        assert "1.33" in versions.kube_proxy or "v1.33" in versions.kube_proxy
+        assert versions.ebs_csi.startswith("v1.5")
+
+    def test_k8s_132_factory(self) -> None:
+        """Verify K8s 1.32 factory method returns correct versions."""
+        versions = EksAddonVersions.for_k8s_1_32()
+        assert "1.32" in versions.kube_proxy or "v1.32" in versions.kube_proxy
+        assert versions.ebs_csi.startswith("v1.5")
+
+    def test_version_format(self) -> None:
+        """Verify all versions follow expected format."""
+        versions = EksAddonVersions()
+        for attr in ["ebs_csi", "fsx_csi", "vpc_cni", "coredns", "kube_proxy"]:
+            version = getattr(versions, attr)
+            # Format: vX.Y.Z-eksbuild.N
+            assert version.startswith("v"), f"{attr} should start with 'v'"
+            assert "eksbuild" in version, f"{attr} should contain 'eksbuild'"
+
+
+class TestProtectionConfig:
+    """Tests for resource protection configuration."""
+
+    def test_default_values(self) -> None:
+        """Verify default protection configuration (dev-like)."""
+        config = ProtectionConfig()
+        assert config.removal_policy == cdk.RemovalPolicy.DESTROY
+        assert config.enable_deletion_protection is False
+        assert config.retain_on_delete is False
+
+    def test_dev_factory(self) -> None:
+        """Verify dev protection allows easy cleanup."""
+        config = ProtectionConfig.for_dev()
+        assert config.removal_policy == cdk.RemovalPolicy.DESTROY
+        assert config.enable_deletion_protection is False
+        assert config.retain_on_delete is False
+
+    def test_staging_factory(self) -> None:
+        """Verify staging protection has moderate safeguards."""
+        config = ProtectionConfig.for_staging()
+        assert config.removal_policy == cdk.RemovalPolicy.SNAPSHOT
+        assert config.enable_deletion_protection is True
+        assert config.retain_on_delete is False
+
+    def test_prod_factory(self) -> None:
+        """Verify production protection has maximum safeguards."""
+        config = ProtectionConfig.for_prod()
+        assert config.removal_policy == cdk.RemovalPolicy.RETAIN
+        assert config.enable_deletion_protection is True
+        assert config.retain_on_delete is True
+
+    def test_environment_configs_have_correct_protection(self) -> None:
+        """Verify each environment factory sets correct protection."""
+        dev = EnvironmentConfig.for_dev("123456789012")
+        staging = EnvironmentConfig.for_staging("123456789012")
+        prod = EnvironmentConfig.for_prod("123456789012")
+
+        # Dev: destroyable
+        assert dev.protection.removal_policy == cdk.RemovalPolicy.DESTROY
+        assert dev.protection.enable_deletion_protection is False
+
+        # Staging: snapshot on delete
+        assert staging.protection.removal_policy == cdk.RemovalPolicy.SNAPSHOT
+        assert staging.protection.enable_deletion_protection is True
+
+        # Prod: retain everything
+        assert prod.protection.removal_policy == cdk.RemovalPolicy.RETAIN
+        assert prod.protection.enable_deletion_protection is True
+        assert prod.protection.retain_on_delete is True
 
 
 class TestEnvironmentConfig:

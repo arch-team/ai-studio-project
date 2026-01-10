@@ -17,6 +17,7 @@ import os
 import aws_cdk as cdk
 from cdk_nag import AwsSolutionsChecks, NagSuppressions
 
+from aspects import apply_standard_tags
 from config import get_environment_config
 from stacks import (
     AlbStack,
@@ -56,17 +57,9 @@ def create_app() -> cdk.App:
         region=region,
     )
 
-    # Common tags for all resources
-    common_tags = {
-        "Project": "ai-training-platform",
-        "Environment": env_config.name.value,
-        "ManagedBy": "cdk",
-        "CostCenter": f"ai-platform-{env_config.name.value}",
-    }
-
-    # Apply common tags to all resources
-    for key, value in common_tags.items():
-        cdk.Tags.of(app).add(key, value)
+    # Apply standard tags (centralized tag management)
+    # This includes: Project, Environment, ManagedBy, CostCenter
+    apply_standard_tags(app, env_config)
 
     # Stack naming convention: ai-platform-{env}-{stack-name}
     stack_prefix = env_config.resource_prefix

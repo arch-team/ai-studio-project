@@ -7,9 +7,11 @@ This module exports environment configuration classes for multi-environment depl
 from .environments import (
     DatabaseConfig,
     DeploymentMode,
+    EksAddonVersions,
     EksConfig,
     EnvironmentConfig,
     EnvironmentType,
+    ProtectionConfig,
     StorageConfig,
     VpcConfig,
     get_environment_config,
@@ -18,9 +20,11 @@ from .environments import (
 __all__ = [
     "DatabaseConfig",
     "DeploymentMode",
+    "EksAddonVersions",
     "EksConfig",
     "EnvironmentConfig",
     "EnvironmentType",
+    "ProtectionConfig",
     "StorageConfig",
     "VpcConfig",
     "get_environment_config",

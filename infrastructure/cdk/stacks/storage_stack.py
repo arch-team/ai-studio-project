@@ -94,12 +94,8 @@ class StorageStack(cdk.Stack):
         Returns:
             Configured S3 bucket
         """
-        # Determine removal policy based on environment
-        removal_policy = (
-            RemovalPolicy.RETAIN
-            if self.env_config.name.value == "prod"
-            else RemovalPolicy.DESTROY
-        )
+        # Use protection config for removal policy
+        removal_policy = self.env_config.protection.removal_policy
 
         # Create bucket with SSE-KMS encryption
         bucket = s3.Bucket(
@@ -128,9 +124,9 @@ class StorageStack(cdk.Stack):
             ),
             # Lifecycle rules
             lifecycle_rules=lifecycle_rules or [],
-            # Removal policy
+            # Removal policy (from protection config)
             removal_policy=removal_policy,
-            auto_delete_objects=removal_policy == RemovalPolicy.DESTROY,
+            auto_delete_objects=not self.env_config.protection.retain_on_delete,
             # Object ownership (recommended setting)
             object_ownership=s3.ObjectOwnership.BUCKET_OWNER_ENFORCED,
         )

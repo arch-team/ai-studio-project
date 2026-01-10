@@ -215,37 +215,40 @@ class EksStack(cdk.Stack):
             )
         )
 
-        # Install EBS CSI Driver add-on (EKS 1.33 compatible)
+        # Get addon versions from config (centralized version management)
+        addon_versions = self.env_config.eks.addon_versions
+
+        # Install EBS CSI Driver add-on
         # The add-on will create the ServiceAccount automatically
         eks.CfnAddon(
             self,
             "EbsCsiAddon",
             addon_name="aws-ebs-csi-driver",
             cluster_name=self._eks_cluster.cluster_name,
-            addon_version="v1.54.0-eksbuild.1",
+            addon_version=addon_versions.ebs_csi,
             service_account_role_arn=ebs_csi_role.role_arn,
             resolve_conflicts="OVERWRITE",
         )
 
-        # Install FSx CSI Driver add-on (EKS 1.33 compatible)
+        # Install FSx CSI Driver add-on
         # The add-on will create the ServiceAccount automatically
         eks.CfnAddon(
             self,
             "FsxCsiAddon",
             addon_name="aws-fsx-csi-driver",
             cluster_name=self._eks_cluster.cluster_name,
-            addon_version="v1.8.0-eksbuild.1",
+            addon_version=addon_versions.fsx_csi,
             service_account_role_arn=fsx_csi_role.role_arn,
             resolve_conflicts="OVERWRITE",
         )
 
-        # Install VPC CNI add-on (EKS 1.33 compatible)
+        # Install VPC CNI add-on
         eks.CfnAddon(
             self,
             "VpcCniAddon",
             addon_name="vpc-cni",
             cluster_name=self._eks_cluster.cluster_name,
-            addon_version="v1.21.1-eksbuild.1",
+            addon_version=addon_versions.vpc_cni,
             resolve_conflicts="OVERWRITE",
             configuration_values=cdk.Fn.to_json_string(
                 {
@@ -258,23 +261,23 @@ class EksStack(cdk.Stack):
             ),
         )
 
-        # Install CoreDNS add-on (EKS 1.33 compatible)
+        # Install CoreDNS add-on
         eks.CfnAddon(
             self,
             "CoreDnsAddon",
             addon_name="coredns",
             cluster_name=self._eks_cluster.cluster_name,
-            addon_version="v1.12.4-eksbuild.1",
+            addon_version=addon_versions.coredns,
             resolve_conflicts="OVERWRITE",
         )
 
-        # Install kube-proxy add-on (EKS 1.33 compatible)
+        # Install kube-proxy add-on
         eks.CfnAddon(
             self,
             "KubeProxyAddon",
             addon_name="kube-proxy",
             cluster_name=self._eks_cluster.cluster_name,
-            addon_version="v1.33.5-eksbuild.2",
+            addon_version=addon_versions.kube_proxy,
             resolve_conflicts="OVERWRITE",
         )
 

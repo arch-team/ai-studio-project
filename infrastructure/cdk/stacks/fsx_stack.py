@@ -22,7 +22,7 @@ from aws_cdk import aws_fsx as fsx
 from aws_cdk import aws_iam as iam
 from aws_cdk import aws_s3 as s3
 
-from config import EnvironmentConfig, EnvironmentType
+from config import EnvironmentConfig
 from constructs import Construct
 
 
@@ -216,12 +216,8 @@ class FsxLustreStack(cdk.Stack):
         )
         subnet_id = private_subnets.subnet_ids[0]
 
-        # Determine removal policy based on environment
-        removal_policy = (
-            "RETAIN"
-            if self.env_config.name == EnvironmentType.PROD
-            else "DELETE"
-        )
+        # Use protection config for removal policy
+        removal_policy = self.env_config.protection.removal_policy
 
         # Calculate weekly maintenance window (Sunday 2:00 AM UTC)
         weekly_maintenance_start_time = "7:02:00"  # Day:Hour:Minute (7=Sunday)
@@ -253,11 +249,8 @@ class FsxLustreStack(cdk.Stack):
             ],
         )
 
-        # Apply removal policy
-        if removal_policy == "RETAIN":
-            file_system.apply_removal_policy(RemovalPolicy.RETAIN)
-        else:
-            file_system.apply_removal_policy(RemovalPolicy.DESTROY)
+        # Apply removal policy from protection config
+        file_system.apply_removal_policy(removal_policy)
 
         return file_system
 

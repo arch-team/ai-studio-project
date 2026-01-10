@@ -7,8 +7,12 @@ deployments (dev, staging, prod) following AWS Well-Architected Framework best p
 
 from dataclasses import dataclass, field
 from enum import Enum
+from typing import TYPE_CHECKING
 
 import aws_cdk as cdk
+
+if TYPE_CHECKING:
+    pass
 
 
 class DeploymentMode(str, Enum):
@@ -80,19 +84,109 @@ class StorageConfig:
 
 
 @dataclass(frozen=True)
+class EksAddonVersions:
+    """EKS Add-on versions compatible with specific Kubernetes versions.
+
+    These versions are validated for compatibility with EKS.
+    Update these when upgrading Kubernetes version.
+
+    Reference: https://docs.aws.amazon.com/eks/latest/userguide/managing-add-ons.html
+
+    Attributes:
+        ebs_csi: Amazon EBS CSI Driver version
+        fsx_csi: Amazon FSx CSI Driver version
+        vpc_cni: Amazon VPC CNI version
+        coredns: CoreDNS version
+        kube_proxy: kube-proxy version
+    """
+    ebs_csi: str = "v1.54.0-eksbuild.1"
+    fsx_csi: str = "v1.8.0-eksbuild.1"
+    vpc_cni: str = "v1.21.1-eksbuild.1"
+    coredns: str = "v1.12.4-eksbuild.1"
+    kube_proxy: str = "v1.33.5-eksbuild.2"
+
+    @classmethod
+    def for_k8s_1_33(cls) -> "EksAddonVersions":
+        """Factory method for Kubernetes 1.33 compatible versions."""
+        return cls(
+            ebs_csi="v1.54.0-eksbuild.1",
+            fsx_csi="v1.8.0-eksbuild.1",
+            vpc_cni="v1.21.1-eksbuild.1",
+            coredns="v1.12.4-eksbuild.1",
+            kube_proxy="v1.33.5-eksbuild.2",
+        )
+
+    @classmethod
+    def for_k8s_1_32(cls) -> "EksAddonVersions":
+        """Factory method for Kubernetes 1.32 compatible versions."""
+        return cls(
+            ebs_csi="v1.52.0-eksbuild.1",
+            fsx_csi="v1.8.0-eksbuild.1",
+            vpc_cni="v1.19.2-eksbuild.1",
+            coredns="v1.11.4-eksbuild.2",
+            kube_proxy="v1.32.3-eksbuild.2",
+        )
+
+
+@dataclass(frozen=True)
 class EksConfig:
     """EKS cluster configuration.
 
     Attributes:
         kubernetes_version: EKS Kubernetes version
+        addon_versions: EKS Add-on versions compatible with kubernetes_version
         node_instance_types: List of GPU instance types for HyperPod
         min_nodes: Minimum nodes in auto-scaling group
         max_nodes: Maximum nodes in auto-scaling group
     """
     kubernetes_version: str = "1.33"
-    node_instance_types: tuple = ("p4d.24xlarge", "p5.48xlarge", "trn1.32xlarge")
+    addon_versions: EksAddonVersions = field(
+        default_factory=EksAddonVersions.for_k8s_1_33
+    )
+    node_instance_types: tuple[str, ...] = ("p4d.24xlarge", "p5.48xlarge", "trn1.32xlarge")
     min_nodes: int = 2
     max_nodes: int = 100
+
+
+@dataclass(frozen=True)
+class ProtectionConfig:
+    """Resource protection configuration for different environments.
+
+    Attributes:
+        removal_policy: CDK RemovalPolicy for stateful resources (databases, buckets)
+        enable_deletion_protection: Enable deletion protection for databases
+        retain_on_delete: Whether to retain resources when stack is deleted
+    """
+    removal_policy: cdk.RemovalPolicy = cdk.RemovalPolicy.DESTROY
+    enable_deletion_protection: bool = False
+    retain_on_delete: bool = False
+
+    @classmethod
+    def for_dev(cls) -> "ProtectionConfig":
+        """Development: allow easy cleanup."""
+        return cls(
+            removal_policy=cdk.RemovalPolicy.DESTROY,
+            enable_deletion_protection=False,
+            retain_on_delete=False,
+        )
+
+    @classmethod
+    def for_staging(cls) -> "ProtectionConfig":
+        """Staging: moderate protection."""
+        return cls(
+            removal_policy=cdk.RemovalPolicy.SNAPSHOT,
+            enable_deletion_protection=True,
+            retain_on_delete=False,
+        )
+
+    @classmethod
+    def for_prod(cls) -> "ProtectionConfig":
+        """Production: maximum protection - retain all stateful resources."""
+        return cls(
+            removal_policy=cdk.RemovalPolicy.RETAIN,
+            enable_deletion_protection=True,
+            retain_on_delete=True,
+        )
 
 
 @dataclass(frozen=True)
@@ -109,6 +203,7 @@ class EnvironmentConfig:
     database: DatabaseConfig = field(default_factory=DatabaseConfig)
     storage: StorageConfig = field(default_factory=StorageConfig)
     eks: EksConfig = field(default_factory=EksConfig)
+    protection: ProtectionConfig = field(default_factory=ProtectionConfig)
 
     def to_cdk_environment(self) -> cdk.Environment:
         """Convert to CDK Environment for stack deployment."""
@@ -142,6 +237,7 @@ class EnvironmentConfig:
                 min_nodes=1,
                 max_nodes=10,
             ),
+            protection=ProtectionConfig.for_dev(),
         )
 
     @classmethod
@@ -167,6 +263,7 @@ class EnvironmentConfig:
                 min_nodes=2,
                 max_nodes=50,
             ),
+            protection=ProtectionConfig.for_staging(),
         )
 
     @classmethod
@@ -194,6 +291,7 @@ class EnvironmentConfig:
                 min_nodes=2,
                 max_nodes=100,
             ),
+            protection=ProtectionConfig.for_prod(),
         )
 
 
