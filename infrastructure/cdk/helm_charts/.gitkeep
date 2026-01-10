@@ -1,0 +1,2 @@
+# This directory contains HyperPod Helm Chart downloaded by setup_helm_chart.sh
+# Run: ./scripts/setup_helm_chart.sh to populate this directory

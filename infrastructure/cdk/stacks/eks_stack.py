@@ -5,23 +5,30 @@ This stack creates Amazon EKS cluster as the foundation for HyperPod:
 - Amazon EKS cluster with Kubernetes 1.32+
 - EKS add-ons (EBS CSI, FSx CSI, VPC CNI, CoreDNS, kube-proxy)
 - IAM roles for IRSA (IAM Roles for Service Accounts)
+- HyperPod Helm Chart dependencies (auto-installed)
 
-After deploying this stack, you need to:
-1. Configure kubectl to access the EKS cluster
-2. Install HyperPod Helm Chart dependencies
-3. Then deploy the SagemakerHyperPodStack
+Prerequisites:
+    Run ./scripts/setup_helm_chart.sh before deploying this stack
+    to download and prepare the HyperPod Helm Chart.
 
 Reference: https://docs.aws.amazon.com/sagemaker/latest/dg/sagemaker-hyperpod-eks-install-packages-using-helm-chart.html
 """
+
+import os
+from pathlib import Path
 
 import aws_cdk as cdk
 from aws_cdk import aws_ec2 as ec2
 from aws_cdk import aws_eks as eks
 from aws_cdk import aws_iam as iam
+from aws_cdk import aws_s3_assets as s3_assets
 from aws_cdk.lambda_layer_kubectl_v32 import KubectlV32Layer
 from constructs import Construct
 
 from config import EnvironmentConfig
+
+# Path to the HyperPod Helm Chart (relative to this file)
+HELM_CHART_PATH = Path(__file__).parent.parent / "helm_charts" / "HyperPodHelmChart"
 
 
 class EksStack(cdk.Stack):
@@ -31,6 +38,10 @@ class EksStack(cdk.Stack):
     - Amazon EKS cluster (K8s 1.32+)
     - Required EKS add-ons (EBS CSI, FSx CSI, VPC CNI, CoreDNS, kube-proxy)
     - IAM roles for IRSA
+    - HyperPod Helm Chart dependencies (health-monitoring-agent, device plugins, etc.)
+
+    Prerequisites:
+        Run ./scripts/setup_helm_chart.sh before deploying this stack.
 
     Attributes:
         eks_cluster: The EKS cluster for orchestration
@@ -66,6 +77,9 @@ class EksStack(cdk.Stack):
 
         # Install EKS add-ons
         self._install_eks_addons()
+
+        # Install HyperPod Helm Chart dependencies
+        self._install_hyperpod_helm_chart()
 
         # Create outputs
         self._create_outputs()
@@ -265,6 +279,107 @@ class EksStack(cdk.Stack):
             resolve_conflicts="OVERWRITE",
         )
 
+    def _install_hyperpod_helm_chart(self) -> None:
+        """Install HyperPod Helm Chart dependencies.
+
+        This installs the HyperPod Helm Chart which includes:
+        - Health monitoring agent (required for cluster monitoring)
+        - Deep health check (for HyperPod deep health check feature)
+        - Job auto-restart (for PyTorch training job auto-restart)
+        - Kubeflow MPI operator (for distributed ML workloads)
+        - NVIDIA device plugin (for GPU instances)
+        - Neuron device plugin (for Trainium/Inferentia instances)
+        - AWS EFA device plugin (for Elastic Fabric Adapter)
+        - Training operators (Kubeflow training operators)
+
+        Prerequisites:
+            Run ./scripts/setup_helm_chart.sh to download the Helm Chart first.
+
+        Raises:
+            FileNotFoundError: If the Helm Chart is not found at the expected path.
+        """
+        # Check if Helm Chart exists
+        if not HELM_CHART_PATH.exists():
+            raise FileNotFoundError(
+                f"HyperPod Helm Chart not found at {HELM_CHART_PATH}. "
+                "Please run ./scripts/setup_helm_chart.sh first to download the Helm Chart."
+            )
+
+        # Create S3 Asset from the Helm Chart directory
+        helm_chart_asset = s3_assets.Asset(
+            self,
+            "HyperPodHelmChartAsset",
+            path=str(HELM_CHART_PATH),
+        )
+
+        # Install HyperPod Helm Chart using the EKS cluster's addHelmChart method
+        # Note: We use chart_asset to install from the local packaged chart
+        self._eks_cluster.add_helm_chart(
+            "HyperPodDependencies",
+            chart_asset=helm_chart_asset,
+            namespace="kube-system",
+            release="hyperpod-dependencies",
+            wait=True,
+            # Custom values for HyperPod configuration
+            values={
+                # Global settings
+                "global": {
+                    "region": self.env_config.region,
+                },
+                # Enable required components
+                "trainingOperators": {
+                    "enabled": True,
+                },
+                "health-monitoring-agent": {
+                    "enabled": True,
+                },
+                "deep-health-check": {
+                    "enabled": True,
+                },
+                "job-auto-restart": {
+                    "enabled": True,
+                },
+                "mpi-operator": {
+                    "enabled": True,
+                },
+                "hyperpod-patching": {
+                    "enabled": True,
+                },
+                # Device plugins
+                "nvidia-device-plugin": {
+                    "devicePlugin": {
+                        "enabled": True,
+                    },
+                },
+                "neuron-device-plugin": {
+                    "devicePlugin": {
+                        "enabled": True,
+                    },
+                },
+                "aws-efa-k8s-device-plugin": {
+                    "devicePlugin": {
+                        "enabled": True,
+                    },
+                },
+                # Disable optional components (can be enabled later if needed)
+                "cert-manager": {
+                    "enabled": False,  # Usually pre-installed separately
+                },
+                "mlflow": {
+                    "enabled": False,  # Optional
+                },
+                "storage": {
+                    "enabled": False,  # Using EKS add-ons for storage
+                },
+                "inferenceOperators": {
+                    "enabled": False,  # Enable when inference is needed
+                },
+                "gpu-operator": {
+                    "enabled": False,  # Using nvidia-device-plugin instead
+                },
+            },
+        )
+
     def _create_outputs(self) -> None:
         """Create CloudFormation outputs for cross-stack references."""
         # EKS Cluster outputs
@@ -316,12 +431,12 @@ class EksStack(cdk.Stack):
             description="Command to configure kubectl",
         )
 
-        # Output Helm install command
+        # Output Helm Chart installation status
         cdk.CfnOutput(
             self,
-            "HelmInstallCommand",
-            value="git clone https://github.com/aws/sagemaker-hyperpod-cli.git && cd sagemaker-hyperpod-cli/helm_chart && helm dependencies update HyperPodHelmChart && helm install hyperpod-dependencies HyperPodHelmChart --namespace kube-system",
-            description="Command to install HyperPod Helm dependencies",
+            "HelmChartStatus",
+            value="HyperPod Helm Chart automatically installed via CDK",
+            description="HyperPod Helm Chart is automatically installed during stack deployment",
         )
 
     @property

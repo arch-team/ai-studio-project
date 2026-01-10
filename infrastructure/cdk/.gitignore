@@ -1,0 +1,24 @@
+# CDK Output
+cdk.out/
+
+# Helm Charts (downloaded by setup_helm_chart.sh)
+helm_charts/HyperPodHelmChart/
+
+# Temporary files
+.tmp_hyperpod_cli/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
