@@ -21,10 +21,12 @@ from config import EnvironmentConfig, get_environment_config
 from stacks import (
     AlbStack,
     DatabaseStack,
+    EksStack,
     FsxLustreStack,
     HyperPodStack,
     IamStack,
     NetworkStack,
+    SagemakerHyperPodStack,
     StorageStack,
 )
 
@@ -117,10 +119,55 @@ def create_app() -> cdk.App:
     )
 
     # =========================================================================
-    # Layer 3: Compute Stack (HyperPod EKS)
+    # Layer 3a: EKS Foundation Stack
     # =========================================================================
 
-    # HyperPod Stack - EKS cluster with GPU node groups
+    # EKS Stack - EKS cluster foundation for HyperPod
+    # This stack creates the EKS cluster and add-ons
+    # After deployment, you need to install HyperPod Helm Chart before deploying HyperPod
+    eks_stack = EksStack(
+        app,
+        f"{stack_prefix}-eks",
+        env_config=env_config,
+        vpc=network_stack.vpc,
+        eks_node_role=iam_stack.eks_node_role,
+        env=env_config.to_cdk_environment(),
+        description="Amazon EKS cluster for HyperPod orchestration",
+    )
+    eks_stack.add_dependency(network_stack)
+    eks_stack.add_dependency(iam_stack)
+
+    # =========================================================================
+    # Layer 3b: SageMaker HyperPod Stack (requires Helm Chart installation)
+    # =========================================================================
+
+    # SageMaker HyperPod Stack - HyperPod cluster attached to EKS
+    # IMPORTANT: Before deploying this stack, you MUST:
+    # 1. Deploy the EKS stack first
+    # 2. Configure kubectl to access the EKS cluster
+    # 3. Install HyperPod Helm Chart dependencies:
+    #    git clone https://github.com/aws/sagemaker-hyperpod-cli.git
+    #    cd sagemaker-hyperpod-cli/helm_chart
+    #    helm dependencies update HyperPodHelmChart
+    #    helm install hyperpod-dependencies HyperPodHelmChart --namespace kube-system
+    sagemaker_hyperpod_stack = SagemakerHyperPodStack(
+        app,
+        f"{stack_prefix}-sagemaker-hyperpod",
+        env_config=env_config,
+        vpc=network_stack.vpc,
+        eks_cluster=eks_stack.eks_cluster,
+        env=env_config.to_cdk_environment(),
+        description="SageMaker HyperPod cluster with EKS orchestration",
+    )
+    sagemaker_hyperpod_stack.add_dependency(eks_stack)
+
+    # =========================================================================
+    # Layer 3 (Legacy): Combined HyperPod Stack
+    # =========================================================================
+
+    # HyperPod Stack - Combined EKS + HyperPod (Legacy, kept for reference)
+    # This stack attempts to create both EKS and HyperPod in one deployment
+    # Use EksStack + SagemakerHyperPodStack separately for proper sequencing
     hyperpod_stack = HyperPodStack(
         app,
         f"{stack_prefix}-hyperpod",
@@ -128,7 +175,7 @@ def create_app() -> cdk.App:
         vpc=network_stack.vpc,
         eks_node_role=iam_stack.eks_node_role,
         env=env_config.to_cdk_environment(),
-        description="SageMaker HyperPod with EKS orchestration and GPU node groups",
+        description="(Legacy) SageMaker HyperPod with EKS orchestration and GPU node groups",
     )
     hyperpod_stack.add_dependency(network_stack)
     hyperpod_stack.add_dependency(iam_stack)
@@ -251,6 +298,61 @@ def create_app() -> cdk.App:
         ],
     )
 
+    # Suppressions for EKS Stack
+    NagSuppressions.add_stack_suppressions(
+        eks_stack,
+        [
+            {
+                "id": "AwsSolutions-IAM4",
+                "reason": "AWS managed policies used for EKS add-ons and CDK custom resources",
+            },
+            {
+                "id": "AwsSolutions-IAM5",
+                "reason": "Wildcard permissions required for EKS cluster management and CDK custom resources",
+            },
+            {
+                "id": "AwsSolutions-EKS1",
+                "reason": "EKS cluster has private endpoint access enabled",
+            },
+            {
+                "id": "AwsSolutions-L1",
+                "reason": "Lambda runtime version is managed by CDK construct library for EKS and kubectl providers",
+            },
+            {
+                "id": "AwsSolutions-SF1",
+                "reason": "Step Function logging is managed by CDK EKS construct; acceptable for dev environment",
+            },
+            {
+                "id": "AwsSolutions-SF2",
+                "reason": "X-Ray tracing is managed by CDK EKS construct; acceptable for dev environment",
+            },
+        ],
+    )
+
+    # Suppressions for SageMaker HyperPod Stack
+    NagSuppressions.add_stack_suppressions(
+        sagemaker_hyperpod_stack,
+        [
+            {
+                "id": "AwsSolutions-IAM4",
+                "reason": "AWS managed policies used for HyperPod execution role",
+            },
+            {
+                "id": "AwsSolutions-IAM5",
+                "reason": "Wildcard permissions required for EC2 network access and ECR operations",
+            },
+            {
+                "id": "AwsSolutions-S1",
+                "reason": "Lifecycle scripts bucket access logging will be configured in production",
+            },
+            {
+                "id": "AwsSolutions-L1",
+                "reason": "Lambda runtime version is managed by CDK construct library for S3 deployment",
+            },
+        ],
+    )
+
+    # Suppressions for Legacy HyperPod Stack
     NagSuppressions.add_stack_suppressions(
         hyperpod_stack,
         [
