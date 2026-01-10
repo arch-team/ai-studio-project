@@ -16,7 +16,6 @@ Reference: spec.md NFR-001 (FSx capacity planning formula),
 """
 
 import aws_cdk as cdk
-from aws_cdk import RemovalPolicy
 from aws_cdk import aws_ec2 as ec2
 from aws_cdk import aws_fsx as fsx
 from aws_cdk import aws_iam as iam
@@ -242,7 +241,9 @@ class FsxLustreStack(cdk.Stack):
                 # Auto import policy will be configured via Data Repository Association
             ),
             tags=[
-                cdk.CfnTag(key="Name", value=f"{self.env_config.resource_prefix}-fsx-lustre"),
+                cdk.CfnTag(
+                    key="Name", value=f"{self.env_config.resource_prefix}-fsx-lustre"
+                ),
                 cdk.CfnTag(key="Environment", value=self.env_config.name.value),
                 cdk.CfnTag(key="StorageCapacityGiB", value=str(storage_capacity)),
                 cdk.CfnTag(key="ThroughputPerTiB", value=str(throughput_per_tib)),
@@ -283,7 +284,9 @@ class FsxLustreStack(cdk.Stack):
                 ),
             ),
             tags=[
-                cdk.CfnTag(key="Name", value=f"{self.env_config.resource_prefix}-fsx-dra"),
+                cdk.CfnTag(
+                    key="Name", value=f"{self.env_config.resource_prefix}-fsx-dra"
+                ),
                 cdk.CfnTag(key="Environment", value=self.env_config.name.value),
             ],
         )
@@ -360,7 +363,9 @@ class FsxLustreStack(cdk.Stack):
         )
 
         # Calculated Throughput
-        throughput_mbps = (storage_capacity // 1024) * self.env_config.storage.fsx_throughput_per_tb
+        throughput_mbps = (
+            storage_capacity // 1024
+        ) * self.env_config.storage.fsx_throughput_per_tb
         cdk.CfnOutput(
             self,
             "TotalThroughputMBps",
@@ -417,7 +422,9 @@ class FsxLustreStack(cdk.Stack):
                 ).subnet_ids[0],
                 "securityGroupIds": self._security_group.security_group_id,
                 "deploymentType": "PERSISTENT_2",
-                "perUnitStorageThroughput": str(self.env_config.storage.fsx_throughput_per_tb),
+                "perUnitStorageThroughput": str(
+                    self.env_config.storage.fsx_throughput_per_tb
+                ),
             },
             "reclaimPolicy": "Retain",
             "volumeBindingMode": "Immediate",
@@ -457,5 +464,7 @@ class FsxLustreStack(cdk.Stack):
                 "fsx:CreateDataRepositoryTask",
                 "fsx:DescribeDataRepositoryTasks",
             ],
-            resource_arns=[f"arn:aws:fsx:{self.region}:{self.account}:file-system/{self._file_system.ref}"],
+            resource_arns=[
+                f"arn:aws:fsx:{self.region}:{self.account}:file-system/{self._file_system.ref}"
+            ],
         )

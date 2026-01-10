@@ -9,7 +9,6 @@ This stack creates Aurora MySQL Serverless v2 with:
 - Encryption at rest using AWS managed keys
 """
 
-
 import aws_cdk as cdk
 from aws_cdk import Duration
 from aws_cdk import aws_ec2 as ec2
@@ -293,52 +292,61 @@ class DatabaseStack(cdk.Stack):
 
     def _create_outputs(self) -> None:
         """创建 CloudFormation 输出用于跨 Stack 引用。"""
-        from utils import create_output, create_outputs_batch
-
-        # 批量创建基础输出
-        create_outputs_batch(
+        # Cluster endpoint
+        cdk.CfnOutput(
             self,
-            [
-                (
-                    "ClusterEndpoint",
-                    self._cluster.cluster_endpoint.hostname,
-                    "Aurora cluster writer endpoint",
-                ),
-                (
-                    "ReaderEndpoint",
-                    self._cluster.cluster_read_endpoint.hostname,
-                    "Aurora cluster reader endpoint",
-                ),
-                (
-                    "Port",
-                    str(self._cluster.cluster_endpoint.port),
-                    "Aurora cluster port",
-                ),
-                (
-                    "SecurityGroupId",
-                    self._security_group.security_group_id,
-                    "Aurora security group ID",
-                ),
-            ],
+            "ClusterEndpoint",
+            value=self._cluster.cluster_endpoint.hostname,
+            description="Aurora cluster writer endpoint",
+            export_name=f"{self.env_config.resource_prefix}-aurora-endpoint",
         )
 
-        # 条件输出 - Secret ARN
+        # Reader endpoint
+        cdk.CfnOutput(
+            self,
+            "ReaderEndpoint",
+            value=self._cluster.cluster_read_endpoint.hostname,
+            description="Aurora cluster reader endpoint",
+            export_name=f"{self.env_config.resource_prefix}-aurora-reader-endpoint",
+        )
+
+        # Port
+        cdk.CfnOutput(
+            self,
+            "Port",
+            value=str(self._cluster.cluster_endpoint.port),
+            description="Aurora cluster port",
+            export_name=f"{self.env_config.resource_prefix}-aurora-port",
+        )
+
+        # Secret ARN
         if self._secret:
-            create_output(
+            cdk.CfnOutput(
                 self,
                 "SecretArn",
-                self._secret.secret_arn,
-                "Secrets Manager secret ARN for database credentials",
+                value=self._secret.secret_arn,
+                description="Secrets Manager secret ARN for database credentials",
+                export_name=f"{self.env_config.resource_prefix}-aurora-secret-arn",
             )
 
-        # 条件输出 - RDS Proxy endpoint
+        # Proxy endpoint (if enabled)
         if self._proxy:
-            create_output(
+            cdk.CfnOutput(
                 self,
                 "ProxyEndpoint",
-                self._proxy.endpoint,
-                "RDS Proxy endpoint",
+                value=self._proxy.endpoint,
+                description="RDS Proxy endpoint",
+                export_name=f"{self.env_config.resource_prefix}-aurora-proxy-endpoint",
             )
+
+        # Security group ID
+        cdk.CfnOutput(
+            self,
+            "SecurityGroupId",
+            value=self._security_group.security_group_id,
+            description="Aurora security group ID",
+            export_name=f"{self.env_config.resource_prefix}-aurora-sg-id",
+        )
 
     @property
     def cluster(self) -> rds.DatabaseCluster:

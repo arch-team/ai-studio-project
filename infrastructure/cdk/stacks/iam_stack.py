@@ -141,7 +141,9 @@ class IamStack(cdk.Stack):
             )
         )
 
-        cdk.Tags.of(role).add("Name", f"{self.env_config.resource_prefix}-eks-node-role")
+        cdk.Tags.of(role).add(
+            "Name", f"{self.env_config.resource_prefix}-eks-node-role"
+        )
 
         return role
 
@@ -229,9 +231,7 @@ class IamStack(cdk.Stack):
                 ],
                 resources=["*"],
                 conditions={
-                    "StringEquals": {
-                        "cloudwatch:namespace": ["AI-Platform/Training"]
-                    }
+                    "StringEquals": {"cloudwatch:namespace": ["AI-Platform/Training"]}
                 },
             )
         )

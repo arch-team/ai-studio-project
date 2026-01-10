@@ -284,7 +284,9 @@ class TestEnvironmentSpecificConfiguration:
         fs_props = list(filesystems.values())[0].get("Properties", {})
         storage_capacity = fs_props.get("StorageCapacity", 0)
         # Should be at least 10 TiB but aligned to FSx requirements
-        assert storage_capacity >= 10240, f"Dev storage capacity {storage_capacity} < 10240"
+        assert (
+            storage_capacity >= 10240
+        ), f"Dev storage capacity {storage_capacity} < 10240"
 
     def test_prod_storage_capacity(
         self, cdk_app: cdk.App, prod_config: EnvironmentConfig, cdk_env: cdk.Environment
@@ -318,4 +320,6 @@ class TestEnvironmentSpecificConfiguration:
         fs_props = list(filesystems.values())[0].get("Properties", {})
         storage_capacity = fs_props.get("StorageCapacity", 0)
         # Should be at least 100 TiB but aligned to FSx requirements
-        assert storage_capacity >= 102400, f"Prod storage capacity {storage_capacity} < 102400"
+        assert (
+            storage_capacity >= 102400
+        ), f"Prod storage capacity {storage_capacity} < 102400"

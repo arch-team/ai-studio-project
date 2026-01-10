@@ -8,9 +8,8 @@ Tests cover:
 - CDK Environment conversion
 """
 
-import pytest
-
 import aws_cdk as cdk
+import pytest
 
 from config import (
     DatabaseConfig,
@@ -285,7 +284,9 @@ class TestGetEnvironmentConfig:
     def test_invalid_environment_raises(self) -> None:
         """Verify invalid environment name raises ValueError."""
         with pytest.raises(ValueError) as exc_info:
-            get_environment_config(env_name="invalid", account="123", region="us-east-1")
+            get_environment_config(
+                env_name="invalid", account="123", region="us-east-1"
+            )
 
         assert "Invalid environment" in str(exc_info.value)
         assert "dev" in str(exc_info.value)

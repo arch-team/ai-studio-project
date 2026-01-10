@@ -14,6 +14,7 @@ Reference: https://docs.aws.amazon.com/cdk/v2/guide/tagging.html
 from typing import TYPE_CHECKING
 
 import aws_cdk as cdk
+
 from constructs import IConstruct
 
 if TYPE_CHECKING:

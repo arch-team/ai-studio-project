@@ -7,6 +7,7 @@ CDK Nag 抑制规则的集中管理。
 from typing import TYPE_CHECKING
 
 from cdk_nag import NagSuppressions
+
 from constructs import IConstruct
 
 if TYPE_CHECKING:

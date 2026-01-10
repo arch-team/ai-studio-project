@@ -23,6 +23,7 @@ class DeploymentMode(str, Enum):
         MULTI_AZ: Multi-AZ deployment for production (full HA)
         HYBRID: Hybrid mode - compute multi-AZ, data layer single AZ (cost optimized)
     """
+
     SINGLE_AZ = "single-az"
     MULTI_AZ = "multi-az"
     HYBRID = "hybrid"
@@ -30,6 +31,7 @@ class DeploymentMode(str, Enum):
 
 class EnvironmentType(str, Enum):
     """Environment types for the platform."""
+
     DEV = "dev"
     STAGING = "staging"
     PROD = "prod"
@@ -45,6 +47,7 @@ class VpcConfig:
         nat_gateways: Number of NAT Gateways (2 for cost-optimized HA)
         deployment_mode: Deployment mode for AZ strategy
     """
+
     cidr: str = "10.0.0.0/16"
     max_azs: int = 3
     nat_gateways: int = 2
@@ -61,6 +64,7 @@ class DatabaseConfig:
         backup_retention_days: Backup retention period
         enable_proxy: Enable RDS Proxy for connection pooling
     """
+
     min_acu: float = 0.5
     max_acu: float = 16.0
     backup_retention_days: int = 7
@@ -77,6 +81,7 @@ class StorageConfig:
         checkpoint_retention_days: Cold checkpoint retention period
         checkpoint_ia_transition_days: Days before transition to Standard-IA
     """
+
     fsx_storage_capacity_gib: int = 10 * 1024  # 10 TiB default
     fsx_throughput_per_tb: int = 500  # Cost-optimized default
     checkpoint_retention_days: int = 90
@@ -99,6 +104,7 @@ class EksAddonVersions:
         coredns: CoreDNS version
         kube_proxy: kube-proxy version
     """
+
     ebs_csi: str = "v1.54.0-eksbuild.1"
     fsx_csi: str = "v1.8.0-eksbuild.1"
     vpc_cni: str = "v1.21.1-eksbuild.1"
@@ -139,11 +145,16 @@ class EksConfig:
         min_nodes: Minimum nodes in auto-scaling group
         max_nodes: Maximum nodes in auto-scaling group
     """
+
     kubernetes_version: str = "1.33"
     addon_versions: EksAddonVersions = field(
         default_factory=EksAddonVersions.for_k8s_1_33
     )
-    node_instance_types: tuple[str, ...] = ("p4d.24xlarge", "p5.48xlarge", "trn1.32xlarge")
+    node_instance_types: tuple[str, ...] = (
+        "p4d.24xlarge",
+        "p5.48xlarge",
+        "trn1.32xlarge",
+    )
     min_nodes: int = 2
     max_nodes: int = 100
 
@@ -157,6 +168,7 @@ class ProtectionConfig:
         enable_deletion_protection: Enable deletion protection for databases
         retain_on_delete: Whether to retain resources when stack is deleted
     """
+
     removal_policy: cdk.RemovalPolicy = cdk.RemovalPolicy.DESTROY
     enable_deletion_protection: bool = False
     retain_on_delete: bool = False
@@ -196,6 +208,7 @@ class EnvironmentConfig:
     This class aggregates all configuration for a specific environment
     and provides factory methods for standard configurations.
     """
+
     name: EnvironmentType
     account: str
     region: str
@@ -293,7 +306,9 @@ class EnvironmentConfig:
         )
 
     @classmethod
-    def for_staging(cls, account: str, region: str = "us-east-1") -> "EnvironmentConfig":
+    def for_staging(
+        cls, account: str, region: str = "us-east-1"
+    ) -> "EnvironmentConfig":
         """预发布环境的工厂方法 - 中等规模配置。"""
         return cls._create_environment(
             name=EnvironmentType.STAGING,
@@ -359,6 +374,8 @@ def get_environment_config(
 
     if env_name not in factory_methods:
         valid_envs = ", ".join(factory_methods.keys())
-        raise ValueError(f"Invalid environment: {env_name}. Valid options: {valid_envs}")
+        raise ValueError(
+            f"Invalid environment: {env_name}. Valid options: {valid_envs}"
+        )
 
     return factory_methods[env_name](account=account, region=region)

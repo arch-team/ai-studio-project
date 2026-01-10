@@ -81,7 +81,11 @@ class TestSubnetArchitecture:
             {
                 "MapPublicIpOnLaunch": True,
                 "Tags": Match.array_with(
-                    [Match.object_like({"Key": "aws-cdk:subnet-type", "Value": "Public"})]
+                    [
+                        Match.object_like(
+                            {"Key": "aws-cdk:subnet-type", "Value": "Public"}
+                        )
+                    ]
                 ),
             },
         )
@@ -93,7 +97,11 @@ class TestSubnetArchitecture:
             {
                 "MapPublicIpOnLaunch": False,
                 "Tags": Match.array_with(
-                    [Match.object_like({"Key": "aws-cdk:subnet-type", "Value": "Private"})]
+                    [
+                        Match.object_like(
+                            {"Key": "aws-cdk:subnet-type", "Value": "Private"}
+                        )
+                    ]
                 ),
             },
         )
@@ -105,7 +113,11 @@ class TestSubnetArchitecture:
             {
                 "MapPublicIpOnLaunch": False,
                 "Tags": Match.array_with(
-                    [Match.object_like({"Key": "aws-cdk:subnet-type", "Value": "Isolated"})]
+                    [
+                        Match.object_like(
+                            {"Key": "aws-cdk:subnet-type", "Value": "Isolated"}
+                        )
+                    ]
                 ),
             },
         )

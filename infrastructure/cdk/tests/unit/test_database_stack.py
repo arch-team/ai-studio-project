@@ -120,7 +120,9 @@ class TestAuroraClusterConfiguration:
         template.has_resource_properties(
             "AWS::RDS::DBCluster",
             {
-                "EnableCloudwatchLogsExports": Match.array_with(["audit", "error", "slowquery"]),
+                "EnableCloudwatchLogsExports": Match.array_with(
+                    ["audit", "error", "slowquery"]
+                ),
             },
         )
 

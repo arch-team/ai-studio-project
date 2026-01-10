@@ -7,8 +7,6 @@ Tests cover:
 - get_data_classification_tag function
 """
 
-import pytest
-
 import aws_cdk as cdk
 
 from aspects import (

@@ -69,7 +69,9 @@ class AlbStack(cdk.Stack):
 
         # Determine if HTTPS should be enabled
         # In dev environment, if no certificate is provided, use HTTP-only mode
-        self._https_enabled = bool(certificate_arn) or env_config.name != EnvironmentType.DEV
+        self._https_enabled = (
+            bool(certificate_arn) or env_config.name != EnvironmentType.DEV
+        )
 
         # Create security group for ALB
         self._security_group = self._create_security_group()
@@ -290,7 +292,9 @@ class AlbStack(cdk.Stack):
         - Grafana (port 3000)
         """
         # Get the active listener (HTTPS if available, otherwise HTTP)
-        active_listener = self._https_listener if self._https_listener else self._http_listener
+        active_listener = (
+            self._https_listener if self._https_listener else self._http_listener
+        )
 
         # Backend API target group
         self._backend_target_group = elbv2.ApplicationTargetGroup(

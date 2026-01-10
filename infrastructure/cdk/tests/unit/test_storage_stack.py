@@ -223,9 +223,7 @@ class TestBucketTags:
         template.has_resource_properties(
             "AWS::S3::Bucket",
             {
-                "Tags": Match.array_with(
-                    [Match.object_like({"Key": "Name"})]
-                ),
+                "Tags": Match.array_with([Match.object_like({"Key": "Name"})]),
             },
         )
 
@@ -235,7 +233,11 @@ class TestBucketTags:
             "AWS::S3::Bucket",
             {
                 "Tags": Match.array_with(
-                    [Match.object_like({"Key": "DataClassification", "Value": "internal"})]
+                    [
+                        Match.object_like(
+                            {"Key": "DataClassification", "Value": "internal"}
+                        )
+                    ]
                 ),
             },
         )

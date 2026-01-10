@@ -9,7 +9,6 @@ This stack creates the VPC infrastructure with 3-tier subnet isolation:
 Follows AWS Well-Architected Framework security best practices.
 """
 
-
 import aws_cdk as cdk
 from aws_cdk import aws_ec2 as ec2
 

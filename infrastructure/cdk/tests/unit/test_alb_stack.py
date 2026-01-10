@@ -14,7 +14,6 @@ Tests cover:
 
 import aws_cdk as cdk
 import pytest
-from aws_cdk import aws_ec2 as ec2
 from aws_cdk.assertions import Match, Template
 
 from config import EnvironmentConfig
@@ -124,7 +123,7 @@ class TestSecurityGroupConfiguration:
         iam_stack = IamStack(
             cdk_app, "TestIamStack", env_config=dev_config, env=cdk_env
         )
-        eks_stack = EksStack(
+        EksStack(
             cdk_app,
             "TestEksStack",
             env_config=dev_config,
@@ -203,7 +202,7 @@ class TestHttpsListener:
         iam_stack = IamStack(
             cdk_app, "TestIamStack", env_config=dev_config, env=cdk_env
         )
-        eks_stack = EksStack(
+        EksStack(
             cdk_app,
             "TestEksStack",
             env_config=dev_config,
@@ -257,7 +256,7 @@ class TestHttpRedirect:
         iam_stack = IamStack(
             cdk_app, "TestIamStack", env_config=dev_config, env=cdk_env
         )
-        eks_stack = EksStack(
+        EksStack(
             cdk_app,
             "TestEksStack",
             env_config=dev_config,
@@ -326,7 +325,7 @@ class TestTargetGroups:
         iam_stack = IamStack(
             cdk_app, "TestIamStack", env_config=dev_config, env=cdk_env
         )
-        eks_stack = EksStack(
+        EksStack(
             cdk_app,
             "TestEksStack",
             env_config=dev_config,
@@ -373,9 +372,7 @@ class TestWafConfiguration:
     """Tests for WAF configuration."""
 
     @pytest.fixture
-    def template_with_waf(
-        self, cdk_app: cdk.App, cdk_env: cdk.Environment
-    ) -> Template:
+    def template_with_waf(self, cdk_app: cdk.App, cdk_env: cdk.Environment) -> Template:
         """Create template with WAF enabled (prod config)."""
         prod_config = EnvironmentConfig.for_prod(
             account="123456789012", region="us-east-1"
@@ -386,7 +383,7 @@ class TestWafConfiguration:
         iam_stack = IamStack(
             cdk_app, "TestIamStack", env_config=prod_config, env=cdk_env
         )
-        eks_stack = EksStack(
+        EksStack(
             cdk_app,
             "TestEksStack",
             env_config=prod_config,
@@ -431,7 +428,7 @@ class TestAlbStackOutputs:
         iam_stack = IamStack(
             cdk_app, "TestIamStack", env_config=dev_config, env=cdk_env
         )
-        eks_stack = EksStack(
+        EksStack(
             cdk_app,
             "TestEksStack",
             env_config=dev_config,
@@ -482,7 +479,7 @@ class TestAlbStackTags:
         iam_stack = IamStack(
             cdk_app, "TestIamStack", env_config=dev_config, env=cdk_env
         )
-        eks_stack = EksStack(
+        EksStack(
             cdk_app,
             "TestEksStack",
             env_config=dev_config,

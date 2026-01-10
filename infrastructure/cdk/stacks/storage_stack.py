@@ -14,7 +14,7 @@ All buckets are configured with:
 """
 
 import aws_cdk as cdk
-from aws_cdk import Duration, RemovalPolicy
+from aws_cdk import Duration
 from aws_cdk import aws_iam as iam
 from aws_cdk import aws_s3 as s3
 
@@ -227,7 +227,12 @@ class StorageStack(cdk.Stack):
         lifecycle_rules = [
             builder.transition_rule(
                 "TransitionToIA",
-                [(s3.StorageClass.INFREQUENT_ACCESS, storage_config.checkpoint_ia_transition_days)],
+                [
+                    (
+                        s3.StorageClass.INFREQUENT_ACCESS,
+                        storage_config.checkpoint_ia_transition_days,
+                    )
+                ],
             ),
             builder.expiration_rule(
                 "ExpireCheckpoints",
@@ -246,46 +251,52 @@ class StorageStack(cdk.Stack):
 
     def _create_outputs(self) -> None:
         """创建 CloudFormation 输出用于跨 Stack 引用。"""
-        from utils import create_outputs_batch
-
-        # 批量创建 S3 bucket 输出
-        create_outputs_batch(
+        # Datasets bucket
+        cdk.CfnOutput(
             self,
-            [
-                # Datasets bucket
-                (
-                    "DatasetsBucketName",
-                    self._datasets_bucket.bucket_name,
-                    "S3 bucket name for training datasets",
-                ),
-                (
-                    "DatasetsBucketArn",
-                    self._datasets_bucket.bucket_arn,
-                    "S3 bucket ARN for training datasets",
-                ),
-                # Models bucket
-                (
-                    "ModelsBucketName",
-                    self._models_bucket.bucket_name,
-                    "S3 bucket name for model artifacts",
-                ),
-                (
-                    "ModelsBucketArn",
-                    self._models_bucket.bucket_arn,
-                    "S3 bucket ARN for model artifacts",
-                ),
-                # Checkpoints bucket
-                (
-                    "CheckpointsBucketName",
-                    self._checkpoints_bucket.bucket_name,
-                    "S3 bucket name for training checkpoints",
-                ),
-                (
-                    "CheckpointsBucketArn",
-                    self._checkpoints_bucket.bucket_arn,
-                    "S3 bucket ARN for training checkpoints",
-                ),
-            ],
+            "DatasetsBucketName",
+            value=self._datasets_bucket.bucket_name,
+            description="S3 bucket name for training datasets",
+            export_name=f"{self.env_config.resource_prefix}-datasets-bucket",
+        )
+        cdk.CfnOutput(
+            self,
+            "DatasetsBucketArn",
+            value=self._datasets_bucket.bucket_arn,
+            description="S3 bucket ARN for training datasets",
+            export_name=f"{self.env_config.resource_prefix}-datasets-bucket-arn",
+        )
+
+        # Models bucket
+        cdk.CfnOutput(
+            self,
+            "ModelsBucketName",
+            value=self._models_bucket.bucket_name,
+            description="S3 bucket name for model artifacts",
+            export_name=f"{self.env_config.resource_prefix}-models-bucket",
+        )
+        cdk.CfnOutput(
+            self,
+            "ModelsBucketArn",
+            value=self._models_bucket.bucket_arn,
+            description="S3 bucket ARN for model artifacts",
+            export_name=f"{self.env_config.resource_prefix}-models-bucket-arn",
+        )
+
+        # Checkpoints bucket
+        cdk.CfnOutput(
+            self,
+            "CheckpointsBucketName",
+            value=self._checkpoints_bucket.bucket_name,
+            description="S3 bucket name for training checkpoints",
+            export_name=f"{self.env_config.resource_prefix}-checkpoints-bucket",
+        )
+        cdk.CfnOutput(
+            self,
+            "CheckpointsBucketArn",
+            value=self._checkpoints_bucket.bucket_arn,
+            description="S3 bucket ARN for training checkpoints",
+            export_name=f"{self.env_config.resource_prefix}-checkpoints-bucket-arn",
         )
 
     @property

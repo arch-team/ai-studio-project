@@ -96,9 +96,7 @@ class GpuNodeGroupConstruct(Construct):
         self._launch_template = self._create_launch_template(eks_cluster)
 
         # Create node group
-        self._node_group = self._create_node_group(
-            eks_cluster, node_role, subnets
-        )
+        self._node_group = self._create_node_group(eks_cluster, node_role, subnets)
 
     def _create_launch_template(self, eks_cluster: eks.ICluster) -> ec2.LaunchTemplate:
         """Create EC2 launch template for GPU nodes.
@@ -160,7 +158,8 @@ class GpuNodeGroupConstruct(Construct):
         )
 
         cdk.Tags.of(launch_template).add(
-            "Name", f"{self.env_config.resource_prefix}-{self._node_group_config.name}-lt"
+            "Name",
+            f"{self.env_config.resource_prefix}-{self._node_group_config.name}-lt",
         )
 
         return launch_template
@@ -191,21 +190,25 @@ class GpuNodeGroupConstruct(Construct):
         }
 
         # Prepare taints for GPU node isolation
-        taints = [
-            eks.CfnNodegroup.TaintProperty(
-                key=t.get("key", "nvidia.com/gpu"),
-                value=t.get("value", "true"),
-                effect=t.get("effect", "NO_SCHEDULE"),
-            )
-            for t in config.taints
-        ] if config.taints else [
-            # Default GPU taint to prevent non-GPU workloads
-            eks.CfnNodegroup.TaintProperty(
-                key="nvidia.com/gpu",
-                value="true",
-                effect="NO_SCHEDULE",
-            )
-        ]
+        taints = (
+            [
+                eks.CfnNodegroup.TaintProperty(
+                    key=t.get("key", "nvidia.com/gpu"),
+                    value=t.get("value", "true"),
+                    effect=t.get("effect", "NO_SCHEDULE"),
+                )
+                for t in config.taints
+            ]
+            if config.taints
+            else [
+                # Default GPU taint to prevent non-GPU workloads
+                eks.CfnNodegroup.TaintProperty(
+                    key="nvidia.com/gpu",
+                    value="true",
+                    effect="NO_SCHEDULE",
+                )
+            ]
+        )
 
         node_group = eks.CfnNodegroup(
             self,

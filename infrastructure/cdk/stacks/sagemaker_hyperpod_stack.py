@@ -105,7 +105,9 @@ class SagemakerHyperPodStack(cdk.Stack):
         cdk.Tags.of(bucket).add("Purpose", "hyperpod-lifecycle-scripts")
 
         # Deploy lifecycle scripts to S3
-        assets_path = os.path.join(os.path.dirname(__file__), "..", "assets", "lifecycle-scripts")
+        assets_path = os.path.join(
+            os.path.dirname(__file__), "..", "assets", "lifecycle-scripts"
+        )
         s3deploy.BucketDeployment(
             self,
             "DeployLifecycleScripts",
@@ -237,9 +239,7 @@ class SagemakerHyperPodStack(cdk.Stack):
         based on workload requirements.
         """
         # Get private subnet IDs for the cluster
-        private_subnet_ids = [
-            subnet.subnet_id for subnet in self._vpc.private_subnets
-        ]
+        private_subnet_ids = [subnet.subnet_id for subnet in self._vpc.private_subnets]
 
         # Get security group IDs (use EKS cluster security group)
         security_group_ids = [self._eks_cluster.cluster_security_group_id]
@@ -279,7 +279,9 @@ class SagemakerHyperPodStack(cdk.Stack):
             node_recovery="Automatic",
             # Tags
             tags=[
-                cdk.CfnTag(key="Name", value=f"{self.env_config.resource_prefix}-hyperpod"),
+                cdk.CfnTag(
+                    key="Name", value=f"{self.env_config.resource_prefix}-hyperpod"
+                ),
                 cdk.CfnTag(key="Environment", value=self.env_config.name.value),
                 cdk.CfnTag(key="ManagedBy", value="cdk"),
             ],

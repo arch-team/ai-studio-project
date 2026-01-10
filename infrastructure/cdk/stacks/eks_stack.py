@@ -392,48 +392,61 @@ class EksStack(cdk.Stack):
 
     def _create_outputs(self) -> None:
         """创建 CloudFormation 输出用于跨 Stack 引用。"""
-        from utils import create_outputs_batch
-
-        # 批量创建 EKS 集群输出
-        create_outputs_batch(
+        # EKS Cluster outputs
+        cdk.CfnOutput(
             self,
-            [
-                (
-                    "EksClusterName",
-                    self._eks_cluster.cluster_name,
-                    "EKS cluster name",
-                ),
-                (
-                    "EksClusterArn",
-                    self._eks_cluster.cluster_arn,
-                    "EKS cluster ARN",
-                ),
-                (
-                    "EksClusterEndpoint",
-                    self._eks_cluster.cluster_endpoint,
-                    "EKS cluster API endpoint",
-                ),
-                (
-                    "EksClusterSecurityGroupId",
-                    self._eks_cluster.cluster_security_group_id,
-                    "EKS cluster security group ID",
-                ),
-                (
-                    "EksOidcProviderArn",
-                    self._eks_cluster.open_id_connect_provider.open_id_connect_provider_arn,
-                    "EKS OIDC provider ARN for IRSA",
-                ),
-                (
-                    "KubeconfigCommand",
-                    f"aws eks update-kubeconfig --name {self._eks_cluster.cluster_name} --region {self.env_config.region}",
-                    "Command to configure kubectl",
-                ),
-                (
-                    "HelmChartStatus",
-                    "HyperPod Helm Chart automatically installed via CDK",
-                    "HyperPod Helm Chart is automatically installed during stack deployment",
-                ),
-            ],
+            "EksClusterName",
+            value=self._eks_cluster.cluster_name,
+            description="EKS cluster name",
+            export_name=f"{self.env_config.resource_prefix}-eks-cluster-name",
+        )
+
+        cdk.CfnOutput(
+            self,
+            "EksClusterArn",
+            value=self._eks_cluster.cluster_arn,
+            description="EKS cluster ARN",
+            export_name=f"{self.env_config.resource_prefix}-eks-cluster-arn",
+        )
+
+        cdk.CfnOutput(
+            self,
+            "EksClusterEndpoint",
+            value=self._eks_cluster.cluster_endpoint,
+            description="EKS cluster API endpoint",
+            export_name=f"{self.env_config.resource_prefix}-eks-endpoint",
+        )
+
+        cdk.CfnOutput(
+            self,
+            "EksClusterSecurityGroupId",
+            value=self._eks_cluster.cluster_security_group_id,
+            description="EKS cluster security group ID",
+            export_name=f"{self.env_config.resource_prefix}-eks-sg-id",
+        )
+
+        cdk.CfnOutput(
+            self,
+            "EksOidcProviderArn",
+            value=self._eks_cluster.open_id_connect_provider.open_id_connect_provider_arn,
+            description="EKS OIDC provider ARN for IRSA",
+            export_name=f"{self.env_config.resource_prefix}-eks-oidc-arn",
+        )
+
+        # Output kubeconfig command
+        cdk.CfnOutput(
+            self,
+            "KubeconfigCommand",
+            value=f"aws eks update-kubeconfig --name {self._eks_cluster.cluster_name} --region {self.env_config.region}",
+            description="Command to configure kubectl",
+        )
+
+        # Output Helm Chart installation status
+        cdk.CfnOutput(
+            self,
+            "HelmChartStatus",
+            value="HyperPod Helm Chart automatically installed via CDK",
+            description="HyperPod Helm Chart is automatically installed during stack deployment",
         )
 
     @property

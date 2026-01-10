@@ -56,7 +56,11 @@ class TestFullSynthesis:
 
         # Layer 2: Data
         database_stack = DatabaseStack(
-            app, "dev-database", env_config=env_config, vpc=network_stack.vpc, env=cdk_env
+            app,
+            "dev-database",
+            env_config=env_config,
+            vpc=network_stack.vpc,
+            env=cdk_env,
         )
         storage_stack = StorageStack(
             app, "dev-storage", env_config=env_config, env=cdk_env
@@ -114,7 +118,11 @@ class TestFullSynthesis:
 
         # Layer 2: Data
         database_stack = DatabaseStack(
-            app, "prod-database", env_config=env_config, vpc=network_stack.vpc, env=cdk_env
+            app,
+            "prod-database",
+            env_config=env_config,
+            vpc=network_stack.vpc,
+            env=cdk_env,
         )
         storage_stack = StorageStack(
             app, "prod-storage", env_config=env_config, env=cdk_env
@@ -290,9 +298,7 @@ class TestResourceCounts:
 
         template.resource_count_is("AWS::S3::Bucket", 3)
 
-    def test_network_creates_one_vpc(
-        self, test_account: str, test_region: str
-    ) -> None:
+    def test_network_creates_one_vpc(self, test_account: str, test_region: str) -> None:
         """Verify network stack creates exactly 1 VPC."""
         app = cdk.App()
         env_config = get_environment_config("dev", test_account, test_region)

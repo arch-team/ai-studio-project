@@ -100,8 +100,7 @@ class TestEksNodeRole:
         # Verify that at least one role has managed policy ARNs
         roles = template.find_resources("AWS::IAM::Role")
         has_managed_policies = any(
-            "ManagedPolicyArns" in role.get("Properties", {})
-            for role in roles.values()
+            "ManagedPolicyArns" in role.get("Properties", {}) for role in roles.values()
         )
         assert has_managed_policies, "No role with managed policy ARNs found"
 

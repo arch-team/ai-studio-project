@@ -157,11 +157,7 @@ class TestLifecycleScriptsBucket:
             {
                 "BucketEncryption": {
                     "ServerSideEncryptionConfiguration": [
-                        {
-                            "ServerSideEncryptionByDefault": {
-                                "SSEAlgorithm": "AES256"
-                            }
-                        }
+                        {"ServerSideEncryptionByDefault": {"SSEAlgorithm": "AES256"}}
                     ]
                 }
             },
@@ -171,11 +167,7 @@ class TestLifecycleScriptsBucket:
         """Verify bucket has versioning enabled."""
         template.has_resource_properties(
             "AWS::S3::Bucket",
-            {
-                "VersioningConfiguration": {
-                    "Status": "Enabled"
-                }
-            },
+            {"VersioningConfiguration": {"Status": "Enabled"}},
         )
 
     def test_public_access_blocked(self, template: Template) -> None:
@@ -256,11 +248,7 @@ class TestHyperPodExecutionRole:
                     "Statement": Match.array_with(
                         [
                             Match.object_like(
-                                {
-                                    "Principal": {
-                                        "Service": "sagemaker.amazonaws.com"
-                                    }
-                                }
+                                {"Principal": {"Service": "sagemaker.amazonaws.com"}}
                             )
                         ]
                     )
@@ -446,9 +434,7 @@ class TestHyperPodClusterConfiguration:
         """Verify automatic node recovery is enabled."""
         template.has_resource_properties(
             "AWS::SageMaker::Cluster",
-            {
-                "NodeRecovery": "Automatic"
-            },
+            {"NodeRecovery": "Automatic"},
         )
 
     def test_instance_group_configured(self, template: Template) -> None:
@@ -495,9 +481,7 @@ class TestRemovalPolicies:
     """Tests for removal policies per environment."""
 
     @pytest.fixture
-    def dev_template(
-        self, cdk_app: cdk.App, cdk_env: cdk.Environment
-    ) -> Template:
+    def dev_template(self, cdk_app: cdk.App, cdk_env: cdk.Environment) -> Template:
         """Create template for dev environment."""
         dev_config = EnvironmentConfig.for_dev(
             account="123456789012", region="us-east-1"
@@ -505,9 +489,7 @@ class TestRemovalPolicies:
         network_stack = NetworkStack(
             cdk_app, "DevNetworkStack", env_config=dev_config, env=cdk_env
         )
-        iam_stack = IamStack(
-            cdk_app, "DevIamStack", env_config=dev_config, env=cdk_env
-        )
+        iam_stack = IamStack(cdk_app, "DevIamStack", env_config=dev_config, env=cdk_env)
         eks_stack = EksStack(
             cdk_app,
             "DevEksStack",
@@ -527,9 +509,7 @@ class TestRemovalPolicies:
         return Template.from_stack(stack)
 
     @pytest.fixture
-    def prod_template(
-        self, cdk_app: cdk.App, cdk_env: cdk.Environment
-    ) -> Template:
+    def prod_template(self, cdk_app: cdk.App, cdk_env: cdk.Environment) -> Template:
         """Create template for prod environment."""
         prod_config = EnvironmentConfig.for_prod(
             account="123456789012", region="us-east-1"
