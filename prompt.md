@@ -200,3 +200,16 @@ Prometheus/Grafana 对应Amazon SageMaker HyperPod observability
 
 
 /speckit.checklist 对比分析/Users/jinhuasu/Project_Workspace/Anker-Projects/ml-platform-research/llm-platform-solution/ai-studio-project/infrastructure IaC项目的实现，检查tasks.md 中的Phase 1: Setup - 项目初始化和基础设施即代码 (18 tasks), 在实际的infrastructure IaC项目的实现中还没有实现
+
+
+
+
+
+EC2 节点组（用于 cert-manager）
+cert-manager 需要使用EC2 节点组，而不能使用Fargate ，不然会导致
+Training Operator 需要在带有 sagemaker.amazonaws.com/compute-type: hyperpod 标签的节点上运行
+
+在infrastructure/cdk 项目中资源的配置应该将cdk作为其唯一的来源
+
+
+完善一下cdk项目，
