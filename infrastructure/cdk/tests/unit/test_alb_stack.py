@@ -73,7 +73,6 @@ class TestAlbStackCreation:
         dev_config: EnvironmentConfig,
         cdk_env: cdk.Environment,
         network_stack: NetworkStack,
-        eks_stack: EksStack,
     ) -> AlbStack:
         """Create an ALB Stack for testing."""
         return AlbStack(

@@ -42,6 +42,8 @@ include = ["config*", "stacks*", "constructs*"]
 [tool.ruff]
 target-version = "py311"
 line-length = 88
+
+[tool.ruff.lint]
 select = [
     "E",    # pycodestyle errors
     "W",    # pycodestyle warnings
@@ -59,7 +61,7 @@ ignore = [
     "ARG001", # unused function argument (common in CDK)
 ]
 
-[tool.ruff.isort]
+[tool.ruff.lint.isort]
 known-first-party = ["config", "stacks", "constructs"]
 
 [tool.mypy]

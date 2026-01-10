@@ -127,7 +127,8 @@ class StorageStack(cdk.Stack):
             lifecycle_rules=lifecycle_rules or [],
             # Removal policy (from protection config)
             removal_policy=removal_policy,
-            auto_delete_objects=not self.env_config.protection.retain_on_delete,
+            # Auto-delete objects only supported with DESTROY policy
+            auto_delete_objects=(removal_policy == cdk.RemovalPolicy.DESTROY),
             # Object ownership (recommended setting)
             object_ownership=s3.ObjectOwnership.BUCKET_OWNER_ENFORCED,
         )

@@ -184,12 +184,13 @@ class DatabaseStack(cdk.Stack):
         # Create CloudWatch log group for audit logs
         # Log group is created but not assigned as Aurora will auto-create it
         # This explicit creation ensures proper lifecycle management
+        # Note: LogGroup doesn't support SNAPSHOT policy, always use DESTROY
         logs.LogGroup(
             self,
             "AuditLogGroup",
             log_group_name=f"/aws/rds/{self.env_config.resource_prefix}/aurora/audit",
             retention=logs.RetentionDays.ONE_MONTH,
-            removal_policy=self.env_config.protection.removal_policy,
+            removal_policy=cdk.RemovalPolicy.DESTROY,
         )
 
         # Create Aurora Serverless v2 cluster

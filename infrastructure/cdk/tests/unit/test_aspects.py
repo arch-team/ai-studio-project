@@ -37,7 +37,7 @@ class TestApplyStandardTags:
         apply_standard_tags(cdk_app, dev_config)
 
     def test_works_with_all_environments(
-        self, cdk_app: cdk.App, test_account: str, test_region: str
+        self, test_account: str, test_region: str
     ) -> None:
         """Verify function works with dev, staging, and prod configs."""
         for factory in [

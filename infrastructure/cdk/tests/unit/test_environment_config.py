@@ -172,7 +172,7 @@ class TestProtectionConfig:
     def test_staging_factory(self) -> None:
         """Verify staging protection has moderate safeguards."""
         config = ProtectionConfig.for_staging()
-        assert config.removal_policy == cdk.RemovalPolicy.SNAPSHOT
+        assert config.removal_policy == cdk.RemovalPolicy.DESTROY
         assert config.enable_deletion_protection is True
         assert config.retain_on_delete is False
 
@@ -193,8 +193,8 @@ class TestProtectionConfig:
         assert dev.protection.removal_policy == cdk.RemovalPolicy.DESTROY
         assert dev.protection.enable_deletion_protection is False
 
-        # Staging: snapshot on delete
-        assert staging.protection.removal_policy == cdk.RemovalPolicy.SNAPSHOT
+        # Staging: destroyable with deletion protection
+        assert staging.protection.removal_policy == cdk.RemovalPolicy.DESTROY
         assert staging.protection.enable_deletion_protection is True
 
         # Prod: retain everything

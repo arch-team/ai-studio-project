@@ -184,9 +184,9 @@ class ProtectionConfig:
 
     @classmethod
     def for_staging(cls) -> "ProtectionConfig":
-        """Staging: moderate protection."""
+        """Staging: moderate protection - same as dev for resource lifecycle."""
         return cls(
-            removal_policy=cdk.RemovalPolicy.SNAPSHOT,
+            removal_policy=cdk.RemovalPolicy.DESTROY,
             enable_deletion_protection=True,
             retain_on_delete=False,
         )
