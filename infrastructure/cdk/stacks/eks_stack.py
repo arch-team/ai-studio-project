@@ -288,6 +288,16 @@ class EksStack(cdk.Stack):
             resolve_conflicts="OVERWRITE",
         )
 
+        # Install EKS Pod Identity Agent add-on
+        # Required by HyperPod Training Operator for IAM authentication
+        eks.CfnAddon(
+            self,
+            "PodIdentityAgentAddon",
+            addon_name="eks-pod-identity-agent",
+            cluster_name=self._eks_cluster.cluster_name,
+            resolve_conflicts="OVERWRITE",
+        )
+
     def _install_cert_manager(self) -> eks.HelmChart:
         """Install cert-manager via Helm Chart with EC2 node group.
 

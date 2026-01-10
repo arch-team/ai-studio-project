@@ -24,6 +24,7 @@ Reference:
 
 import aws_cdk as cdk
 from aws_cdk import aws_eks as eks
+from aws_cdk import aws_iam as iam
 
 from config import EnvironmentConfig
 from constructs import Construct
@@ -79,22 +80,96 @@ class HyperPodAddonsStack(cdk.Stack):
         self.env_config = env_config
         self._eks_cluster = eks_cluster
 
+        # Create IAM role for Training Operator Pod Identity
+        self._training_operator_role = self._create_training_operator_role()
+
         # T008d-1: Install Training Operator add-on
         self._training_operator_addon = self._install_training_operator()
+
+        # Create Pod Identity Association for Training Operator
+        self._training_operator_pod_identity = self._create_training_operator_pod_identity()
 
         # T008d-1: Install Task Governance (Kueue) add-on
         # Note: Task Governance automatically configures PriorityClass per spec.md FR-004
         self._task_governance_addon = self._install_task_governance()
 
         # T008d-2: Install Observability add-on (Prometheus + Grafana)
-        # Note: Observability add-on requires Amazon Managed Service for Prometheus workspace
-        # and EKS Pod Identity Agent to be configured first.
-        # Uncomment the following line after setting up the prerequisites:
+        # Note: Observability add-on was already installed and auto-creates its own Pod Identity
+        # Uncomment to manage via CDK after removing existing add-on:
         # self._observability_addon = self._install_observability()
-        self._observability_addon = None  # Disabled until prerequisites are configured
+        self._observability_addon = None  # Already installed externally
 
         # Create outputs
         self._create_outputs()
+
+    def _create_training_operator_role(self) -> iam.Role:
+        """Create IAM role for Training Operator Pod Identity.
+
+        This role is assumed by the Training Operator controller manager pod
+        via EKS Pod Identity to access SageMaker APIs for node health checks.
+
+        EKS Pod Identity requires trust policy with both sts:AssumeRole and sts:TagSession.
+
+        Reference: https://docs.aws.amazon.com/sagemaker/latest/dg/sagemaker-eks-operator-install.html
+        """
+        # Create custom assume role policy for EKS Pod Identity
+        # Must include both sts:AssumeRole and sts:TagSession actions
+        assume_role_policy = iam.PolicyDocument(
+            statements=[
+                iam.PolicyStatement(
+                    effect=iam.Effect.ALLOW,
+                    principals=[iam.ServicePrincipal("pods.eks.amazonaws.com")],
+                    actions=["sts:AssumeRole", "sts:TagSession"],
+                )
+            ]
+        )
+
+        role = iam.Role(
+            self,
+            "TrainingOperatorRole",
+            role_name=f"{self.env_config.resource_prefix}-training-operator-role",
+            assumed_by=iam.ServicePrincipal("pods.eks.amazonaws.com"),  # Placeholder, overridden below
+            description="IAM role for HyperPod Training Operator Pod Identity",
+        )
+
+        # Override the assume role policy with our custom one that includes sts:TagSession
+        cfn_role = role.node.default_child
+        cfn_role.assume_role_policy_document = assume_role_policy.to_json()
+
+        # Attach the managed policy for Training Operator
+        role.add_managed_policy(
+            iam.ManagedPolicy.from_aws_managed_policy_name(
+                "AmazonSageMakerHyperPodTrainingOperatorAccess"
+            )
+        )
+
+        cdk.Tags.of(role).add(
+            "Name", f"{self.env_config.resource_prefix}-training-operator-role"
+        )
+
+        return role
+
+    def _create_training_operator_pod_identity(self) -> eks.CfnPodIdentityAssociation:
+        """Create EKS Pod Identity Association for Training Operator.
+
+        This associates the IAM role with the Training Operator's ServiceAccount,
+        allowing the controller manager to access AWS APIs.
+        """
+        association = eks.CfnPodIdentityAssociation(
+            self,
+            "TrainingOperatorPodIdentity",
+            cluster_name=self._eks_cluster.cluster_name,
+            namespace="aws-hyperpod",
+            service_account="hp-training-operator-controller-manager",
+            role_arn=self._training_operator_role.role_arn,
+        )
+
+        # Ensure association is created after the add-on (which creates the ServiceAccount)
+        association.add_dependency(self._training_operator_addon)
+
+        cdk.Tags.of(association).add("Component", "training-operator")
+
+        return association
 
     def _install_training_operator(self) -> eks.CfnAddon:
         """Install HyperPod Training Operator add-on.
@@ -251,5 +326,5 @@ class HyperPodAddonsStack(cdk.Stack):
 
     @property
     def observability_addon(self) -> eks.CfnAddon | None:
-        """Get Observability add-on (may be None if not configured)."""
+        """Get Observability add-on (may be None if managed externally)."""
         return self._observability_addon

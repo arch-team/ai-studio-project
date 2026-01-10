@@ -291,13 +291,14 @@ class SagemakerHyperPodStack(cdk.Stack):
             ),
             # Enable automatic node recovery
             node_recovery="Automatic",
-            # Tags
+            # Tags - SageMaker=true is required by AmazonSageMakerHyperPodTrainingOperatorAccess policy
             tags=[
                 cdk.CfnTag(
                     key="Name", value=f"{self.env_config.resource_prefix}-hyperpod"
                 ),
                 cdk.CfnTag(key="Environment", value=self.env_config.name.value),
                 cdk.CfnTag(key="ManagedBy", value="cdk"),
+                cdk.CfnTag(key="SageMaker", value="true"),  # Required for Training Operator
             ],
         )
 
