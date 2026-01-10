@@ -87,7 +87,11 @@ class HyperPodAddonsStack(cdk.Stack):
         self._task_governance_addon = self._install_task_governance()
 
         # T008d-2: Install Observability add-on (Prometheus + Grafana)
-        self._observability_addon = self._install_observability()
+        # Note: Observability add-on requires Amazon Managed Service for Prometheus workspace
+        # and EKS Pod Identity Agent to be configured first.
+        # Uncomment the following line after setting up the prerequisites:
+        # self._observability_addon = self._install_observability()
+        self._observability_addon = None  # Disabled until prerequisites are configured
 
         # Create outputs
         self._create_outputs()
@@ -155,7 +159,7 @@ class HyperPodAddonsStack(cdk.Stack):
 
         cdk.Tags.of(addon).add(
             "Description",
-            "HyperPod Task Governance (Kueue) for workload scheduling, Gang Scheduling, and PriorityClass",
+            "HyperPod Task Governance - Kueue for workload scheduling and Gang Scheduling",
         )
 
         return addon
@@ -214,18 +218,26 @@ class HyperPodAddonsStack(cdk.Stack):
             self,
             "TaskGovernanceAddonName",
             value=self._task_governance_addon.addon_name,
-            description="HyperPod Task Governance add-on name (includes PriorityClass config)",
+            description="HyperPod Task Governance add-on name - includes PriorityClass config",
             export_name=f"{self.env_config.resource_prefix}-task-governance-addon",
         )
 
-        # T008d-2 outputs
-        cdk.CfnOutput(
-            self,
-            "ObservabilityAddonName",
-            value=self._observability_addon.addon_name,
-            description="HyperPod Observability add-on name (Amazon Managed Prometheus/Grafana)",
-            export_name=f"{self.env_config.resource_prefix}-observability-addon",
-        )
+        # T008d-2 outputs (only if Observability is enabled)
+        if self._observability_addon is not None:
+            cdk.CfnOutput(
+                self,
+                "ObservabilityAddonName",
+                value=self._observability_addon.addon_name,
+                description="HyperPod Observability add-on name - Amazon Managed Prometheus and Grafana",
+                export_name=f"{self.env_config.resource_prefix}-observability-addon",
+            )
+        else:
+            cdk.CfnOutput(
+                self,
+                "ObservabilityAddonStatus",
+                value="Disabled - requires Amazon Managed Service for Prometheus workspace",
+                description="Observability add-on status",
+            )
 
     @property
     def training_operator_addon(self) -> eks.CfnAddon:
@@ -238,6 +250,6 @@ class HyperPodAddonsStack(cdk.Stack):
         return self._task_governance_addon
 
     @property
-    def observability_addon(self) -> eks.CfnAddon:
-        """Get Observability add-on."""
+    def observability_addon(self) -> eks.CfnAddon | None:
+        """Get Observability add-on (may be None if not configured)."""
         return self._observability_addon

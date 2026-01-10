@@ -77,7 +77,10 @@ class EksStack(cdk.Stack):
         # Install EKS add-ons
         self._install_eks_addons()
 
-        # Install HyperPod Helm Chart dependencies
+        # Install cert-manager (required by HyperPod Training Operator)
+        self._cert_manager_chart = self._install_cert_manager()
+
+        # Install HyperPod Helm Chart dependencies (depends on cert-manager)
         self._install_hyperpod_helm_chart()
 
         # Create outputs
@@ -285,6 +288,113 @@ class EksStack(cdk.Stack):
             resolve_conflicts="OVERWRITE",
         )
 
+    def _install_cert_manager(self) -> eks.HelmChart:
+        """Install cert-manager via Helm Chart with EC2 node group.
+
+        cert-manager is required by HyperPod Training Operator add-on.
+        It provides certificate management for Kubernetes webhooks.
+
+        Since EKS cluster has no default nodes (managed by HyperPod), we use
+        a dedicated EC2 node group to run cert-manager pods.
+
+        Reference:
+        - https://cert-manager.io/docs/installation/helm/
+        - https://docs.aws.amazon.com/sagemaker/latest/dg/sagemaker-eks-operator-install.html
+
+        Returns:
+            The cert-manager Helm Chart resource for dependency management.
+        """
+        # Create a small EC2 node group for system components (cert-manager, etc.)
+        # Using EC2 nodes ensures proper TLS certificate generation
+        self._eks_cluster.add_nodegroup_capacity(
+            "SystemNodeGroup",
+            nodegroup_name=f"{self.env_config.resource_prefix}-system-nodes",
+            instance_types=[ec2.InstanceType("t3.medium")],
+            min_size=1,
+            max_size=2,
+            desired_size=1,
+            disk_size=20,
+            capacity_type=eks.CapacityType.ON_DEMAND,
+            ami_type=eks.NodegroupAmiType.AL2023_X86_64_STANDARD,  # Required for K8s 1.33+
+            labels={
+                "node-role": "system",
+                "workload-type": "control-plane",
+            },
+            taints=[
+                eks.TaintSpec(
+                    key="CriticalAddonsOnly",
+                    value="true",
+                    effect=eks.TaintEffect.PREFER_NO_SCHEDULE,
+                ),
+            ],
+        )
+
+        cert_manager_chart = self._eks_cluster.add_helm_chart(
+            "CertManager",
+            chart="cert-manager",
+            repository="https://charts.jetstack.io",
+            namespace="cert-manager",
+            release="cert-manager",
+            version="v1.17.2",  # Latest stable version as of 2025
+            create_namespace=True,
+            wait=True,  # Wait for cert-manager to be ready before proceeding
+            timeout=cdk.Duration.minutes(15),  # Fargate pods may take longer to start
+            values={
+                # Install CRDs with Helm (recommended approach)
+                "crds": {
+                    "enabled": True,
+                },
+                # Resource requests for production stability
+                "resources": {
+                    "requests": {
+                        "cpu": "50m",
+                        "memory": "64Mi",
+                    },
+                },
+                # Enable prometheus metrics
+                "prometheus": {
+                    "enabled": True,
+                },
+                # Disable startupapicheck (can fail due to node startup timing)
+                "startupapicheck": {
+                    "enabled": False,
+                },
+                # Tolerate system node taint for all cert-manager components
+                "tolerations": [
+                    {
+                        "key": "CriticalAddonsOnly",
+                        "operator": "Exists",
+                    },
+                ],
+                "webhook": {
+                    "tolerations": [
+                        {
+                            "key": "CriticalAddonsOnly",
+                            "operator": "Exists",
+                        },
+                    ],
+                },
+                "cainjector": {
+                    "tolerations": [
+                        {
+                            "key": "CriticalAddonsOnly",
+                            "operator": "Exists",
+                        },
+                    ],
+                },
+            },
+        )
+
+        # Add tags
+        cdk.Tags.of(cert_manager_chart).add(
+            "Component", "cert-manager"
+        )
+        cdk.Tags.of(cert_manager_chart).add(
+            "Description", "Certificate management for HyperPod Training Operator"
+        )
+
+        return cert_manager_chart
+
     def _install_hyperpod_helm_chart(self) -> None:
         """Install HyperPod Helm Chart dependencies.
 
@@ -322,7 +432,7 @@ class EksStack(cdk.Stack):
         # Note: We use chart_asset to install from the local packaged chart
         # Increase timeout to 15 minutes for complex chart with many dependencies
         # Skip CRDs if they already exist from previous installations
-        self._eks_cluster.add_helm_chart(
+        hyperpod_chart = self._eks_cluster.add_helm_chart(
             "HyperPodDependencies",
             chart_asset=helm_chart_asset,
             namespace="kube-system",
@@ -371,9 +481,9 @@ class EksStack(cdk.Stack):
                         "enabled": True,
                     },
                 },
-                # Disable optional components (can be enabled later if needed)
+                # cert-manager is installed separately via its own Helm Chart
                 "cert-manager": {
-                    "enabled": False,  # Usually pre-installed separately
+                    "enabled": False,  # Installed separately before HyperPod dependencies
                 },
                 "mlflow": {
                     "enabled": False,  # Optional
@@ -389,6 +499,9 @@ class EksStack(cdk.Stack):
                 },
             },
         )
+
+        # Ensure HyperPod dependencies are installed after cert-manager
+        hyperpod_chart.node.add_dependency(self._cert_manager_chart)
 
     def _create_outputs(self) -> None:
         """创建 CloudFormation 输出用于跨 Stack 引用。"""

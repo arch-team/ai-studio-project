@@ -24,6 +24,7 @@ from stacks import (
     DatabaseStack,
     EksStack,
     FsxLustreStack,
+    HyperPodAddonsStack,
     IamStack,
     NetworkStack,
     SagemakerHyperPodStack,
@@ -151,6 +152,24 @@ def create_app() -> cdk.App:
         description="SageMaker HyperPod cluster with EKS orchestration",
     )
     sagemaker_hyperpod_stack.add_dependency(eks_stack)
+
+    # =========================================================================
+    # Layer 3c: HyperPod Add-ons (Training Operator, Task Governance, Observability)
+    # =========================================================================
+
+    # HyperPod Add-ons Stack - EKS add-ons for distributed training
+    # T008d-1: Training Operator (PyTorchJob/TFJob CRD) + Task Governance (Kueue)
+    # T008d-2: Observability (Prometheus + Grafana via Amazon Managed Service)
+    hyperpod_addons_stack = HyperPodAddonsStack(
+        app,
+        f"{stack_prefix}-hyperpod-addons",
+        env_config=env_config,
+        eks_cluster=eks_stack.eks_cluster,
+        env=env_config.to_cdk_environment(),
+        description="HyperPod EKS add-ons: Training Operator, Task Governance, Observability",
+    )
+    hyperpod_addons_stack.add_dependency(eks_stack)
+    hyperpod_addons_stack.add_dependency(sagemaker_hyperpod_stack)
 
     # =========================================================================
     # Layer 4: High-Performance Storage (FSx for Lustre)

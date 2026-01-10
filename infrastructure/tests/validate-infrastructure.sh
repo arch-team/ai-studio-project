@@ -29,8 +29,9 @@ NAMESPACE_MONITORING="${NAMESPACE_MONITORING:-monitoring}"
 NAMESPACE_KUEUE="${NAMESPACE_KUEUE:-kueue-system}"
 NAMESPACE_SPACES="${NAMESPACE_SPACES:-sagemaker-spaces}"
 
-# Test results tracking
-declare -A TEST_RESULTS
+# Test results tracking (bash 3.2 compatible - no associative arrays)
+TEST_NAMES=()
+TEST_STATUSES=()
 TOTAL_TESTS=0
 PASSED_TESTS=0
 FAILED_TESTS=0
@@ -68,14 +69,15 @@ record_test() {
     local details="${3:-}"
 
     TOTAL_TESTS=$((TOTAL_TESTS + 1))
+    TEST_NAMES+=("$test_name")
 
     if [[ "$result" == "PASS" ]]; then
         PASSED_TESTS=$((PASSED_TESTS + 1))
-        TEST_RESULTS["$test_name"]="✅ PASS"
+        TEST_STATUSES+=("✅ PASS")
         log_success "$test_name"
     else
         FAILED_TESTS=$((FAILED_TESTS + 1))
-        TEST_RESULTS["$test_name"]="❌ FAIL: $details"
+        TEST_STATUSES+=("❌ FAIL: $details")
         log_fail "$test_name - $details"
     fi
 }
@@ -156,10 +158,14 @@ test_cluster_health() {
 
     # Test 3: All nodes Ready
     local not_ready_nodes
-    not_ready_nodes=$(kubectl get nodes --no-headers | grep -v " Ready" | wc -l || echo "0")
-    if [[ "$not_ready_nodes" -eq 0 ]]; then
-        local total_nodes
-        total_nodes=$(kubectl get nodes --no-headers | wc -l)
+    local total_nodes
+    # Use xargs to properly trim whitespace and handle edge cases
+    not_ready_nodes=$(kubectl get nodes --no-headers 2>/dev/null | grep -v " Ready" | wc -l | xargs)
+    total_nodes=$(kubectl get nodes --no-headers 2>/dev/null | wc -l | xargs)
+    # Default to 0 if empty
+    not_ready_nodes=${not_ready_nodes:-0}
+    total_nodes=${total_nodes:-0}
+    if [[ "$not_ready_nodes" == "0" ]]; then
         record_test "All nodes Ready ($total_nodes nodes)" "PASS"
     else
         record_test "All nodes Ready" "FAIL" "$not_ready_nodes nodes not ready"
@@ -188,13 +194,13 @@ test_gpu_nodes() {
 
     # Test 1: GPU nodes exist
     local gpu_nodes
-    gpu_nodes=$(kubectl get nodes -l "nvidia.com/gpu" --no-headers 2>/dev/null | wc -l || echo "0")
+    gpu_nodes=$(kubectl get nodes -l "nvidia.com/gpu" --no-headers 2>/dev/null | wc -l | tr -d ' ' || echo "0")
 
     if [[ "$gpu_nodes" -gt 0 ]]; then
         record_test "GPU nodes exist ($gpu_nodes nodes)" "PASS"
     else
         # Check for GPU node groups without labels yet
-        gpu_nodes=$(kubectl get nodes -l "node.kubernetes.io/instance-type" --no-headers 2>/dev/null | grep -E "p4d|p5|g5|trn1" | wc -l || echo "0")
+        gpu_nodes=$(kubectl get nodes -l "node.kubernetes.io/instance-type" --no-headers 2>/dev/null | grep -E "p4d|p5|g5|trn1" | wc -l | tr -d ' ' || echo "0")
         if [[ "$gpu_nodes" -gt 0 ]]; then
             record_test "GPU nodes exist ($gpu_nodes nodes, pending GPU detection)" "PASS"
         else
@@ -206,12 +212,12 @@ test_gpu_nodes() {
 
     # Test 2: NVIDIA device plugin running
     local nvidia_dp_pods
-    nvidia_dp_pods=$(kubectl get pods -n kube-system -l app=nvidia-device-plugin-daemonset --field-selector=status.phase=Running --no-headers 2>/dev/null | wc -l || echo "0")
+    nvidia_dp_pods=$(kubectl get pods -n kube-system -l app=nvidia-device-plugin-daemonset --field-selector=status.phase=Running --no-headers 2>/dev/null | wc -l | tr -d ' ' || echo "0")
     if [[ "$nvidia_dp_pods" -gt 0 ]]; then
         record_test "NVIDIA device plugin running ($nvidia_dp_pods pods)" "PASS"
     else
         # Check for alternative labels
-        nvidia_dp_pods=$(kubectl get pods -n kube-system -l name=nvidia-device-plugin-ds --field-selector=status.phase=Running --no-headers 2>/dev/null | wc -l || echo "0")
+        nvidia_dp_pods=$(kubectl get pods -n kube-system -l name=nvidia-device-plugin-ds --field-selector=status.phase=Running --no-headers 2>/dev/null | wc -l | tr -d ' ' || echo "0")
         if [[ "$nvidia_dp_pods" -gt 0 ]]; then
             record_test "NVIDIA device plugin running ($nvidia_dp_pods pods)" "PASS"
         else
@@ -288,12 +294,12 @@ test_hyperpod_addons() {
 
     # Test 1: Training Operator
     local training_operator_pods
-    training_operator_pods=$(kubectl get pods -n "$NAMESPACE_TRAINING" -l control-plane=kubeflow-training-operator --field-selector=status.phase=Running --no-headers 2>/dev/null | wc -l || echo "0")
+    training_operator_pods=$(kubectl get pods -n "$NAMESPACE_TRAINING" -l control-plane=kubeflow-training-operator --field-selector=status.phase=Running --no-headers 2>/dev/null | wc -l | tr -d ' ' || echo "0")
     if [[ "$training_operator_pods" -gt 0 ]]; then
         record_test "Training Operator running" "PASS"
     else
         # Check alternative namespace
-        training_operator_pods=$(kubectl get pods -A -l control-plane=kubeflow-training-operator --field-selector=status.phase=Running --no-headers 2>/dev/null | wc -l || echo "0")
+        training_operator_pods=$(kubectl get pods -A -l control-plane=kubeflow-training-operator --field-selector=status.phase=Running --no-headers 2>/dev/null | wc -l | tr -d ' ' || echo "0")
         if [[ "$training_operator_pods" -gt 0 ]]; then
             record_test "Training Operator running" "PASS"
         else
@@ -310,7 +316,7 @@ test_hyperpod_addons() {
 
     # Test 3: Kueue
     local kueue_pods
-    kueue_pods=$(kubectl get pods -n "$NAMESPACE_KUEUE" -l control-plane=controller-manager --field-selector=status.phase=Running --no-headers 2>/dev/null | wc -l || echo "0")
+    kueue_pods=$(kubectl get pods -n "$NAMESPACE_KUEUE" -l control-plane=controller-manager --field-selector=status.phase=Running --no-headers 2>/dev/null | wc -l | tr -d ' ' || echo "0")
     if [[ "$kueue_pods" -gt 0 ]]; then
         record_test "Kueue controller running" "PASS"
     else
@@ -342,12 +348,12 @@ test_hyperpod_addons() {
 
     # Test 6: Prometheus (Observability)
     local prometheus_pods
-    prometheus_pods=$(kubectl get pods -n "$NAMESPACE_MONITORING" -l app=prometheus --field-selector=status.phase=Running --no-headers 2>/dev/null | wc -l || echo "0")
+    prometheus_pods=$(kubectl get pods -n "$NAMESPACE_MONITORING" -l app=prometheus --field-selector=status.phase=Running --no-headers 2>/dev/null | wc -l | tr -d ' ' || echo "0")
     if [[ "$prometheus_pods" -gt 0 ]]; then
         record_test "Prometheus running" "PASS"
     else
         # Check alternative labels
-        prometheus_pods=$(kubectl get pods -n "$NAMESPACE_MONITORING" -l app.kubernetes.io/name=prometheus --field-selector=status.phase=Running --no-headers 2>/dev/null | wc -l || echo "0")
+        prometheus_pods=$(kubectl get pods -n "$NAMESPACE_MONITORING" -l app.kubernetes.io/name=prometheus --field-selector=status.phase=Running --no-headers 2>/dev/null | wc -l | tr -d ' ' || echo "0")
         if [[ "$prometheus_pods" -gt 0 ]]; then
             record_test "Prometheus running" "PASS"
         else
@@ -357,11 +363,11 @@ test_hyperpod_addons() {
 
     # Test 7: Grafana
     local grafana_pods
-    grafana_pods=$(kubectl get pods -n "$NAMESPACE_MONITORING" -l app=grafana --field-selector=status.phase=Running --no-headers 2>/dev/null | wc -l || echo "0")
+    grafana_pods=$(kubectl get pods -n "$NAMESPACE_MONITORING" -l app=grafana --field-selector=status.phase=Running --no-headers 2>/dev/null | wc -l | tr -d ' ' || echo "0")
     if [[ "$grafana_pods" -gt 0 ]]; then
         record_test "Grafana running" "PASS"
     else
-        grafana_pods=$(kubectl get pods -n "$NAMESPACE_MONITORING" -l app.kubernetes.io/name=grafana --field-selector=status.phase=Running --no-headers 2>/dev/null | wc -l || echo "0")
+        grafana_pods=$(kubectl get pods -n "$NAMESPACE_MONITORING" -l app.kubernetes.io/name=grafana --field-selector=status.phase=Running --no-headers 2>/dev/null | wc -l | tr -d ' ' || echo "0")
         if [[ "$grafana_pods" -gt 0 ]]; then
             record_test "Grafana running" "PASS"
         else
@@ -371,12 +377,12 @@ test_hyperpod_addons() {
 
     # Test 8: Elastic Agent (Resiliency)
     local elastic_agent_pods
-    elastic_agent_pods=$(kubectl get pods -n "$NAMESPACE_TRAINING" -l app=hyperpod-elastic-agent --field-selector=status.phase=Running --no-headers 2>/dev/null | wc -l || echo "0")
+    elastic_agent_pods=$(kubectl get pods -n "$NAMESPACE_TRAINING" -l app=hyperpod-elastic-agent --field-selector=status.phase=Running --no-headers 2>/dev/null | wc -l | tr -d ' ' || echo "0")
     if [[ "$elastic_agent_pods" -gt 0 ]]; then
         record_test "Elastic Agent running" "PASS"
     else
         # Elastic Agent may be in kube-system
-        elastic_agent_pods=$(kubectl get pods -A -l app=hyperpod-elastic-agent --field-selector=status.phase=Running --no-headers 2>/dev/null | wc -l || echo "0")
+        elastic_agent_pods=$(kubectl get pods -A -l app=hyperpod-elastic-agent --field-selector=status.phase=Running --no-headers 2>/dev/null | wc -l | tr -d ' ' || echo "0")
         if [[ "$elastic_agent_pods" -gt 0 ]]; then
             record_test "Elastic Agent running" "PASS"
         else
@@ -398,11 +404,11 @@ test_hyperpod_addons() {
 
     # Test 10: Spaces Controller
     local spaces_controller_pods
-    spaces_controller_pods=$(kubectl get pods -n "$NAMESPACE_SPACES" -l app=spaces-controller --field-selector=status.phase=Running --no-headers 2>/dev/null | wc -l || echo "0")
+    spaces_controller_pods=$(kubectl get pods -n "$NAMESPACE_SPACES" -l app=spaces-controller --field-selector=status.phase=Running --no-headers 2>/dev/null | wc -l | tr -d ' ' || echo "0")
     if [[ "$spaces_controller_pods" -gt 0 ]]; then
         record_test "Spaces Controller running" "PASS"
     else
-        spaces_controller_pods=$(kubectl get pods -n "$NAMESPACE_SPACES" -l app.kubernetes.io/name=spaces-controller --field-selector=status.phase=Running --no-headers 2>/dev/null | wc -l || echo "0")
+        spaces_controller_pods=$(kubectl get pods -n "$NAMESPACE_SPACES" -l app.kubernetes.io/name=spaces-controller --field-selector=status.phase=Running --no-headers 2>/dev/null | wc -l | tr -d ' ' || echo "0")
         if [[ "$spaces_controller_pods" -gt 0 ]]; then
             record_test "Spaces Controller running" "PASS"
         else
@@ -420,12 +426,12 @@ test_fsx_storage() {
 
     # Test 1: FSx CSI Driver
     local fsx_csi_pods
-    fsx_csi_pods=$(kubectl get pods -n kube-system -l app=fsx-csi-controller --field-selector=status.phase=Running --no-headers 2>/dev/null | wc -l || echo "0")
+    fsx_csi_pods=$(kubectl get pods -n kube-system -l app=fsx-csi-controller --field-selector=status.phase=Running --no-headers 2>/dev/null | wc -l | tr -d ' ' || echo "0")
     if [[ "$fsx_csi_pods" -gt 0 ]]; then
         record_test "FSx CSI Driver running" "PASS"
     else
         # Check alternative labels
-        fsx_csi_pods=$(kubectl get pods -n kube-system -l app.kubernetes.io/name=aws-fsx-csi-driver --field-selector=status.phase=Running --no-headers 2>/dev/null | wc -l || echo "0")
+        fsx_csi_pods=$(kubectl get pods -n kube-system -l app.kubernetes.io/name=aws-fsx-csi-driver --field-selector=status.phase=Running --no-headers 2>/dev/null | wc -l | tr -d ' ' || echo "0")
         if [[ "$fsx_csi_pods" -gt 0 ]]; then
             record_test "FSx CSI Driver running" "PASS"
         else
@@ -665,8 +671,8 @@ generate_report() {
 |-----------|--------|
 EOF
 
-    for test_name in "${!TEST_RESULTS[@]}"; do
-        echo "| $test_name | ${TEST_RESULTS[$test_name]} |" >> "$REPORT_FILE"
+    for i in "${!TEST_NAMES[@]}"; do
+        echo "| ${TEST_NAMES[$i]} | ${TEST_STATUSES[$i]} |" >> "$REPORT_FILE"
     done
 
     cat >> "$REPORT_FILE" << EOF
@@ -699,9 +705,9 @@ EOF
 The following tests failed and require attention:
 
 EOF
-        for test_name in "${!TEST_RESULTS[@]}"; do
-            if [[ "${TEST_RESULTS[$test_name]}" == *"FAIL"* ]]; then
-                echo "- **$test_name**: ${TEST_RESULTS[$test_name]}" >> "$REPORT_FILE"
+        for i in "${!TEST_NAMES[@]}"; do
+            if [[ "${TEST_STATUSES[$i]}" == *"FAIL"* ]]; then
+                echo "- **${TEST_NAMES[$i]}**: ${TEST_STATUSES[$i]}" >> "$REPORT_FILE"
             fi
         done
     else

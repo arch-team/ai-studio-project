@@ -244,11 +244,25 @@ class SagemakerHyperPodStack(cdk.Stack):
         # Get security group IDs (use EKS cluster security group)
         security_group_ids = [self._eks_cluster.cluster_security_group_id]
 
-        # Create minimal instance group for cluster validation
+        # Create minimal instance group for cluster controller
         # Note: HyperPod requires at least one instance group
-        minimal_instance_group = sagemaker.CfnCluster.ClusterInstanceGroupProperty(
+        controller_instance_group = sagemaker.CfnCluster.ClusterInstanceGroupProperty(
             instance_group_name="controller-group",
-            instance_type="ml.m5.xlarge",  # Cost-effective for validation
+            instance_type="ml.m5.xlarge",  # Cost-effective for controller
+            instance_count=1,
+            life_cycle_config=sagemaker.CfnCluster.ClusterLifeCycleConfigProperty(
+                source_s3_uri=f"s3://{self._lifecycle_scripts_bucket.bucket_name}/lifecycle-scripts",
+                on_create="on_create.sh",
+            ),
+            execution_role=self._hyperpod_execution_role.role_arn,
+        )
+
+        # Create larger instance group for system add-ons and workloads
+        # ml.m5.4xlarge supports ~234 pods (8 ENIs × 30 IPs per ENI)
+        # This is much larger than ml.m5.xlarge's ~14 pods limit
+        system_instance_group = sagemaker.CfnCluster.ClusterInstanceGroupProperty(
+            instance_group_name="system-group",
+            instance_type="ml.m5.4xlarge",  # Large instance for high pods capacity (~234 pods)
             instance_count=1,
             life_cycle_config=sagemaker.CfnCluster.ClusterLifeCycleConfigProperty(
                 source_s3_uri=f"s3://{self._lifecycle_scripts_bucket.bucket_name}/lifecycle-scripts",
@@ -262,8 +276,8 @@ class SagemakerHyperPodStack(cdk.Stack):
             self,
             "HyperPodCluster",
             cluster_name=f"{self.env_config.resource_prefix}-hyperpod",
-            # Minimal instance group for validation
-            instance_groups=[minimal_instance_group],
+            # Instance groups: controller + system nodes
+            instance_groups=[controller_instance_group, system_instance_group],
             # VPC configuration - same as EKS cluster
             vpc_config=sagemaker.CfnCluster.VpcConfigProperty(
                 security_group_ids=security_group_ids,
