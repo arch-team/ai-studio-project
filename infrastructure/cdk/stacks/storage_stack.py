@@ -16,11 +16,10 @@ All buckets are configured with:
 import aws_cdk as cdk
 from aws_cdk import Duration, RemovalPolicy
 from aws_cdk import aws_iam as iam
-from aws_cdk import aws_kms as kms
 from aws_cdk import aws_s3 as s3
-from constructs import Construct
 
 from config import EnvironmentConfig
+from constructs import Construct
 
 
 class StorageStack(cdk.Stack):

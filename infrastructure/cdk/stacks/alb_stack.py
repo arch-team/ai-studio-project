@@ -17,11 +17,10 @@ from aws_cdk import Duration
 from aws_cdk import aws_certificatemanager as acm
 from aws_cdk import aws_ec2 as ec2
 from aws_cdk import aws_elasticloadbalancingv2 as elbv2
-from aws_cdk import aws_iam as iam
 from aws_cdk import aws_wafv2 as wafv2
-from constructs import Construct
 
 from config import EnvironmentConfig, EnvironmentType
+from constructs import Construct
 
 
 class AlbStack(cdk.Stack):

@@ -16,14 +16,14 @@ Reference: spec.md NFR-001 (FSx capacity planning formula),
 """
 
 import aws_cdk as cdk
-from aws_cdk import Duration, RemovalPolicy
+from aws_cdk import RemovalPolicy
 from aws_cdk import aws_ec2 as ec2
 from aws_cdk import aws_fsx as fsx
 from aws_cdk import aws_iam as iam
 from aws_cdk import aws_s3 as s3
-from constructs import Construct
 
 from config import EnvironmentConfig, EnvironmentType
+from constructs import Construct
 
 
 class FsxLustreStack(cdk.Stack):

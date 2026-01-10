@@ -9,13 +9,12 @@ This stack creates the VPC infrastructure with 3-tier subnet isolation:
 Follows AWS Well-Architected Framework security best practices.
 """
 
-from typing import Optional
 
 import aws_cdk as cdk
 from aws_cdk import aws_ec2 as ec2
-from constructs import Construct
 
 from config import DeploymentMode, EnvironmentConfig
+from constructs import Construct
 
 
 class NetworkStack(cdk.Stack):

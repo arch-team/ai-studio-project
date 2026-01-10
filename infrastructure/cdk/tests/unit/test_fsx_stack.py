@@ -9,13 +9,12 @@ Tests cover:
 - Security group configuration
 """
 
-import pytest
 import aws_cdk as cdk
-from aws_cdk import aws_s3 as s3
+import pytest
 from aws_cdk.assertions import Match, Template
 
 from config import EnvironmentConfig
-from stacks import FsxLustreStack, NetworkStack, StorageStack, EksStack, IamStack
+from stacks import EksStack, FsxLustreStack, IamStack, NetworkStack, StorageStack
 
 
 class TestFsxStackCreation:

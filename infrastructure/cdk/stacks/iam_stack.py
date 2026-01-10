@@ -10,9 +10,9 @@ This stack creates IAM roles and policies following least-privilege principle:
 
 import aws_cdk as cdk
 from aws_cdk import aws_iam as iam
-from constructs import Construct
 
 from config import EnvironmentConfig
+from constructs import Construct
 
 
 class IamStack(cdk.Stack):

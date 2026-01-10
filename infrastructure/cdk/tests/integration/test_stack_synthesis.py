@@ -8,19 +8,17 @@ Tests cover:
 - CDK Nag compliance (for staging/prod)
 """
 
-import pytest
 import aws_cdk as cdk
+import pytest
 from aws_cdk.assertions import Template
 
-from config import EnvironmentConfig, get_environment_config
+from config import get_environment_config
 from stacks import (
-    AlbStack,
     DatabaseStack,
     EksStack,
     FsxLustreStack,
     IamStack,
     NetworkStack,
-    SagemakerHyperPodStack,
     StorageStack,
 )
 

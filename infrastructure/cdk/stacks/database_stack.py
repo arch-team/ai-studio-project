@@ -9,7 +9,6 @@ This stack creates Aurora MySQL Serverless v2 with:
 - Encryption at rest using AWS managed keys
 """
 
-from typing import Optional
 
 import aws_cdk as cdk
 from aws_cdk import Duration
@@ -17,9 +16,9 @@ from aws_cdk import aws_ec2 as ec2
 from aws_cdk import aws_logs as logs
 from aws_cdk import aws_rds as rds
 from aws_cdk import aws_secretsmanager as secretsmanager
-from constructs import Construct
 
 from config import EnvironmentConfig
+from constructs import Construct
 
 
 class DatabaseStack(cdk.Stack):
@@ -74,7 +73,7 @@ class DatabaseStack(cdk.Stack):
         self._cluster = self._create_aurora_cluster()
 
         # Create RDS Proxy if enabled
-        self._proxy: Optional[rds.DatabaseProxy] = None
+        self._proxy: rds.DatabaseProxy | None = None
         if env_config.database.enable_proxy:
             self._proxy = self._create_rds_proxy()
 
@@ -337,7 +336,7 @@ class DatabaseStack(cdk.Stack):
         return self._cluster
 
     @property
-    def proxy(self) -> Optional[rds.DatabaseProxy]:
+    def proxy(self) -> rds.DatabaseProxy | None:
         """Get RDS Proxy instance (None if disabled)."""
         return self._proxy
 
@@ -347,7 +346,7 @@ class DatabaseStack(cdk.Stack):
         return self._security_group
 
     @property
-    def secret(self) -> Optional[secretsmanager.ISecret]:
+    def secret(self) -> secretsmanager.ISecret | None:
         """Get Secrets Manager secret containing credentials."""
         return self._secret
 

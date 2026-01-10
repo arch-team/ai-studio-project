@@ -8,15 +8,14 @@ This construct creates GPU node groups for SageMaker HyperPod with:
 - Topology spread constraints
 """
 
-from typing import Optional, Sequence
 
 import aws_cdk as cdk
 from aws_cdk import aws_ec2 as ec2
 from aws_cdk import aws_eks as eks
 from aws_cdk import aws_iam as iam
-from constructs import Construct
 
 from config import EnvironmentConfig
+from constructs import Construct
 
 
 class GpuNodeGroupConfig:

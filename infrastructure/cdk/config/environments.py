@@ -7,7 +7,6 @@ deployments (dev, staging, prod) following AWS Well-Architected Framework best p
 
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Optional
 
 import aws_cdk as cdk
 
@@ -200,8 +199,8 @@ class EnvironmentConfig:
 
 def get_environment_config(
     env_name: str,
-    account: Optional[str] = None,
-    region: Optional[str] = None,
+    account: str | None = None,
+    region: str | None = None,
 ) -> EnvironmentConfig:
     """Get environment configuration by name.
 

@@ -17,7 +17,7 @@ import os
 import aws_cdk as cdk
 from cdk_nag import AwsSolutionsChecks, NagSuppressions
 
-from config import EnvironmentConfig, get_environment_config
+from config import get_environment_config
 from stacks import (
     AlbStack,
     DatabaseStack,

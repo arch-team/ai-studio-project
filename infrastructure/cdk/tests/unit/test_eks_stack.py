@@ -9,9 +9,8 @@ Tests cover:
 - Node groups configuration
 """
 
-import pytest
 import aws_cdk as cdk
-from aws_cdk import aws_iam as iam
+import pytest
 from aws_cdk.assertions import Match, Template
 
 from config import EnvironmentConfig

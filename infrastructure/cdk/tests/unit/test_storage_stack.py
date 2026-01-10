@@ -11,8 +11,8 @@ Tests cover:
 - Removal policies per environment
 """
 
-import pytest
 import aws_cdk as cdk
+import pytest
 from aws_cdk.assertions import Match, Template
 
 from config import EnvironmentConfig

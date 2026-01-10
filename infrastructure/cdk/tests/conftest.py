@@ -5,12 +5,11 @@ This module provides common fixtures used across all test modules,
 including CDK App instances and environment configurations.
 """
 
-import pytest
 import aws_cdk as cdk
+import pytest
 from aws_cdk.assertions import Template
 
-from config import EnvironmentConfig, EnvironmentType
-
+from config import EnvironmentConfig
 
 # =============================================================================
 # Environment Configuration Fixtures
