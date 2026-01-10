@@ -66,54 +66,9 @@ metadata:
 spec:
   clusterQueue: preprocessing-queue
 
----
-# Workload Priority Class - High Priority
-apiVersion: scheduling.k8s.io/v1
-kind: PriorityClass
-metadata:
-  name: training-high-priority
-  labels:
-    platform.ai/priority-class: high
-value: 100000
-globalDefault: false
-description: "High priority for critical training workloads"
-preemptionPolicy: PreemptLowerPriority
-
----
-# Workload Priority Class - Normal Priority
-apiVersion: scheduling.k8s.io/v1
-kind: PriorityClass
-metadata:
-  name: training-normal-priority
-  labels:
-    platform.ai/priority-class: normal
-value: 50000
-globalDefault: false
-description: "Normal priority for standard training workloads"
-preemptionPolicy: PreemptLowerPriority
-
----
-# Workload Priority Class - Low Priority (Batch/Preemptible)
-apiVersion: scheduling.k8s.io/v1
-kind: PriorityClass
-metadata:
-  name: training-low-priority
-  labels:
-    platform.ai/priority-class: low
-value: 10000
-globalDefault: false
-description: "Low priority for batch and preemptible workloads"
-preemptionPolicy: Never
-
----
-# Workload Priority Class - Preprocessing
-apiVersion: scheduling.k8s.io/v1
-kind: PriorityClass
-metadata:
-  name: preprocessing-priority
-  labels:
-    platform.ai/priority-class: preprocessing
-value: 30000
-globalDefault: false
-description: "Priority for data preprocessing jobs"
-preemptionPolicy: PreemptLowerPriority
+# Note: PriorityClass configuration is automatically provided by the
+# SageMaker HyperPod Task Governance add-on (amazon-sagemaker-hyperpod-task-governance).
+# No manual PriorityClass creation is needed.
+#
+# Task Governance automatically configures PriorityClass resources per spec.md FR-004.
+# Reference: https://docs.aws.amazon.com/sagemaker/latest/dg/sagemaker-hyperpod-task-governance.html

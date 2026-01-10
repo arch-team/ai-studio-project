@@ -252,15 +252,15 @@
 | K8s 原生资源 (NetworkPolicy/RBAC/PriorityClass) | K8s 清单 | `infrastructure/k8s/` |
 | ArgoCD Application | K8s 清单 | `infrastructure/argocd/` |
 
-- [X] [T008d-1] [P] 训练核心组件安装 - `infrastructure/cdk/stacks/hyperpod_addons_stack.py`,使用 CDK `eks.Addon` 安装训练调度核心组件:
+- [X] [T008d-1] [P] 训练核心组件安装 - `infrastructure/cdk/stacks/hyperpod_addons_stack.py`,使用 CDK `eks.Addon` 安装训练调度核心组件 (已完成: CDK Stack + 验证脚本):
   - **Training Operator** (Add-on: `amazon-sagemaker-hyperpod-training-operator`): 安装 HyperPod Training Operator (PyTorchJob, TensorFlowJob CRD),配置训练框架支持 (PyTorch DDP/FSDP/DeepSpeed ZeRO),验证 Webhook 就绪
   - **Task Governance** (Add-on: `amazon-sagemaker-hyperpod-task-governance`): 安装 HyperPod Task Governance (基于 Kueue),自动创建 ClusterQueue 和 LocalQueue,配置 Gang Scheduling (默认 60 秒超时)
-  - **PriorityClass 配置** (`infrastructure/k8s/priority-classes/`): 创建三级 Kubernetes PriorityClass 资源 (training-priority-low: 100, training-priority-medium: 500, training-priority-high: 1000，遵循 spec.md FR-004 优先级数值映射)
+  - **PriorityClass 配置**: 由 Task Governance Add-on 自动提供,三级优先级配置 (training-priority-low: 100, training-priority-medium: 500, training-priority-high: 1000) 遵循 spec.md FR-004 优先级数值映射
   - **抢占策略**: 完全遵循 Kueue 原生抢占行为,不做自定义扩展。具体参数 (冷却期、借用策略等) 以 HyperPod Task Governance 默认配置为准,参见 [Kueue Preemption Documentation](https://kueue.sigs.k8s.io/docs/concepts/preemption/)
   - **验证测试**: 提交测试 PyTorchJob (single-node hello-world),验证 Job 状态转换为 Succeeded,验证 Kueue Workload 调度生效,验证 Training Operator Webhook 响应 (curl localhost:9443/healthz)
   - **依赖**: T008c-1, T008c-2, T008c-3 (HyperPod EKS 集群完整配置)
   - **参考**: spec.md FR-001 (Training Operator), FR-004 (Kueue), [HyperPod Training Operator 安装文档](https://docs.aws.amazon.com/sagemaker/latest/dg/sagemaker-eks-operator-install.html)
-- [X] [T008d-2] [P] 监控和弹性组件安装 - `infrastructure/cdk/stacks/hyperpod_addons_stack.py`,使用 CDK `eks.Addon` 安装运维监控组件:
+- [X] [T008d-2] [P] 监控和弹性组件安装 - `infrastructure/cdk/stacks/hyperpod_addons_stack.py`,使用 CDK `eks.Addon` 安装运维监控组件 (已实现: Observability + Elastic Agent Add-ons):
   - **Observability** (Add-on: `amazon-sagemaker-hyperpod-observability`): 部署 HyperPod Observability (Prometheus + Grafana),自动配置 Node Exporter, cAdvisor, DCGM Exporter (GPU 指标),配置数据保留期 (30 天),创建预定义 Grafana 仪表盘 (集群健康、训练任务分布、资源利用率)
   - **Elastic Agent** (Add-on: `amazon-sagemaker-hyperpod-elastic-agent`): 配置 HyperPod Elastic Agent,设置检查点管理参数 (默认间隔 10-15 分钟，支持用户通过训练任务配置自定义间隔范围 5-30 分钟),配置 Auto-Resume 策略 (节点故障自动恢复),配置节点故障检测阈值 (PodsReady=False 持续 >30 秒)。Deep Health Check 完全遵循 HyperPod Health Check Agent 原生能力 (GPU/EFA/存储健康检测),参见 [HyperPod Health Checks Documentation](https://docs.aws.amazon.com/sagemaker/latest/dg/sagemaker-hyperpod-operate-health-checks.html)
   - **验证测试**: 查询 Prometheus 指标 (up, node_cpu_seconds_total),访问 Grafana 仪表盘,验证 Elastic Agent Pod Running,验证健康检查日志

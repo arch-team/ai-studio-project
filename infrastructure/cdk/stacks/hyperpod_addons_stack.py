@@ -1,0 +1,405 @@
+"""
+HyperPod Add-ons Stack for AI Training Platform.
+
+This stack installs HyperPod-specific EKS add-ons using CDK eks.Addon:
+- T008d-1: Training Operator (amazon-sagemaker-hyperpod-training-operator)
+- T008d-1: Task Governance / Kueue (amazon-sagemaker-hyperpod-task-governance)
+- T008d-2: Observability (amazon-sagemaker-hyperpod-observability)
+- T008d-2: Elastic Agent (amazon-sagemaker-hyperpod-elastic-agent)
+
+Note: PriorityClass configuration is automatically provided by the Task Governance
+add-on, so no manual PriorityClass creation is needed.
+
+Reference:
+- T008d-1: Training core components installation
+- T008d-2: Monitoring and elastic components installation
+- spec.md FR-004: Priority level numerical mapping (managed by Task Governance)
+- spec.md FR-007/FR-016: Observability (Prometheus + Grafana)
+- spec.md FR-010/FR-011: Elastic Agent (checkpoint management, auto-resume)
+- https://docs.aws.amazon.com/sagemaker/latest/dg/sagemaker-eks-operator-install.html
+"""
+
+import aws_cdk as cdk
+from aws_cdk import aws_eks as eks
+
+from config import EnvironmentConfig
+from constructs import Construct
+
+
+class HyperPodAddonsStack(cdk.Stack):
+    """HyperPod Add-ons Stack.
+
+    This stack installs HyperPod-specific add-ons:
+    - Training Operator: Manages PyTorchJob, TensorFlowJob CRDs for distributed training
+    - Task Governance: Kueue-based workload scheduling with Gang Scheduling support
+      (includes automatic PriorityClass configuration per spec.md FR-004)
+    - Observability: Prometheus + Grafana for cluster monitoring (spec.md FR-007/FR-016)
+    - Elastic Agent: Checkpoint management and auto-resume (spec.md FR-010/FR-011)
+
+    Prerequisites:
+    - EKS cluster must be deployed with HyperPod Helm Chart installed (EksStack)
+    - SageMaker HyperPod cluster must be created (SagemakerHyperPodStack)
+
+    Attributes:
+        training_operator_addon: The Training Operator EKS add-on
+        task_governance_addon: The Task Governance (Kueue) EKS add-on
+        observability_addon: The Observability (Prometheus + Grafana) EKS add-on
+        elastic_agent_addon: The Elastic Agent EKS add-on
+    """
+
+    # HyperPod Add-on names
+    TRAINING_OPERATOR_ADDON = "amazon-sagemaker-hyperpod-training-operator"
+    TASK_GOVERNANCE_ADDON = "amazon-sagemaker-hyperpod-task-governance"
+    OBSERVABILITY_ADDON = "amazon-sagemaker-hyperpod-observability"
+    ELASTIC_AGENT_ADDON = "amazon-sagemaker-hyperpod-elastic-agent"
+
+    def __init__(
+        self,
+        scope: Construct,
+        construct_id: str,
+        env_config: EnvironmentConfig,
+        eks_cluster: eks.ICluster,
+        **kwargs,
+    ) -> None:
+        """Initialize the HyperPod Add-ons Stack.
+
+        Args:
+            scope: CDK scope
+            construct_id: Stack identifier
+            env_config: Environment configuration
+            eks_cluster: EKS cluster to install add-ons on
+            **kwargs: Additional stack properties
+        """
+        super().__init__(scope, construct_id, **kwargs)
+
+        self.env_config = env_config
+        self._eks_cluster = eks_cluster
+
+        # T008d-1: Install Training Operator add-on
+        self._training_operator_addon = self._install_training_operator()
+
+        # T008d-1: Install Task Governance (Kueue) add-on
+        # Note: Task Governance automatically configures PriorityClass per spec.md FR-004
+        self._task_governance_addon = self._install_task_governance()
+
+        # T008d-2: Install Observability add-on (Prometheus + Grafana)
+        self._observability_addon = self._install_observability()
+
+        # T008d-2: Install Elastic Agent add-on (checkpoint management, auto-resume)
+        self._elastic_agent_addon = self._install_elastic_agent()
+
+        # Create outputs
+        self._create_outputs()
+
+    def _install_training_operator(self) -> eks.CfnAddon:
+        """Install HyperPod Training Operator add-on.
+
+        The Training Operator provides:
+        - PyTorchJob and TFJob CRD support
+        - PyTorch DDP/FSDP/DeepSpeed ZeRO framework support
+        - Webhook validation for training job configurations
+
+        Reference: https://docs.aws.amazon.com/sagemaker/latest/dg/sagemaker-hyperpod-training-operator.html
+        """
+        addon = eks.CfnAddon(
+            self,
+            "TrainingOperatorAddon",
+            addon_name=self.TRAINING_OPERATOR_ADDON,
+            cluster_name=self._eks_cluster.cluster_name,
+            resolve_conflicts="OVERWRITE",
+            # Configuration for Training Operator
+            configuration_values=cdk.Fn.to_json_string(
+                {
+                    # Enable PyTorch elastic training support
+                    "enablePyTorchElastic": True,
+                    # Gang scheduling timeout (seconds) - spec requires 60s
+                    "gangSchedulingTimeout": 60,
+                    # Enable suspend support for Kueue integration
+                    "enableSuspendSupport": True,
+                }
+            ),
+            tags=[
+                cdk.CfnTag(key="Name", value=f"{self.env_config.resource_prefix}-training-operator"),
+                cdk.CfnTag(key="Component", value="training-operator"),
+                cdk.CfnTag(key="ManagedBy", value="cdk"),
+            ],
+        )
+
+        # Add description tag
+        cdk.Tags.of(addon).add(
+            "Description",
+            "HyperPod Training Operator for PyTorchJob/TFJob CRD management",
+        )
+
+        return addon
+
+    def _install_task_governance(self) -> eks.CfnAddon:
+        """Install HyperPod Task Governance (Kueue) add-on.
+
+        Task Governance provides:
+        - Kueue-based workload scheduling
+        - Automatic ClusterQueue and LocalQueue creation
+        - Gang Scheduling support (default 60s timeout)
+        - Preemption policy management
+        - PriorityClass configuration (automatically managed per spec.md FR-004)
+
+        Reference: https://docs.aws.amazon.com/sagemaker/latest/dg/sagemaker-hyperpod-task-governance.html
+        """
+        addon = eks.CfnAddon(
+            self,
+            "TaskGovernanceAddon",
+            addon_name=self.TASK_GOVERNANCE_ADDON,
+            cluster_name=self._eks_cluster.cluster_name,
+            resolve_conflicts="OVERWRITE",
+            # Configuration for Task Governance (Kueue)
+            configuration_values=cdk.Fn.to_json_string(
+                {
+                    # Enable fair sharing
+                    "fairSharing": {
+                        "enable": True,
+                    },
+                    # Kueue controller settings
+                    "controller": {
+                        # Enable metrics for HyperPod Observability integration
+                        "enableClusterQueueResources": True,
+                    },
+                    # Integration with training frameworks
+                    "integrations": {
+                        "frameworks": [
+                            "kubeflow.org/pytorchjob",
+                            "kubeflow.org/tfjob",
+                            "batch/job",
+                            "pod",
+                        ],
+                    },
+                }
+            ),
+            tags=[
+                cdk.CfnTag(key="Name", value=f"{self.env_config.resource_prefix}-task-governance"),
+                cdk.CfnTag(key="Component", value="task-governance"),
+                cdk.CfnTag(key="ManagedBy", value="cdk"),
+            ],
+        )
+
+        # Ensure Task Governance is installed after Training Operator
+        # for proper CRD dependency resolution
+        addon.add_dependency(self._training_operator_addon)
+
+        cdk.Tags.of(addon).add(
+            "Description",
+            "HyperPod Task Governance (Kueue) for workload scheduling, Gang Scheduling, and PriorityClass",
+        )
+
+        return addon
+
+    def _install_observability(self) -> eks.CfnAddon:
+        """Install HyperPod Observability add-on (T008d-2).
+
+        Observability provides:
+        - Prometheus for metrics collection
+        - Grafana for visualization and dashboards
+        - Node Exporter for system metrics
+        - cAdvisor for container metrics
+        - DCGM Exporter for GPU metrics
+        - 30-day data retention period
+        - Pre-defined dashboards (cluster health, training distribution, resource utilization)
+
+        Reference:
+        - spec.md FR-007/FR-016: Observability requirements
+        - https://docs.aws.amazon.com/sagemaker/latest/dg/sagemaker-hyperpod-eks-operate-console-ui-dashboard.html
+        """
+        addon = eks.CfnAddon(
+            self,
+            "ObservabilityAddon",
+            addon_name=self.OBSERVABILITY_ADDON,
+            cluster_name=self._eks_cluster.cluster_name,
+            resolve_conflicts="OVERWRITE",
+            # Configuration for Observability
+            configuration_values=cdk.Fn.to_json_string(
+                {
+                    # Prometheus configuration
+                    "prometheus": {
+                        "enabled": True,
+                        # Data retention period (30 days per spec.md)
+                        "retention": "30d",
+                        # Enable remote write for long-term storage (optional)
+                        "remoteWrite": {
+                            "enabled": False,
+                        },
+                    },
+                    # Grafana configuration
+                    "grafana": {
+                        "enabled": True,
+                        # Enable pre-defined dashboards
+                        "defaultDashboards": {
+                            "clusterHealth": True,
+                            "trainingJobDistribution": True,
+                            "resourceUtilization": True,
+                            "gpuMetrics": True,
+                        },
+                    },
+                    # Metrics exporters
+                    "exporters": {
+                        # Node Exporter for system metrics
+                        "nodeExporter": {
+                            "enabled": True,
+                        },
+                        # cAdvisor for container metrics
+                        "cadvisor": {
+                            "enabled": True,
+                        },
+                        # DCGM Exporter for GPU metrics
+                        "dcgmExporter": {
+                            "enabled": True,
+                        },
+                    },
+                    # Metrics refresh interval (≤30 seconds per spec.md FR-013)
+                    "scrapeInterval": "15s",
+                }
+            ),
+            tags=[
+                cdk.CfnTag(key="Name", value=f"{self.env_config.resource_prefix}-observability"),
+                cdk.CfnTag(key="Component", value="observability"),
+                cdk.CfnTag(key="ManagedBy", value="cdk"),
+            ],
+        )
+
+        # Ensure Observability is installed after Training Operator
+        # for proper training job metrics collection
+        addon.add_dependency(self._training_operator_addon)
+
+        cdk.Tags.of(addon).add(
+            "Description",
+            "HyperPod Observability (Prometheus + Grafana) for cluster monitoring and GPU metrics",
+        )
+
+        return addon
+
+    def _install_elastic_agent(self) -> eks.CfnAddon:
+        """Install HyperPod Elastic Agent add-on (T008d-2).
+
+        Elastic Agent provides:
+        - Checkpoint management (10-15 minute default interval, configurable 5-30 minutes)
+        - Auto-Resume strategy for node failure recovery
+        - Node failure detection (PodsReady=False > 30 seconds)
+        - Deep Health Check (GPU/EFA/storage health detection)
+
+        Reference:
+        - spec.md FR-010/FR-011: Elastic Agent requirements
+        - https://docs.aws.amazon.com/sagemaker/latest/dg/sagemaker-hyperpod-operate-health-checks.html
+        """
+        addon = eks.CfnAddon(
+            self,
+            "ElasticAgentAddon",
+            addon_name=self.ELASTIC_AGENT_ADDON,
+            cluster_name=self._eks_cluster.cluster_name,
+            resolve_conflicts="OVERWRITE",
+            # Configuration for Elastic Agent
+            configuration_values=cdk.Fn.to_json_string(
+                {
+                    # Checkpoint management configuration
+                    "checkpoint": {
+                        "enabled": True,
+                        # Default interval 10-15 minutes, user configurable 5-30 minutes
+                        "defaultIntervalMinutes": 10,
+                        "minIntervalMinutes": 5,
+                        "maxIntervalMinutes": 30,
+                    },
+                    # Auto-Resume configuration for node failure recovery
+                    "autoResume": {
+                        "enabled": True,
+                        # Resume from latest checkpoint on node failure
+                        "resumeFromCheckpoint": True,
+                    },
+                    # Node failure detection configuration
+                    "nodeFailureDetection": {
+                        "enabled": True,
+                        # PodsReady=False threshold (seconds) per spec.md
+                        "podsReadyThresholdSeconds": 30,
+                    },
+                    # Deep Health Check (HyperPod native capability)
+                    # Includes GPU/EFA/storage health detection
+                    "deepHealthCheck": {
+                        "enabled": True,
+                        # Health check components
+                        "components": {
+                            "gpu": True,
+                            "efa": True,
+                            "storage": True,
+                        },
+                    },
+                }
+            ),
+            tags=[
+                cdk.CfnTag(key="Name", value=f"{self.env_config.resource_prefix}-elastic-agent"),
+                cdk.CfnTag(key="Component", value="elastic-agent"),
+                cdk.CfnTag(key="ManagedBy", value="cdk"),
+            ],
+        )
+
+        # Ensure Elastic Agent is installed after Observability
+        # for proper health metrics integration
+        addon.add_dependency(self._observability_addon)
+
+        cdk.Tags.of(addon).add(
+            "Description",
+            "HyperPod Elastic Agent for checkpoint management, auto-resume, and deep health check",
+        )
+
+        return addon
+
+    def _create_outputs(self) -> None:
+        """Create CloudFormation outputs for cross-stack references."""
+        # T008d-1 outputs
+        cdk.CfnOutput(
+            self,
+            "TrainingOperatorAddonName",
+            value=self._training_operator_addon.addon_name,
+            description="HyperPod Training Operator add-on name",
+            export_name=f"{self.env_config.resource_prefix}-training-operator-addon",
+        )
+
+        cdk.CfnOutput(
+            self,
+            "TaskGovernanceAddonName",
+            value=self._task_governance_addon.addon_name,
+            description="HyperPod Task Governance add-on name (includes PriorityClass config)",
+            export_name=f"{self.env_config.resource_prefix}-task-governance-addon",
+        )
+
+        # T008d-2 outputs
+        cdk.CfnOutput(
+            self,
+            "ObservabilityAddonName",
+            value=self._observability_addon.addon_name,
+            description="HyperPod Observability add-on name (Prometheus + Grafana)",
+            export_name=f"{self.env_config.resource_prefix}-observability-addon",
+        )
+
+        cdk.CfnOutput(
+            self,
+            "ElasticAgentAddonName",
+            value=self._elastic_agent_addon.addon_name,
+            description="HyperPod Elastic Agent add-on name (checkpoint, auto-resume)",
+            export_name=f"{self.env_config.resource_prefix}-elastic-agent-addon",
+        )
+
+    @property
+    def training_operator_addon(self) -> eks.CfnAddon:
+        """Get Training Operator add-on."""
+        return self._training_operator_addon
+
+    @property
+    def task_governance_addon(self) -> eks.CfnAddon:
+        """Get Task Governance add-on."""
+        return self._task_governance_addon
+
+    @property
+    def observability_addon(self) -> eks.CfnAddon:
+        """Get Observability add-on."""
+        return self._observability_addon
+
+    @property
+    def elastic_agent_addon(self) -> eks.CfnAddon:
+        """Get Elastic Agent add-on."""
+        return self._elastic_agent_addon
