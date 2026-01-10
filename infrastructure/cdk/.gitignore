@@ -19,6 +19,9 @@ venv/
 *.swp
 *.swo
 
+# MCP Server
+.serena/
+
 # OS
 .DS_Store
 Thumbs.db
