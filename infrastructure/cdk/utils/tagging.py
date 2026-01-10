@@ -6,10 +6,10 @@ to AWS resources to ensure consistency across the infrastructure.
 """
 
 import aws_cdk as cdk
-from constructs import Construct
 
 from config import EnvironmentConfig
 from config.constants import TAG_KEYS
+from constructs import Construct
 
 
 def apply_standard_tags(
@@ -75,7 +75,9 @@ def create_cfn_tags(
         List of CfnTag objects
     """
     tags = [
-        cdk.CfnTag(key=TAG_KEYS.NAME, value=f"{env_config.resource_prefix}-{resource_name}"),
+        cdk.CfnTag(
+            key=TAG_KEYS.NAME, value=f"{env_config.resource_prefix}-{resource_name}"
+        ),
         cdk.CfnTag(key=TAG_KEYS.ENVIRONMENT, value=env_config.name.value),
         cdk.CfnTag(key=TAG_KEYS.MANAGED_BY, value="cdk"),
     ]
@@ -103,7 +105,9 @@ def create_addon_tags(
         List of CfnTag objects for the add-on
     """
     return [
-        cdk.CfnTag(key=TAG_KEYS.NAME, value=f"{env_config.resource_prefix}-{addon_name}"),
+        cdk.CfnTag(
+            key=TAG_KEYS.NAME, value=f"{env_config.resource_prefix}-{addon_name}"
+        ),
         cdk.CfnTag(key=TAG_KEYS.COMPONENT, value=component),
         cdk.CfnTag(key=TAG_KEYS.MANAGED_BY, value="cdk"),
     ]

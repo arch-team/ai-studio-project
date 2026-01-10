@@ -9,9 +9,9 @@ from typing import Any
 
 import aws_cdk as cdk
 from aws_cdk import aws_iam as iam
-from constructs import Construct
 
 from config import EnvironmentConfig
+from constructs import Construct
 
 
 def create_tagged_role(
@@ -168,6 +168,22 @@ def add_policy_statement(
             conditions=conditions,
         )
     )
+
+
+def add_policy_statements(
+    role: iam.Role,
+    statements: list[tuple[str, list[str], list[str]]],
+    effect: iam.Effect = iam.Effect.ALLOW,
+) -> None:
+    """Add multiple policy statements to an IAM role.
+
+    Args:
+        role: The IAM role to add the statements to
+        statements: List of tuples (sid, actions, resources)
+        effect: Allow or Deny for all statements (default: Allow)
+    """
+    for sid, actions, resources in statements:
+        add_policy_statement(role, sid, actions, resources, effect=effect)
 
 
 def create_irsa_conditions(

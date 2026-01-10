@@ -25,7 +25,6 @@ Reference:
 import aws_cdk as cdk
 from aws_cdk import aws_eks as eks
 from aws_cdk import aws_iam as iam
-from constructs import Construct
 
 from config import EnvironmentConfig
 from config.constants import (
@@ -34,6 +33,7 @@ from config.constants import (
     MANAGED_POLICIES,
     SERVICE_ACCOUNTS,
 )
+from constructs import Construct
 from utils.iam_helpers import create_pod_identity_role
 from utils.outputs import create_output
 from utils.tagging import apply_component_tag, create_addon_tags
@@ -90,7 +90,9 @@ class HyperPodAddonsStack(cdk.Stack):
         self._training_operator_addon = self._install_training_operator()
 
         # Create Pod Identity Association for Training Operator
-        self._training_operator_pod_identity = self._create_training_operator_pod_identity()
+        self._training_operator_pod_identity = (
+            self._create_training_operator_pod_identity()
+        )
 
         # T008d-1: Install Task Governance (Kueue) add-on
         # Note: Task Governance automatically configures PriorityClass per spec.md FR-004
@@ -104,6 +106,37 @@ class HyperPodAddonsStack(cdk.Stack):
 
         # Create outputs
         self._create_outputs()
+
+    def _create_addon(
+        self,
+        construct_id: str,
+        addon_name: str,
+        component: str,
+        description: str,
+    ) -> eks.CfnAddon:
+        """Create an EKS add-on with standard configuration.
+
+        Args:
+            construct_id: Unique identifier for the construct
+            addon_name: Name of the EKS add-on
+            component: Component name for tagging
+            description: Description for the add-on
+
+        Returns:
+            The created CfnAddon
+        """
+        addon = eks.CfnAddon(
+            self,
+            construct_id,
+            addon_name=addon_name,
+            cluster_name=self._eks_cluster.cluster_name,
+            resolve_conflicts="OVERWRITE",
+            tags=create_addon_tags(self.env_config, component, component),
+        )
+
+        cdk.Tags.of(addon).add("Description", description)
+
+        return addon
 
     def _create_training_operator_role(self) -> iam.Role:
         """Create IAM role for Training Operator Pod Identity.
@@ -155,22 +188,12 @@ class HyperPodAddonsStack(cdk.Stack):
 
         Reference: https://docs.aws.amazon.com/sagemaker/latest/dg/sagemaker-eks-operator-install.html
         """
-        addon = eks.CfnAddon(
-            self,
-            "TrainingOperatorAddon",
+        return self._create_addon(
+            construct_id="TrainingOperatorAddon",
             addon_name=EKS_ADDON_NAMES.TRAINING_OPERATOR,
-            cluster_name=self._eks_cluster.cluster_name,
-            resolve_conflicts="OVERWRITE",
-            tags=create_addon_tags(self.env_config, "training-operator", "training-operator"),
+            component="training-operator",
+            description="HyperPod Training Operator for PyTorchJob/TFJob CRD management",
         )
-
-        # Add description tag
-        cdk.Tags.of(addon).add(
-            "Description",
-            "HyperPod Training Operator for PyTorchJob/TFJob CRD management",
-        )
-
-        return addon
 
     def _install_task_governance(self) -> eks.CfnAddon:
         """Install HyperPod Task Governance (Kueue) add-on.
@@ -184,23 +207,16 @@ class HyperPodAddonsStack(cdk.Stack):
 
         Reference: https://docs.aws.amazon.com/sagemaker/latest/dg/sagemaker-hyperpod-eks-operate-console-ui-governance-setup-task-governance.html
         """
-        addon = eks.CfnAddon(
-            self,
-            "TaskGovernanceAddon",
+        addon = self._create_addon(
+            construct_id="TaskGovernanceAddon",
             addon_name=EKS_ADDON_NAMES.TASK_GOVERNANCE,
-            cluster_name=self._eks_cluster.cluster_name,
-            resolve_conflicts="OVERWRITE",
-            tags=create_addon_tags(self.env_config, "task-governance", "task-governance"),
+            component="task-governance",
+            description="HyperPod Task Governance - Kueue for workload scheduling and Gang Scheduling",
         )
 
         # Ensure Task Governance is installed after Training Operator
         # for proper CRD dependency resolution
         addon.add_dependency(self._training_operator_addon)
-
-        cdk.Tags.of(addon).add(
-            "Description",
-            "HyperPod Task Governance - Kueue for workload scheduling and Gang Scheduling",
-        )
 
         return addon
 
@@ -219,23 +235,16 @@ class HyperPodAddonsStack(cdk.Stack):
         - spec.md FR-007/FR-016: Observability requirements
         - https://docs.aws.amazon.com/sagemaker/latest/dg/hyperpod-observability-addon-setup.html
         """
-        addon = eks.CfnAddon(
-            self,
-            "ObservabilityAddon",
+        addon = self._create_addon(
+            construct_id="ObservabilityAddon",
             addon_name=EKS_ADDON_NAMES.OBSERVABILITY,
-            cluster_name=self._eks_cluster.cluster_name,
-            resolve_conflicts="OVERWRITE",
-            tags=create_addon_tags(self.env_config, "observability", "observability"),
+            component="observability",
+            description="HyperPod Observability for cluster monitoring via Amazon Managed Prometheus/Grafana",
         )
 
         # Ensure Observability is installed after Training Operator
         # for proper training job metrics collection
         addon.add_dependency(self._training_operator_addon)
-
-        cdk.Tags.of(addon).add(
-            "Description",
-            "HyperPod Observability for cluster monitoring via Amazon Managed Prometheus/Grafana",
-        )
 
         return addon
 
@@ -268,11 +277,12 @@ class HyperPodAddonsStack(cdk.Stack):
                 export_name=f"{self.env_config.resource_prefix}-observability-addon",
             )
         else:
-            cdk.CfnOutput(
+            create_output(
                 self,
                 "ObservabilityAddonStatus",
-                value="Disabled - requires Amazon Managed Service for Prometheus workspace",
-                description="Observability add-on status",
+                "Disabled - requires Amazon Managed Service for Prometheus workspace",
+                "Observability add-on status",
+                export_name=None,  # No export needed for status message
             )
 
     @property

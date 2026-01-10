@@ -15,13 +15,24 @@ Prerequisites:
 import os
 
 import aws_cdk as cdk
-from aws_cdk import aws_ec2 as ec2
-from aws_cdk import aws_eks as eks
-from aws_cdk import aws_iam as iam
-from aws_cdk import aws_s3 as s3
-from aws_cdk import aws_s3_deployment as s3deploy
-from aws_cdk import aws_sagemaker as sagemaker
-from constructs import Construct
+from aws_cdk import (
+    aws_ec2 as ec2,
+)
+from aws_cdk import (
+    aws_eks as eks,
+)
+from aws_cdk import (
+    aws_iam as iam,
+)
+from aws_cdk import (
+    aws_s3 as s3,
+)
+from aws_cdk import (
+    aws_s3_deployment as s3deploy,
+)
+from aws_cdk import (
+    aws_sagemaker as sagemaker,
+)
 
 from config import EnvironmentConfig
 from config.constants import (
@@ -30,9 +41,14 @@ from config.constants import (
     SAGEMAKER_INSTANCES,
     TAG_KEYS,
 )
-from utils.iam_helpers import add_policy_statement, create_tagged_role
+from constructs import Construct
+from utils.iam_helpers import (
+    add_policy_statement,
+    add_policy_statements,
+    create_tagged_role,
+)
 from utils.outputs import create_output
-from utils.tagging import apply_standard_tags, create_cfn_tags
+from utils.tagging import create_cfn_tags
 
 
 class SagemakerHyperPodStack(cdk.Stack):
@@ -162,58 +178,48 @@ class SagemakerHyperPodStack(cdk.Stack):
 
         # Add EC2 permissions required for EKS-orchestrated HyperPod
         # Reference: https://docs.aws.amazon.com/sagemaker/latest/dg/sagemaker-hyperpod-prerequisites-iam.html
-        add_policy_statement(
+        ec2_network_actions = [
+            "ec2:AssignPrivateIpAddresses",
+            "ec2:AttachNetworkInterface",
+            "ec2:CreateNetworkInterface",
+            "ec2:CreateNetworkInterfacePermission",
+            "ec2:DeleteNetworkInterface",
+            "ec2:DeleteNetworkInterfacePermission",
+            "ec2:DescribeInstances",
+            "ec2:DescribeInstanceTypes",
+            "ec2:DescribeNetworkInterfaces",
+            "ec2:DescribeTags",
+            "ec2:DescribeVpcs",
+            "ec2:DescribeDhcpOptions",
+            "ec2:DescribeSubnets",
+            "ec2:DescribeSecurityGroups",
+            "ec2:DetachNetworkInterface",
+            "ec2:ModifyNetworkInterfaceAttribute",
+            "ec2:UnassignPrivateIpAddresses",
+        ]
+
+        # Add remaining permissions using batch helper
+        add_policy_statements(
             role,
-            sid="Ec2NetworkAccess",
-            actions=[
-                "ec2:AssignPrivateIpAddresses",
-                "ec2:AttachNetworkInterface",
-                "ec2:CreateNetworkInterface",
-                "ec2:CreateNetworkInterfacePermission",
-                "ec2:DeleteNetworkInterface",
-                "ec2:DeleteNetworkInterfacePermission",
-                "ec2:DescribeInstances",
-                "ec2:DescribeInstanceTypes",
-                "ec2:DescribeNetworkInterfaces",
-                "ec2:DescribeTags",
-                "ec2:DescribeVpcs",
-                "ec2:DescribeDhcpOptions",
-                "ec2:DescribeSubnets",
-                "ec2:DescribeSecurityGroups",
-                "ec2:DetachNetworkInterface",
-                "ec2:ModifyNetworkInterfaceAttribute",
-                "ec2:UnassignPrivateIpAddresses",
+            [
+                ("Ec2NetworkAccess", ec2_network_actions, ["*"]),
+                (
+                    "Ec2CreateTags",
+                    ["ec2:CreateTags"],
+                    ["arn:aws:ec2:*:*:network-interface/*"],
+                ),
+                (
+                    "EcrAccess",
+                    [
+                        "ecr:BatchCheckLayerAvailability",
+                        "ecr:BatchGetImage",
+                        "ecr:GetAuthorizationToken",
+                        "ecr:GetDownloadUrlForLayer",
+                    ],
+                    ["*"],
+                ),
+                ("EksPodIdentity", ["eks-auth:AssumeRoleForPodIdentity"], ["*"]),
             ],
-            resources=["*"],
-        )
-
-        # Add EC2 CreateTags permission for network interfaces
-        add_policy_statement(
-            role,
-            sid="Ec2CreateTags",
-            actions=["ec2:CreateTags"],
-            resources=["arn:aws:ec2:*:*:network-interface/*"],
-        )
-
-        # Add ECR permissions for pulling container images
-        add_policy_statement(
-            role,
-            sid="EcrAccess",
-            actions=[
-                "ecr:BatchCheckLayerAvailability",
-                "ecr:BatchGetImage",
-                "ecr:GetAuthorizationToken",
-                "ecr:GetDownloadUrlForLayer",
-            ],
-            resources=["*"],
-        )
-
-        # Add EKS Pod Identity permission (optional but recommended)
-        add_policy_statement(
-            role,
-            sid="EksPodIdentity",
-            actions=["eks-auth:AssumeRoleForPodIdentity"],
-            resources=["*"],
         )
 
         return role
@@ -259,25 +265,26 @@ class SagemakerHyperPodStack(cdk.Stack):
         security_group_ids = [self._eks_cluster.cluster_security_group_id]
 
         # Create instance groups using helper method
-        controller_group = self._create_instance_group(
-            name=INSTANCE_GROUPS.CONTROLLER,
-            instance_type=SAGEMAKER_INSTANCES.CONTROLLER,
-            instance_count=1,
-        )
-
-        # ml.m5.4xlarge supports ~234 pods (8 ENIs × 30 IPs per ENI)
-        system_group = self._create_instance_group(
-            name=INSTANCE_GROUPS.SYSTEM,
-            instance_type=SAGEMAKER_INSTANCES.SYSTEM,
-            instance_count=1,
-        )
+        instance_groups = [
+            self._create_instance_group(
+                name=INSTANCE_GROUPS.CONTROLLER,
+                instance_type=SAGEMAKER_INSTANCES.CONTROLLER,
+                instance_count=1,
+            ),
+            # ml.m5.4xlarge supports ~234 pods (8 ENIs × 30 IPs per ENI)
+            self._create_instance_group(
+                name=INSTANCE_GROUPS.SYSTEM,
+                instance_type=SAGEMAKER_INSTANCES.SYSTEM,
+                instance_count=1,
+            ),
+        ]
 
         # Create HyperPod cluster with standard tags + SageMaker=true
         cluster = sagemaker.CfnCluster(
             self,
             "HyperPodCluster",
             cluster_name=f"{self.env_config.resource_prefix}-hyperpod",
-            instance_groups=[controller_group, system_group],
+            instance_groups=instance_groups,
             vpc_config=sagemaker.CfnCluster.VpcConfigProperty(
                 security_group_ids=security_group_ids,
                 subnets=private_subnet_ids,
