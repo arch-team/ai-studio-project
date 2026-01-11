@@ -12,7 +12,7 @@ Reference: tasks.md T008g - HyperPod 基础设施验证测试
 
 import os
 import sys
-from typing import Generator, Optional
+from typing import Generator
 
 import pytest
 
@@ -22,7 +22,8 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "cdk"))
 # CDK imports (may fail if CDK not installed)
 try:
     import aws_cdk as cdk
-    from config import EnvironmentConfig, EnvironmentType
+    from config import EnvironmentConfig
+
     CDK_AVAILABLE = True
 except ImportError:
     CDK_AVAILABLE = False
@@ -32,6 +33,7 @@ except ImportError:
 # Kubernetes client imports (may fail if not installed)
 try:
     from kubernetes import client, config as k8s_config
+
     K8S_AVAILABLE = True
 except ImportError:
     K8S_AVAILABLE = False
@@ -41,6 +43,7 @@ except ImportError:
 # AWS SDK imports
 try:
     import boto3
+
     BOTO3_AVAILABLE = True
 except ImportError:
     BOTO3_AVAILABLE = False
@@ -50,6 +53,7 @@ except ImportError:
 # ============================================================================
 # CDK Test Fixtures
 # ============================================================================
+
 
 @pytest.fixture
 def app():
@@ -113,6 +117,7 @@ def reset_environment_variables() -> Generator[None, None, None]:
 # Infrastructure Validation Fixtures
 # ============================================================================
 
+
 @pytest.fixture(scope="module")
 def k8s_core_client():
     """Initialize Kubernetes CoreV1Api client."""
@@ -170,7 +175,9 @@ def infra_config():
     return {
         "cluster_name": os.environ.get("CLUSTER_NAME", "ai-platform-hyperpod"),
         "namespace_training": os.environ.get("NAMESPACE_TRAINING", "training-jobs"),
-        "namespace_monitoring": os.environ.get("NAMESPACE_MONITORING", "monitoring"),
+        "namespace_monitoring": os.environ.get(
+            "NAMESPACE_MONITORING", "hyperpod-observability"
+        ),
         "namespace_kueue": os.environ.get("NAMESPACE_KUEUE", "kueue-system"),
         "namespace_spaces": os.environ.get("NAMESPACE_SPACES", "sagemaker-spaces"),
         "aws_region": os.environ.get("AWS_REGION", "us-east-1"),
@@ -181,6 +188,7 @@ def infra_config():
 # Pytest Configuration
 # ============================================================================
 
+
 def pytest_configure(config):
     """Configure pytest markers."""
     config.addinivalue_line(
@@ -189,6 +197,7 @@ def pytest_configure(config):
     config.addinivalue_line(
         "markers", "infrastructure: marks tests as infrastructure validation tests"
     )
+    config.addinivalue_line("markers", "cdk: marks tests as CDK stack tests")
     config.addinivalue_line(
-        "markers", "cdk: marks tests as CDK stack tests"
+        "markers", "integration: marks tests as integration tests requiring live cluster"
     )

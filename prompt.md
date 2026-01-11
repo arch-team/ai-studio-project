@@ -217,3 +217,5 @@ Training Operator 需要在带有 sagemaker.amazonaws.com/compute-type: hyperpod
 使用code-simplifier插件帮我优化当前项目中的代码，这个项目是使用AWS CDK实现的IaC项目
 
 检查当前项目已实现的功能跟 tasks.md中标注为完成的任务真实存在的差异
+
+/Users/jinhuasu/Project_Workspace/Anker-Projects/ml-platform-research/llm-platform-solution/ai-studio-project/infrastructure/tests 这个目录下的文件组织比较混乱，请整理优化，在保持功能不变的情况下文件组织结构清晰，一目了然

@@ -141,25 +141,25 @@ run_quick_validation() {
     log_info "========== Quick Validation Mode =========="
 
     # Cluster health
-    run_suite "cluster-health" "${SCRIPT_DIR}/validate-infrastructure.sh" "--cluster" || true
+    run_suite "cluster-health" "${SCRIPT_DIR}/scripts/validate-infrastructure.sh" "--cluster" || true
 
     # Add-ons verification
-    run_suite "hyperpod-addons" "${SCRIPT_DIR}/verify-hyperpod-addons.sh" "" || true
+    run_suite "hyperpod-addons" "${SCRIPT_DIR}/scripts/verify-hyperpod-addons.sh" "" || true
 }
 
 run_full_validation() {
     log_info "========== Full Validation Mode =========="
 
     # Run comprehensive infrastructure validation
-    run_suite "infrastructure-full" "${SCRIPT_DIR}/validate-infrastructure.sh" "--all" || true
+    run_suite "infrastructure-full" "${SCRIPT_DIR}/scripts/validate-infrastructure.sh" "--all" || true
 
     # Run HyperPod add-ons verification
-    run_suite "hyperpod-addons-verbose" "${SCRIPT_DIR}/verify-hyperpod-addons.sh" "--verbose" || true
+    run_suite "hyperpod-addons-verbose" "${SCRIPT_DIR}/scripts/verify-hyperpod-addons.sh" "--verbose" || true
 
     # Run FSx performance test (if FSx is available)
-    if [[ -x "${SCRIPT_DIR}/fsx-performance-test.sh" ]]; then
+    if [[ -x "${SCRIPT_DIR}/scripts/fsx-performance-test.sh" ]]; then
         log_info "Running FSx performance test (this may take several minutes)..."
-        run_suite "fsx-performance" "${SCRIPT_DIR}/fsx-performance-test.sh" "" || true
+        run_suite "fsx-performance" "${SCRIPT_DIR}/scripts/fsx-performance-test.sh" "" || true
     fi
 }
 
@@ -169,11 +169,11 @@ run_pytest_validation() {
     local pytest_output="${REPORT_DIR}/pytest-infrastructure-${TIMESTAMP}.xml"
 
     if command -v pytest &> /dev/null; then
-        if [[ -f "${SCRIPT_DIR}/test_infrastructure.py" ]]; then
+        if [[ -d "${SCRIPT_DIR}/integration" ]] || [[ -d "${SCRIPT_DIR}/unit" ]]; then
             TOTAL_SUITES=$((TOTAL_SUITES + 1))
             log_info "Running pytest infrastructure tests..."
 
-            if pytest "${SCRIPT_DIR}/test_infrastructure.py" \
+            if pytest "${SCRIPT_DIR}" \
                 --junitxml="$pytest_output" \
                 -v \
                 --tb=short \
@@ -187,7 +187,7 @@ run_pytest_validation() {
                 SUITE_RESULTS+=("❌ pytest-infrastructure: FAILED")
             fi
         else
-            log_warn "Pytest test file not found: ${SCRIPT_DIR}/test_infrastructure.py"
+            log_warn "Pytest test directories not found: ${SCRIPT_DIR}/integration or ${SCRIPT_DIR}/unit"
         fi
     else
         log_warn "pytest not installed. Skipping pytest tests."
