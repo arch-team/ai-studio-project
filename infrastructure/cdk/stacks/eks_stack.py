@@ -270,7 +270,7 @@ class EksStack(cdk.Stack):
         eks.CfnAddon(
             self,
             "EbsCsiAddon",
-            addon_name="aws-ebs-csi-driver",
+            addon_name=EKS_ADDON_NAMES.EBS_CSI_DRIVER,
             cluster_name=self._eks_cluster.cluster_name,
             addon_version=addon_versions.ebs_csi,
             service_account_role_arn=ebs_csi_role.role_arn,
@@ -282,7 +282,7 @@ class EksStack(cdk.Stack):
         eks.CfnAddon(
             self,
             "FsxCsiAddon",
-            addon_name="aws-fsx-csi-driver",
+            addon_name=EKS_ADDON_NAMES.FSX_CSI_DRIVER,
             cluster_name=self._eks_cluster.cluster_name,
             addon_version=addon_versions.fsx_csi,
             service_account_role_arn=fsx_csi_role.role_arn,
@@ -293,7 +293,7 @@ class EksStack(cdk.Stack):
         eks.CfnAddon(
             self,
             "VpcCniAddon",
-            addon_name="vpc-cni",
+            addon_name=EKS_ADDON_NAMES.VPC_CNI,
             cluster_name=self._eks_cluster.cluster_name,
             addon_version=addon_versions.vpc_cni,
             resolve_conflicts="OVERWRITE",
@@ -312,7 +312,7 @@ class EksStack(cdk.Stack):
         eks.CfnAddon(
             self,
             "CoreDnsAddon",
-            addon_name="coredns",
+            addon_name=EKS_ADDON_NAMES.COREDNS,
             cluster_name=self._eks_cluster.cluster_name,
             addon_version=addon_versions.coredns,
             resolve_conflicts="OVERWRITE",
@@ -322,7 +322,7 @@ class EksStack(cdk.Stack):
         eks.CfnAddon(
             self,
             "KubeProxyAddon",
-            addon_name="kube-proxy",
+            addon_name=EKS_ADDON_NAMES.KUBE_PROXY,
             cluster_name=self._eks_cluster.cluster_name,
             addon_version=addon_versions.kube_proxy,
             resolve_conflicts="OVERWRITE",
@@ -333,7 +333,7 @@ class EksStack(cdk.Stack):
         eks.CfnAddon(
             self,
             "PodIdentityAgentAddon",
-            addon_name="eks-pod-identity-agent",
+            addon_name=EKS_ADDON_NAMES.POD_IDENTITY_AGENT,
             cluster_name=self._eks_cluster.cluster_name,
             resolve_conflicts="OVERWRITE",
         )
