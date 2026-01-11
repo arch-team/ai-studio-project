@@ -185,7 +185,8 @@ Prometheus/Grafana 对应Amazon SageMaker HyperPod observability
 
 对当前的目录下的cdk项目进行在dev环境下的全面功能是否正常，在验证的过程中如果碰到问题，请自行分析并继续，直到cdk这个项目的所有功能都正常可用
 
-当前目录下的基础设施即代码（IaC）项目有很多的配置参数，分散在那个代码文件中，不便于根据不同的需求场景配置和修改，将这个项目中的变更频率高的配置参数提炼到专门的配置文件中，并且设计结构清晰，易读性的配置文件，最终可以通过修改配置文件就可以变更最终部署到AWS资源
+当前目录下的基础设施即代码（IaC）项目有很多的配置参数，分散在代码文件中，不便于根据不同的需求配置和修改和维护基础设施部署的变更，以达到集中式的IaC配置管理的效果。遵循配置与代码分离的原则，优先使用社区成熟的SDK而不是自己造轮子
+同时涉及的配置参数种类繁多，需要从参数的所属服务、变更的频率等设计结构清晰，易读，易维护的配置文件管理，最终可以通过修改集中式配置变更就可以CDK Stack的更新与部署
 
 对当前目录下的基础设施即代码（IaC）项目进行详细的验证保证其中的各项功能都正常
 
@@ -219,3 +220,9 @@ Training Operator 需要在带有 sagemaker.amazonaws.com/compute-type: hyperpod
 检查当前项目已实现的功能跟 tasks.md中标注为完成的任务真实存在的差异
 
 /Users/jinhuasu/Project_Workspace/Anker-Projects/ml-platform-research/llm-platform-solution/ai-studio-project/infrastructure/tests 这个目录下的文件组织比较混乱，请整理优化，在保持功能不变的情况下文件组织结构清晰，一目了然
+
+Amazon EKS 有原生提供的Cert Manager add-ons（Install cert-manager to manage X.509 certificates），而当前的CDK项目中eks_stack.py使用的_install_cert_manager （Install cert-manager via Helm Chart），是否可以直接使用Amazon EKS 有原生提供的Cert Manager add-ons，请分析可行性并完成完整的部署验证
+
+
+
+tasks.md是我通过spec-kit项目编写的训练平台开发任务，请分析
