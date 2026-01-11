@@ -25,6 +25,9 @@ class EksAddonNames:
     KUBE_PROXY: str = "kube-proxy"
     POD_IDENTITY_AGENT: str = "eks-pod-identity-agent"
 
+    # Community Add-ons
+    CERT_MANAGER: str = "cert-manager"
+
 
 @dataclass(frozen=True)
 class KubernetesNamespaces:

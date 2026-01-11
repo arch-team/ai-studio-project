@@ -24,6 +24,7 @@ from aws_cdk import aws_s3_assets as s3_assets
 from aws_cdk.lambda_layer_kubectl_v33 import KubectlV33Layer
 
 from config import EnvironmentConfig
+from config.constants import EKS_ADDON_NAMES
 from constructs import Construct
 
 # Path to the HyperPod Helm Chart (relative to this file)
@@ -74,13 +75,13 @@ class EksStack(cdk.Stack):
         # Create EKS cluster
         self._eks_cluster = self._create_eks_cluster()
 
-        # Install EKS add-ons
+        # Create System Node Group for control plane workloads
+        self._create_system_node_group()
+
+        # Install EKS add-ons (including cert-manager community add-on)
         self._install_eks_addons()
 
-        # Install cert-manager (required by HyperPod Training Operator)
-        self._cert_manager_chart = self._install_cert_manager()
-
-        # Install HyperPod Helm Chart dependencies (depends on cert-manager)
+        # Install HyperPod Helm Chart dependencies (depends on cert-manager add-on)
         self._install_hyperpod_helm_chart()
 
         # Create outputs
@@ -192,8 +193,42 @@ class EksStack(cdk.Stack):
 
         return role
 
+    def _create_system_node_group(self) -> None:
+        """Create EC2 node group for system components.
+
+        This node group runs system workloads like HyperPod dependencies
+        that require compute resources before HyperPod managed nodes are available.
+
+        The node group uses:
+        - t3.medium instances for cost efficiency
+        - AL2023 AMI for K8s 1.33+ compatibility
+        - CriticalAddonsOnly taint to reserve for system workloads
+        """
+        self._eks_cluster.add_nodegroup_capacity(
+            "SystemNodeGroup",
+            nodegroup_name=f"{self.env_config.resource_prefix}-system-nodes",
+            instance_types=[ec2.InstanceType("t3.medium")],
+            min_size=1,
+            max_size=2,
+            desired_size=1,
+            disk_size=20,
+            capacity_type=eks.CapacityType.ON_DEMAND,
+            ami_type=eks.NodegroupAmiType.AL2023_X86_64_STANDARD,
+            labels={
+                "node-role": "system",
+                "workload-type": "control-plane",
+            },
+            taints=[
+                eks.TaintSpec(
+                    key="CriticalAddonsOnly",
+                    value="true",
+                    effect=eks.TaintEffect.PREFER_NO_SCHEDULE,
+                ),
+            ],
+        )
+
     def _install_eks_addons(self) -> None:
-        """安装 EKS 必需的插件。
+        """安装 EKS 必需的插件（含 cert-manager community add-on）。
 
         必需插件：
         - EBS CSI Driver (≥v1.28.0) - 持久化卷
@@ -201,8 +236,13 @@ class EksStack(cdk.Stack):
         - VPC CNI (≥v1.16.0) - Pod 网络
         - CoreDNS - DNS 解析
         - kube-proxy - Service 网络
+        - EKS Pod Identity Agent - IAM 认证
+        - cert-manager - 证书管理（HyperPod Training Operator 前置条件）
 
         注意：EKS 插件会自动创建 ServiceAccount，我们只需创建 IRSA 角色。
+
+        Reference:
+        - https://docs.aws.amazon.com/eks/latest/userguide/community-addons.html
         """
         # 创建 EBS CSI Driver IRSA 角色
         ebs_csi_role = self._create_irsa_role(
@@ -298,112 +338,22 @@ class EksStack(cdk.Stack):
             resolve_conflicts="OVERWRITE",
         )
 
-    def _install_cert_manager(self) -> eks.HelmChart:
-        """Install cert-manager via Helm Chart with EC2 node group.
-
-        cert-manager is required by HyperPod Training Operator add-on.
-        It provides certificate management for Kubernetes webhooks.
-
-        Since EKS cluster has no default nodes (managed by HyperPod), we use
-        a dedicated EC2 node group to run cert-manager pods.
-
-        Reference:
-        - https://cert-manager.io/docs/installation/helm/
-        - https://docs.aws.amazon.com/sagemaker/latest/dg/sagemaker-eks-operator-install.html
-
-        Returns:
-            The cert-manager Helm Chart resource for dependency management.
-        """
-        # Create a small EC2 node group for system components (cert-manager, etc.)
-        # Using EC2 nodes ensures proper TLS certificate generation
-        self._eks_cluster.add_nodegroup_capacity(
-            "SystemNodeGroup",
-            nodegroup_name=f"{self.env_config.resource_prefix}-system-nodes",
-            instance_types=[ec2.InstanceType("t3.medium")],
-            min_size=1,
-            max_size=2,
-            desired_size=1,
-            disk_size=20,
-            capacity_type=eks.CapacityType.ON_DEMAND,
-            ami_type=eks.NodegroupAmiType.AL2023_X86_64_STANDARD,  # Required for K8s 1.33+
-            labels={
-                "node-role": "system",
-                "workload-type": "control-plane",
-            },
-            taints=[
-                eks.TaintSpec(
-                    key="CriticalAddonsOnly",
-                    value="true",
-                    effect=eks.TaintEffect.PREFER_NO_SCHEDULE,
-                ),
-            ],
+        # Install cert-manager community add-on
+        # Required by HyperPod Training Operator for webhook certificates
+        # Reference: https://docs.aws.amazon.com/eks/latest/userguide/community-addons.html
+        self._cert_manager_addon = eks.CfnAddon(
+            self,
+            "CertManagerAddon",
+            addon_name=EKS_ADDON_NAMES.CERT_MANAGER,
+            cluster_name=self._eks_cluster.cluster_name,
+            resolve_conflicts="OVERWRITE",
         )
 
-        cert_manager_chart = self._eks_cluster.add_helm_chart(
-            "CertManager",
-            chart="cert-manager",
-            repository="https://charts.jetstack.io",
-            namespace="cert-manager",
-            release="cert-manager",
-            version="v1.17.2",  # Latest stable version as of 2025
-            create_namespace=True,
-            wait=True,  # Wait for cert-manager to be ready before proceeding
-            timeout=cdk.Duration.minutes(15),  # Allow time for Helm chart installation
-            values={
-                # Install CRDs with Helm (recommended approach)
-                "crds": {
-                    "enabled": True,
-                },
-                # Resource requests for production stability
-                "resources": {
-                    "requests": {
-                        "cpu": "50m",
-                        "memory": "64Mi",
-                    },
-                },
-                # Enable prometheus metrics
-                "prometheus": {
-                    "enabled": True,
-                },
-                # Disable startupapicheck (can fail due to node startup timing)
-                "startupapicheck": {
-                    "enabled": False,
-                },
-                # Tolerate system node taint for all cert-manager components
-                "tolerations": [
-                    {
-                        "key": "CriticalAddonsOnly",
-                        "operator": "Exists",
-                    },
-                ],
-                "webhook": {
-                    "tolerations": [
-                        {
-                            "key": "CriticalAddonsOnly",
-                            "operator": "Exists",
-                        },
-                    ],
-                },
-                "cainjector": {
-                    "tolerations": [
-                        {
-                            "key": "CriticalAddonsOnly",
-                            "operator": "Exists",
-                        },
-                    ],
-                },
-            },
-        )
-
-        # Add tags
-        cdk.Tags.of(cert_manager_chart).add(
-            "Component", "cert-manager"
-        )
-        cdk.Tags.of(cert_manager_chart).add(
+        # Add tags for cert-manager add-on
+        cdk.Tags.of(self._cert_manager_addon).add("Component", "cert-manager")
+        cdk.Tags.of(self._cert_manager_addon).add(
             "Description", "Certificate management for HyperPod Training Operator"
         )
-
-        return cert_manager_chart
 
     def _install_hyperpod_helm_chart(self) -> None:
         """Install HyperPod Helm Chart dependencies.
@@ -511,7 +461,7 @@ class EksStack(cdk.Stack):
         )
 
         # Ensure HyperPod dependencies are installed after cert-manager
-        hyperpod_chart.node.add_dependency(self._cert_manager_chart)
+        hyperpod_chart.node.add_dependency(self._cert_manager_addon)
 
     def _create_outputs(self) -> None:
         """创建 CloudFormation 输出用于跨 Stack 引用。"""
@@ -562,6 +512,15 @@ class EksStack(cdk.Stack):
             "KubeconfigCommand",
             value=f"aws eks update-kubeconfig --name {self._eks_cluster.cluster_name} --region {self.env_config.region}",
             description="Command to configure kubectl",
+        )
+
+        # cert-manager add-on output
+        cdk.CfnOutput(
+            self,
+            "CertManagerAddonName",
+            value=self._cert_manager_addon.addon_name,
+            description="cert-manager EKS add-on name",
+            export_name=f"{self.env_config.resource_prefix}-cert-manager-addon",
         )
 
         # Output Helm Chart installation status
