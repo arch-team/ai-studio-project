@@ -349,12 +349,6 @@ class EksStack(cdk.Stack):
             resolve_conflicts="OVERWRITE",
         )
 
-        # Add tags for cert-manager add-on
-        cdk.Tags.of(self._cert_manager_addon).add("Component", "cert-manager")
-        cdk.Tags.of(self._cert_manager_addon).add(
-            "Description", "Certificate management for HyperPod Training Operator"
-        )
-
     def _install_hyperpod_helm_chart(self) -> None:
         """Install HyperPod Helm Chart dependencies.
 
@@ -518,7 +512,7 @@ class EksStack(cdk.Stack):
         cdk.CfnOutput(
             self,
             "CertManagerAddonName",
-            value=self._cert_manager_addon.addon_name,
+            value=EKS_ADDON_NAMES.CERT_MANAGER,
             description="cert-manager EKS add-on name",
             export_name=f"{self.env_config.resource_prefix}-cert-manager-addon",
         )
