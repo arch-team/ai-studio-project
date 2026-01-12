@@ -11,7 +11,8 @@ import os
 from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
-from typing import BinaryIO, Iterator, Optional
+from threading import Lock
+from typing import Any, AsyncGenerator, BinaryIO, NoReturn, Optional
 
 import boto3
 from botocore.config import Config
@@ -19,6 +20,14 @@ from botocore.exceptions import ClientError
 from pydantic import BaseModel
 
 from src.core.config import get_settings
+from src.core.exceptions import (
+    S3DeleteError,
+    S3DownloadError,
+    S3Error,
+    S3NotFoundError,
+    S3PermissionError,
+    S3UploadError,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -76,28 +85,33 @@ class S3Client:
         """Initialize S3 client with configuration."""
         self.settings = get_settings()
         self._client = None
-        self._resource = None
+        self._client_lock = Lock()  # 线程安全锁
 
     @property
-    def client(self):
-        """Get or create boto3 S3 client.
+    def client(self) -> Any:
+        """Get or create boto3 S3 client with thread safety.
 
         Returns:
             boto3 S3 client
         """
         if self._client is None:
-            config = Config(
-                region_name=self.settings.aws_region,
-                retries={"max_attempts": 3, "mode": "adaptive"},
-                s3={"addressing_style": "path"},  # Use path-style for compatibility
-            )
+            with self._client_lock:
+                # 双重检查锁定模式
+                if self._client is None:
+                    config = Config(
+                        region_name=self.settings.aws_region,
+                        retries={"max_attempts": 3, "mode": "adaptive"},
+                        s3={
+                            "addressing_style": "path"
+                        },  # Use path-style for compatibility
+                    )
 
-            session_kwargs = {}
-            if self.settings.aws_profile:
-                session_kwargs["profile_name"] = self.settings.aws_profile
+                    session_kwargs = {}
+                    if self.settings.aws_profile:
+                        session_kwargs["profile_name"] = self.settings.aws_profile
 
-            session = boto3.Session(**session_kwargs)
-            self._client = session.client("s3", config=config)
+                    session = boto3.Session(**session_kwargs)
+                    self._client = session.client("s3", config=config)
 
         return self._client
 
@@ -124,6 +138,142 @@ class S3Client:
             raise ValueError(f"Bucket not configured for type: {bucket_type}")
 
         return bucket
+
+    def _create_s3_object_from_response(
+        self,
+        bucket: str,
+        key: str,
+        head_response: dict,
+        content_type: Optional[str] = None,
+    ) -> S3Object:
+        """Create S3Object from head_object response.
+
+        Args:
+            bucket: S3 bucket name
+            key: S3 object key
+            head_response: Response from head_object
+            content_type: Optional content type override
+
+        Returns:
+            S3Object with metadata
+        """
+        return S3Object(
+            key=key,
+            bucket=bucket,
+            size=head_response.get("ContentLength", 0),
+            last_modified=head_response["LastModified"],
+            etag=head_response["ETag"].strip('"'),
+            storage_class=head_response.get("StorageClass", "STANDARD"),
+            content_type=content_type or head_response.get("ContentType"),
+        )
+
+    def _prepare_upload_args(
+        self,
+        content_type: str,
+        storage_class: Optional[StorageTier] = None,
+        metadata: Optional[dict[str, str]] = None,
+    ) -> dict[str, Any]:
+        """Prepare ExtraArgs for S3 upload operations.
+
+        Args:
+            content_type: MIME content type
+            storage_class: Optional storage tier
+            metadata: Optional metadata dictionary
+
+        Returns:
+            Dictionary of extra arguments for upload
+        """
+        extra_args: dict[str, Any] = {
+            "ContentType": content_type,
+            "ServerSideEncryption": "aws:kms",  # SSE-KMS encryption
+        }
+
+        if storage_class:
+            extra_args["StorageClass"] = storage_class.value
+
+        if metadata:
+            extra_args["Metadata"] = metadata
+
+        return extra_args
+
+    def _handle_client_error(
+        self,
+        error: ClientError,
+        operation: str,
+        bucket: Optional[str] = None,
+        key: Optional[str] = None,
+    ) -> NoReturn:
+        """Handle ClientError with appropriate logging and re-raise typed exception.
+
+        Args:
+            error: The ClientError exception
+            operation: Name of the S3 operation that failed
+            bucket: Optional bucket name for context
+            key: Optional object key for context
+
+        Raises:
+            S3NotFoundError: If object not found (404)
+            S3PermissionError: If access denied (403)
+            S3UploadError: If upload operation fails
+            S3DownloadError: If download operation fails
+            S3DeleteError: If delete operation fails
+            S3Error: For all other S3 errors
+        """
+        error_code = error.response.get("Error", {}).get("Code", "")
+        error_message = error.response.get("Error", {}).get("Message", str(error))
+        s3_path = f"s3://{bucket}/{key}" if bucket and key else ""
+
+        logger.error(f"S3 {operation} failed: {error_code} - {error_message}")
+
+        details = {
+            "operation": operation,
+            "error_code": error_code,
+            "bucket": bucket,
+            "key": key,
+        }
+
+        # Map error codes to specific exceptions
+        if error_code in ("404", "NoSuchKey", "NoSuchBucket"):
+            raise S3NotFoundError(
+                message=f"Object not found: {s3_path}" if s3_path else error_message,
+                code=error_code,
+                details=details,
+            )
+
+        if error_code in ("403", "AccessDenied"):
+            raise S3PermissionError(
+                message=f"Access denied: {s3_path}" if s3_path else error_message,
+                code=error_code,
+                details=details,
+            )
+
+        # Map operation to specific exception type
+        operation_lower = operation.lower()
+        if "upload" in operation_lower:
+            raise S3UploadError(
+                message=f"Upload failed: {error_message}",
+                code=error_code,
+                details=details,
+            )
+        if "download" in operation_lower:
+            raise S3DownloadError(
+                message=f"Download failed: {error_message}",
+                code=error_code,
+                details=details,
+            )
+        if "delete" in operation_lower:
+            raise S3DeleteError(
+                message=f"Delete failed: {error_message}",
+                code=error_code,
+                details=details,
+            )
+
+        # Generic S3 error for all other cases
+        raise S3Error(
+            message=f"S3 {operation} failed: {error_message}",
+            code=error_code,
+            details=details,
+        )
 
     async def upload_file(
         self,
@@ -155,48 +305,29 @@ class S3Client:
             raise FileNotFoundError(f"File not found: {file_path}")
 
         try:
-            # Auto-detect content type
+            # Auto-detect content type if not provided
             if not content_type:
-                content_type, _ = mimetypes.guess_type(file_path)
-                content_type = content_type or "application/octet-stream"
+                detected_type, _ = mimetypes.guess_type(file_path)
+                content_type = detected_type or "application/octet-stream"
 
-            extra_args = {
-                "ContentType": content_type,
-                "StorageClass": storage_class.value,
-                "ServerSideEncryption": "aws:kms",  # SSE-KMS encryption
-            }
-
-            if metadata:
-                extra_args["Metadata"] = metadata
+            # Prepare upload arguments
+            extra_args = self._prepare_upload_args(
+                content_type, storage_class, metadata
+            )
 
             # Upload file
             file_size = os.path.getsize(file_path)
-
-            self.client.upload_file(
-                file_path,
-                bucket,
-                key,
-                ExtraArgs=extra_args,
-            )
-
+            self.client.upload_file(file_path, bucket, key, ExtraArgs=extra_args)
             logger.info(f"File uploaded: s3://{bucket}/{key} ({file_size} bytes)")
 
-            # Get object metadata
+            # Get and return object metadata
             head_response = self.client.head_object(Bucket=bucket, Key=key)
-
-            return S3Object(
-                key=key,
-                bucket=bucket,
-                size=file_size,
-                last_modified=head_response["LastModified"],
-                etag=head_response["ETag"].strip('"'),
-                storage_class=storage_class.value,
-                content_type=content_type,
+            return self._create_s3_object_from_response(
+                bucket, key, head_response, content_type
             )
 
         except ClientError as e:
-            logger.error(f"S3 upload failed: {e}")
-            raise RuntimeError(f"S3 upload failed: {e}")
+            self._handle_client_error(e, "upload", bucket, key)
 
     async def upload_fileobj(
         self,
@@ -205,6 +336,7 @@ class S3Client:
         key: str,
         content_type: str = "application/octet-stream",
         metadata: Optional[dict[str, str]] = None,
+        storage_class: StorageTier = StorageTier.STANDARD,
     ) -> S3Object:
         """Upload a file-like object to S3.
 
@@ -214,44 +346,29 @@ class S3Client:
             key: S3 object key
             content_type: MIME type
             metadata: Custom metadata dict
+            storage_class: S3 storage class
 
         Returns:
             S3Object with upload result
         """
         try:
-            extra_args = {
-                "ContentType": content_type,
-                "ServerSideEncryption": "aws:kms",
-            }
-
-            if metadata:
-                extra_args["Metadata"] = metadata
-
-            self.client.upload_fileobj(
-                file_obj,
-                bucket,
-                key,
-                ExtraArgs=extra_args,
+            # Prepare upload arguments
+            extra_args = self._prepare_upload_args(
+                content_type, storage_class, metadata
             )
 
+            # Upload file object
+            self.client.upload_fileobj(file_obj, bucket, key, ExtraArgs=extra_args)
             logger.info(f"File object uploaded: s3://{bucket}/{key}")
 
-            # Get object metadata
+            # Get and return object metadata
             head_response = self.client.head_object(Bucket=bucket, Key=key)
-
-            return S3Object(
-                key=key,
-                bucket=bucket,
-                size=head_response["ContentLength"],
-                last_modified=head_response["LastModified"],
-                etag=head_response["ETag"].strip('"'),
-                storage_class=head_response.get("StorageClass", "STANDARD"),
-                content_type=content_type,
+            return self._create_s3_object_from_response(
+                bucket, key, head_response, content_type
             )
 
         except ClientError as e:
-            logger.error(f"S3 upload failed: {e}")
-            raise RuntimeError(f"S3 upload failed: {e}")
+            self._handle_client_error(e, "upload", bucket, key)
 
     async def download_file(
         self,
@@ -276,17 +393,13 @@ class S3Client:
             # Ensure directory exists
             os.makedirs(os.path.dirname(file_path), exist_ok=True)
 
+            # Download file
             self.client.download_file(bucket, key, file_path)
-
             logger.info(f"File downloaded: s3://{bucket}/{key} -> {file_path}")
             return file_path
 
         except ClientError as e:
-            error_code = e.response.get("Error", {}).get("Code", "")
-            if error_code == "404":
-                raise RuntimeError(f"Object not found: s3://{bucket}/{key}")
-            logger.error(f"S3 download failed: {e}")
-            raise RuntimeError(f"S3 download failed: {e}")
+            self._handle_client_error(e, "download", bucket, key)
 
     async def list_objects(
         self,
@@ -294,7 +407,7 @@ class S3Client:
         prefix: str = "",
         max_keys: int = 1000,
         delimiter: Optional[str] = None,
-    ) -> Iterator[S3Object]:
+    ) -> AsyncGenerator[S3Object, None]:
         """List objects in S3 bucket with pagination.
 
         Args:
@@ -330,8 +443,7 @@ class S3Client:
                     )
 
         except ClientError as e:
-            logger.error(f"S3 list failed: {e}")
-            raise RuntimeError(f"S3 list failed: {e}")
+            self._handle_client_error(e, "list", bucket)
 
     async def delete_object(self, bucket: str, key: str) -> bool:
         """Delete an object from S3.
@@ -349,8 +461,7 @@ class S3Client:
             return True
 
         except ClientError as e:
-            logger.error(f"S3 delete failed: {e}")
-            raise RuntimeError(f"S3 delete failed: {e}")
+            self._handle_client_error(e, "delete", bucket, key)
 
     async def delete_objects(self, bucket: str, keys: list[str]) -> int:
         """Delete multiple objects from S3.
@@ -368,9 +479,10 @@ class S3Client:
         try:
             # S3 delete_objects supports up to 1000 keys per request
             deleted_count = 0
+            batch_size = 1000
 
-            for i in range(0, len(keys), 1000):
-                batch = keys[i : i + 1000]
+            for i in range(0, len(keys), batch_size):
+                batch = keys[i : i + batch_size]
                 response = self.client.delete_objects(
                     Bucket=bucket,
                     Delete={"Objects": [{"Key": k} for k in batch]},
@@ -381,8 +493,7 @@ class S3Client:
             return deleted_count
 
         except ClientError as e:
-            logger.error(f"S3 batch delete failed: {e}")
-            raise RuntimeError(f"S3 batch delete failed: {e}")
+            self._handle_client_error(e, "batch delete", bucket)
 
     async def generate_presigned_url(
         self,
@@ -405,11 +516,11 @@ class S3Client:
             PresignedUrl with the generated URL
         """
         try:
-            client_method = "get_object" if method.upper() == "GET" else "put_object"
+            normalized_method = method.upper()
+            client_method = "get_object" if normalized_method == "GET" else "put_object"
 
             params = {"Bucket": bucket, "Key": key}
-
-            if method.upper() == "PUT" and content_type:
+            if normalized_method == "PUT" and content_type:
                 params["ContentType"] = content_type
 
             url = self.client.generate_presigned_url(
@@ -421,14 +532,13 @@ class S3Client:
             return PresignedUrl(
                 url=url,
                 expires_in=expires_in,
-                method=method.upper(),
+                method=normalized_method,
                 bucket=bucket,
                 key=key,
             )
 
         except ClientError as e:
-            logger.error(f"Failed to generate presigned URL: {e}")
-            raise RuntimeError(f"Failed to generate presigned URL: {e}")
+            self._handle_client_error(e, "generate presigned URL", bucket, key)
 
     async def object_exists(self, bucket: str, key: str) -> bool:
         """Check if an object exists in S3.
@@ -463,21 +573,10 @@ class S3Client:
         """
         try:
             response = self.client.head_object(Bucket=bucket, Key=key)
-
-            return S3Object(
-                key=key,
-                bucket=bucket,
-                size=response["ContentLength"],
-                last_modified=response["LastModified"],
-                etag=response["ETag"].strip('"'),
-                storage_class=response.get("StorageClass", "STANDARD"),
-                content_type=response.get("ContentType"),
-            )
+            return self._create_s3_object_from_response(bucket, key, response)
 
         except ClientError as e:
-            if e.response.get("Error", {}).get("Code") == "404":
-                raise RuntimeError(f"Object not found: s3://{bucket}/{key}")
-            raise RuntimeError(f"Failed to get object metadata: {e}")
+            self._handle_client_error(e, "get object metadata", bucket, key)
 
     async def copy_object(
         self,
@@ -506,20 +605,16 @@ class S3Client:
             if storage_class:
                 extra_args["StorageClass"] = storage_class.value
 
-            self.client.copy(
-                copy_source,
-                dest_bucket,
-                dest_key,
-                ExtraArgs=extra_args,
+            self.client.copy(copy_source, dest_bucket, dest_key, ExtraArgs=extra_args)
+            logger.info(
+                f"Object copied: s3://{source_bucket}/{source_key} -> "
+                f"s3://{dest_bucket}/{dest_key}"
             )
-
-            logger.info(f"Object copied: s3://{source_bucket}/{source_key} -> s3://{dest_bucket}/{dest_key}")
 
             return await self.get_object_metadata(dest_bucket, dest_key)
 
         except ClientError as e:
-            logger.error(f"S3 copy failed: {e}")
-            raise RuntimeError(f"S3 copy failed: {e}")
+            self._handle_client_error(e, "copy", dest_bucket, dest_key)
 
 
 # Singleton instance

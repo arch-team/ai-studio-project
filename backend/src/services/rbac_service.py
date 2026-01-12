@@ -56,7 +56,7 @@ class Permission:
 
     resource_type: ResourceType
     action: Action
-    conditions: Optional[dict] = None  # e.g., {"owner_only": True}
+    conditions: Optional[dict[str, bool]] = None  # e.g., {"owner_only": True}
 
 
 class PermissionResult(BaseModel):
@@ -75,14 +75,31 @@ ROLE_HIERARCHY = {
     Role.ADMIN: 4,
 }
 
+# Kubernetes role mapping
+K8S_ROLE_MAPPING = {
+    Role.ADMIN: "cluster-admin",
+    Role.PROJECT_MANAGER: "admin",
+    Role.ENGINEER: "edit",
+    Role.VIEWER: "view",
+}
+
 # Permission matrix: defines minimum role required for each action
 PERMISSION_MATRIX: dict[ResourceType, dict[Action, tuple[Role, bool]]] = {
     # (minimum_role, owner_can_override)
     ResourceType.TRAINING_JOB: {
         Action.CREATE: (Role.ENGINEER, False),
-        Action.READ: (Role.VIEWER, True),  # Viewers can read, owners can always read their own
-        Action.UPDATE: (Role.ENGINEER, True),  # Engineers can update, owners can update their own
-        Action.DELETE: (Role.PROJECT_MANAGER, True),  # PM+ can delete, owners can delete their own
+        Action.READ: (
+            Role.VIEWER,
+            True,
+        ),  # Viewers can read, owners can always read their own
+        Action.UPDATE: (
+            Role.ENGINEER,
+            True,
+        ),  # Engineers can update, owners can update their own
+        Action.DELETE: (
+            Role.PROJECT_MANAGER,
+            True,
+        ),  # PM+ can delete, owners can delete their own
         Action.LIST: (Role.VIEWER, False),
         Action.EXECUTE: (Role.ENGINEER, True),  # Start, stop, pause, resume
     },
@@ -148,9 +165,13 @@ PERMISSION_MATRIX: dict[ResourceType, dict[Action, tuple[Role, bool]]] = {
 class RBACService:
     """Service for role-based access control."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize RBAC service."""
         self._permission_cache: dict[str, PermissionResult] = {}
+        # 预先计算角色值集合，避免重复生成
+        self._valid_roles: set[str] = {r.value for r in Role}
+        # 预先创建角色字符串到枚举的映射，避免重复转换
+        self._role_enum_map: dict[str, Role] = {r.value: r for r in Role}
 
     def get_role_level(self, role: str) -> int:
         """Get hierarchical level for a role.
@@ -161,10 +182,10 @@ class RBACService:
         Returns:
             Role level (higher = more privileges)
         """
-        try:
-            return ROLE_HIERARCHY.get(Role(role), 0)
-        except ValueError:
-            return 0
+        # 使用预计算的集合和映射，提升性能
+        if role in self._valid_roles:
+            return ROLE_HIERARCHY.get(self._role_enum_map[role], 0)
+        return 0
 
     def has_minimum_role(self, user_role: str, required_role: Role) -> bool:
         """Check if user role meets minimum requirement.
@@ -200,16 +221,16 @@ class RBACService:
         Returns:
             PermissionResult with allowed status and reason
         """
-        # Get permission requirements
-        resource_permissions = PERMISSION_MATRIX.get(resource_type)
-        if not resource_permissions:
-            return PermissionResult(
-                allowed=False,
-                reason=f"Unknown resource type: {resource_type}",
-            )
+        # 获取权限要求，使用更简洁的访问方式
+        action_requirement = PERMISSION_MATRIX.get(resource_type, {}).get(action)
 
-        action_requirement = resource_permissions.get(action)
-        if not action_requirement:
+        if action_requirement is None:
+            # 判断是资源类型错误还是操作错误
+            if resource_type not in PERMISSION_MATRIX:
+                return PermissionResult(
+                    allowed=False,
+                    reason=f"Unknown resource type: {resource_type}",
+                )
             return PermissionResult(
                 allowed=False,
                 reason=f"Unknown action: {action} for resource {resource_type}",
@@ -217,15 +238,15 @@ class RBACService:
 
         minimum_role, owner_can_override = action_requirement
 
-        # Check if user is the owner and owner override is allowed
-        if owner_can_override and resource_owner_id and user_id:
-            if resource_owner_id == user_id:
-                return PermissionResult(
-                    allowed=True,
-                    reason="Owner access granted",
-                )
+        # 检查所有者权限（简化条件判断）
+        is_owner = owner_can_override and resource_owner_id == user_id
+        if is_owner:
+            return PermissionResult(
+                allowed=True,
+                reason="Owner access granted",
+            )
 
-        # Check role hierarchy
+        # 检查角色层级
         if self.has_minimum_role(user_role, minimum_role):
             return PermissionResult(allowed=True)
 
@@ -251,18 +272,22 @@ class RBACService:
         Returns:
             List of allowed actions
         """
-        allowed = []
         resource_permissions = PERMISSION_MATRIX.get(resource_type, {})
 
-        for action, (minimum_role, owner_can_override) in resource_permissions.items():
-            if is_owner and owner_can_override:
-                allowed.append(action)
-            elif self.has_minimum_role(user_role, minimum_role):
-                allowed.append(action)
+        # 使用列表推导式替代循环，更简洁高效
+        return [
+            action
+            for action, (
+                minimum_role,
+                owner_can_override,
+            ) in resource_permissions.items()
+            if (is_owner and owner_can_override)
+            or self.has_minimum_role(user_role, minimum_role)
+        ]
 
-        return allowed
-
-    def get_kubernetes_role_binding(self, user_role: str, namespace: str) -> dict:
+    def get_kubernetes_role_binding(
+        self, user_role: str, namespace: str
+    ) -> dict[str, object]:
         """Generate Kubernetes RoleBinding for user.
 
         Args:
@@ -272,18 +297,8 @@ class RBACService:
         Returns:
             Kubernetes RoleBinding manifest
         """
-        # Map platform roles to Kubernetes ClusterRoles
-        k8s_role_mapping = {
-            Role.ADMIN: "cluster-admin",
-            Role.PROJECT_MANAGER: "admin",
-            Role.ENGINEER: "edit",
-            Role.VIEWER: "view",
-        }
-
-        try:
-            k8s_role = k8s_role_mapping.get(Role(user_role), "view")
-        except ValueError:
-            k8s_role = "view"
+        # 将 k8s 角色映射移到类属性中，避免每次重新创建
+        k8s_role = self._get_k8s_role(user_role)
 
         return {
             "apiVersion": "rbac.authorization.k8s.io/v1",
@@ -298,6 +313,21 @@ class RBACService:
                 "name": k8s_role,
             },
         }
+
+    def _get_k8s_role(self, user_role: str) -> str:
+        """Map platform role to Kubernetes ClusterRole.
+
+        Args:
+            user_role: Platform role string
+
+        Returns:
+            Kubernetes ClusterRole name
+        """
+        # 使用预计算的映射，避免异常处理
+        if user_role in self._valid_roles:
+            role_enum = self._role_enum_map[user_role]
+            return K8S_ROLE_MAPPING.get(role_enum, "view")
+        return "view"
 
 
 # Singleton instance
