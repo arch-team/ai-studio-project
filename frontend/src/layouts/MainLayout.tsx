@@ -10,6 +10,10 @@ interface MainLayoutProps {
   children: ReactNode;
 }
 
+/**
+ * Task: T018 - 创建 Cloudscape Layout
+ * 使用 AppLayout 组件,配置侧边导航和顶部导航
+ */
 const navigationItems = [
   { type: 'link' as const, text: '首页', href: '/' },
   { type: 'divider' as const },
@@ -17,8 +21,8 @@ const navigationItems = [
     type: 'section' as const,
     text: '训练管理',
     items: [
-      { type: 'link' as const, text: '训练任务', href: '/training/jobs' },
-      { type: 'link' as const, text: '模型版本', href: '/training/models' },
+      { type: 'link' as const, text: '训练任务', href: '/training-jobs' },
+      { type: 'link' as const, text: '模型版本', href: '/models' },
     ],
   },
   {
@@ -32,8 +36,8 @@ const navigationItems = [
     type: 'section' as const,
     text: '资源管理',
     items: [
-      { type: 'link' as const, text: '配额管理', href: '/resources/quotas' },
-      { type: 'link' as const, text: '集群监控', href: '/resources/monitoring' },
+      { type: 'link' as const, text: '配额管理', href: '/quotas' },
+      { type: 'link' as const, text: '集群监控', href: '/monitoring' },
     ],
   },
   {
@@ -41,6 +45,16 @@ const navigationItems = [
     text: '开发环境',
     items: [
       { type: 'link' as const, text: 'Spaces', href: '/spaces' },
+    ],
+  },
+  { type: 'divider' as const },
+  {
+    type: 'section' as const,
+    text: '管理',
+    items: [
+      { type: 'link' as const, text: '用户管理', href: '/admin/users' },
+      { type: 'link' as const, text: '审计日志', href: '/admin/audit-logs' },
+      { type: 'link' as const, text: '报告分析', href: '/reports' },
     ],
   },
 ];

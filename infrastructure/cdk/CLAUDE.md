@@ -25,6 +25,9 @@ cdk deploy --context env=staging   # Deploy staging environment
 cdk deploy --context env=prod      # Deploy production environment
 cdk diff                           # Show pending changes
 
+# Deploy specific stack
+cdk deploy ai-platform-dev-network --context env=dev
+
 # Specify account/region via context
 cdk deploy --context env=dev --context account=123456789012 --context region=us-west-2
 
@@ -32,8 +35,18 @@ cdk deploy --context env=dev --context account=123456789012 --context region=us-
 ruff check .                       # Lint
 ruff format .                      # Format
 mypy .                             # Type check
-pytest                             # Run tests
+
+# Testing
+pytest                             # Run all tests
 pytest -m unit                     # Run only unit tests
+pytest -m integration              # Run only integration tests
+pytest tests/unit/test_eks_stack.py -v                    # Run single test file
+pytest tests/unit/test_eks_stack.py::test_function -v    # Run single test
+pytest --cov=stacks --cov=config --cov-report=term-missing  # With coverage
+
+# First-time deployment prerequisites
+./scripts/setup_helm_chart.sh      # Download HyperPod Helm Chart
+cdk bootstrap aws://ACCOUNT_ID/REGION  # Bootstrap CDK (once per account/region)
 ```
 
 ## Architecture
@@ -56,6 +69,33 @@ Layer 4 (Storage):     FsxLustreStack
 Layer 5 (Ingress):     AlbStack
 ```
 
+### Key Patterns
+
+**Constants Usage**: Always use constants from `config/constants.py` instead of hardcoded strings:
+```python
+from config.constants import EKS_ADDON_NAMES, K8S_NAMESPACES, TIMEOUTS
+
+# Good
+addon_name = EKS_ADDON_NAMES.TRAINING_OPERATOR
+namespace = K8S_NAMESPACES.KUBE_SYSTEM
+
+# Avoid
+addon_name = "amazon-sagemaker-hyperpod-training-operator"
+```
+
+**Environment Config Factory Methods**: Use factory methods for environment-specific configs:
+```python
+from config import get_environment_config, EnvironmentConfig
+
+# Via factory function (recommended for app.py)
+config = get_environment_config("dev", account="123456789012", region="us-east-1")
+
+# Via class methods (for specific environments)
+dev_config = EnvironmentConfig.for_dev(account="123456789012")
+```
+
+**Stack Dependencies**: Dependencies are declared via `add_dependency()` in `app.py`. When adding new stacks, ensure proper dependency ordering.
+
 ### Key Files
 
 - `app.py` - CDK app entry point, stack instantiation and CDK Nag suppressions
@@ -69,7 +109,22 @@ Layer 5 (Ingress):     AlbStack
   - `iam_helpers.py` - IAM helper functions
   - `s3_lifecycle.py` - S3 lifecycle policies
   - `outputs.py` - CloudFormation outputs helpers
-- `aspects/` - CDK Aspects (e.g., tagging aspect)
+- `aspects/` - CDK Aspects (tagging aspect applies standard tags to all resources)
+- `tests/conftest.py` - Pytest fixtures (`dev_config`, `cdk_app`, `cdk_env`, etc.)
+
+### Testing Patterns
+
+Tests use `aws_cdk.assertions.Template` for CloudFormation assertions:
+```python
+from aws_cdk.assertions import Template
+from tests.conftest import get_template
+
+def test_something(cdk_app, dev_config, cdk_env):
+    stack = MyStack(cdk_app, "test-stack", env_config=dev_config, env=cdk_env)
+    template = get_template(stack)
+    template.resource_count_is("AWS::S3::Bucket", 1)
+    template.has_resource_properties("AWS::S3::Bucket", {"BucketEncryption": {...}})
+```
 
 ### HyperPod Deployment
 
@@ -99,7 +154,7 @@ Environments configured via `config/environments.py` with factory methods:
 
 EKS Add-on versions managed via `EksAddonVersions`:
 - `EksAddonVersions.for_k8s_1_32()` - Add-on versions for K8s 1.32
-- `EksAddonVersions.for_k8s_1_33()` - Add-on versions for K8s 1.33
+- `EksAddonVersions.for_k8s_1_33()` - Add-on versions for K8s 1.33 (default)
 
 Configuration passed via CDK context: `--context env=dev`
 
@@ -113,3 +168,9 @@ Configuration passed via CDK context: `--context env=dev`
 ### CDK Nag
 
 Security checks via cdk-nag (enabled for staging/prod, skipped for dev). Suppressions centrally managed in `utils/nag_suppressions.py` with documented reasons.
+
+### Resource Protection
+
+- **dev**: `RemovalPolicy.DESTROY`, no deletion protection
+- **staging**: `RemovalPolicy.DESTROY`, deletion protection enabled
+- **prod**: `RemovalPolicy.RETAIN`, deletion protection enabled, termination protection on stacks

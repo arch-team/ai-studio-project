@@ -45,6 +45,25 @@ class Settings(BaseSettings):
     secret_key: str = "dev-secret-key-change-in-production"
     access_token_expire_minutes: int = 30
 
+    # IAM Identity Center (SSO) Configuration
+    sso_enabled: bool = False
+    sso_issuer_url: Optional[str] = None  # IAM Identity Center issuer URL
+    sso_client_id: Optional[str] = None  # OIDC client ID
+    sso_client_secret: Optional[str] = None  # OIDC client secret
+    sso_redirect_uri: Optional[str] = None  # OAuth callback URL
+
+    # Local Authentication (fallback when SSO is disabled)
+    local_auth_enabled: bool = True
+    password_min_length: int = 12
+    password_require_uppercase: bool = True
+    password_require_lowercase: bool = True
+    password_require_digit: bool = True
+    password_require_special: bool = True
+    login_max_attempts: int = 5
+    login_lockout_minutes: int = 30
+    password_expire_days: int = 90
+    password_history_count: int = 5
+
     # CORS
     cors_origins: list[str] = ["http://localhost:5173"]
 

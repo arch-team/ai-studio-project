@@ -164,3 +164,16 @@ Training Operator 需要在带有 sagemaker.amazonaws.com/compute-type: hyperpod
 
 
 当前目录是一个AWS CDK的基础设施即代码的项目，用于创建基于SageMaker HyperPod on EKS的训练平台的AWS服务的部署，仔细分析理解这个项目，画出符合专业、规划的AWS部署架构图，采用AWS标准的图标（icon），最终的部署架构使用drawio格式输出,名为WS部署架构图-cc.drawio
+
+
+
+  # 后端验证
+  cd backend
+  pip install -r requirements.txt
+  alembic upgrade head  # 运行数据库迁移
+  uvicorn src.main:app --reload
+
+  # 前端验证
+  cd frontend
+  npm install
+  npm run dev

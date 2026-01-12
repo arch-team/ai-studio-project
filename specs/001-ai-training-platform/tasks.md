@@ -345,12 +345,12 @@
 **目标**: 创建核心数据模型、企业级认证系统、审计日志基础设施、客户端封装和安全配置
 
 ### 核心数据表迁移
-- [ ] [T009] 创建 users 表迁移 - `backend/alembic/versions/001_create_users.py`,字段: id (UUID), username, email, iam_identity_id, role (enum), status, resource_quota_id (FK)
-- [ ] [T010] 创建 resource_quotas 表迁移 - `backend/alembic/versions/002_create_resource_quotas.py`,字段: id, name, quota_type, max_cpu_cores, max_gpu_count, max_memory_gb, max_storage_gb
-- [ ] [T010b] 创建 resource_limit_configs 表迁移 - `backend/alembic/versions/002b_create_resource_limit_configs.py`,字段: id, config_name, role (enum: admin/project_manager/engineer/viewer), project_id (FK, nullable), max_gpu_per_job, max_cpu_per_job, max_memory_gb_per_job, max_storage_gb_per_job, max_nodes_per_job, priority_default (enum: high/medium/low), created_at, updated_at
-- [ ] [T010a] 创建 audit_logs 表迁移 - `backend/alembic/versions/003_create_audit_logs.py`,字段: id, user_id (FK), operation_type (enum: create/update/delete/login/logout), resource_type (enum: training_job/dataset/model/user/quota/space), resource_id, request_data (JSON), response_data (JSON), ip_address, user_agent, status (enum: success/failed), created_at, expires_at (created_at + 90天)
-- [ ] [T010c] 创建 development_spaces 表迁移 - `backend/alembic/versions/004_create_development_spaces.py`,字段: id (UUID), space_name (VARCHAR 255), owner_id (FK users), instance_type (enum: ml.t3.medium/ml.t3.large/ml.g4dn.xlarge), space_type (enum: jupyter/vscode/rstudio), status (enum: pending/running/stopped/failed/deleted), storage_size_gb (INT), lifecycle_config_arn (VARCHAR), sagemaker_space_arn (VARCHAR), created_at (TIMESTAMP), updated_at (TIMESTAMP), deleted_at (TIMESTAMP, nullable)
-- [ ] [T010d] 创建训练任务状态转换约束 - `backend/alembic/versions/005_training_job_state_constraints.py`,实现数据库级状态转换验证,防止非法状态转换 (如 Completed → Running):
+- [X] [T009] 创建 users 表迁移 - `backend/alembic/versions/001_create_users.py`,字段: id (UUID), username, email, iam_identity_id, role (enum), status, resource_quota_id (FK)
+- [X] [T010] 创建 resource_quotas 表迁移 - `backend/alembic/versions/002_create_resource_quotas.py`,字段: id, name, quota_type, max_cpu_cores, max_gpu_count, max_memory_gb, max_storage_gb
+- [X] [T010b] 创建 resource_limit_configs 表迁移 - `backend/alembic/versions/002b_create_resource_limit_configs.py`,字段: id, config_name, role (enum: admin/project_manager/engineer/viewer), project_id (FK, nullable), max_gpu_per_job, max_cpu_per_job, max_memory_gb_per_job, max_storage_gb_per_job, max_nodes_per_job, priority_default (enum: high/medium/low), created_at, updated_at
+- [X] [T010a] 创建 audit_logs 表迁移 - `backend/alembic/versions/003_create_audit_logs.py`,字段: id, user_id (FK), operation_type (enum: create/update/delete/login/logout), resource_type (enum: training_job/dataset/model/user/quota/space), resource_id, request_data (JSON), response_data (JSON), ip_address, user_agent, status (enum: success/failed), created_at, expires_at (created_at + 90天)
+- [X] [T010c] 创建 development_spaces 表迁移 - `backend/alembic/versions/004_create_development_spaces.py`,字段: id (UUID), space_name (VARCHAR 255), owner_id (FK users), instance_type (enum: ml.t3.medium/ml.t3.large/ml.g4dn.xlarge), space_type (enum: jupyter/vscode/rstudio), status (enum: pending/running/stopped/failed/deleted), storage_size_gb (INT), lifecycle_config_arn (VARCHAR), sagemaker_space_arn (VARCHAR), created_at (TIMESTAMP), updated_at (TIMESTAMP), deleted_at (TIMESTAMP, nullable)
+- [X] [T010d] 创建训练任务状态转换约束 - `backend/alembic/versions/005_training_job_state_constraints.py`,实现数据库级状态转换验证,防止非法状态转换 (如 Completed → Running):
   - **状态转换矩阵表**: 创建 `training_job_state_transitions` 表存储合法状态转换规则 (from_status, to_status, is_allowed),根据 spec.md Training Job State Model L533-547 定义的状态转换规则初始化数据
   - **CHECK 约束**: 在 `training_jobs` 表添加 CHECK 约束验证状态枚举值有效性 (Submitted/Running/Paused/Preempted/Completed/Failed)
   - **更新触发器**: 创建 BEFORE UPDATE 触发器 `validate_training_job_state_transition`,在状态更新前查询状态转换矩阵表,验证 (OLD.status → NEW.status) 是否合法,非法转换抛出异常并记录到审计日志
@@ -360,19 +360,19 @@
   - **参考**: spec.md Training Job State Model 状态转换规则
 
 ### SQLAlchemy 模型
-- [ ] [T011] 创建 SQLAlchemy User 模型 - `backend/src/models/user.py`,使用 Pydantic v2 schema 验证,关联 resource_quotas
-- [ ] [T011c] 创建 Space 模型 - `backend/src/models/space.py`,包含状态转换验证逻辑 (pending → running → stopped),关联 User (owner_id),支持 SageMaker Spaces ARN 存储,实现资源配额检查方法,提供空间生命周期管理接口 (start/stop/delete)
-- [ ] [T012] 创建 SQLAlchemy ResourceQuota 模型 - `backend/src/models/resource_quota.py`,包含配额验证逻辑
-- [ ] [T012b] 创建 ResourceLimitConfig 模型 - `backend/src/models/resource_limit_config.py`,包含限制验证逻辑,关联 User (通过 role),支持项目级和全局级配置 (project_id nullable),实现默认限制查询方法 (根据 user role + project 查找适用配置),提供配额检查和应用默认限制的服务接口
-- [ ] [T012a] 创建 AuditLog 模型 - `backend/src/models/audit_log.py`,包含自动过期逻辑 (expires_at = created_at + 90天),关联 User,支持操作类型和资源类型枚举,实现审计日志查询优化
+- [X] [T011] 创建 SQLAlchemy User 模型 - `backend/src/models/user.py`,使用 Pydantic v2 schema 验证,关联 resource_quotas
+- [X] [T011c] 创建 Space 模型 - `backend/src/models/space.py`,包含状态转换验证逻辑 (pending → running → stopped),关联 User (owner_id),支持 SageMaker Spaces ARN 存储,实现资源配额检查方法,提供空间生命周期管理接口 (start/stop/delete)
+- [X] [T012] 创建 SQLAlchemy ResourceQuota 模型 - `backend/src/models/resource_quota.py`,包含配额验证逻辑
+- [X] [T012b] 创建 ResourceLimitConfig 模型 - `backend/src/models/resource_limit_config.py`,包含限制验证逻辑,关联 User (通过 role),支持项目级和全局级配置 (project_id nullable),实现默认限制查询方法 (根据 user role + project 查找适用配置),提供配额检查和应用默认限制的服务接口
+- [X] [T012a] 创建 AuditLog 模型 - `backend/src/models/audit_log.py`,包含自动过期逻辑 (expires_at = created_at + 90天),关联 User,支持操作类型和资源类型枚举,实现审计日志查询优化
 
 ### 认证中间件
-- [ ] [T013] 实现基础认证中间件 - `backend/src/middleware/auth.py`,验证 IAM Identity Center token,提取用户信息
+- [X] [T013] 实现基础认证中间件 - `backend/src/middleware/auth.py`,验证 IAM Identity Center token,提取用户信息
 
 ### 企业级认证扩展
-- [ ] [T013a] SSO集成实现 - `backend/src/middleware/sso.py`,集成AWS IAM Identity Center (SAML 2.0/OIDC),配置IdP元数据,实现用户自动映射和角色同步
-- [ ] [T013b] RBAC策略管理 - `backend/src/services/rbac_service.py`,定义角色层次 (admin/project_manager/engineer/viewer),实现基于资源的权限检查,集成Kubernetes RBAC
-- [ ] [T013c] 本地账号管理API - `backend/src/api/auth.py`,实现POST/PUT /auth/local-accounts,支持密码重置和账号启用/禁用,作为SSO不可用时的备用认证,包含以下密码安全要求:
+- [X] [T013a] SSO集成实现 - `backend/src/middleware/sso.py`,集成AWS IAM Identity Center (SAML 2.0/OIDC),配置IdP元数据,实现用户自动映射和角色同步
+- [X] [T013b] RBAC策略管理 - `backend/src/services/rbac_service.py`,定义角色层次 (admin/project_manager/engineer/viewer),实现基于资源的权限检查,集成Kubernetes RBAC
+- [X] [T013c] 本地账号管理API - `backend/src/api/auth.py`,实现POST/PUT /auth/local-accounts,支持密码重置和账号启用/禁用,作为SSO不可用时的备用认证,包含以下密码安全要求:
   - **密码强度策略**: 最小长度 12 字符,必须包含大小写字母、数字和特殊字符
   - **密码哈希算法**: 使用 bcrypt (cost factor ≥12) 或 argon2id 存储密码哈希
   - **密码重置安全**: 生成临时令牌 (有效期 15 分钟),通过邮件发送重置链接,令牌使用后立即失效
@@ -384,18 +384,18 @@
   - **参考**: spec.md FR-015 企业级认证和 SC-015 安全标准
 
 ### AWS 客户端封装
-- [ ] [T014] [P] HyperPod SDK 客户端封装 - `backend/src/clients/hyperpod_client.py`,封装 HyperPod Training 模块 API,使用 T000 验证的方法名实现训练任务生命周期管理 (提交、状态查询、暂停/恢复/终止),参考 `docs/hyperpod-sdk-reference.md` 获取准确的方法签名 (依赖 T000)
-- [ ] [T015] [P] S3 客户端封装 - `backend/src/clients/s3_client.py`,封装 boto3 S3 操作 (upload_file, download_file, list_objects),支持 presigned URLs,继承 T008b 配置的 SSE-KMS 默认加密
+- [X] [T014] [P] HyperPod SDK 客户端封装 - `backend/src/clients/hyperpod_client.py`,封装 HyperPod Training 模块 API,使用 T000 验证的方法名实现训练任务生命周期管理 (提交、状态查询、暂停/恢复/终止),参考 `docs/hyperpod-sdk-reference.md` 获取准确的方法签名 (依赖 T000)
+- [X] [T015] [P] S3 客户端封装 - `backend/src/clients/s3_client.py`,封装 boto3 S3 操作 (upload_file, download_file, list_objects),支持 presigned URLs,继承 T008b 配置的 SSE-KMS 默认加密
 
 ### FastAPI 应用配置
-- [ ] [T016] 配置 FastAPI 应用入口 - `backend/src/main.py`,注册路由,配置 CORS,集成认证中间件,配置 OpenAPI docs (TLS 终止由 T008i ALB 处理,应用无需配置 HTTPS)
-- [ ] [T016b] 审计日志中间件 - `backend/src/middleware/audit.py`,拦截所有 API 请求,自动记录操作日志 (user_id, operation_type, resource_type, request/response data),异步写入数据库,确保审计完整性
+- [X] [T016] 配置 FastAPI 应用入口 - `backend/src/main.py`,注册路由,配置 CORS,集成认证中间件,配置 OpenAPI docs (TLS 终止由 T008i ALB 处理,应用无需配置 HTTPS)
+- [X] [T016b] 审计日志中间件 - `backend/src/middleware/audit.py`,拦截所有 API 请求,自动记录操作日志 (user_id, operation_type, resource_type, request/response data),异步写入数据库,确保审计完整性
 
 ### 前端基础配置
-- [ ] [T017] [P] 配置 React Router - `frontend/src/App.tsx`,路由配置 (/training-jobs, /datasets, /admin, /reports, /ide)
-- [ ] [T018] [P] 创建 Cloudscape Layout - `frontend/src/layouts/MainLayout.tsx`,使用 AppLayout 组件,配置侧边导航和顶部导航
-- [ ] [T019] [P] 配置 Zustand store - `frontend/src/store/`,创建 authStore, trainingJobsStore, datasetsStore
-- [ ] [T020] [P] 配置 TanStack Query - `frontend/src/lib/queryClient.ts`,配置全局 query client,设置重试策略和缓存策略
+- [X] [T017] [P] 配置 React Router - `frontend/src/App.tsx`,路由配置 (/training-jobs, /datasets, /admin, /reports, /ide)
+- [X] [T018] [P] 创建 Cloudscape Layout - `frontend/src/layouts/MainLayout.tsx`,使用 AppLayout 组件,配置侧边导航和顶部导航
+- [X] [T019] [P] 配置 Zustand store - `frontend/src/store/`,创建 authStore, trainingJobsStore, datasetsStore
+- [X] [T020] [P] 配置 TanStack Query - `frontend/src/lib/queryClient.ts`,配置全局 query client,设置重试策略和缓存策略
 
 **并行执行机会**:
 - 数据库迁移: T009 → T010 → T010b → T010a → T010c 串行执行 (确保 Alembic 版本号正确)
