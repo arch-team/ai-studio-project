@@ -11,10 +11,14 @@ from datetime import datetime
 
 import structlog
 from fastapi import FastAPI, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from src.core.config import get_settings
+from src.core.exceptions import AppException, get_http_status_code
+from src.schemas.error import ErrorDetail, ErrorResponse, ValidationErrorResponse
 from src.api.v1.router import api_router
 
 # Configure structured logging
@@ -75,20 +79,153 @@ app = FastAPI(
 )
 
 
-# Exception handler for unhandled errors
+# === Exception Handlers ===
+
+
+@app.exception_handler(AppException)
+async def app_exception_handler(request: Request, exc: AppException) -> JSONResponse:
+    """Automatic handler for all AppException subclasses.
+
+    Maps AppException to appropriate HTTP status code and returns
+    standardized error response.
+    """
+    status_code = get_http_status_code(exc)
+    request_id = getattr(request.state, "request_id", None)
+
+    # Structured logging with appropriate level
+    log_method = logger.error if status_code >= 500 else logger.warning
+    log_method(
+        "app_exception",
+        error_type=type(exc).__name__,
+        error_code=exc.code,
+        message=exc.message,
+        details=exc.details,
+        path=str(request.url.path),
+        method=request.method,
+        status_code=status_code,
+        request_id=request_id,
+        exc_info=status_code >= 500,
+    )
+
+    error_response = ErrorResponse(
+        error=type(exc).__name__,
+        message=exc.message,
+        code=exc.code,
+        details=exc.details,
+        request_id=request_id,
+        path=str(request.url.path),
+    )
+
+    headers = {}
+    if status_code == 401:
+        headers["WWW-Authenticate"] = "Bearer"
+
+    return JSONResponse(
+        status_code=status_code,
+        content=error_response.model_dump(mode="json"),
+        headers=headers or None,
+    )
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(
+    request: Request, exc: RequestValidationError
+) -> JSONResponse:
+    """Handle Pydantic validation errors with detailed field information."""
+    request_id = getattr(request.state, "request_id", None)
+
+    error_details = []
+    for error in exc.errors():
+        field_path = ".".join(str(loc) for loc in error["loc"])
+        error_details.append(
+            ErrorDetail(
+                field=field_path,
+                message=error["msg"],
+                code=error["type"],
+            )
+        )
+
+    logger.warning(
+        "validation_error",
+        path=str(request.url.path),
+        method=request.method,
+        errors=[e.model_dump() for e in error_details],
+        request_id=request_id,
+    )
+
+    error_response = ValidationErrorResponse(
+        error="ValidationError",
+        message="Request validation failed",
+        code="VALIDATION_ERROR",
+        details={"error_count": len(error_details)},
+        errors=error_details,
+        request_id=request_id,
+        path=str(request.url.path),
+    )
+
+    return JSONResponse(
+        status_code=422,
+        content=error_response.model_dump(mode="json"),
+    )
+
+
+@app.exception_handler(StarletteHTTPException)
+async def http_exception_handler(
+    request: Request, exc: StarletteHTTPException
+) -> JSONResponse:
+    """Handle HTTPException with standardized format."""
+    request_id = getattr(request.state, "request_id", None)
+
+    logger.warning(
+        "http_exception",
+        status_code=exc.status_code,
+        detail=exc.detail,
+        path=str(request.url.path),
+        method=request.method,
+        request_id=request_id,
+    )
+
+    error_response = ErrorResponse(
+        error="HTTPException",
+        message=str(exc.detail) if exc.detail else "HTTP error",
+        code=f"HTTP_{exc.status_code}",
+        request_id=request_id,
+        path=str(request.url.path),
+    )
+
+    return JSONResponse(
+        status_code=exc.status_code,
+        content=error_response.model_dump(mode="json"),
+        headers=exc.headers,
+    )
+
+
 @app.exception_handler(Exception)
-async def global_exception_handler(request: Request, exc: Exception):
-    """Global exception handler for unhandled errors."""
+async def global_exception_handler(request: Request, exc: Exception) -> JSONResponse:
+    """Global handler for unhandled exceptions."""
+    request_id = getattr(request.state, "request_id", None)
+
     logger.error(
         "unhandled_exception",
-        path=request.url.path,
-        method=request.method,
+        error_type=type(exc).__name__,
         error=str(exc),
+        path=str(request.url.path),
+        method=request.method,
+        request_id=request_id,
         exc_info=True,
     )
+
+    error_response = ErrorResponse(
+        error="InternalServerError",
+        message="An unexpected error occurred",
+        code="INTERNAL_ERROR",
+        request_id=request_id,
+        path=str(request.url.path),
+    )
+
     return JSONResponse(
         status_code=500,
-        content={"detail": "Internal server error"},
+        content=error_response.model_dump(mode="json"),
     )
 
 

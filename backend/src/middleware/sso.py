@@ -14,6 +14,13 @@ from jose import jwt
 from pydantic import BaseModel
 
 from src.core.config import get_settings
+from src.core.exceptions import (
+    SSOConfigurationError,
+    SSODiscoveryError,
+    SSOTokenExchangeError,
+    SSOTokenVerificationError,
+    SSOUserInfoError,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -78,10 +85,15 @@ class SSOClient:
             SSOConfig with IdP metadata
 
         Raises:
-            RuntimeError: If discovery fails
+            SSOConfigurationError: If SSO is not configured
+            SSODiscoveryError: If discovery fails
         """
         if not self.settings.sso_issuer_url:
-            raise RuntimeError("SSO issuer URL not configured")
+            raise SSOConfigurationError(
+                message="SSO issuer URL not configured",
+                code="SSO_NOT_CONFIGURED",
+                details={"required_setting": "sso_issuer_url"},
+            )
 
         discovery_url = f"{self.settings.sso_issuer_url}/.well-known/openid-configuration"
 
@@ -102,8 +114,12 @@ class SSOClient:
                 )
                 return self._config
             except httpx.HTTPError as e:
-                logger.error(f"Failed to discover SSO configuration: {e}")
-                raise RuntimeError(f"SSO discovery failed: {e}")
+                logger.error("sso_discovery_failed", discovery_url=discovery_url, error=str(e))
+                raise SSODiscoveryError(
+                    message="Failed to discover SSO configuration",
+                    code="SSO_DISCOVERY_FAILED",
+                    details={"discovery_url": discovery_url},
+                ) from e
 
     async def get_jwks(self) -> dict[str, Any]:
         """Fetch JSON Web Key Set for token verification.
@@ -131,7 +147,10 @@ class SSOClient:
             Authorization URL to redirect user
         """
         if not self._config:
-            raise RuntimeError("SSO not configured. Call discover_configuration first.")
+            raise SSOConfigurationError(
+                message="SSO not configured. Call discover_configuration first.",
+                code="SSO_NOT_INITIALIZED",
+            )
 
         params = {
             "client_id": self.settings.sso_client_id,
@@ -155,7 +174,7 @@ class SSOClient:
             Token response with access_token, id_token, etc.
 
         Raises:
-            RuntimeError: If token exchange fails
+            SSOTokenExchangeError: If token exchange fails
         """
         if not self._config:
             await self.discover_configuration()
@@ -185,8 +204,11 @@ class SSOClient:
                     scope=data.get("scope"),
                 )
             except httpx.HTTPError as e:
-                logger.error(f"Token exchange failed: {e}")
-                raise RuntimeError(f"Token exchange failed: {e}")
+                logger.error("sso_token_exchange_failed", error=str(e))
+                raise SSOTokenExchangeError(
+                    message="Failed to exchange authorization code for tokens",
+                    code="TOKEN_EXCHANGE_FAILED",
+                ) from e
 
     async def get_userinfo(self, access_token: str) -> SSOUserInfo:
         """Fetch user information from SSO provider.
@@ -198,7 +220,7 @@ class SSOClient:
             SSOUserInfo with user details
 
         Raises:
-            RuntimeError: If userinfo request fails
+            SSOUserInfoError: If userinfo request fails
         """
         if not self._config:
             await self.discover_configuration()
@@ -222,8 +244,11 @@ class SSOClient:
                     roles=data.get("roles", []),
                 )
             except httpx.HTTPError as e:
-                logger.error(f"Userinfo request failed: {e}")
-                raise RuntimeError(f"Userinfo request failed: {e}")
+                logger.error("sso_userinfo_failed", error=str(e))
+                raise SSOUserInfoError(
+                    message="Failed to fetch user information from SSO provider",
+                    code="USERINFO_FAILED",
+                ) from e
 
     def verify_id_token(self, id_token: str, nonce: Optional[str] = None) -> dict[str, Any]:
         """Verify and decode ID token.
@@ -236,10 +261,13 @@ class SSOClient:
             Decoded token claims
 
         Raises:
-            RuntimeError: If verification fails
+            SSOTokenVerificationError: If verification fails
         """
         if not self._jwks:
-            raise RuntimeError("JWKS not loaded. Call get_jwks first.")
+            raise SSOConfigurationError(
+                message="JWKS not loaded. Call get_jwks first.",
+                code="JWKS_NOT_LOADED",
+            )
 
         try:
             # Decode header to get key ID
@@ -254,7 +282,11 @@ class SSOClient:
                     break
 
             if not key:
-                raise RuntimeError(f"Key {kid} not found in JWKS")
+                raise SSOTokenVerificationError(
+                    message=f"Key {kid} not found in JWKS",
+                    code="KEY_NOT_FOUND",
+                    details={"kid": kid},
+                )
 
             # Verify and decode token
             claims = jwt.decode(
@@ -267,12 +299,20 @@ class SSOClient:
 
             # Verify nonce if provided
             if nonce and claims.get("nonce") != nonce:
-                raise RuntimeError("Nonce mismatch")
+                raise SSOTokenVerificationError(
+                    message="Nonce mismatch",
+                    code="NONCE_MISMATCH",
+                )
 
             return claims
+        except SSOTokenVerificationError:
+            raise
         except Exception as e:
-            logger.error(f"ID token verification failed: {e}")
-            raise RuntimeError(f"ID token verification failed: {e}")
+            logger.error("sso_token_verification_failed", error=str(e))
+            raise SSOTokenVerificationError(
+                message=f"ID token verification failed: {e}",
+                code="TOKEN_VERIFICATION_FAILED",
+            ) from e
 
     async def logout_url(self, id_token: Optional[str] = None) -> Optional[str]:
         """Generate logout URL for SSO logout.

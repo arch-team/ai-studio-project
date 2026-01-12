@@ -13,6 +13,7 @@ from jose import JWTError, jwt
 from pydantic import BaseModel
 
 from src.core.config import get_settings
+from src.core.exceptions import AuthenticationError
 
 logger = logging.getLogger(__name__)
 
@@ -43,14 +44,6 @@ class CurrentUser(BaseModel):
     is_authenticated: bool = True
 
 
-class AuthenticationError(Exception):
-    """Custom authentication error."""
-
-    def __init__(self, detail: str, status_code: int = status.HTTP_401_UNAUTHORIZED):
-        self.detail = detail
-        self.status_code = status_code
-
-
 def decode_token(token: str) -> TokenPayload:
     """Decode and validate JWT token.
 
@@ -76,8 +69,12 @@ def decode_token(token: str) -> TokenPayload:
         )
         return TokenPayload(**payload)
     except JWTError as e:
-        logger.warning(f"JWT decode error: {e}")
-        raise AuthenticationError(f"Invalid token: {e}")
+        logger.warning("jwt_decode_error", error=str(e))
+        raise AuthenticationError(
+            message=f"Invalid token: {e}",
+            code="INVALID_TOKEN",
+            details={"reason": str(e)},
+        ) from e
 
 
 async def get_current_user_optional(

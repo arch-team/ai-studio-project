@@ -15,6 +15,13 @@ from typing import Any, Optional
 from pydantic import BaseModel
 
 from src.core.config import get_settings
+from src.core.exceptions import (
+    HyperPodError,
+    HyperPodJobCreationError,
+    HyperPodJobDeletionError,
+    HyperPodJobNotFoundError,
+    HyperPodSDKNotAvailableError,
+)
 
 # HyperPod SDK imports
 # Note: These are the correct imports based on docs/hyperpod-sdk-reference.md
@@ -179,11 +186,14 @@ class HyperPodClient:
             TrainingJobInfo with job details
 
         Raises:
-            RuntimeError: If SDK not available or job creation fails
+            HyperPodSDKNotAvailableError: If SDK not available
+            HyperPodJobCreationError: If job creation fails
         """
         if not HYPERPOD_SDK_AVAILABLE or HyperPodPytorchJob is None:
-            raise RuntimeError(
-                "HyperPod SDK not available. Install with: pip install sagemaker-hyperpod"
+            raise HyperPodSDKNotAvailableError(
+                message="HyperPod SDK not available",
+                code="SDK_NOT_AVAILABLE",
+                details={"install_command": "pip install sagemaker-hyperpod"},
             )
 
         try:
@@ -204,7 +214,11 @@ class HyperPodClient:
                 volumes=volume_configs if volume_configs else None,
             )
 
-            logger.info(f"Training job created: {config.job_name}, status: {job.status}")
+            logger.info(
+                "training_job_created",
+                job_name=config.job_name,
+                status=job.status,
+            )
 
             return TrainingJobInfo(
                 job_name=job.name,
@@ -214,9 +228,22 @@ class HyperPodClient:
                 creation_time=datetime.utcnow(),
             )
 
+        except HyperPodSDKNotAvailableError:
+            raise
         except Exception as e:
-            logger.error(f"Failed to create training job: {e}")
-            raise RuntimeError(f"Failed to create training job: {e}")
+            logger.error(
+                "training_job_creation_failed",
+                job_name=config.job_name,
+                error=str(e),
+            )
+            raise HyperPodJobCreationError(
+                message=f"Failed to create training job: {config.job_name}",
+                code="JOB_CREATION_FAILED",
+                details={
+                    "job_name": config.job_name,
+                    "instance_type": config.instance_type,
+                },
+            ) from e
 
     async def describe_training_job(self, job_name: str) -> TrainingJobInfo:
         """Get details of a training job.
@@ -230,11 +257,14 @@ class HyperPodClient:
             TrainingJobInfo with current job status
 
         Raises:
-            RuntimeError: If SDK not available or job lookup fails
+            HyperPodSDKNotAvailableError: If SDK not available
+            HyperPodJobNotFoundError: If job not found or lookup fails
         """
         if not HYPERPOD_SDK_AVAILABLE or HyperPodPytorchJob is None:
-            raise RuntimeError(
-                "HyperPod SDK not available. Install with: pip install sagemaker-hyperpod"
+            raise HyperPodSDKNotAvailableError(
+                message="HyperPod SDK not available",
+                code="SDK_NOT_AVAILABLE",
+                details={"install_command": "pip install sagemaker-hyperpod"},
             )
 
         try:
@@ -250,9 +280,19 @@ class HyperPodClient:
                 end_time=getattr(job, "end_time", None),
             )
 
+        except HyperPodSDKNotAvailableError:
+            raise
         except Exception as e:
-            logger.error(f"Failed to describe training job: {e}")
-            raise RuntimeError(f"Training job not found or error: {job_name} - {e}")
+            logger.error(
+                "training_job_describe_failed",
+                job_name=job_name,
+                error=str(e),
+            )
+            raise HyperPodJobNotFoundError(
+                message=f"Training job not found: {job_name}",
+                code="JOB_NOT_FOUND",
+                details={"job_name": job_name},
+            ) from e
 
     async def delete_training_job(self, job_name: str) -> TrainingJobInfo:
         """Delete (stop) a training job.
@@ -266,11 +306,14 @@ class HyperPodClient:
             TrainingJobInfo with updated status
 
         Raises:
-            RuntimeError: If SDK not available or delete operation fails
+            HyperPodSDKNotAvailableError: If SDK not available
+            HyperPodJobDeletionError: If delete operation fails
         """
         if not HYPERPOD_SDK_AVAILABLE or HyperPodPytorchJob is None:
-            raise RuntimeError(
-                "HyperPod SDK not available. Install with: pip install sagemaker-hyperpod"
+            raise HyperPodSDKNotAvailableError(
+                message="HyperPod SDK not available",
+                code="SDK_NOT_AVAILABLE",
+                details={"install_command": "pip install sagemaker-hyperpod"},
             )
 
         try:
@@ -278,7 +321,7 @@ class HyperPodClient:
             job = await asyncio.to_thread(HyperPodPytorchJob.get, name=job_name)
             await asyncio.to_thread(job.delete)
 
-            logger.info(f"Training job deleted: {job_name}")
+            logger.info("training_job_deleted", job_name=job_name)
 
             return TrainingJobInfo(
                 job_name=job_name,
@@ -287,9 +330,19 @@ class HyperPodClient:
                 node_count=0,
             )
 
+        except HyperPodSDKNotAvailableError:
+            raise
         except Exception as e:
-            logger.error(f"Failed to delete training job: {e}")
-            raise RuntimeError(f"Failed to delete training job: {e}")
+            logger.error(
+                "training_job_deletion_failed",
+                job_name=job_name,
+                error=str(e),
+            )
+            raise HyperPodJobDeletionError(
+                message=f"Failed to delete training job: {job_name}",
+                code="JOB_DELETION_FAILED",
+                details={"job_name": job_name},
+            ) from e
 
     async def get_training_job_logs(
         self,

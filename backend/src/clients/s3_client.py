@@ -223,7 +223,15 @@ class S3Client:
         error_message = error.response.get("Error", {}).get("Message", str(error))
         s3_path = f"s3://{bucket}/{key}" if bucket and key else ""
 
-        logger.error(f"S3 {operation} failed: {error_code} - {error_message}")
+        # Structured logging
+        logger.error(
+            "s3_operation_failed",
+            operation=operation,
+            error_code=error_code,
+            error_message=error_message,
+            bucket=bucket,
+            key=key,
+        )
 
         details = {
             "operation": operation,
@@ -232,48 +240,48 @@ class S3Client:
             "key": key,
         }
 
-        # Map error codes to specific exceptions
+        # Map error codes to specific exceptions with exception chaining
         if error_code in ("404", "NoSuchKey", "NoSuchBucket"):
             raise S3NotFoundError(
                 message=f"Object not found: {s3_path}" if s3_path else error_message,
                 code=error_code,
                 details=details,
-            )
+            ) from error
 
         if error_code in ("403", "AccessDenied"):
             raise S3PermissionError(
                 message=f"Access denied: {s3_path}" if s3_path else error_message,
                 code=error_code,
                 details=details,
-            )
+            ) from error
 
-        # Map operation to specific exception type
+        # Map operation to specific exception type with exception chaining
         operation_lower = operation.lower()
         if "upload" in operation_lower:
             raise S3UploadError(
                 message=f"Upload failed: {error_message}",
                 code=error_code,
                 details=details,
-            )
+            ) from error
         if "download" in operation_lower:
             raise S3DownloadError(
                 message=f"Download failed: {error_message}",
                 code=error_code,
                 details=details,
-            )
+            ) from error
         if "delete" in operation_lower:
             raise S3DeleteError(
                 message=f"Delete failed: {error_message}",
                 code=error_code,
                 details=details,
-            )
+            ) from error
 
-        # Generic S3 error for all other cases
+        # Generic S3 error for all other cases with exception chaining
         raise S3Error(
             message=f"S3 {operation} failed: {error_message}",
             code=error_code,
             details=details,
-        )
+        ) from error
 
     async def upload_file(
         self,
