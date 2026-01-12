@@ -4,13 +4,13 @@ Provides a consistent exception hierarchy for the entire application,
 improving error handling and enabling better error classification.
 
 Features:
-- Hierarchical exception classes for different error domains
-- Automatic HTTP status code mapping via get_http_status_code()
+- Hierarchical exception classes with built-in HTTP status codes
+- Automatic HTTP status code via http_status class attribute
 - Standard error structure with message, code, and details
 """
 
 from http import HTTPStatus
-from typing import Optional, TYPE_CHECKING
+from typing import ClassVar, Optional, TYPE_CHECKING
 
 if TYPE_CHECKING:
     pass  # Future type imports if needed
@@ -21,7 +21,12 @@ class AppException(Exception):
 
     All custom exceptions should inherit from this class to enable
     unified exception handling and error classification.
+
+    Subclasses can override http_status to specify their HTTP status code.
     """
+
+    # 默认 HTTP 状态码，子类可覆盖
+    http_status: ClassVar[int] = HTTPStatus.INTERNAL_SERVER_ERROR
 
     def __init__(
         self,
@@ -46,124 +51,124 @@ class AppException(Exception):
 class AuthenticationError(AppException):
     """Raised when authentication fails."""
 
-    pass
+    http_status: ClassVar[int] = HTTPStatus.UNAUTHORIZED
 
 
 class AuthorizationError(AppException):
     """Raised when user lacks permission for an action."""
 
-    pass
+    http_status: ClassVar[int] = HTTPStatus.FORBIDDEN
 
 
 class InvalidCredentialsError(AuthenticationError):
     """Raised when login credentials are invalid."""
 
-    pass
+    pass  # 继承 401 UNAUTHORIZED
 
 
 class AccountLockedError(AuthenticationError):
     """Raised when account is locked due to failed login attempts."""
 
-    pass
+    http_status: ClassVar[int] = HTTPStatus.TOO_MANY_REQUESTS  # 429
 
 
 class AccountDisabledError(AuthenticationError):
     """Raised when account is disabled."""
 
-    pass
+    http_status: ClassVar[int] = HTTPStatus.FORBIDDEN  # 403
 
 
 class PasswordExpiredError(AuthenticationError):
     """Raised when password has expired."""
 
-    pass
+    pass  # 继承 401 UNAUTHORIZED
 
 
 class TokenError(AuthenticationError):
     """Raised for token-related errors (invalid, expired, etc.)."""
 
-    pass
+    pass  # 继承 401 UNAUTHORIZED
 
 
 # Resource Exceptions
 class ResourceNotFoundError(AppException):
     """Raised when a requested resource is not found."""
 
-    pass
+    http_status: ClassVar[int] = HTTPStatus.NOT_FOUND
 
 
 class ResourceConflictError(AppException):
     """Raised when a resource conflict occurs (e.g., duplicate)."""
 
-    pass
+    http_status: ClassVar[int] = HTTPStatus.CONFLICT
 
 
 class ResourceValidationError(AppException):
     """Raised when resource validation fails."""
 
-    pass
+    http_status: ClassVar[int] = HTTPStatus.BAD_REQUEST
 
 
 # S3/Storage Exceptions
 class StorageError(AppException):
     """Base exception for storage operations."""
 
-    pass
+    pass  # 继承 500 INTERNAL_SERVER_ERROR
 
 
 class S3Error(StorageError):
     """Base exception for S3 operations."""
 
-    pass
+    pass  # 继承 500 INTERNAL_SERVER_ERROR
 
 
 class S3NotFoundError(S3Error):
     """Raised when S3 object is not found."""
 
-    pass
+    http_status: ClassVar[int] = HTTPStatus.NOT_FOUND
 
 
 class S3PermissionError(S3Error):
     """Raised when S3 permission is denied."""
 
-    pass
+    http_status: ClassVar[int] = HTTPStatus.FORBIDDEN
 
 
 class S3UploadError(S3Error):
     """Raised when S3 upload fails."""
 
-    pass
+    pass  # 继承 500 INTERNAL_SERVER_ERROR
 
 
 class S3DownloadError(S3Error):
     """Raised when S3 download fails."""
 
-    pass
+    pass  # 继承 500 INTERNAL_SERVER_ERROR
 
 
 class S3DeleteError(S3Error):
     """Raised when S3 delete fails."""
 
-    pass
+    pass  # 继承 500 INTERNAL_SERVER_ERROR
 
 
 # Validation Exceptions
 class ValidationError(AppException):
     """Raised when input validation fails."""
 
-    pass
+    http_status: ClassVar[int] = HTTPStatus.BAD_REQUEST
 
 
 class PasswordValidationError(ValidationError):
     """Raised when password doesn't meet policy requirements."""
 
-    pass
+    pass  # 继承 400 BAD_REQUEST
 
 
 class PasswordHistoryError(ValidationError):
     """Raised when new password matches a recent password."""
 
-    pass
+    pass  # 继承 400 BAD_REQUEST
 
 
 class PasswordResetTokenError(ValidationError):
@@ -173,144 +178,95 @@ class PasswordResetTokenError(ValidationError):
     as password reset is a validation scenario, not authentication.
     """
 
-    pass
+    pass  # 继承 400 BAD_REQUEST
 
 
 # Service Exceptions
 class ServiceUnavailableError(AppException):
     """Raised when an external service is unavailable."""
 
-    pass
+    http_status: ClassVar[int] = HTTPStatus.SERVICE_UNAVAILABLE
 
 
 class ConfigurationError(AppException):
     """Raised when configuration is invalid or missing."""
 
-    pass
+    http_status: ClassVar[int] = HTTPStatus.SERVICE_UNAVAILABLE
 
 
 # SSO Exceptions
 class SSOError(AppException):
     """Base exception for SSO operations."""
 
-    pass
+    http_status: ClassVar[int] = HTTPStatus.BAD_GATEWAY
 
 
 class SSOConfigurationError(SSOError):
     """Raised when SSO configuration is missing or invalid."""
 
-    pass
+    http_status: ClassVar[int] = HTTPStatus.SERVICE_UNAVAILABLE
 
 
 class SSODiscoveryError(SSOError):
     """Raised when OIDC discovery fails."""
 
-    pass
+    pass  # 继承 502 BAD_GATEWAY
 
 
 class SSOTokenExchangeError(SSOError):
     """Raised when token exchange fails."""
 
-    pass
+    pass  # 继承 502 BAD_GATEWAY
 
 
 class SSOUserInfoError(SSOError):
     """Raised when userinfo request fails."""
 
-    pass
+    pass  # 继承 502 BAD_GATEWAY
 
 
 class SSOTokenVerificationError(SSOError):
     """Raised when ID token verification fails."""
 
-    pass
+    pass  # 继承 502 BAD_GATEWAY
 
 
 # HyperPod Exceptions
 class HyperPodError(AppException):
     """Base exception for HyperPod operations."""
 
-    pass
+    pass  # 继承 500 INTERNAL_SERVER_ERROR
 
 
 class HyperPodSDKNotAvailableError(HyperPodError):
     """Raised when HyperPod SDK is not installed."""
 
-    pass
+    http_status: ClassVar[int] = HTTPStatus.SERVICE_UNAVAILABLE
 
 
 class HyperPodJobCreationError(HyperPodError):
     """Raised when training job creation fails."""
 
-    pass
+    pass  # 继承 500 INTERNAL_SERVER_ERROR
 
 
 class HyperPodJobNotFoundError(HyperPodError):
     """Raised when training job is not found."""
 
-    pass
+    http_status: ClassVar[int] = HTTPStatus.NOT_FOUND
 
 
 class HyperPodJobDeletionError(HyperPodError):
     """Raised when training job deletion fails."""
 
-    pass
-
-
-# HTTP Status Code Mapping
-# Maps exception types to HTTP status codes using Method Resolution Order (MRO)
-HTTP_STATUS_MAPPING: dict[type, int] = {
-    # 400 Bad Request - Validation errors
-    ValidationError: HTTPStatus.BAD_REQUEST,
-    PasswordValidationError: HTTPStatus.BAD_REQUEST,
-    PasswordHistoryError: HTTPStatus.BAD_REQUEST,
-    PasswordResetTokenError: HTTPStatus.BAD_REQUEST,
-    ResourceValidationError: HTTPStatus.BAD_REQUEST,
-    # 401 Unauthorized - Authentication errors
-    AuthenticationError: HTTPStatus.UNAUTHORIZED,
-    InvalidCredentialsError: HTTPStatus.UNAUTHORIZED,
-    TokenError: HTTPStatus.UNAUTHORIZED,
-    PasswordExpiredError: HTTPStatus.UNAUTHORIZED,
-    # 403 Forbidden - Authorization errors
-    AuthorizationError: HTTPStatus.FORBIDDEN,
-    AccountDisabledError: HTTPStatus.FORBIDDEN,
-    S3PermissionError: HTTPStatus.FORBIDDEN,
-    # 404 Not Found - Resource not found errors
-    ResourceNotFoundError: HTTPStatus.NOT_FOUND,
-    S3NotFoundError: HTTPStatus.NOT_FOUND,
-    HyperPodJobNotFoundError: HTTPStatus.NOT_FOUND,
-    # 409 Conflict - Resource conflict errors
-    ResourceConflictError: HTTPStatus.CONFLICT,
-    # 429 Too Many Requests - Rate limiting
-    AccountLockedError: HTTPStatus.TOO_MANY_REQUESTS,
-    # 500 Internal Server Error - Server-side errors
-    StorageError: HTTPStatus.INTERNAL_SERVER_ERROR,
-    S3Error: HTTPStatus.INTERNAL_SERVER_ERROR,
-    S3UploadError: HTTPStatus.INTERNAL_SERVER_ERROR,
-    S3DownloadError: HTTPStatus.INTERNAL_SERVER_ERROR,
-    S3DeleteError: HTTPStatus.INTERNAL_SERVER_ERROR,
-    HyperPodError: HTTPStatus.INTERNAL_SERVER_ERROR,
-    HyperPodJobCreationError: HTTPStatus.INTERNAL_SERVER_ERROR,
-    HyperPodJobDeletionError: HTTPStatus.INTERNAL_SERVER_ERROR,
-    # 502 Bad Gateway - External service errors
-    SSOError: HTTPStatus.BAD_GATEWAY,
-    SSODiscoveryError: HTTPStatus.BAD_GATEWAY,
-    SSOTokenExchangeError: HTTPStatus.BAD_GATEWAY,
-    SSOUserInfoError: HTTPStatus.BAD_GATEWAY,
-    SSOTokenVerificationError: HTTPStatus.BAD_GATEWAY,
-    # 503 Service Unavailable - Service configuration errors
-    ServiceUnavailableError: HTTPStatus.SERVICE_UNAVAILABLE,
-    SSOConfigurationError: HTTPStatus.SERVICE_UNAVAILABLE,
-    HyperPodSDKNotAvailableError: HTTPStatus.SERVICE_UNAVAILABLE,
-    ConfigurationError: HTTPStatus.SERVICE_UNAVAILABLE,
-}
+    pass  # 继承 500 INTERNAL_SERVER_ERROR
 
 
 def get_http_status_code(exc: AppException) -> int:
     """Get HTTP status code for an exception.
 
-    Uses Method Resolution Order (MRO) to find the most specific mapping.
-    Falls back to 500 Internal Server Error if no mapping is found.
+    Uses the http_status class attribute defined on the exception class.
+    Falls back to 500 Internal Server Error if no attribute is found.
 
     Args:
         exc: Application exception instance
@@ -318,7 +274,4 @@ def get_http_status_code(exc: AppException) -> int:
     Returns:
         HTTP status code as integer
     """
-    for exc_type in type(exc).__mro__:
-        if exc_type in HTTP_STATUS_MAPPING:
-            return HTTP_STATUS_MAPPING[exc_type]
-    return HTTPStatus.INTERNAL_SERVER_ERROR
+    return getattr(exc, "http_status", HTTPStatus.INTERNAL_SERVER_ERROR)

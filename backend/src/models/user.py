@@ -30,12 +30,55 @@ class UserStatus(str, PyEnum):
 
 
 class UserRole(str, PyEnum):
-    """用户角色枚举 (与 RBAC 策略对应)."""
+    """用户角色枚举 (与 RBAC 策略对应).
+
+    角色层级: ADMIN > PROJECT_MANAGER > ENGINEER > VIEWER
+    支持比较运算符: admin >= viewer → True
+    """
 
     ADMIN = "admin"
     PROJECT_MANAGER = "project_manager"
     ENGINEER = "engineer"
     VIEWER = "viewer"
+
+    @classmethod
+    def get_hierarchy(cls) -> dict["UserRole", int]:
+        """获取角色层级映射 (数值越高权限越大)."""
+        return {
+            cls.ADMIN: 4,
+            cls.PROJECT_MANAGER: 3,
+            cls.ENGINEER: 2,
+            cls.VIEWER: 1,
+        }
+
+    @classmethod
+    def get_level(cls, role: "UserRole") -> int:
+        """获取指定角色的层级数值."""
+        return cls.get_hierarchy().get(role, 0)
+
+    def __ge__(self, other: "UserRole") -> bool:
+        """比较运算符: 判断当前角色层级是否 >= 另一角色."""
+        if not isinstance(other, UserRole):
+            return NotImplemented
+        return self.get_level(self) >= self.get_level(other)
+
+    def __gt__(self, other: "UserRole") -> bool:
+        """比较运算符: 判断当前角色层级是否 > 另一角色."""
+        if not isinstance(other, UserRole):
+            return NotImplemented
+        return self.get_level(self) > self.get_level(other)
+
+    def __le__(self, other: "UserRole") -> bool:
+        """比较运算符: 判断当前角色层级是否 <= 另一角色."""
+        if not isinstance(other, UserRole):
+            return NotImplemented
+        return self.get_level(self) <= self.get_level(other)
+
+    def __lt__(self, other: "UserRole") -> bool:
+        """比较运算符: 判断当前角色层级是否 < 另一角色."""
+        if not isinstance(other, UserRole):
+            return NotImplemented
+        return self.get_level(self) < self.get_level(other)
 
 
 class User(Base):
@@ -174,10 +217,4 @@ class User(Base):
         Returns:
             True if user has sufficient permissions
         """
-        role_hierarchy = {
-            UserRole.ADMIN: 4,
-            UserRole.PROJECT_MANAGER: 3,
-            UserRole.ENGINEER: 2,
-            UserRole.VIEWER: 1,
-        }
-        return role_hierarchy.get(self.role, 0) >= role_hierarchy.get(required_role, 0)
+        return self.role >= required_role

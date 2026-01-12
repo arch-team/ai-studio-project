@@ -5,7 +5,6 @@ Task: T016 - 配置 FastAPI 应用入口
 (TLS 终止由 T008i ALB 处理,应用无需配置 HTTPS)
 """
 
-import logging
 from contextlib import asynccontextmanager
 from datetime import datetime
 

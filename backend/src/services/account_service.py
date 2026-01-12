@@ -16,6 +16,7 @@ from src.core.exceptions import (
     ResourceConflictError,
     ResourceNotFoundError,
 )
+from src.core.singleton import create_singleton_getter
 from src.services.password_service import PasswordService, get_password_service
 
 logger = logging.getLogger(__name__)
@@ -380,17 +381,5 @@ class AccountService:
         logger.info(f"Password reset completed for: {email}")
 
 
-# Singleton instance
-_account_service: Optional[AccountService] = None
-
-
-def get_account_service() -> AccountService:
-    """Get or create account service singleton.
-
-    Returns:
-        AccountService instance
-    """
-    global _account_service
-    if _account_service is None:
-        _account_service = AccountService()
-    return _account_service
+# Singleton instance - 使用通用单例工厂
+get_account_service = create_singleton_getter(AccountService)

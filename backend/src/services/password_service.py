@@ -14,6 +14,7 @@ from passlib.context import CryptContext
 
 from src.core.config import get_settings
 from src.core.exceptions import PasswordHistoryError, PasswordValidationError
+from src.core.singleton import create_singleton_getter
 
 logger = logging.getLogger(__name__)
 
@@ -78,6 +79,27 @@ class PasswordPolicy:
                 code="PASSWORD_POLICY_VIOLATION",
                 details={"violations": violations},
             )
+        return password
+
+    @staticmethod
+    def as_pydantic_validator(password: str) -> str:
+        """Pydantic field_validator 专用入口.
+
+        与 validate_or_raise 类似，但抛出 ValueError 而非 PasswordValidationError，
+        以符合 Pydantic 的验证器约定。
+
+        Args:
+            password: Password to validate
+
+        Returns:
+            Validated password
+
+        Raises:
+            ValueError: If password doesn't meet policy requirements
+        """
+        is_valid, violations = PasswordPolicy.validate(password)
+        if not is_valid:
+            raise ValueError("; ".join(violations))
         return password
 
 
@@ -175,17 +197,5 @@ class PasswordService:
         return password_changed_at + timedelta(days=settings.password_expire_days)
 
 
-# Singleton instance
-_password_service: Optional[PasswordService] = None
-
-
-def get_password_service() -> PasswordService:
-    """Get or create password service singleton.
-
-    Returns:
-        PasswordService instance
-    """
-    global _password_service
-    if _password_service is None:
-        _password_service = PasswordService()
-    return _password_service
+# Singleton instance - 使用通用单例工厂
+get_password_service = create_singleton_getter(PasswordService)

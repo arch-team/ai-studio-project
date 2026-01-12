@@ -12,16 +12,13 @@ from typing import Optional
 
 from pydantic import BaseModel
 
+from src.core.singleton import create_singleton_getter
+from src.models.user import UserRole
+
 logger = logging.getLogger(__name__)
 
-
-class Role(str, Enum):
-    """Platform roles with hierarchical permissions."""
-
-    ADMIN = "admin"
-    PROJECT_MANAGER = "project_manager"
-    ENGINEER = "engineer"
-    VIEWER = "viewer"
+# 使用 UserRole 作为角色枚举的权威定义，保持向后兼容
+Role = UserRole
 
 
 class ResourceType(str, Enum):
@@ -68,12 +65,8 @@ class PermissionResult(BaseModel):
 
 
 # Role hierarchy (higher number = more privileges)
-ROLE_HIERARCHY = {
-    Role.VIEWER: 1,
-    Role.ENGINEER: 2,
-    Role.PROJECT_MANAGER: 3,
-    Role.ADMIN: 4,
-}
+# 使用 UserRole 的权威定义，保持向后兼容
+ROLE_HIERARCHY = UserRole.get_hierarchy()
 
 # Kubernetes role mapping
 K8S_ROLE_MAPPING = {
@@ -330,17 +323,5 @@ class RBACService:
         return "view"
 
 
-# Singleton instance
-_rbac_service: Optional[RBACService] = None
-
-
-def get_rbac_service() -> RBACService:
-    """Get or create RBAC service singleton.
-
-    Returns:
-        RBACService instance
-    """
-    global _rbac_service
-    if _rbac_service is None:
-        _rbac_service = RBACService()
-    return _rbac_service
+# Singleton instance - 使用通用单例工厂
+get_rbac_service = create_singleton_getter(RBACService)

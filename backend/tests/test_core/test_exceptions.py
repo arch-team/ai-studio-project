@@ -39,7 +39,6 @@ from src.core.exceptions import (
     HyperPodJobCreationError,
     HyperPodJobNotFoundError,
     HyperPodJobDeletionError,
-    HTTP_STATUS_MAPPING,
     get_http_status_code,
 )
 
@@ -78,7 +77,7 @@ class TestAppException:
 
 
 class TestHTTPStatusMapping:
-    """Test HTTP_STATUS_MAPPING coverage and correctness."""
+    """Test http_status class attribute coverage and correctness."""
 
     @pytest.mark.parametrize(
         "exc_class,expected_status",
@@ -128,10 +127,10 @@ class TestHTTPStatusMapping:
             (ConfigurationError, HTTPStatus.SERVICE_UNAVAILABLE),
         ],
     )
-    def test_status_mapping_exists(self, exc_class, expected_status):
-        """Test that each exception class has correct status mapping."""
-        assert exc_class in HTTP_STATUS_MAPPING
-        assert HTTP_STATUS_MAPPING[exc_class] == expected_status
+    def test_status_mapping_via_http_status_attr(self, exc_class, expected_status):
+        """Test that each exception class has correct http_status attribute."""
+        assert hasattr(exc_class, "http_status")
+        assert exc_class.http_status == expected_status
 
 
 class TestGetHttpStatusCode:

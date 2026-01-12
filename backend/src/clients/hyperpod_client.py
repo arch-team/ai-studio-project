@@ -16,7 +16,6 @@ from pydantic import BaseModel
 
 from src.core.config import get_settings
 from src.core.exceptions import (
-    HyperPodError,
     HyperPodJobCreationError,
     HyperPodJobDeletionError,
     HyperPodJobNotFoundError,

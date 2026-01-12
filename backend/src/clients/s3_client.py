@@ -5,12 +5,14 @@ Task: T015 - S3 客户端封装
 支持 presigned URLs,继承 T008b 配置的 SSE-KMS 默认加密
 """
 
+import asyncio
 import logging
 import mimetypes
 import os
 from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
+from functools import partial
 from threading import Lock
 from typing import Any, AsyncGenerator, BinaryIO, NoReturn, Optional
 
@@ -323,13 +325,26 @@ class S3Client:
                 content_type, storage_class, metadata
             )
 
-            # Upload file
+            # Upload file - 使用 run_in_executor 避免阻塞事件循环
             file_size = os.path.getsize(file_path)
-            self.client.upload_file(file_path, bucket, key, ExtraArgs=extra_args)
+            loop = asyncio.get_event_loop()
+            await loop.run_in_executor(
+                None,  # 使用默认线程池
+                partial(
+                    self.client.upload_file,
+                    file_path,
+                    bucket,
+                    key,
+                    ExtraArgs=extra_args,
+                ),
+            )
             logger.info(f"File uploaded: s3://{bucket}/{key} ({file_size} bytes)")
 
-            # Get and return object metadata
-            head_response = self.client.head_object(Bucket=bucket, Key=key)
+            # Get and return object metadata - 同样使用 run_in_executor
+            head_response = await loop.run_in_executor(
+                None,
+                partial(self.client.head_object, Bucket=bucket, Key=key),
+            )
             return self._create_s3_object_from_response(
                 bucket, key, head_response, content_type
             )
@@ -365,12 +380,25 @@ class S3Client:
                 content_type, storage_class, metadata
             )
 
-            # Upload file object
-            self.client.upload_fileobj(file_obj, bucket, key, ExtraArgs=extra_args)
+            # Upload file object - 使用 run_in_executor 避免阻塞事件循环
+            loop = asyncio.get_event_loop()
+            await loop.run_in_executor(
+                None,
+                partial(
+                    self.client.upload_fileobj,
+                    file_obj,
+                    bucket,
+                    key,
+                    ExtraArgs=extra_args,
+                ),
+            )
             logger.info(f"File object uploaded: s3://{bucket}/{key}")
 
             # Get and return object metadata
-            head_response = self.client.head_object(Bucket=bucket, Key=key)
+            head_response = await loop.run_in_executor(
+                None,
+                partial(self.client.head_object, Bucket=bucket, Key=key),
+            )
             return self._create_s3_object_from_response(
                 bucket, key, head_response, content_type
             )
@@ -401,8 +429,12 @@ class S3Client:
             # Ensure directory exists
             os.makedirs(os.path.dirname(file_path), exist_ok=True)
 
-            # Download file
-            self.client.download_file(bucket, key, file_path)
+            # Download file - 使用 run_in_executor 避免阻塞事件循环
+            loop = asyncio.get_event_loop()
+            await loop.run_in_executor(
+                None,
+                partial(self.client.download_file, bucket, key, file_path),
+            )
             logger.info(f"File downloaded: s3://{bucket}/{key} -> {file_path}")
             return file_path
 
@@ -464,7 +496,11 @@ class S3Client:
             True if deleted successfully
         """
         try:
-            self.client.delete_object(Bucket=bucket, Key=key)
+            loop = asyncio.get_event_loop()
+            await loop.run_in_executor(
+                None,
+                partial(self.client.delete_object, Bucket=bucket, Key=key),
+            )
             logger.info(f"Object deleted: s3://{bucket}/{key}")
             return True
 
@@ -488,12 +524,17 @@ class S3Client:
             # S3 delete_objects supports up to 1000 keys per request
             deleted_count = 0
             batch_size = 1000
+            loop = asyncio.get_event_loop()
 
             for i in range(0, len(keys), batch_size):
                 batch = keys[i : i + batch_size]
-                response = self.client.delete_objects(
-                    Bucket=bucket,
-                    Delete={"Objects": [{"Key": k} for k in batch]},
+                response = await loop.run_in_executor(
+                    None,
+                    partial(
+                        self.client.delete_objects,
+                        Bucket=bucket,
+                        Delete={"Objects": [{"Key": k} for k in batch]},
+                    ),
                 )
                 deleted_count += len(response.get("Deleted", []))
 
@@ -559,7 +600,11 @@ class S3Client:
             True if object exists
         """
         try:
-            self.client.head_object(Bucket=bucket, Key=key)
+            loop = asyncio.get_event_loop()
+            await loop.run_in_executor(
+                None,
+                partial(self.client.head_object, Bucket=bucket, Key=key),
+            )
             return True
         except ClientError as e:
             if e.response.get("Error", {}).get("Code") == "404":
@@ -580,7 +625,11 @@ class S3Client:
             RuntimeError: If object not found
         """
         try:
-            response = self.client.head_object(Bucket=bucket, Key=key)
+            loop = asyncio.get_event_loop()
+            response = await loop.run_in_executor(
+                None,
+                partial(self.client.head_object, Bucket=bucket, Key=key),
+            )
             return self._create_s3_object_from_response(bucket, key, response)
 
         except ClientError as e:
@@ -613,7 +662,17 @@ class S3Client:
             if storage_class:
                 extra_args["StorageClass"] = storage_class.value
 
-            self.client.copy(copy_source, dest_bucket, dest_key, ExtraArgs=extra_args)
+            loop = asyncio.get_event_loop()
+            await loop.run_in_executor(
+                None,
+                partial(
+                    self.client.copy,
+                    copy_source,
+                    dest_bucket,
+                    dest_key,
+                    ExtraArgs=extra_args,
+                ),
+            )
             logger.info(
                 f"Object copied: s3://{source_bucket}/{source_key} -> "
                 f"s3://{dest_bucket}/{dest_key}"

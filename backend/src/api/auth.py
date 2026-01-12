@@ -21,6 +21,7 @@ from src.core.exceptions import (
     ResourceConflictError,
 )
 from src.middleware.auth import CurrentUser, get_current_user, require_role
+from src.models.user import UserRole
 from src.services.account_service import AccountService, get_account_service
 from src.services.password_service import PasswordPolicy, PasswordService, get_password_service
 
@@ -28,8 +29,8 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
-# Valid roles for the platform
-VALID_ROLES = ["admin", "project_manager", "engineer", "viewer"]
+# Valid roles for the platform - 使用 UserRole 枚举生成
+VALID_ROLES = [role.value for role in UserRole]
 
 
 def validate_role(role: Optional[str], required: bool = True) -> Optional[str]:
@@ -54,24 +55,6 @@ def validate_role(role: Optional[str], required: bool = True) -> Optional[str]:
     return role
 
 
-def validate_password_field(password: str) -> str:
-    """Validate password against policy for Pydantic models.
-
-    Args:
-        password: Password to validate
-
-    Returns:
-        Validated password
-
-    Raises:
-        ValueError: If password doesn't meet policy requirements
-    """
-    is_valid, violations = PasswordPolicy.validate(password)
-    if not is_valid:
-        raise ValueError("; ".join(violations))
-    return password
-
-
 # Request/Response models
 class LocalAccountCreate(BaseModel):
     """Request to create a local account."""
@@ -94,7 +77,7 @@ class LocalAccountCreate(BaseModel):
     @field_validator("password")
     @classmethod
     def validate_password(cls, v: str) -> str:
-        return validate_password_field(v)
+        return PasswordPolicy.as_pydantic_validator(v)
 
     @field_validator("role")
     @classmethod
@@ -124,7 +107,7 @@ class PasswordChange(BaseModel):
     @field_validator("new_password")
     @classmethod
     def validate_new_password(cls, v: str) -> str:
-        return validate_password_field(v)
+        return PasswordPolicy.as_pydantic_validator(v)
 
 
 class PasswordResetRequest(BaseModel):
@@ -142,7 +125,7 @@ class PasswordResetConfirm(BaseModel):
     @field_validator("new_password")
     @classmethod
     def validate_new_password(cls, v: str) -> str:
-        return validate_password_field(v)
+        return PasswordPolicy.as_pydantic_validator(v)
 
 
 class LocalAccountResponse(BaseModel):
