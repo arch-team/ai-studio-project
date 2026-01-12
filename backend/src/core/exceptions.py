@@ -166,6 +166,16 @@ class PasswordHistoryError(ValidationError):
     pass
 
 
+class PasswordResetTokenError(ValidationError):
+    """Raised when password reset token is invalid or expired.
+
+    Distinct from TokenError to use 400 status instead of 401,
+    as password reset is a validation scenario, not authentication.
+    """
+
+    pass
+
+
 # Service Exceptions
 class ServiceUnavailableError(AppException):
     """Raised when an external service is unavailable."""
@@ -254,6 +264,7 @@ HTTP_STATUS_MAPPING: dict[type, int] = {
     ValidationError: HTTPStatus.BAD_REQUEST,
     PasswordValidationError: HTTPStatus.BAD_REQUEST,
     PasswordHistoryError: HTTPStatus.BAD_REQUEST,
+    PasswordResetTokenError: HTTPStatus.BAD_REQUEST,
     ResourceValidationError: HTTPStatus.BAD_REQUEST,
     # 401 Unauthorized - Authentication errors
     AuthenticationError: HTTPStatus.UNAUTHORIZED,

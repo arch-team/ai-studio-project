@@ -336,14 +336,14 @@ class AccountService:
             new_password: New password
 
         Raises:
-            TokenError: If token is invalid or expired
+            PasswordResetTokenError: If token is invalid or expired
             PasswordHistoryError: If new password matches recent history
         """
-        from src.core.exceptions import TokenError
+        from src.core.exceptions import PasswordResetTokenError
 
         token_data = _password_reset_tokens.get(token)
         if not token_data:
-            raise TokenError(
+            raise PasswordResetTokenError(
                 message="Invalid or expired reset token",
                 code="INVALID_TOKEN",
             )
@@ -351,14 +351,14 @@ class AccountService:
         email, expiry = token_data
         if datetime.utcnow() > expiry:
             del _password_reset_tokens[token]
-            raise TokenError(
+            raise PasswordResetTokenError(
                 message="Invalid or expired reset token",
                 code="TOKEN_EXPIRED",
             )
 
         account = self.find_by_email(email)
         if not account:
-            raise TokenError(
+            raise PasswordResetTokenError(
                 message="Invalid or expired reset token",
                 code="ACCOUNT_NOT_FOUND",
             )

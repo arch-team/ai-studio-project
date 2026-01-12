@@ -18,10 +18,7 @@ from src.core.exceptions import (
     AccountLockedError,
     InvalidCredentialsError,
     PasswordExpiredError,
-    PasswordHistoryError,
     ResourceConflictError,
-    ResourceNotFoundError,
-    TokenError,
 )
 from src.middleware.auth import CurrentUser, get_current_user, require_role
 from src.services.account_service import AccountService, get_account_service
@@ -278,23 +275,16 @@ async def update_local_account(
         Updated account details
 
     Raises:
-        HTTPException: If account not found
+        ResourceNotFoundError: If account not found (auto-mapped to 404)
     """
-    try:
-        account_data = account_service.update_account(
-            username=username,
-            display_name=update.display_name,
-            role=update.role,
-            is_enabled=update.is_enabled,
-        )
-        logger.info(f"Local account updated: {username} by {current_user.username}")
-        return _account_to_response(account_data, password_service)
-
-    except ResourceNotFoundError:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Account not found",
-        )
+    account_data = account_service.update_account(
+        username=username,
+        display_name=update.display_name,
+        role=update.role,
+        is_enabled=update.is_enabled,
+    )
+    logger.info(f"Local account updated: {username} by {current_user.username}")
+    return _account_to_response(account_data, password_service)
 
 
 @router.post("/login", response_model=LoginResponse)
@@ -382,31 +372,16 @@ async def change_password(
         Success message
 
     Raises:
-        HTTPException: If current password is incorrect or new password is in history
+        ResourceNotFoundError: If account not found (auto-mapped to 404)
+        InvalidCredentialsError: If current password incorrect (auto-mapped to 401)
+        PasswordHistoryError: If new password in history (auto-mapped to 400)
     """
-    try:
-        account_service.change_password(
-            username=current_user.username,
-            current_password=request.current_password,
-            new_password=request.new_password,
-        )
-        return MessageResponse(message="Password changed successfully")
-
-    except ResourceNotFoundError:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Account not found",
-        )
-    except InvalidCredentialsError:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Current password is incorrect",
-        )
-    except PasswordHistoryError as e:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=e.message,
-        )
+    account_service.change_password(
+        username=current_user.username,
+        current_password=request.current_password,
+        new_password=request.new_password,
+    )
+    return MessageResponse(message="Password changed successfully")
 
 
 @router.post("/password/reset-request", response_model=MessageResponse)
@@ -452,19 +427,8 @@ async def confirm_password_reset(
         Success message
 
     Raises:
-        HTTPException: If token is invalid or expired
+        PasswordResetTokenError: If token invalid/expired (auto-mapped to 400)
+        PasswordHistoryError: If new password in history (auto-mapped to 400)
     """
-    try:
-        account_service.confirm_password_reset(request.token, request.new_password)
-        return MessageResponse(message="Password has been reset successfully")
-
-    except TokenError:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid or expired reset token",
-        )
-    except PasswordHistoryError as e:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=e.message,
-        )
+    account_service.confirm_password_reset(request.token, request.new_password)
+    return MessageResponse(message="Password has been reset successfully")
