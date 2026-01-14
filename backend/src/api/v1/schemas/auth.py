@@ -8,7 +8,9 @@ from pydantic import BaseModel, EmailStr, Field
 class LoginRequest(BaseModel):
     """Login request schema."""
 
-    username: Optional[str] = Field(None, description="Username for local login")
+    username: Optional[str] = Field(
+        None, min_length=1, max_length=64, description="Username for local login"
+    )
     password: Optional[str] = Field(None, description="Password for local login")
     id_token: Optional[str] = Field(None, description="SSO ID token")
 

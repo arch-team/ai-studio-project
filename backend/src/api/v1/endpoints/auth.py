@@ -21,7 +21,7 @@ from src.api.v1.schemas.auth import (
     UserResponse,
 )
 from src.application.services.auth_service import AuthService
-from src.core.database import get_db_session
+from src.core.database import get_db
 from src.core.security.exceptions import (
     AccountLockedError,
     AuthenticationError,
@@ -56,7 +56,7 @@ def _get_client_ip(request: Request) -> str:
 async def login(
     request: Request,
     login_data: LoginRequest,
-    session: AsyncSession = Depends(get_db_session),
+    session: AsyncSession = Depends(get_db),
 ):
     """Authenticate user via local credentials or SSO token."""
     auth_service = AuthService(session)
@@ -217,7 +217,7 @@ async def login(
 )
 async def refresh_token(
     refresh_data: RefreshTokenRequest,
-    session: AsyncSession = Depends(get_db_session),
+    session: AsyncSession = Depends(get_db),
 ):
     """Refresh access token using refresh token."""
     try:
@@ -263,7 +263,7 @@ async def logout(
 )
 async def create_local_account(
     account_data: LocalAccountCreateRequest,
-    session: AsyncSession = Depends(get_db_session),
+    session: AsyncSession = Depends(get_db),
     current_user: CurrentUser = Depends(require_admin),
 ):
     """Create a new local authentication account (Admin only)."""
@@ -305,7 +305,7 @@ async def create_local_account(
 )
 async def enable_account(
     user_id: int,
-    session: AsyncSession = Depends(get_db_session),
+    session: AsyncSession = Depends(get_db),
     current_user: CurrentUser = Depends(require_admin),
 ):
     """Enable a user account (Admin only)."""
@@ -327,7 +327,7 @@ async def enable_account(
 )
 async def disable_account(
     user_id: int,
-    session: AsyncSession = Depends(get_db_session),
+    session: AsyncSession = Depends(get_db),
     current_user: CurrentUser = Depends(require_admin),
 ):
     """Disable a user account (Admin only)."""
@@ -349,7 +349,7 @@ async def disable_account(
 )
 async def unlock_account(
     user_id: int,
-    session: AsyncSession = Depends(get_db_session),
+    session: AsyncSession = Depends(get_db),
     current_user: CurrentUser = Depends(require_admin),
 ):
     """Unlock a locked user account (Admin only)."""
@@ -374,7 +374,7 @@ async def unlock_account(
 )
 async def change_password(
     password_data: PasswordChangeRequest,
-    session: AsyncSession = Depends(get_db_session),
+    session: AsyncSession = Depends(get_db),
     current_user: CurrentUser = Depends(get_current_active_user),
 ):
     """Change password for the current user."""
@@ -409,7 +409,7 @@ async def change_password(
 )
 async def request_password_reset(
     reset_data: PasswordResetRequest,
-    session: AsyncSession = Depends(get_db_session),
+    session: AsyncSession = Depends(get_db),
 ):
     """Request a password reset email."""
     auth_service = AuthService(session)
@@ -433,7 +433,7 @@ async def request_password_reset(
 )
 async def confirm_password_reset(
     reset_data: PasswordResetConfirmRequest,
-    session: AsyncSession = Depends(get_db_session),
+    session: AsyncSession = Depends(get_db),
 ):
     """Confirm password reset with token."""
     try:
@@ -468,7 +468,7 @@ async def confirm_password_reset(
 @router.get("/me", response_model=UserResponse)
 async def get_current_user_info(
     current_user: CurrentUser = Depends(get_current_active_user),
-    session: AsyncSession = Depends(get_db_session),
+    session: AsyncSession = Depends(get_db),
 ):
     """Get current user information."""
     from sqlalchemy import select
