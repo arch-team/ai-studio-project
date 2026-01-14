@@ -5,7 +5,7 @@ Infrastructure layer provides the concrete implementation using AWS SDK.
 """
 
 from abc import ABC, abstractmethod
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 
 class IHyperPodClient(ABC):
@@ -19,9 +19,9 @@ class IHyperPodClient(ABC):
     async def create_cluster(
         self,
         cluster_name: str,
-        instance_groups: List[Dict[str, Any]],
-        vpc_config: Dict[str, Any],
-    ) -> Dict[str, Any]:
+        instance_groups: list[dict[str, Any]],
+        vpc_config: dict[str, Any],
+    ) -> dict[str, Any]:
         """Create a new HyperPod cluster.
 
         Args:
@@ -35,7 +35,7 @@ class IHyperPodClient(ABC):
         pass
 
     @abstractmethod
-    async def describe_cluster(self, cluster_name: str) -> Dict[str, Any]:
+    async def describe_cluster(self, cluster_name: str) -> dict[str, Any]:
         """Get cluster details.
 
         Args:
@@ -48,8 +48,8 @@ class IHyperPodClient(ABC):
 
     @abstractmethod
     async def list_clusters(
-        self, max_results: int = 100, next_token: Optional[str] = None
-    ) -> Dict[str, Any]:
+        self, max_results: int = 100, next_token: str | None = None
+    ) -> dict[str, Any]:
         """List all HyperPod clusters.
 
         Args:
@@ -62,7 +62,7 @@ class IHyperPodClient(ABC):
         pass
 
     @abstractmethod
-    async def delete_cluster(self, cluster_name: str) -> Dict[str, Any]:
+    async def delete_cluster(self, cluster_name: str) -> dict[str, Any]:
         """Delete a HyperPod cluster.
 
         Args:
@@ -75,8 +75,8 @@ class IHyperPodClient(ABC):
 
     @abstractmethod
     async def update_cluster(
-        self, cluster_name: str, instance_groups: List[Dict[str, Any]]
-    ) -> Dict[str, Any]:
+        self, cluster_name: str, instance_groups: list[dict[str, Any]]
+    ) -> dict[str, Any]:
         """Update cluster instance groups.
 
         Args:
@@ -93,8 +93,8 @@ class IHyperPodClient(ABC):
         self,
         cluster_name: str,
         job_name: str,
-        job_config: Dict[str, Any],
-    ) -> Dict[str, Any]:
+        job_config: dict[str, Any],
+    ) -> dict[str, Any]:
         """Submit a training job to the cluster.
 
         Args:
@@ -110,7 +110,7 @@ class IHyperPodClient(ABC):
     @abstractmethod
     async def get_training_job_status(
         self, cluster_name: str, job_name: str
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Get training job status.
 
         Args:
@@ -125,7 +125,7 @@ class IHyperPodClient(ABC):
     @abstractmethod
     async def stop_training_job(
         self, cluster_name: str, job_name: str
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Stop a running training job.
 
         Args:

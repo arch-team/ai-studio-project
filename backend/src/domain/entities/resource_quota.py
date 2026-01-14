@@ -3,7 +3,6 @@
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import Optional
 
 from src.core.utils import utc_now
 
@@ -34,7 +33,7 @@ class ResourceQuota:
     id: int
     name: str
     quota_type: QuotaType = QuotaType.USER
-    description: Optional[str] = None
+    description: str | None = None
 
     # CPU quota (vCPU)
     max_cpu_cores: int = 0
@@ -50,11 +49,11 @@ class ResourceQuota:
     reserved_memory_gb: int = 0
 
     # Storage quota (GB)
-    max_storage_gb: Optional[int] = None
+    max_storage_gb: int | None = None
 
     # Job limits
     max_concurrent_jobs: int = 5
-    max_total_jobs: Optional[int] = None
+    max_total_jobs: int | None = None
 
     # Spot instance limit
     max_spot_instances: int = 0
@@ -62,10 +61,10 @@ class ResourceQuota:
     # Status and validity
     status: QuotaStatus = QuotaStatus.ACTIVE
     valid_from: datetime = field(default_factory=utc_now)
-    valid_until: Optional[datetime] = None
+    valid_until: datetime | None = None
 
     # Audit fields
-    created_by: Optional[int] = None
+    created_by: int | None = None
     created_at: datetime = field(default_factory=utc_now)
     updated_at: datetime = field(default_factory=utc_now)
 
@@ -116,8 +115,8 @@ class ResourceQuota:
         gpu_count: int,
         memory_gb: int,
         current_running_jobs: int,
-        gpu_type: Optional[str] = None,
-    ) -> tuple[bool, Optional[str]]:
+        gpu_type: str | None = None,
+    ) -> tuple[bool, str | None]:
         """Validate if a new job can be submitted within quota limits.
 
         Returns:

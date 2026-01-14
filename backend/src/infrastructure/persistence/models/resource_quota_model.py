@@ -2,7 +2,7 @@
 
 import enum
 from datetime import datetime
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 
 from sqlalchemy import (
     BigInteger,
@@ -60,7 +60,7 @@ class ResourceQuotaModel(Base, TimestampMixin):
         index=True,
         comment="配额名称",
     )
-    description: Mapped[Optional[str]] = mapped_column(
+    description: Mapped[str | None] = mapped_column(
         Text,
         nullable=True,
         comment="配额描述",
@@ -100,7 +100,7 @@ class ResourceQuotaModel(Base, TimestampMixin):
         default=0,
         comment="预留GPU数量",
     )
-    gpu_types: Mapped[Optional[list]] = mapped_column(
+    gpu_types: Mapped[list | None] = mapped_column(
         JSON,
         nullable=True,
         comment="允许的GPU类型列表",
@@ -120,7 +120,7 @@ class ResourceQuotaModel(Base, TimestampMixin):
     )
 
     # Storage quota (unit: GB)
-    max_storage_gb: Mapped[Optional[int]] = mapped_column(
+    max_storage_gb: Mapped[int | None] = mapped_column(
         Integer,
         nullable=True,
         comment="最大存储空间(GB)",
@@ -133,7 +133,7 @@ class ResourceQuotaModel(Base, TimestampMixin):
         default=5,
         comment="最大并发训练任务数",
     )
-    max_total_jobs: Mapped[Optional[int]] = mapped_column(
+    max_total_jobs: Mapped[int | None] = mapped_column(
         Integer,
         nullable=True,
         comment="总训练任务数限制",
@@ -163,14 +163,14 @@ class ResourceQuotaModel(Base, TimestampMixin):
         server_default=func.now(),
         comment="生效时间",
     )
-    valid_until: Mapped[Optional[datetime]] = mapped_column(
+    valid_until: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=False),
         nullable=True,
         comment="过期时间",
     )
 
     # Audit fields
-    created_by: Mapped[Optional[int]] = mapped_column(
+    created_by: Mapped[int | None] = mapped_column(
         BigInteger,
         ForeignKey("users.id", ondelete="SET NULL"),
         nullable=True,

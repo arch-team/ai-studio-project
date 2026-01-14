@@ -23,7 +23,7 @@ class LoginAttemptModel(Base):
         autoincrement=True,
         comment="记录ID",
     )
-    user_id: Mapped[Optional[int]] = mapped_column(
+    user_id: Mapped[int | None] = mapped_column(
         BigInteger,
         ForeignKey("users.id", ondelete="SET NULL"),
         nullable=True,
@@ -42,7 +42,7 @@ class LoginAttemptModel(Base):
         index=True,
         comment="IP地址",
     )
-    user_agent: Mapped[Optional[str]] = mapped_column(
+    user_agent: Mapped[str | None] = mapped_column(
         Text,
         nullable=True,
         comment="User-Agent",
@@ -54,7 +54,7 @@ class LoginAttemptModel(Base):
         server_default="0",
         comment="是否成功",
     )
-    failure_reason: Mapped[Optional[str]] = mapped_column(
+    failure_reason: Mapped[str | None] = mapped_column(
         String(50),
         nullable=True,
         comment="失败原因",

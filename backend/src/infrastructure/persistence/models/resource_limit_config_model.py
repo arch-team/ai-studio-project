@@ -1,7 +1,6 @@
 """ResourceLimitConfig ORM model - Per-job resource limits by role."""
 
 import enum
-from typing import Optional
 
 from sqlalchemy import BigInteger, Enum, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column
@@ -56,7 +55,7 @@ class ResourceLimitConfigModel(Base, TimestampMixin):
     )
 
     # Project scope (nullable for global config)
-    project_id: Mapped[Optional[int]] = mapped_column(
+    project_id: Mapped[int | None] = mapped_column(
         BigInteger,
         nullable=True,
         index=True,

@@ -1,14 +1,12 @@
 """Authentication Dependencies - FastAPI dependency injection for auth."""
 
-from typing import Optional
-
 from fastapi import Depends, HTTPException, Request, status
 
 from src.api.middleware.auth import CurrentUser
 from src.application.services.rbac_service import Permission, get_rbac_service
 
 
-def get_current_user(request: Request) -> Optional[CurrentUser]:
+def get_current_user(request: Request) -> CurrentUser | None:
     """Get current user from request (optional)."""
     return CurrentUser.from_request(request)
 

@@ -3,7 +3,6 @@
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import Optional
 
 from src.core.utils import utc_now
 
@@ -48,7 +47,7 @@ class ResourceLimitConfig:
     role: LimitRole
 
     # Project scope (None = global config)
-    project_id: Optional[int] = None
+    project_id: int | None = None
 
     # Per-job limits
     max_gpu_per_job: int = 8
@@ -75,7 +74,7 @@ class ResourceLimitConfig:
         memory_gb: int,
         storage_gb: int,
         node_count: int,
-    ) -> tuple[bool, Optional[str]]:
+    ) -> tuple[bool, str | None]:
         """Validate job resources against limits.
 
         Returns:

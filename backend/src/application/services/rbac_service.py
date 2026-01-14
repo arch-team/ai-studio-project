@@ -1,7 +1,6 @@
 """RBAC Service - Role-Based Access Control management."""
 
 from enum import Enum
-from typing import Dict, List, Optional, Set
 
 from src.core.security.constants import ROLE_HIERARCHY
 from src.core.security.exceptions import InsufficientPermissionsError
@@ -64,7 +63,7 @@ class Permission(str, Enum):
 
 
 # Role to permission mapping
-ROLE_PERMISSIONS: Dict[str, Set[Permission]] = {
+ROLE_PERMISSIONS: dict[str, set[Permission]] = {
     "admin": set(Permission),  # Admin has all permissions
     "project_manager": {
         # Project manager: manage jobs, datasets, models within project
@@ -123,7 +122,7 @@ ROLE_PERMISSIONS: Dict[str, Set[Permission]] = {
 }
 
 # K8s RBAC binding mappings
-K8S_RBAC_BINDINGS: Dict[str, Dict[str, str]] = {
+K8S_RBAC_BINDINGS: dict[str, dict[str, str]] = {
     "admin": {
         "cluster_role": "cluster-admin",
         "namespace_role": "admin",
@@ -146,30 +145,28 @@ K8S_RBAC_BINDINGS: Dict[str, Dict[str, str]] = {
 class RBACService:
     """Role-Based Access Control service for permission management."""
 
+    @staticmethod
+    def _normalize_role(role: str) -> str:
+        """Normalize role to lowercase."""
+        return role.lower()
+
     def has_permission(self, role: str, permission: Permission) -> bool:
         """Check if a role has a specific permission."""
-        role_lower = role.lower()
-        return permission in ROLE_PERMISSIONS.get(role_lower, set())
+        return permission in ROLE_PERMISSIONS.get(self._normalize_role(role), set())
 
     def has_role_level(self, role: str, required_role: str) -> bool:
         """Check if a role meets or exceeds the required role level."""
-        role_lower = role.lower()
-        required_lower = required_role.lower()
-
-        role_level = ROLE_HIERARCHY.get(role_lower, 0)
-        required_level = ROLE_HIERARCHY.get(required_lower, 0)
-
+        role_level = ROLE_HIERARCHY.get(self._normalize_role(role), 0)
+        required_level = ROLE_HIERARCHY.get(self._normalize_role(required_role), 0)
         return role_level >= required_level
 
-    def get_permissions(self, role: str) -> Set[Permission]:
+    def get_permissions(self, role: str) -> set[Permission]:
         """Get all permissions for a role."""
-        role_lower = role.lower()
-        return ROLE_PERMISSIONS.get(role_lower, set())
+        return ROLE_PERMISSIONS.get(self._normalize_role(role), set())
 
-    def get_k8s_rbac_binding(self, role: str) -> Optional[Dict[str, str]]:
+    def get_k8s_rbac_binding(self, role: str) -> dict[str, str] | None:
         """Get K8s RBAC binding for a role."""
-        role_lower = role.lower()
-        return K8S_RBAC_BINDINGS.get(role_lower)
+        return K8S_RBAC_BINDINGS.get(self._normalize_role(role))
 
     def check_permission(self, role: str, permission: Permission) -> None:
         """Check permission and raise exception if not authorized."""
@@ -183,9 +180,9 @@ class RBACService:
 
     def get_role_level(self, role: str) -> int:
         """Get numeric level for a role."""
-        return ROLE_HIERARCHY.get(role.lower(), 0)
+        return ROLE_HIERARCHY.get(self._normalize_role(role), 0)
 
-    def get_allowed_roles_for_permission(self, permission: Permission) -> List[str]:
+    def get_allowed_roles_for_permission(self, permission: Permission) -> list[str]:
         """Get list of roles that have a specific permission."""
         return [
             role
@@ -195,7 +192,7 @@ class RBACService:
 
 
 # Singleton instance
-_rbac_service: Optional[RBACService] = None
+_rbac_service: RBACService | None = None
 
 
 def get_rbac_service() -> RBACService:

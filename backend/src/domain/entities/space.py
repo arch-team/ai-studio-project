@@ -3,7 +3,6 @@
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import Optional
 
 from src.core.utils import utc_now
 
@@ -63,13 +62,13 @@ class Space:
     status: SpaceStatus = SpaceStatus.PENDING
 
     # SageMaker integration
-    lifecycle_config_arn: Optional[str] = None
-    sagemaker_space_arn: Optional[str] = None
+    lifecycle_config_arn: str | None = None
+    sagemaker_space_arn: str | None = None
 
     # Timestamps
     created_at: datetime = field(default_factory=utc_now)
     updated_at: datetime = field(default_factory=utc_now)
-    deleted_at: Optional[datetime] = None
+    deleted_at: datetime | None = None
 
     def can_transition_to(self, new_status: SpaceStatus) -> bool:
         """Check if transition to new_status is valid."""
@@ -176,7 +175,7 @@ class Space:
         available_cpu: int,
         available_memory_gb: int,
         available_gpu: int,
-    ) -> tuple[bool, Optional[str]]:
+    ) -> tuple[bool, str | None]:
         """Validate space resource requirements against available quota.
 
         Returns:

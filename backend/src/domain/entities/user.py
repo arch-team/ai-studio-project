@@ -3,7 +3,6 @@
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import Optional
 
 from src.core.utils import utc_now
 
@@ -44,11 +43,11 @@ class User:
     email: str
     status: UserStatus = UserStatus.ACTIVE
     role: UserRole = UserRole.ENGINEER
-    display_name: Optional[str] = None
-    iam_identity_id: Optional[str] = None
+    display_name: str | None = None
+    iam_identity_id: str | None = None
     iam_groups: list[str] = field(default_factory=list)
-    resource_quota_id: Optional[int] = None
-    last_login_at: Optional[datetime] = None
+    resource_quota_id: int | None = None
+    last_login_at: datetime | None = None
     created_at: datetime = field(default_factory=utc_now)
     updated_at: datetime = field(default_factory=utc_now)
 

@@ -2,7 +2,7 @@
 
 import enum
 import uuid
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 
 from sqlalchemy import BigInteger, Enum, ForeignKey, Integer, String
 from sqlalchemy.dialects.mysql import CHAR
@@ -104,12 +104,12 @@ class DevelopmentSpaceModel(Base, TimestampMixin, SoftDeleteMixin):
     )
 
     # SageMaker integration
-    lifecycle_config_arn: Mapped[Optional[str]] = mapped_column(
+    lifecycle_config_arn: Mapped[str | None] = mapped_column(
         String(512),
         nullable=True,
         comment="Lifecycle配置ARN",
     )
-    sagemaker_space_arn: Mapped[Optional[str]] = mapped_column(
+    sagemaker_space_arn: Mapped[str | None] = mapped_column(
         String(512),
         nullable=True,
         unique=True,

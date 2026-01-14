@@ -1,12 +1,10 @@
 """Security Exceptions - Authentication and authorization errors."""
 
-from typing import List, Optional
-
 
 class SecurityError(Exception):
     """Base class for security-related errors."""
 
-    def __init__(self, message: str, code: Optional[str] = None):
+    def __init__(self, message: str, code: str | None = None):
         self.message = message
         self.code = code or "SECURITY_ERROR"
         super().__init__(self.message)
@@ -37,7 +35,7 @@ class AccountLockedError(SecurityError):
     """Raised when an account is locked due to too many failed login attempts."""
 
     def __init__(
-        self, message: str = "Account is locked", locked_until: Optional[str] = None
+        self, message: str = "Account is locked", locked_until: str | None = None
     ):
         self.locked_until = locked_until
         super().__init__(message, code="ACCOUNT_LOCKED")
@@ -46,7 +44,7 @@ class AccountLockedError(SecurityError):
 class PasswordTooWeakError(SecurityError):
     """Raised when a password does not meet strength requirements."""
 
-    def __init__(self, violations: List[str]):
+    def __init__(self, violations: list[str]):
         self.violations = violations
         message = "Password does not meet requirements: " + "; ".join(violations)
         super().__init__(message, code="PASSWORD_TOO_WEAK")

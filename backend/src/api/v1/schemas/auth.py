@@ -1,18 +1,16 @@
 """Authentication Schemas - Request/response models for auth endpoints."""
 
-from typing import Optional
-
 from pydantic import BaseModel, EmailStr, Field
 
 
 class LoginRequest(BaseModel):
     """Login request schema."""
 
-    username: Optional[str] = Field(
+    username: str | None = Field(
         None, min_length=1, max_length=64, description="Username for local login"
     )
-    password: Optional[str] = Field(None, description="Password for local login")
-    id_token: Optional[str] = Field(None, description="SSO ID token")
+    password: str | None = Field(None, description="Password for local login")
+    id_token: str | None = Field(None, description="SSO ID token")
 
 
 class TokenResponse(BaseModel):
@@ -30,7 +28,7 @@ class UserResponse(BaseModel):
     id: int = Field(..., description="User ID")
     username: str = Field(..., description="Username")
     email: str = Field(..., description="Email address")
-    display_name: Optional[str] = Field(None, description="Display name")
+    display_name: str | None = Field(None, description="Display name")
     role: str = Field(..., description="User role")
     status: str = Field(..., description="User status")
     auth_type: str = Field(..., description="Authentication type")
@@ -55,20 +53,16 @@ class LocalAccountCreateRequest(BaseModel):
     username: str = Field(..., min_length=3, max_length=64, description="Username")
     email: EmailStr = Field(..., description="Email address")
     password: str = Field(..., min_length=12, description="Password")
-    display_name: Optional[str] = Field(
-        None, max_length=128, description="Display name"
-    )
+    display_name: str | None = Field(None, max_length=128, description="Display name")
     role: str = Field(default="engineer", description="User role")
 
 
 class LocalAccountUpdateRequest(BaseModel):
     """Update local account request schema."""
 
-    email: Optional[EmailStr] = Field(None, description="Email address")
-    display_name: Optional[str] = Field(
-        None, max_length=128, description="Display name"
-    )
-    role: Optional[str] = Field(None, description="User role")
+    email: EmailStr | None = Field(None, description="Email address")
+    display_name: str | None = Field(None, max_length=128, description="Display name")
+    role: str | None = Field(None, description="User role")
 
 
 class PasswordChangeRequest(BaseModel):
@@ -102,4 +96,4 @@ class ErrorResponse(BaseModel):
 
     error: str = Field(..., description="Error code")
     message: str = Field(..., description="Error message")
-    details: Optional[dict] = Field(None, description="Additional error details")
+    details: dict | None = Field(None, description="Additional error details")

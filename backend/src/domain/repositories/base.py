@@ -1,7 +1,7 @@
 """Base Repository Interface - Generic repository contract for DDD."""
 
 from abc import ABC, abstractmethod
-from typing import Generic, List, Optional, TypeVar
+from typing import Generic, TypeVar
 from uuid import UUID
 
 # Type variable for entity types
@@ -12,12 +12,12 @@ class IRepository(ABC, Generic[T]):
     """Abstract base repository interface."""
 
     @abstractmethod
-    async def get_by_id(self, id: UUID) -> Optional[T]:
+    async def get_by_id(self, id: UUID) -> T | None:
         """Get entity by ID."""
         pass
 
     @abstractmethod
-    async def get_all(self, limit: int = 100, offset: int = 0) -> List[T]:
+    async def get_all(self, limit: int = 100, offset: int = 0) -> list[T]:
         """Get all entities with pagination."""
         pass
 

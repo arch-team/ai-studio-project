@@ -1,7 +1,6 @@
 """Base model classes and mixins for SQLAlchemy ORM models."""
 
 from datetime import datetime
-from typing import Optional
 
 from sqlalchemy import DateTime, func
 from sqlalchemy.orm import Mapped, mapped_column
@@ -28,7 +27,7 @@ class TimestampMixin:
 class SoftDeleteMixin:
     """Mixin providing soft delete functionality."""
 
-    deleted_at: Mapped[Optional[datetime]] = mapped_column(
+    deleted_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=False),
         nullable=True,
         default=None,

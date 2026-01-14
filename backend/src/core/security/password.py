@@ -1,7 +1,6 @@
 """Password Hashing and Validation - Security-compliant password management."""
 
 import re
-from typing import List
 
 from passlib.context import CryptContext
 
@@ -39,7 +38,7 @@ class PasswordValidator:
     """Password strength validation following enterprise security standards."""
 
     @staticmethod
-    def validate_strength(password: str) -> List[str]:
+    def validate_strength(password: str) -> list[str]:
         """Validate password strength per FR-015 requirements."""
         violations = []
 
@@ -65,7 +64,7 @@ class PasswordValidator:
     @staticmethod
     def check_password_history(
         new_password: str,
-        password_history: List[str],
+        password_history: list[str],
         hasher: PasswordHasher,
     ) -> bool:
         """Check if password was recently used (True if OK, False if reused)."""

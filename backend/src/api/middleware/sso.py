@@ -3,7 +3,6 @@
 import asyncio
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
-from typing import Dict, List, Optional
 
 import httpx
 from authlib.integrations.httpx_client import AsyncOAuth2Client
@@ -25,9 +24,9 @@ class SSOHealthState:
 
     consecutive_failures: int = 0
     is_degraded: bool = False
-    last_failure_at: Optional[datetime] = None
-    last_recovery_check_at: Optional[datetime] = None
-    last_success_at: Optional[datetime] = None
+    last_failure_at: datetime | None = None
+    last_recovery_check_at: datetime | None = None
+    last_success_at: datetime | None = None
 
 
 @dataclass
@@ -37,8 +36,8 @@ class SSOUserInfo:
     identity_id: str
     username: str
     email: str
-    display_name: Optional[str] = None
-    groups: List[str] = field(default_factory=list)
+    display_name: str | None = None
+    groups: list[str] = field(default_factory=list)
 
 
 class SSOHealthTracker:
@@ -88,7 +87,7 @@ class SSOHealthTracker:
         async with self._lock:
             self._state.last_recovery_check_at = utc_now()
 
-    def get_status(self) -> Dict:
+    def get_status(self) -> dict:
         """Get current health status."""
         return {
             "is_degraded": self._state.is_degraded,
@@ -113,16 +112,16 @@ class SSOService:
         self,
         issuer_url: str,
         client_id: str,
-        client_secret: Optional[str] = None,
-        jwks_uri: Optional[str] = None,
+        client_secret: str | None = None,
+        jwks_uri: str | None = None,
     ):
         self._issuer_url = issuer_url
         self._client_id = client_id
         self._client_secret = client_secret
         self._jwks_uri = jwks_uri or f"{issuer_url}/.well-known/jwks.json"
         self._health_tracker = SSOHealthTracker()
-        self._jwks_cache: Optional[Dict] = None
-        self._jwks_cache_time: Optional[datetime] = None
+        self._jwks_cache: dict | None = None
+        self._jwks_cache_time: datetime | None = None
 
     @property
     def health_tracker(self) -> SSOHealthTracker:
@@ -185,7 +184,7 @@ class SSOService:
         self,
         authorization_code: str,
         redirect_uri: str,
-    ) -> Dict[str, str]:
+    ) -> dict[str, str]:
         """Exchange authorization code for tokens (OAuth2 flow)."""
         if self._health_tracker.is_degraded:
             if not await self._health_tracker.should_attempt_recovery():
@@ -223,7 +222,7 @@ class SSOService:
             await self._health_tracker.record_failure()
             raise SSOError(f"Token exchange failed: {str(e)}")
 
-    async def _get_jwks(self) -> Dict:
+    async def _get_jwks(self) -> dict:
         """Get JWKS with caching."""
         # Check cache (5 minute cache)
         if self._jwks_cache and self._jwks_cache_time:
@@ -260,7 +259,7 @@ class SSOService:
 
 
 # Role mapping from IAM Identity Center groups
-DEFAULT_ROLE_MAPPING: Dict[str, str] = {
+DEFAULT_ROLE_MAPPING: dict[str, str] = {
     "AI-Platform-Admins": "admin",
     "AI-Platform-ProjectManagers": "project_manager",
     "AI-Platform-Engineers": "engineer",
@@ -269,7 +268,7 @@ DEFAULT_ROLE_MAPPING: Dict[str, str] = {
 
 
 def map_groups_to_role(
-    groups: List[str], role_mapping: Optional[Dict[str, str]] = None
+    groups: list[str], role_mapping: dict[str, str] | None = None
 ) -> str:
     """Map SSO groups to platform role (highest privilege wins)."""
     mapping = role_mapping or DEFAULT_ROLE_MAPPING
@@ -291,10 +290,10 @@ def map_groups_to_role(
 
 
 # Singleton instance
-_sso_service: Optional[SSOService] = None
+_sso_service: SSOService | None = None
 
 
-def get_sso_service() -> Optional[SSOService]:
+def get_sso_service() -> SSOService | None:
     """Get SSO service singleton (None if not configured)."""
     return _sso_service
 
@@ -302,7 +301,7 @@ def get_sso_service() -> Optional[SSOService]:
 def configure_sso_service(
     issuer_url: str,
     client_id: str,
-    client_secret: Optional[str] = None,
+    client_secret: str | None = None,
 ) -> SSOService:
     """Configure and return SSO service."""
     global _sso_service

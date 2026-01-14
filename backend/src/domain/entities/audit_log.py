@@ -3,7 +3,7 @@
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from enum import Enum
-from typing import Any, Optional
+from typing import Any
 
 from src.core.utils import utc_now
 
@@ -53,16 +53,16 @@ class AuditLog:
     status: AuditStatus = AuditStatus.SUCCESS
 
     # User and resource info
-    user_id: Optional[int] = None
-    resource_id: Optional[str] = None
+    user_id: int | None = None
+    resource_id: str | None = None
 
     # Request/Response data
-    request_data: Optional[dict[str, Any]] = None
-    response_data: Optional[dict[str, Any]] = None
+    request_data: dict[str, Any] | None = None
+    response_data: dict[str, Any] | None = None
 
     # Client info
-    ip_address: Optional[str] = None
-    user_agent: Optional[str] = None
+    ip_address: str | None = None
+    user_agent: str | None = None
 
     # Timestamps
     created_at: datetime = field(default_factory=utc_now)
@@ -82,7 +82,7 @@ class AuditLog:
         delta = self.expires_at - utc_now()
         return max(0, delta.days)
 
-    def mark_as_failed(self, error_message: Optional[str] = None) -> None:
+    def mark_as_failed(self, error_message: str | None = None) -> None:
         """Mark operation as failed with optional error message."""
         self.status = AuditStatus.FAILED
         if error_message and self.response_data is None:
@@ -93,8 +93,8 @@ class AuditLog:
     @staticmethod
     def create_login_log(
         user_id: int,
-        ip_address: Optional[str] = None,
-        user_agent: Optional[str] = None,
+        ip_address: str | None = None,
+        user_agent: str | None = None,
         success: bool = True,
     ) -> "AuditLog":
         """Factory method for login audit logs."""
@@ -114,10 +114,10 @@ class AuditLog:
         operation: OperationType,
         resource_type: ResourceType,
         resource_id: str,
-        user_id: Optional[int] = None,
-        request_data: Optional[dict[str, Any]] = None,
-        response_data: Optional[dict[str, Any]] = None,
-        ip_address: Optional[str] = None,
+        user_id: int | None = None,
+        request_data: dict[str, Any] | None = None,
+        response_data: dict[str, Any] | None = None,
+        ip_address: str | None = None,
     ) -> "AuditLog":
         """Factory method for resource operation audit logs."""
         return AuditLog(

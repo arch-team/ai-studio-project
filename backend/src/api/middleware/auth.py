@@ -1,7 +1,7 @@
 """Authentication Middleware - JWT token validation for protected routes."""
 
 import re
-from typing import List, Optional
+from typing import Optional
 
 from fastapi import Request
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
@@ -11,7 +11,7 @@ from src.core.security.exceptions import InvalidTokenError, TokenExpiredError
 from src.core.security.jwt import TokenPayload, TokenType, get_jwt_manager
 
 # Paths that don't require authentication
-EXEMPT_PATHS: List[str] = [
+EXEMPT_PATHS: list[str] = [
     "/health",
     "/healthz",
     "/ready",
@@ -25,7 +25,7 @@ EXEMPT_PATHS: List[str] = [
 ]
 
 # Regex patterns for exempt paths
-EXEMPT_PATTERNS: List[str] = [
+EXEMPT_PATTERNS: list[str] = [
     r"^/api/v1/auth/password-reset/.*$",
 ]
 
@@ -81,7 +81,7 @@ class AuthenticationMiddleware(BaseHTTPMiddleware):
 
         return any(re.match(pattern, path) for pattern in EXEMPT_PATTERNS)
 
-    def _extract_token(self, request: Request) -> Optional[str]:
+    def _extract_token(self, request: Request) -> str | None:
         """Extract Bearer token from Authorization header."""
         if not (auth_header := request.headers.get("Authorization")):
             return None
@@ -92,7 +92,7 @@ class AuthenticationMiddleware(BaseHTTPMiddleware):
 
         return parts[1]
 
-    def _validate_token(self, token: str) -> Optional[TokenPayload]:
+    def _validate_token(self, token: str) -> TokenPayload | None:
         """Validate JWT token and return payload."""
         try:
             jwt_manager = get_jwt_manager()

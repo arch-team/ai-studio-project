@@ -2,9 +2,9 @@
 
 import uuid
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from enum import Enum
-from typing import Any, Dict, Optional
+from typing import Any
 
 from authlib.jose import JoseError
 from authlib.jose import jwt as authlib_jwt
@@ -41,15 +41,15 @@ class TokenPayload:
     jti: str  # JWT ID for revocation
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "TokenPayload":
+    def from_dict(cls, data: dict[str, Any]) -> "TokenPayload":
         """Create TokenPayload from decoded JWT dict."""
         return cls(
             sub=data["sub"],
             username=data.get("username", ""),
             email=data.get("email", ""),
             role=data.get("role", ""),
-            exp=datetime.fromtimestamp(data["exp"], tz=timezone.utc),
-            iat=datetime.fromtimestamp(data["iat"], tz=timezone.utc),
+            exp=datetime.fromtimestamp(data["exp"], tz=UTC),
+            iat=datetime.fromtimestamp(data["iat"], tz=UTC),
             token_type=TokenType(data.get("type", TokenType.ACCESS.value)),
             jti=data.get("jti", ""),
         )
@@ -64,12 +64,12 @@ class JWTManager:
 
     def _create_token(
         self,
-        payload: Dict[str, Any],
+        payload: dict[str, Any],
         expires_delta: timedelta,
         token_type: TokenType,
     ) -> str:
         """Create a JWT token with given payload and expiration."""
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         expire = now + expires_delta
 
         token_payload = {
@@ -92,7 +92,7 @@ class JWTManager:
         username: str,
         email: str,
         role: str,
-        expires_delta: Optional[timedelta] = None,
+        expires_delta: timedelta | None = None,
     ) -> str:
         """Create access token for authenticated user."""
         payload = {
@@ -112,7 +112,7 @@ class JWTManager:
     def create_refresh_token(
         self,
         user_id: int,
-        expires_delta: Optional[timedelta] = None,
+        expires_delta: timedelta | None = None,
     ) -> str:
         """Create refresh token for token renewal."""
         payload = {"sub": str(user_id)}
@@ -139,7 +139,7 @@ class JWTManager:
     def verify_token(
         self,
         token: str,
-        expected_type: Optional[TokenType] = None,
+        expected_type: TokenType | None = None,
     ) -> TokenPayload:
         """Verify and decode a JWT token."""
         try:
@@ -172,7 +172,7 @@ class JWTManager:
 
 
 # Singleton instance for convenience
-_jwt_manager: Optional[JWTManager] = None
+_jwt_manager: JWTManager | None = None
 
 
 def get_jwt_manager() -> JWTManager:

@@ -1,6 +1,7 @@
 """Authentication Endpoints - Login, logout, password management."""
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.api.middleware.auth import CurrentUser
@@ -33,6 +34,12 @@ from src.core.security.exceptions import (
     SSOError,
     TokenExpiredError,
 )
+from src.infrastructure.persistence.models import (
+    AuthType,
+    UserModel,
+    UserStatus,
+)
+from src.infrastructure.persistence.models.user_model import UserRole
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
@@ -42,6 +49,41 @@ def _get_client_ip(request: Request) -> str:
     if forwarded := request.headers.get("X-Forwarded-For"):
         return forwarded.split(",")[0].strip()
     return request.client.host if request.client else "unknown"
+
+
+async def _get_or_create_sso_user(
+    session: AsyncSession,
+    user_info: SSOUserInfo,
+    role: str,
+) -> UserModel:
+    """Get or create SSO user."""
+    query_result = await session.execute(
+        select(UserModel).where(UserModel.iam_identity_id == user_info.identity_id)
+    )
+    user = query_result.scalar_one_or_none()
+
+    if not user:
+        # Create new SSO user
+        user = UserModel(
+            username=user_info.username,
+            email=user_info.email,
+            display_name=user_info.display_name,
+            iam_identity_id=user_info.identity_id,
+            iam_groups=user_info.groups,
+            auth_type=AuthType.SSO,
+            status=UserStatus.ACTIVE,
+            role=UserRole(role),
+        )
+        session.add(user)
+        await session.commit()
+        await session.refresh(user)
+    else:
+        # Update existing user's groups and role
+        user.iam_groups = user_info.groups
+        user.role = UserRole(role)
+        await session.commit()
+
+    return user
 
 
 @router.post(
@@ -81,61 +123,17 @@ async def login(
                 role = map_groups_to_role(user_info.groups)
 
                 # Get or create SSO user
-                from sqlalchemy import select
-                from src.infrastructure.persistence.models import (
-                    AuthType,
-                    UserModel,
-                    UserStatus,
-                )
-                from src.infrastructure.persistence.models.user_model import UserRole
+                user = await _get_or_create_sso_user(session, user_info, role)
 
-                query_result = await session.execute(
-                    select(UserModel).where(
-                        UserModel.iam_identity_id == user_info.identity_id
-                    )
-                )
-                user = query_result.scalar_one_or_none()
-
-                if not user:
-                    # Create new SSO user
-                    user = UserModel(
-                        username=user_info.username,
-                        email=user_info.email,
-                        display_name=user_info.display_name,
-                        iam_identity_id=user_info.identity_id,
-                        iam_groups=user_info.groups,
-                        auth_type=AuthType.SSO,
-                        status=UserStatus.ACTIVE,
-                        role=UserRole(role),
-                    )
-                    session.add(user)
-                    await session.commit()
-                    await session.refresh(user)
-                else:
-                    # Update existing user's groups and role
-                    user.iam_groups = user_info.groups
-                    user.role = UserRole(role)
-                    await session.commit()
-
-                # Generate tokens
-                from src.core.security.constants import ACCESS_TOKEN_EXPIRE_MINUTES
-                from src.core.security.jwt import get_jwt_manager
-
-                jwt_manager = get_jwt_manager()
-                access_token = jwt_manager.create_access_token(
-                    user_id=user.id,
-                    username=user.username,
-                    email=user.email,
-                    role=user.role.value,
-                )
-                refresh_token = jwt_manager.create_refresh_token(user_id=user.id)
+                # Generate tokens using auth_service helper
+                tokens = auth_service._create_token_pair(user)
 
                 return LoginResponse(
                     tokens=TokenResponse(
-                        access_token=access_token,
-                        refresh_token=refresh_token,
-                        token_type="bearer",
-                        expires_in=ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+                        access_token=tokens.access_token,
+                        refresh_token=tokens.refresh_token,
+                        token_type=tokens.token_type,
+                        expires_in=tokens.expires_in,
                     ),
                     user=UserResponse(
                         id=user.id,
@@ -466,10 +464,6 @@ async def get_current_user_info(
     session: AsyncSession = Depends(get_db),
 ):
     """Get current user information."""
-    from sqlalchemy import select
-
-    from src.infrastructure.persistence.models import UserModel
-
     result = await session.execute(
         select(UserModel).where(UserModel.id == current_user.user_id)
     )

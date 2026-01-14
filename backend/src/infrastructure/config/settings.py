@@ -1,7 +1,6 @@
 """Application Settings - Pydantic settings configuration."""
 
 from functools import lru_cache
-from typing import Optional
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -31,15 +30,15 @@ class Settings(BaseSettings):
 
     # AWS
     aws_region: str = "us-east-1"
-    aws_access_key_id: Optional[str] = None
-    aws_secret_access_key: Optional[str] = None
+    aws_access_key_id: str | None = None
+    aws_secret_access_key: str | None = None
 
     # S3
     s3_bucket_name: str = "ai-training-platform"
     s3_prefix: str = "data"
 
     # HyperPod
-    hyperpod_cluster_name: Optional[str] = None
+    hyperpod_cluster_name: str | None = None
 
     # Security
     secret_key: str = "change-me-in-production"
@@ -49,7 +48,7 @@ class Settings(BaseSettings):
     cors_origins: list[str] = ["http://localhost:3000"]
 
 
-@lru_cache()
+@lru_cache
 def get_settings() -> Settings:
     """Get cached settings instance."""
     return Settings()

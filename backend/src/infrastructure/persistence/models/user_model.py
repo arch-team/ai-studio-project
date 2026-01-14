@@ -79,20 +79,20 @@ class UserModel(Base, TimestampMixin):
         index=True,
         comment="邮箱地址",
     )
-    display_name: Mapped[Optional[str]] = mapped_column(
+    display_name: Mapped[str | None] = mapped_column(
         String(128),
         nullable=True,
         comment="显示名称",
     )
 
     # IAM integration
-    iam_identity_id: Mapped[Optional[str]] = mapped_column(
+    iam_identity_id: Mapped[str | None] = mapped_column(
         String(255),
         unique=True,
         nullable=True,
         comment="AWS IAM Identity Center用户ID",
     )
-    iam_groups: Mapped[Optional[list]] = mapped_column(
+    iam_groups: Mapped[list | None] = mapped_column(
         JSON,
         nullable=True,
         comment="IAM用户组列表",
@@ -114,7 +114,7 @@ class UserModel(Base, TimestampMixin):
     )
 
     # Resource quota association
-    resource_quota_id: Mapped[Optional[int]] = mapped_column(
+    resource_quota_id: Mapped[int | None] = mapped_column(
         BigInteger,
         ForeignKey("resource_quotas.id", ondelete="SET NULL"),
         nullable=True,
@@ -123,7 +123,7 @@ class UserModel(Base, TimestampMixin):
     )
 
     # Login tracking
-    last_login_at: Mapped[Optional[datetime]] = mapped_column(
+    last_login_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=False),
         nullable=True,
         comment="最后登录时间",
@@ -137,17 +137,17 @@ class UserModel(Base, TimestampMixin):
         server_default="sso",
         comment="认证类型",
     )
-    password_hash: Mapped[Optional[str]] = mapped_column(
+    password_hash: Mapped[str | None] = mapped_column(
         String(255),
         nullable=True,
         comment="密码哈希(本地账号)",
     )
-    password_expires_at: Mapped[Optional[datetime]] = mapped_column(
+    password_expires_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=False),
         nullable=True,
         comment="密码过期时间",
     )
-    locked_until: Mapped[Optional[datetime]] = mapped_column(
+    locked_until: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=False),
         nullable=True,
         comment="账号锁定截止时间",

@@ -56,7 +56,7 @@ class AuditLogModel(Base):
     )
 
     # User association
-    user_id: Mapped[Optional[int]] = mapped_column(
+    user_id: Mapped[int | None] = mapped_column(
         BigInteger,
         ForeignKey("users.id", ondelete="SET NULL"),
         nullable=True,
@@ -77,7 +77,7 @@ class AuditLogModel(Base):
         index=True,
         comment="资源类型",
     )
-    resource_id: Mapped[Optional[str]] = mapped_column(
+    resource_id: Mapped[str | None] = mapped_column(
         String(64),
         nullable=True,
         index=True,
@@ -85,24 +85,24 @@ class AuditLogModel(Base):
     )
 
     # Request/Response data
-    request_data: Mapped[Optional[dict]] = mapped_column(
+    request_data: Mapped[dict | None] = mapped_column(
         JSON,
         nullable=True,
         comment="请求数据",
     )
-    response_data: Mapped[Optional[dict]] = mapped_column(
+    response_data: Mapped[dict | None] = mapped_column(
         JSON,
         nullable=True,
         comment="响应数据",
     )
 
     # Client information
-    ip_address: Mapped[Optional[str]] = mapped_column(
+    ip_address: Mapped[str | None] = mapped_column(
         String(45),
         nullable=True,
         comment="IP地址",
     )
-    user_agent: Mapped[Optional[str]] = mapped_column(
+    user_agent: Mapped[str | None] = mapped_column(
         Text,
         nullable=True,
         comment="User-Agent",

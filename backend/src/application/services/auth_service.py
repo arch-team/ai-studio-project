@@ -2,12 +2,12 @@
 
 from dataclasses import dataclass
 from datetime import timedelta
-from typing import Optional
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.core.security.constants import (
+    ACCESS_TOKEN_EXPIRE_MINUTES,
     LOCKOUT_DURATION_MINUTES,
     MAX_FAILED_LOGIN_ATTEMPTS,
     PASSWORD_EXPIRY_DAYS,
@@ -35,6 +35,7 @@ from src.infrastructure.persistence.models import (
     UserModel,
     UserStatus,
 )
+from src.infrastructure.persistence.models.user_model import UserRole
 
 
 @dataclass
@@ -64,9 +65,9 @@ class AuthService:
     def __init__(
         self,
         session: AsyncSession,
-        jwt_manager: Optional[JWTManager] = None,
-        password_hasher: Optional[PasswordHasher] = None,
-        password_validator: Optional[PasswordValidator] = None,
+        jwt_manager: JWTManager | None = None,
+        password_hasher: PasswordHasher | None = None,
+        password_validator: PasswordValidator | None = None,
     ):
         self._session = session
         self._jwt = jwt_manager or get_jwt_manager()
@@ -78,7 +79,7 @@ class AuthService:
         username: str,
         password: str,
         ip_address: str,
-        user_agent: Optional[str] = None,
+        user_agent: str | None = None,
     ) -> AuthResult:
         """Authenticate with username and password."""
         user = await self._get_user_by_username(username)
@@ -161,7 +162,7 @@ class AuthService:
         email: str,
         password: str,
         role: str,
-        display_name: Optional[str] = None,
+        display_name: str | None = None,
     ) -> UserModel:
         """Create a new local authentication account."""
         # Validate password strength
@@ -182,19 +183,13 @@ class AuthService:
         # Hash password
         password_hash = self._hasher.hash_password(password)
 
-        # Calculate password expiry
-        password_expires_at = utc_now() + timedelta(days=PASSWORD_EXPIRY_DAYS)
-
-        # Import UserRole enum
-        from src.infrastructure.persistence.models.user_model import UserRole
-
         # Create user
         user = UserModel(
             username=username,
             email=email,
             display_name=display_name,
             password_hash=password_hash,
-            password_expires_at=password_expires_at,
+            password_expires_at=utc_now() + timedelta(days=PASSWORD_EXPIRY_DAYS),
             auth_type=AuthType.LOCAL,
             status=UserStatus.ACTIVE,
             role=UserRole(role),
@@ -264,7 +259,7 @@ class AuthService:
         await self._update_user_password(user, new_password)
         await self._session.commit()
 
-    async def request_password_reset(self, email: str) -> Optional[str]:
+    async def request_password_reset(self, email: str) -> str | None:
         """Request password reset and return reset token."""
         user = await self._get_user_by_email(email)
         if not user or not user.is_local_account():
@@ -329,8 +324,6 @@ class AuthService:
 
     def _create_token_pair(self, user: UserModel) -> TokenPair:
         """Create access and refresh token pair."""
-        from src.core.security.constants import ACCESS_TOKEN_EXPIRE_MINUTES
-
         access_token = self._jwt.create_access_token(
             user_id=user.id,
             username=user.username,
@@ -361,21 +354,21 @@ class AuthService:
         user.last_login_at = utc_now()
         await self._session.commit()
 
-    async def _get_user_by_username(self, username: str) -> Optional[UserModel]:
+    async def _get_user_by_username(self, username: str) -> UserModel | None:
         """Get user by username."""
         result = await self._session.execute(
             select(UserModel).where(UserModel.username == username)
         )
         return result.scalar_one_or_none()
 
-    async def _get_user_by_email(self, email: str) -> Optional[UserModel]:
+    async def _get_user_by_email(self, email: str) -> UserModel | None:
         """Get user by email."""
         result = await self._session.execute(
             select(UserModel).where(UserModel.email == email)
         )
         return result.scalar_one_or_none()
 
-    async def _get_user_by_id(self, user_id: int) -> Optional[UserModel]:
+    async def _get_user_by_id(self, user_id: int) -> UserModel | None:
         """Get user by ID."""
         result = await self._session.execute(
             select(UserModel).where(UserModel.id == user_id)
