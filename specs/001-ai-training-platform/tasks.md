@@ -360,11 +360,11 @@
   - **参考**: spec.md Training Job State Model 状态转换规则
 
 ### SQLAlchemy 模型
-- [ ] [T011] 创建 User 模型 - 领域实体 `backend/src/domain/entities/user.py` (纯业务对象) + ORM 模型 `backend/src/infrastructure/persistence/models/user_model.py` (SQLAlchemy),使用 Pydantic v2 schema 验证,关联 resource_quotas
-- [ ] [T011c] 创建 Space 模型 - 领域实体 `backend/src/domain/entities/space.py` + ORM 模型 `backend/src/infrastructure/persistence/models/space_model.py`,包含状态转换验证逻辑 (pending → running → stopped),关联 User (owner_id),支持 SageMaker Spaces ARN 存储,实现资源配额检查方法,提供空间生命周期管理接口 (start/stop/delete)
-- [ ] [T012] 创建 ResourceQuota 模型 - 领域实体 `backend/src/domain/entities/resource_quota.py` + ORM 模型 `backend/src/infrastructure/persistence/models/resource_quota_model.py`,包含配额验证逻辑
-- [ ] [T012b] 创建 ResourceLimitConfig 模型 - 领域实体 `backend/src/domain/entities/resource_limit_config.py` + ORM 模型 `backend/src/infrastructure/persistence/models/resource_limit_config_model.py`,包含限制验证逻辑,关联 User (通过 role),支持项目级和全局级配置 (project_id nullable),实现默认限制查询方法 (根据 user role + project 查找适用配置),提供配额检查和应用默认限制的服务接口
-- [ ] [T012a] 创建 AuditLog 模型 - 领域实体 `backend/src/domain/entities/audit_log.py` + ORM 模型 `backend/src/infrastructure/persistence/models/audit_log_model.py`,包含自动过期逻辑 (expires_at = created_at + 90天),关联 User,支持操作类型和资源类型枚举,实现审计日志查询优化
+- [X] [T011] 创建 User 模型 - 领域实体 `backend/src/domain/entities/user.py` (纯业务对象) + ORM 模型 `backend/src/infrastructure/persistence/models/user_model.py` (SQLAlchemy),使用 Pydantic v2 schema 验证,关联 resource_quotas
+- [X] [T011c] 创建 Space 模型 - 领域实体 `backend/src/domain/entities/space.py` + ORM 模型 `backend/src/infrastructure/persistence/models/space_model.py`,包含状态转换验证逻辑 (pending → running → stopped),关联 User (owner_id),支持 SageMaker Spaces ARN 存储,实现资源配额检查方法,提供空间生命周期管理接口 (start/stop/delete)
+- [X] [T012] 创建 ResourceQuota 模型 - 领域实体 `backend/src/domain/entities/resource_quota.py` + ORM 模型 `backend/src/infrastructure/persistence/models/resource_quota_model.py`,包含配额验证逻辑
+- [X] [T012b] 创建 ResourceLimitConfig 模型 - 领域实体 `backend/src/domain/entities/resource_limit_config.py` + ORM 模型 `backend/src/infrastructure/persistence/models/resource_limit_config_model.py`,包含限制验证逻辑,关联 User (通过 role),支持项目级和全局级配置 (project_id nullable),实现默认限制查询方法 (根据 user role + project 查找适用配置),提供配额检查和应用默认限制的服务接口
+- [X] [T012a] 创建 AuditLog 模型 - 领域实体 `backend/src/domain/entities/audit_log.py` + ORM 模型 `backend/src/infrastructure/persistence/models/audit_log_model.py`,包含自动过期逻辑 (expires_at = created_at + 90天),关联 User,支持操作类型和资源类型枚举,实现审计日志查询优化
 
 ### 认证中间件
 - [ ] [T013] 实现基础认证中间件 - `backend/src/api/middleware/auth.py`,验证 IAM Identity Center token,提取用户信息

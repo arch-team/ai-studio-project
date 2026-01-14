@@ -3,7 +3,7 @@ version: '3.8'
 services:
   # MySQL 8.0 数据库服务 (开发环境)
   mysql:
-    image: mysql:8.0.28
+    image: mysql:8.0
     container_name: ai-training-mysql
     restart: unless-stopped
     environment:
@@ -16,6 +16,7 @@ services:
     volumes:
       - mysql_data:/var/lib/mysql
       - ./docker/mysql/init:/docker-entrypoint-initdb.d:ro
+    command: --log-bin-trust-function-creators=1
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD:-devpassword}"]
       interval: 10s
