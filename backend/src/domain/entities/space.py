@@ -48,10 +48,7 @@ SPACE_STATE_TRANSITIONS = {
 
 @dataclass
 class Space:
-    """Development space domain entity for online IDE environments.
-
-    Represents a SageMaker Space for JupyterLab/VS Code development.
-    """
+    """Development space domain entity for online IDE environments."""
 
     id: str  # UUID
     space_name: str

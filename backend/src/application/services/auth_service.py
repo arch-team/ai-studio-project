@@ -83,7 +83,6 @@ class AuthService:
         """Authenticate with username and password."""
         user = await self._get_user_by_username(username)
 
-        # Record login attempt (for auditing)
         attempt = LoginAttemptModel(
             user_id=user.id if user else None,
             username=username,
@@ -93,7 +92,6 @@ class AuthService:
         )
 
         try:
-            # Check user exists and is local account
             if not user:
                 attempt.failure_reason = "user_not_found"
                 raise AuthenticationError("Invalid credentials")
@@ -102,12 +100,10 @@ class AuthService:
                 attempt.failure_reason = "not_local_account"
                 raise AuthenticationError("This account uses SSO authentication")
 
-            # Check account status
             if user.status != UserStatus.ACTIVE:
                 attempt.failure_reason = "account_inactive"
                 raise AuthenticationError("Account is not active")
 
-            # Check account lock
             if user.is_locked():
                 attempt.failure_reason = "account_locked"
                 raise AccountLockedError(

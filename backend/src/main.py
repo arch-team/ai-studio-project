@@ -1,8 +1,4 @@
-"""AI Training Platform - FastAPI Application Entry Point.
-
-This is the main entry point for the FastAPI application.
-It configures middleware, routes, and application lifecycle events.
-"""
+"""AI Training Platform - FastAPI Application Entry Point."""
 
 from contextlib import asynccontextmanager
 from typing import AsyncIterator
@@ -17,27 +13,18 @@ from src.infrastructure.config import get_settings
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
-    """Application lifecycle manager.
-
-    Handles startup and shutdown events for the application.
-    """
-    # Startup
+    """Application lifecycle manager."""
     settings = get_settings()
     print(f"Starting {settings.app_name} v{settings.app_version}")
     print(f"Environment: {settings.environment}")
 
     yield
 
-    # Shutdown
     print("Shutting down application...")
 
 
 def create_app() -> FastAPI:
-    """Create and configure the FastAPI application.
-
-    Returns:
-        Configured FastAPI application instance.
-    """
+    """Create and configure the FastAPI application."""
     settings = get_settings()
 
     app = FastAPI(
@@ -65,9 +52,8 @@ def create_app() -> FastAPI:
     # Register API routers
     app.include_router(v1_router, prefix="/api")
 
-    # Health check endpoint
     @app.get("/health", tags=["Health"])
-    async def health_check() -> dict:
+    async def _health_check() -> dict:
         """Health check endpoint for load balancers and monitoring."""
         return {
             "status": "healthy",

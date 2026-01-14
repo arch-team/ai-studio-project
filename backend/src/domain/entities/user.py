@@ -37,15 +37,7 @@ class UserRole(Enum):
 
 @dataclass
 class User:
-    """User domain entity representing a platform user.
-
-    Attributes:
-        id: Unique user identifier
-        username: IAM username (unique)
-        email: Email address (unique)
-        status: Account status
-        role: Platform role determining permissions
-    """
+    """User domain entity representing a platform user."""
 
     id: int
     username: str

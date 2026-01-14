@@ -15,14 +15,13 @@ def get_current_user(request: Request) -> Optional[CurrentUser]:
 
 def get_current_active_user(request: Request) -> CurrentUser:
     """Get current active user from request (required)."""
-    user = CurrentUser.from_request(request)
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Not authenticated",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-    return user
+    if user := CurrentUser.from_request(request):
+        return user
+    raise HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Not authenticated",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
 
 
 class RequirePermission:

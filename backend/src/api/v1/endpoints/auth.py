@@ -39,8 +39,7 @@ router = APIRouter(prefix="/auth", tags=["Authentication"])
 
 def _get_client_ip(request: Request) -> str:
     """Extract client IP from request."""
-    forwarded = request.headers.get("X-Forwarded-For")
-    if forwarded:
+    if forwarded := request.headers.get("X-Forwarded-For"):
         return forwarded.split(",")[0].strip()
     return request.client.host if request.client else "unknown"
 
@@ -81,9 +80,8 @@ async def login(
                 # Map groups to role and create/get user
                 role = map_groups_to_role(user_info.groups)
 
-                # For SSO, we need to create or get the user
+                # Get or create SSO user
                 from sqlalchemy import select
-
                 from src.infrastructure.persistence.models import (
                     AuthType,
                     UserModel,

@@ -40,15 +40,7 @@ class PasswordValidator:
 
     @staticmethod
     def validate_strength(password: str) -> List[str]:
-        """Validate password strength, return list of violations.
-
-        Requirements (FR-015):
-        - Minimum 12 characters
-        - At least one lowercase letter
-        - At least one uppercase letter
-        - At least one digit
-        - At least one special character
-        """
+        """Validate password strength per FR-015 requirements."""
         violations = []
 
         if len(password) < PASSWORD_MIN_LENGTH:
@@ -76,18 +68,12 @@ class PasswordValidator:
         password_history: List[str],
         hasher: PasswordHasher,
     ) -> bool:
-        """Check if password was recently used.
-
-        Returns True if password is OK (not in history), False if it was recently used.
-        """
-        # Only check the most recent N passwords
+        """Check if password was recently used (True if OK, False if reused)."""
         recent_history = password_history[:PASSWORD_HISTORY_COUNT]
-
-        for old_hash in recent_history:
-            if hasher.verify_password(new_password, old_hash):
-                return False
-
-        return True
+        return not any(
+            hasher.verify_password(new_password, old_hash)
+            for old_hash in recent_history
+        )
 
 
 # Singleton instance for convenience

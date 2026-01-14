@@ -76,21 +76,14 @@ class AuthenticationMiddleware(BaseHTTPMiddleware):
 
     def _is_exempt_path(self, path: str) -> bool:
         """Check if path is exempt from authentication."""
-        # Exact match
         if path in EXEMPT_PATHS:
             return True
 
-        # Pattern match
-        for pattern in EXEMPT_PATTERNS:
-            if re.match(pattern, path):
-                return True
-
-        return False
+        return any(re.match(pattern, path) for pattern in EXEMPT_PATTERNS)
 
     def _extract_token(self, request: Request) -> Optional[str]:
         """Extract Bearer token from Authorization header."""
-        auth_header = request.headers.get("Authorization")
-        if not auth_header:
+        if not (auth_header := request.headers.get("Authorization")):
             return None
 
         parts = auth_header.split()

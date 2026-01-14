@@ -1,7 +1,4 @@
-"""Application Settings - Pydantic settings configuration.
-
-Loads configuration from environment variables with validation.
-"""
+"""Application Settings - Pydantic settings configuration."""
 
 from functools import lru_cache
 from typing import Optional

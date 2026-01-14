@@ -149,9 +149,7 @@ class RBACService:
     def has_permission(self, role: str, permission: Permission) -> bool:
         """Check if a role has a specific permission."""
         role_lower = role.lower()
-        if role_lower not in ROLE_PERMISSIONS:
-            return False
-        return permission in ROLE_PERMISSIONS[role_lower]
+        return permission in ROLE_PERMISSIONS.get(role_lower, set())
 
     def has_role_level(self, role: str, required_role: str) -> bool:
         """Check if a role meets or exceeds the required role level."""
