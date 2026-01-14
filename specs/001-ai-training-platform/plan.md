@@ -646,56 +646,321 @@ backend/
 
 frontend/
 ├── src/
-│   ├── main.tsx                    # React 应用入口
-│   ├── App.tsx                     # 根组件 (Cloudscape AppLayout)
-│   ├── pages/                      # 页面组件
-│   │   ├── TrainingJobs/           # 训练任务页面
-│   │   │   ├── List.tsx            # 训练任务列表
-│   │   │   ├── Create.tsx          # 创建训练任务
-│   │   │   └── Detail.tsx          # 训练任务详情
-│   │   ├── Datasets/               # 数据集页面
-│   │   ├── ResourceQuotas/         # 资源配额页面
-│   │   ├── Monitoring/             # 监控面板页面
-│   │   └── Spaces/                 # 开发空间页面
-│   ├── components/                 # 共享组件
-│   │   ├── common/                 # 通用组件 (基于 Cloudscape)
-│   │   │   ├── DataTable.tsx       # 数据表格封装
-│   │   │   ├── StatusIndicator.tsx # 状态指示器
-│   │   │   └── Charts.tsx          # 图表组件 (集成 Recharts + Cloudscape)
-│   │   └── domain/                 # 领域组件
-│   │       ├── TrainingJobCard.tsx # 训练任务卡片
-│   │       └── DatasetUploader.tsx # 数据集上传器
-│   ├── services/                   # API 调用服务
-│   │   ├── api.ts                  # Axios 封装
-│   │   ├── training-jobs.ts        # 训练任务 API
-│   │   ├── datasets.ts             # 数据集 API
-│   │   └── monitoring.ts           # 监控 API
-│   ├── stores/                     # Zustand 状态管理
-│   │   ├── auth.ts                 # 认证状态
-│   │   └── ui.ts                   # UI 状态 (侧边栏/主题等)
-│   ├── hooks/                      # React Hooks
-│   │   ├── useTrainingJobs.ts      # TanStack Query (训练任务)
-│   │   ├── useDatasets.ts          # TanStack Query (数据集)
-│   │   └── useAuth.ts              # 认证 Hook
-│   ├── utils/                      # 工具函数
-│   │   ├── format.ts               # 格式化工具
-│   │   └── validation.ts           # 表单验证
-│   └── types/                      # TypeScript 类型定义
-│       ├── training-job.ts         # 训练任务类型
-│       ├── dataset.ts              # 数据集类型
-│       └── api.ts                  # API 响应类型
+│   ├── app/                              # 应用层 - 全局配置和入口
+│   │   ├── App.tsx                       # 根组件 (Cloudscape AppLayout)
+│   │   ├── main.tsx                      # React 应用入口
+│   │   ├── providers/                    # 全局 Provider 组件
+│   │   │   ├── index.tsx                 # 组合所有 Providers
+│   │   │   ├── QueryProvider.tsx         # TanStack Query Provider
+│   │   │   └── ThemeProvider.tsx         # Cloudscape 主题 Provider
+│   │   └── router/                       # 路由配置
+│   │       ├── index.tsx                 # 路由定义
+│   │       ├── routes.ts                 # 路由常量
+│   │       └── guards/                   # 路由守卫
+│   │           ├── AuthGuard.tsx         # 认证守卫
+│   │           └── RoleGuard.tsx         # 角色权限守卫
+│   │
+│   ├── features/                         # 功能模块层 - 按业务域组织 (垂直切片架构)
+│   │   ├── training/                     # 训练任务管理模块
+│   │   │   ├── api/                      # API 调用
+│   │   │   │   ├── trainingJobApi.ts     # 训练任务 CRUD
+│   │   │   │   └── queries.ts            # TanStack Query hooks
+│   │   │   ├── components/               # 模块专用组件
+│   │   │   │   ├── TrainingJobTable.tsx
+│   │   │   │   ├── TrainingJobForm.tsx
+│   │   │   │   ├── TrainingStatusBadge.tsx
+│   │   │   │   ├── MetricsChart.tsx
+│   │   │   │   └── index.ts
+│   │   │   ├── hooks/                    # 模块专用 hooks
+│   │   │   │   ├── useTrainingJob.ts
+│   │   │   │   ├── useTrainingMetrics.ts
+│   │   │   │   └── index.ts
+│   │   │   ├── pages/                    # 页面组件
+│   │   │   │   ├── TrainingJobListPage.tsx
+│   │   │   │   ├── TrainingJobDetailPage.tsx
+│   │   │   │   ├── CreateTrainingJobPage.tsx
+│   │   │   │   └── index.ts
+│   │   │   ├── types/                    # 模块类型定义
+│   │   │   │   └── index.ts
+│   │   │   └── index.ts                  # 模块公开导出
+│   │   │
+│   │   ├── datasets/                     # 数据集管理模块
+│   │   │   ├── api/
+│   │   │   │   ├── datasetApi.ts
+│   │   │   │   └── queries.ts
+│   │   │   ├── components/
+│   │   │   │   ├── DatasetTable.tsx
+│   │   │   │   ├── DatasetUploader.tsx
+│   │   │   │   ├── VersionSelector.tsx
+│   │   │   │   └── index.ts
+│   │   │   ├── hooks/
+│   │   │   │   ├── useDataset.ts
+│   │   │   │   ├── useDatasetUpload.ts
+│   │   │   │   └── index.ts
+│   │   │   ├── pages/
+│   │   │   │   ├── DatasetListPage.tsx
+│   │   │   │   ├── DatasetDetailPage.tsx
+│   │   │   │   ├── CreateDatasetPage.tsx
+│   │   │   │   ├── DatasetVersionsPage.tsx  # 数据集版本历史页面
+│   │   │   │   └── index.ts
+│   │   │   ├── types/
+│   │   │   │   └── index.ts
+│   │   │   └── index.ts
+│   │   │
+│   │   ├── models/                       # 模型版本管理模块
+│   │   │   ├── api/
+│   │   │   │   ├── modelApi.ts           # 模型 CRUD + SageMaker Registry
+│   │   │   │   └── queries.ts            # TanStack Query hooks
+│   │   │   ├── components/
+│   │   │   │   ├── ModelTable.tsx        # 模型列表表格
+│   │   │   │   ├── ModelVersionTable.tsx # 版本历史表格
+│   │   │   │   ├── ModelMetricsCompare.tsx # 版本指标对比
+│   │   │   │   ├── RegistrySyncStatus.tsx  # Registry 同步状态
+│   │   │   │   └── index.ts
+│   │   │   ├── hooks/
+│   │   │   │   ├── useModel.ts           # 模型详情
+│   │   │   │   ├── useModelVersions.ts   # 版本列表
+│   │   │   │   └── index.ts
+│   │   │   ├── pages/
+│   │   │   │   ├── ModelListPage.tsx     # 模型列表页
+│   │   │   │   ├── ModelDetailPage.tsx   # 模型详情页
+│   │   │   │   ├── ModelVersionsPage.tsx # 版本管理页 (T035a)
+│   │   │   │   └── index.ts
+│   │   │   ├── types/
+│   │   │   │   └── index.ts
+│   │   │   └── index.ts
+│   │   │
+│   │   ├── resources/                    # 资源配额管理模块
+│   │   │   ├── api/
+│   │   │   │   ├── quotaApi.ts
+│   │   │   │   └── queries.ts
+│   │   │   ├── components/
+│   │   │   │   ├── QuotaUsageCard.tsx
+│   │   │   │   ├── QuotaTable.tsx
+│   │   │   │   └── index.ts
+│   │   │   ├── hooks/
+│   │   │   ├── pages/
+│   │   │   │   ├── QuotaManagementPage.tsx
+│   │   │   │   └── index.ts
+│   │   │   ├── types/
+│   │   │   └── index.ts
+│   │   │
+│   │   ├── monitoring/                   # 集群监控模块
+│   │   │   ├── api/
+│   │   │   │   ├── metricsApi.ts
+│   │   │   │   └── queries.ts
+│   │   │   ├── components/
+│   │   │   │   ├── ClusterOverview.tsx
+│   │   │   │   ├── GPUUtilizationChart.tsx
+│   │   │   │   ├── NodeStatusTable.tsx
+│   │   │   │   └── index.ts
+│   │   │   ├── hooks/
+│   │   │   │   ├── useClusterMetrics.ts
+│   │   │   │   └── usePollingMetrics.ts
+│   │   │   ├── pages/
+│   │   │   │   ├── MonitoringDashboardPage.tsx
+│   │   │   │   └── index.ts
+│   │   │   ├── types/
+│   │   │   └── index.ts
+│   │   │
+│   │   ├── spaces/                       # 开发空间 (Spaces) 模块
+│   │   │   ├── api/
+│   │   │   │   ├── spaceApi.ts
+│   │   │   │   └── queries.ts
+│   │   │   ├── components/
+│   │   │   │   ├── SpaceCard.tsx
+│   │   │   │   ├── SpaceLauncher.tsx
+│   │   │   │   ├── SpaceStatusIndicator.tsx
+│   │   │   │   └── index.ts
+│   │   │   ├── hooks/
+│   │   │   │   ├── useSpace.ts
+│   │   │   │   └── useSpaceConnection.ts
+│   │   │   ├── pages/
+│   │   │   │   ├── SpaceListPage.tsx
+│   │   │   │   ├── CreateSpacePage.tsx
+│   │   │   │   └── index.ts
+│   │   │   ├── types/
+│   │   │   └── index.ts
+│   │   │
+│   │   ├── auth/                         # 认证授权模块
+│   │   │   ├── api/
+│   │   │   │   ├── authApi.ts
+│   │   │   │   └── queries.ts
+│   │   │   ├── components/
+│   │   │   │   ├── LoginForm.tsx
+│   │   │   │   ├── SSOButton.tsx
+│   │   │   │   └── index.ts
+│   │   │   ├── hooks/
+│   │   │   │   ├── useAuth.ts
+│   │   │   │   └── useCurrentUser.ts
+│   │   │   ├── pages/
+│   │   │   │   ├── LoginPage.tsx
+│   │   │   │   ├── LogoutPage.tsx
+│   │   │   │   └── index.ts
+│   │   │   ├── store/
+│   │   │   │   └── authStore.ts          # 认证状态 (Zustand)
+│   │   │   ├── types/
+│   │   │   └── index.ts
+│   │   │
+│   │   ├── admin/                        # 管理后台模块
+│   │   │   ├── api/
+│   │   │   │   ├── adminApi.ts
+│   │   │   │   └── queries.ts
+│   │   │   ├── components/
+│   │   │   │   ├── UserTable.tsx
+│   │   │   │   ├── AuditLogTable.tsx
+│   │   │   │   └── index.ts
+│   │   │   ├── hooks/
+│   │   │   │   ├── useUsers.ts
+│   │   │   │   └── useAuditLogs.ts
+│   │   │   ├── pages/
+│   │   │   │   ├── UserManagementPage.tsx
+│   │   │   │   ├── AuditLogsPage.tsx
+│   │   │   │   └── index.ts
+│   │   │   ├── types/
+│   │   │   │   └── index.ts
+│   │   │   └── index.ts
+│   │   │
+│   │   ├── reports/                      # 报表分析模块
+│   │   │   ├── api/
+│   │   │   │   ├── reportsApi.ts
+│   │   │   │   └── queries.ts
+│   │   │   ├── components/
+│   │   │   │   ├── ResourceUsageChart.tsx
+│   │   │   │   ├── CostTrendChart.tsx
+│   │   │   │   ├── CostDistributionPie.tsx
+│   │   │   │   └── index.ts
+│   │   │   ├── hooks/
+│   │   │   │   ├── useResourceUsage.ts
+│   │   │   │   └── useCostAnalysis.ts
+│   │   │   ├── pages/
+│   │   │   │   ├── ResourceUsageReportPage.tsx
+│   │   │   │   ├── CostAnalysisPage.tsx
+│   │   │   │   └── index.ts
+│   │   │   ├── types/
+│   │   │   │   └── index.ts
+│   │   │   └── index.ts
+│   │   │
+│   │   └── dashboard/                    # 仪表盘模块
+│   │       ├── components/
+│   │       │   ├── WelcomeCard.tsx
+│   │       │   ├── QuickActions.tsx
+│   │       │   ├── RecentActivity.tsx
+│   │       │   └── index.ts
+│   │       ├── pages/
+│   │       │   ├── HomePage.tsx
+│   │       │   └── index.ts
+│   │       └── index.ts
+│   │
+│   ├── shared/                           # 共享层 - 跨模块复用
+│   │   ├── components/                   # 共享 UI 组件
+│   │   │   ├── feedback/                 # 反馈类组件
+│   │   │   │   ├── ConfirmModal.tsx
+│   │   │   │   ├── ErrorBoundary.tsx
+│   │   │   │   ├── LoadingSpinner.tsx
+│   │   │   │   ├── EmptyState.tsx
+│   │   │   │   └── index.ts
+│   │   │   ├── forms/                    # 表单类组件
+│   │   │   │   ├── FormField.tsx
+│   │   │   │   ├── SelectField.tsx
+│   │   │   │   ├── FileUpload.tsx
+│   │   │   │   └── index.ts
+│   │   │   ├── data-display/             # 数据展示组件
+│   │   │   │   ├── DataTable.tsx         # 通用数据表格
+│   │   │   │   ├── KeyValuePairs.tsx
+│   │   │   │   ├── StatusIndicator.tsx
+│   │   │   │   └── index.ts
+│   │   │   ├── navigation/               # 导航组件
+│   │   │   │   ├── Breadcrumbs.tsx
+│   │   │   │   ├── PageHeader.tsx
+│   │   │   │   └── index.ts
+│   │   │   └── index.ts                  # 统一导出
+│   │   │
+│   │   ├── hooks/                        # 共享 Hooks
+│   │   │   ├── useDebounce.ts
+│   │   │   ├── usePagination.ts
+│   │   │   ├── useLocalStorage.ts
+│   │   │   ├── useNotification.ts
+│   │   │   ├── useConfirm.ts
+│   │   │   └── index.ts
+│   │   │
+│   │   ├── utils/                        # 工具函数
+│   │   │   ├── date.ts                   # 日期格式化
+│   │   │   ├── number.ts                 # 数字格式化
+│   │   │   ├── string.ts                 # 字符串处理
+│   │   │   ├── validation.ts             # 通用验证
+│   │   │   └── index.ts
+│   │   │
+│   │   └── constants/                    # 共享常量
+│   │       ├── api.ts                    # API 相关常量
+│   │       ├── routes.ts                 # 路由路径常量
+│   │       ├── status.ts                 # 状态枚举
+│   │       └── index.ts
+│   │
+│   ├── layouts/                          # 布局组件层
+│   │   ├── MainLayout/                   # 主布局
+│   │   │   ├── MainLayout.tsx
+│   │   │   ├── Navigation.tsx            # 侧边栏导航
+│   │   │   ├── TopNavigation.tsx         # 顶部导航
+│   │   │   ├── Breadcrumbs.tsx           # 面包屑
+│   │   │   └── index.ts
+│   │   ├── AuthLayout/                   # 认证页面布局
+│   │   │   ├── AuthLayout.tsx
+│   │   │   └── index.ts
+│   │   └── index.ts
+│   │
+│   ├── lib/                              # 基础设施层
+│   │   ├── api/                          # API 客户端
+│   │   │   ├── client.ts                 # Axios/Fetch 客户端
+│   │   │   ├── interceptors.ts           # 请求/响应拦截器
+│   │   │   └── index.ts
+│   │   ├── query/                        # TanStack Query 配置
+│   │   │   ├── queryClient.ts            # Query Client 实例
+│   │   │   ├── queryKeys.ts              # Query Key 工厂
+│   │   │   └── index.ts
+│   │   ├── storage/                      # 本地存储封装
+│   │   │   └── localStorage.ts
+│   │   └── index.ts
+│   │
+│   ├── store/                            # 全局状态管理 (Zustand)
+│   │   ├── slices/                       # 状态切片
+│   │   │   ├── uiSlice.ts                # UI 状态 (侧边栏、主题等)
+│   │   │   └── notificationSlice.ts      # 通知状态
+│   │   ├── index.ts                      # 组合所有 Store
+│   │   └── types.ts                      # Store 类型定义
+│   │
+│   └── types/                            # 全局类型定义
+│       ├── api.ts                        # API 响应类型
+│       ├── entities/                     # 业务实体类型
+│       │   ├── trainingJob.ts
+│       │   ├── dataset.ts
+│       │   ├── model.ts
+│       │   ├── resourceQuota.ts
+│       │   ├── space.ts
+│       │   ├── user.ts
+│       │   └── index.ts
+│       ├── common.ts                     # 通用类型
+│       └── index.ts
 │
 ├── tests/
-│   ├── unit/                       # 单元测试 (Jest/Vitest)
-│   │   ├── components/             # 组件测试
-│   │   └── utils/                  # 工具函数测试
-│   └── e2e/                        # E2E 测试 (Playwright)
+│   ├── setup.ts                          # 测试配置
+│   ├── mocks/                            # Mock 数据
+│   │   ├── handlers.ts                   # MSW handlers
+│   │   └── data/
+│   │       ├── trainingJobs.ts
+│   │       └── datasets.ts
+│   ├── unit/                             # 单元测试 (Vitest)
+│   │   ├── components/                   # 组件测试
+│   │   ├── hooks/                        # Hooks 测试
+│   │   └── utils/                        # 工具函数测试
+│   └── e2e/                              # E2E 测试 (Playwright)
 │       └── training-workflow.spec.ts
 │
-├── package.json                    # npm 依赖管理
-├── tsconfig.json                   # TypeScript 配置
-├── vite.config.ts                  # Vite 构建配置
-└── playwright.config.ts            # Playwright 配置
+├── index.html                            # HTML 入口
+├── package.json                          # npm 依赖管理
+├── tsconfig.json                         # TypeScript 配置
+├── vite.config.ts                        # Vite 构建配置
+└── playwright.config.ts                  # Playwright 配置
 
 infrastructure/                     # 基础设施即代码 (IaC)
 ├── cdk/                            # AWS CDK (Python)
@@ -731,9 +996,40 @@ infrastructure/                     # 基础设施即代码 (IaC)
   - `api/`: API 层 - 包含 REST 端点、Pydantic Schema、FastAPI 依赖注入，**依赖 application 层**
   - `core/`: 共享核心 - 跨层工具 (配置、安全、日志)
   - **依赖规则**: 依赖方向 **MUST** 从外层指向内层，内层 **MUST NOT** 依赖外层
-- **前端**: 按页面和组件水平切分, 遵循 Cloudscape 布局模式和 React 最佳实践 (不适用 Clean Architecture)
+- **前端**: 采用 **功能模块化架构 (Feature-based Architecture)** + **垂直切片架构 (Vertical Slice)**:
+  - `app/`: 应用层 - 全局配置、入口、Providers、路由守卫
+  - `features/`: 功能模块层 - **按业务域组织的独立模块**，每个模块包含完整的 api/components/hooks/pages/types
+  - `shared/`: 共享层 - 跨模块复用的组件、hooks、工具函数、常量
+  - `layouts/`: 布局组件层 - MainLayout、AuthLayout 等页面布局
+  - `lib/`: 基础设施层 - API 客户端、TanStack Query 配置、存储封装
+  - `store/`: 全局状态层 - Zustand 状态切片 (仅存放真正全局的状态，模块本地状态放在 features/*/store/)
+  - `types/`: 全局类型层 - 业务实体类型、API 响应类型
+  - **设计优势**: (1)功能内聚，每个业务模块独立可测试 (2)支持 10+ 前端开发者并行开发，减少合并冲突 (3)清晰的依赖边界，shared/ 和 lib/ 供所有 features/ 使用
+  - **参考案例**: Airbnb (Feature-based)、Uber (Web App Platform)、Stripe Dashboard (Vertical Slice)
 - **基础设施**: 采用 AWS CDK Construct/Stack 模式 (不适用 Clean Architecture)
 - **测试**: 按测试类型分层 (unit/integration/e2e), 对齐测试金字塔策略，测试目录结构对齐源码分层
+
+**前端文件命名规范**:
+| 类型 | 命名规范 | 示例 |
+|------|---------|------|
+| 页面组件 | `{名称}Page.tsx` | `TrainingJobListPage.tsx` |
+| UI 组件 | `{名称}.tsx` (PascalCase) | `TrainingJobTable.tsx` |
+| Hooks | `use{名称}.ts` | `useTrainingJob.ts` |
+| API 函数 | `{资源}Api.ts` | `trainingJobApi.ts` |
+| Query Hooks | `queries.ts` | `queries.ts` |
+| Store | `{名称}Slice.ts` | `uiSlice.ts` |
+
+**前端路径别名配置** (vite.config.ts 和 tsconfig.json):
+```typescript
+'@': 'src/*'
+'@app': 'src/app/*'
+'@features': 'src/features/*'
+'@shared': 'src/shared/*'
+'@layouts': 'src/layouts/*'
+'@lib': 'src/lib/*'
+'@store': 'src/store/*'
+'@types': 'src/types/*'
+```
 
 ## Complexity Tracking
 

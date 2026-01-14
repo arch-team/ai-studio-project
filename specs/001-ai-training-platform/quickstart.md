@@ -381,23 +381,83 @@ mypy src/
 
 ### 5.2 前端开发
 
-**目录结构**:
+**目录结构** (Feature-based Architecture):
 ```
-frontend/
-├── src/
-│   ├── main.tsx                # React 应用入口
-│   ├── App.tsx                 # 根组件
-│   ├── layouts/                # 布局组件 (MainLayout.tsx)
-│   ├── pages/                  # 页面组件
-│   │   ├── Dashboard/
-│   │   ├── Jobs/
-│   │   ├── Datasets/
-│   │   └── Settings/
-│   ├── components/             # 共享组件
-│   ├── stores/                 # Zustand 状态管理
-│   ├── api/                    # TanStack Query Hooks
-│   └── types/                  # TypeScript 类型定义
-└── package.json
+frontend/src/
+├── app/                              # 应用层 - 全局配置和入口
+│   ├── App.tsx                       # 根组件
+│   ├── main.tsx                      # 应用入口
+│   ├── providers/                    # 全局 Provider 组件
+│   │   ├── index.tsx                 # 组合所有 Providers
+│   │   ├── QueryProvider.tsx         # TanStack Query Provider
+│   │   └── ThemeProvider.tsx         # Cloudscape 主题 Provider
+│   └── router/                       # 路由配置
+│       ├── index.tsx                 # 路由定义
+│       ├── routes.ts                 # 路由常量
+│       └── guards/                   # 路由守卫
+│           ├── AuthGuard.tsx         # 认证守卫
+│           └── RoleGuard.tsx         # 角色权限守卫
+│
+├── features/                         # 功能模块层 - 按业务域组织
+│   ├── training/                     # 训练任务管理
+│   │   ├── api/                      # API 调用和 TanStack Query hooks
+│   │   ├── components/               # 模块专用组件
+│   │   ├── hooks/                    # 模块专用 hooks
+│   │   ├── pages/                    # 页面组件 (*Page.tsx)
+│   │   └── types/                    # 模块类型定义
+│   ├── datasets/                     # 数据集管理模块
+│   ├── models/                       # 模型版本管理模块
+│   ├── resources/                    # 资源配额管理模块
+│   ├── monitoring/                   # 集群监控模块
+│   ├── spaces/                       # 开发空间模块
+│   ├── auth/                         # 认证授权模块
+│   ├── admin/                        # 管理后台模块 (用户管理、审计日志)
+│   ├── reports/                      # 报表分析模块 (资源使用、成本分析)
+│   └── dashboard/                    # 仪表盘模块
+│
+├── shared/                           # 共享层 - 跨模块复用
+│   ├── components/                   # 共享 UI 组件
+│   │   ├── feedback/                 # 反馈类 (ErrorBoundary, Spinner)
+│   │   ├── forms/                    # 表单类 (DateRangePicker)
+│   │   └── data-display/             # 数据展示 (DataTable)
+│   ├── hooks/                        # 共享 Hooks
+│   └── utils/                        # 工具函数
+│
+├── layouts/                          # 布局组件层
+│   └── MainLayout/                   # 主布局
+│       ├── MainLayout.tsx
+│       ├── Navigation.tsx            # 侧边栏导航
+│       └── TopNavigation.tsx         # 顶部导航
+│
+├── lib/                              # 基础设施层
+│   ├── api/                          # API 客户端
+│   │   ├── client.ts                 # HTTP 客户端
+│   │   └── interceptors.ts           # 请求/响应拦截器
+│   └── query/                        # TanStack Query 配置
+│       ├── queryClient.ts
+│       └── queryKeys.ts              # Query Key 工厂
+│
+├── store/                            # 全局状态管理 (Zustand)
+│   └── slices/
+│       ├── uiSlice.ts                # UI 状态
+│       └── notificationSlice.ts      # 通知状态
+│
+└── types/                            # 全局类型定义
+    └── entities/                     # 业务实体类型
+```
+
+> 📖 **完整目录结构**: 以上为简化版本，完整的前端目录结构（包含所有功能模块的详细文件清单）请参阅 [plan.md](./plan.md#directory-structure) 的 `frontend/` 部分。
+
+**路径别名配置** (vite.config.ts 和 tsconfig.json):
+```typescript
+// 支持的路径别名
+'@app/*'      → 'src/app/*'
+'@features/*' → 'src/features/*'
+'@shared/*'   → 'src/shared/*'
+'@layouts/*'  → 'src/layouts/*'
+'@lib/*'      → 'src/lib/*'
+'@store/*'    → 'src/store/*'
+'@types/*'    → 'src/types/*'
 ```
 
 **开发命令**:

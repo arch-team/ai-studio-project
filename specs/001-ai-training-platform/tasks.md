@@ -106,7 +106,7 @@
 - [X] [T004] [P] 配置 backend/requirements.txt - 添加 fastapi==0.109.0, sqlalchemy==2.0+, alembic, aiomysql, pydantic==2.0+, boto3, sagemaker-hyperpod SDK
 
 ### 前端项目结构
-- [X] [T002] [P] 创建 frontend/ 项目结构 - 使用 Vite + React 18 + TypeScript,创建 `frontend/src/` 目录结构 (pages/, components/, layouts/, store/, lib/)
+- [X] [T002] [P] 创建 frontend/ 项目结构 - 使用 Vite + React 18 + TypeScript,创建 `frontend/src/` 目录结构 (app/, features/, shared/, layouts/, lib/, store/, types/),配置路径别名 (@app, @features, @shared, @layouts, @lib, @store, @types)
 - [X] [T005] [P] 配置 frontend/package.json - 添加 react@18, @cloudscape-design/components, zustand, @tanstack/react-query@5, react-router-dom
 
 ### 开发环境配置
@@ -392,10 +392,10 @@
 - [ ] [T016b] 审计日志中间件 - `backend/src/api/middleware/audit.py`,拦截所有 API 请求,自动记录操作日志 (user_id, operation_type, resource_type, request/response data),异步写入数据库,确保审计完整性
 
 ### 前端基础配置
-- [ ] [T017] [P] 配置 React Router - `frontend/src/App.tsx`,路由配置 (/training-jobs, /datasets, /admin, /reports, /ide)
-- [ ] [T018] [P] 创建 Cloudscape Layout - `frontend/src/layouts/MainLayout.tsx`,使用 AppLayout 组件,配置侧边导航和顶部导航
-- [ ] [T019] [P] 配置 Zustand store - `frontend/src/store/`,创建 authStore, trainingJobsStore, datasetsStore
-- [ ] [T020] [P] 配置 TanStack Query - `frontend/src/lib/queryClient.ts`,配置全局 query client,设置重试策略和缓存策略
+- [ ] [T017] [P] 配置 React Router - `frontend/src/app/App.tsx` 和 `frontend/src/app/router/index.tsx`,路由配置 (/training-jobs, /datasets, /admin, /reports, /ide),配置路由守卫 (AuthGuard, RoleGuard)
+- [ ] [T018] [P] 创建 Cloudscape Layout - `frontend/src/layouts/MainLayout/MainLayout.tsx`,使用 AppLayout 组件,配置侧边导航 (Navigation.tsx) 和顶部导航 (TopNavigation.tsx)
+- [ ] [T019] [P] 配置 Zustand store - `frontend/src/store/slices/`,创建 uiSlice.ts (UI 状态), notificationSlice.ts (通知状态),按功能模块划分状态切片
+- [ ] [T020] [P] 配置 TanStack Query - `frontend/src/lib/query/queryClient.ts` 和 `frontend/src/lib/query/queryKeys.ts`,配置全局 query client,设置重试策略和缓存策略,创建 Query Key 工厂
 
 **并行执行机会**:
 - 数据库迁移: T009 → T010 → T010b → T010a → T010c 串行执行 (确保 Alembic 版本号正确)
@@ -434,11 +434,15 @@
 - [ ] [T031d] [US1] POST /training-jobs/{id}/checkpoints 端点实现 - `backend/src/api/v1/endpoints/training_jobs.py`,支持用户手动触发检查点创建,验证任务状态 (仅 Running 状态可创建),调用 checkpoint_service 创建检查点,返回检查点 ID 和存储路径 (依赖 T038)
 
 ### 前端页面组件
-- [ ] [T032] [US1] [P] 训练任务列表页面 - `frontend/src/pages/TrainingJobs/List.tsx`,使用 Cloudscape Table 组件,支持分页/过滤/排序,实时状态更新
-- [ ] [T033] [US1] [P] 训练任务创建表单 - `frontend/src/pages/TrainingJobs/Create.tsx`,使用 Cloudscape Form 组件,验证训练配置 (实例类型,节点数,训练脚本路径),配额实时检查
-- [ ] [T034] [US1] [P] 训练任务详情页面 - `frontend/src/pages/TrainingJobs/Detail.tsx`,展示训练配置、实时指标、日志流、检查点列表,支持暂停/恢复/终止操作
-- [ ] [T035] [US1] [P] 训练状态监控组件 - `frontend/src/components/TrainingStatus.tsx`,实时显示 GPU 利用率、训练进度、损失曲线,30秒刷新间隔
-- [ ] [T035a] [US1] [P] 模型版本管理页面 - `frontend/src/pages/Models/Versions.tsx`,使用 Cloudscape Table 展示模型版本历史,支持版本对比(metrics diff)、模型回滚、SageMaker Model Registry 同步状态显示
+- [ ] [T032] [US1] [P] 训练任务列表页面 - `frontend/src/features/training/pages/TrainingJobListPage.tsx`,使用 Cloudscape Table 组件,支持分页/过滤/排序,实时状态更新,创建模块 API 层 `frontend/src/features/training/api/queries.ts`
+- [ ] [T033] [US1] [P] 训练任务创建表单 - `frontend/src/features/training/pages/CreateTrainingJobPage.tsx`,使用 Cloudscape Form 组件,验证训练配置 (实例类型,节点数,训练脚本路径),配额实时检查,创建表单组件 `frontend/src/features/training/components/TrainingJobForm.tsx`
+- [ ] [T034] [US1] [P] 训练任务详情页面 - `frontend/src/features/training/pages/TrainingJobDetailPage.tsx`,展示训练配置、实时指标、日志流、检查点列表,支持暂停/恢复/终止操作
+- [ ] [T035] [US1] [P] 训练状态监控组件 - `frontend/src/features/training/components/TrainingStatusMonitor.tsx`,实时显示 GPU 利用率、训练进度、损失曲线,30秒刷新间隔
+- [ ] [T035a] [US1] [P] 模型版本管理页面 - `frontend/src/features/models/pages/ModelVersionsPage.tsx`,使用 Cloudscape Table 展示模型版本历史,支持版本对比(metrics diff)、模型回滚、SageMaker Model Registry 同步状态显示,创建模块类型定义 `frontend/src/features/models/types/index.ts`
+- [ ] [T035b] [US1] [P] 模型列表页面 - `frontend/src/features/models/pages/ModelListPage.tsx`,使用 Cloudscape Table 组件,支持分页/过滤(training_job_id, status)/排序,显示模型名称、版本数、Registry 同步状态,创建模块 API 层 `frontend/src/features/models/api/modelApi.ts` 和 `frontend/src/features/models/api/queries.ts`
+- [ ] [T035c] [US1] [P] 模型详情页面 - `frontend/src/features/models/pages/ModelDetailPage.tsx`,展示模型元数据(metrics, hyperparameters)、关联训练任务、Registry ARN,支持跳转至版本管理页面
+- [ ] [T035d] [US1] [P] 模型列表组件 - `frontend/src/features/models/components/ModelTable.tsx`,复用 Cloudscape Table,支持行选择和批量操作,创建 `frontend/src/features/models/components/RegistrySyncStatus.tsx` 显示 SageMaker Model Registry 同步状态指示器
+- [ ] [T035e] [US1] [P] 模型版本对比组件 - `frontend/src/features/models/components/ModelVersionTable.tsx` 展示版本历史表格,`frontend/src/features/models/components/ModelMetricsCompare.tsx` 实现版本指标对比(metrics diff)可视化,创建 hooks `frontend/src/features/models/hooks/useModel.ts` 和 `frontend/src/features/models/hooks/useModelVersions.ts`
 
 ### HyperPod 集成服务
 - [ ] [T036] [US1] HyperPodPytorchJob 集成逻辑 - `backend/src/application/services/hyperpod_service.py`,封装 HyperPod SDK 训练任务生命周期管理,使用 T000 验证的 Training 模块方法实现训练任务提交、暂停、恢复、终止功能,实现错误处理和重试机制,参考 `docs/hyperpod-sdk-reference.md`。如该模块不支持特定训练模式,MAY 使用 boto3 (SageMaker API) 或 kubernetes-client (直接操作 PyTorchJob CRD) 作为备选方案,但 MUST 提交例外申请并获得平台治理委员会批准,在代码中注释说明理由 (遵循宪章 Principle I.B) (依赖 T000, T014)
@@ -530,7 +534,7 @@
 - 数据库迁移: T021, T022, T022a 可并行
 - SQLAlchemy 模型: T023, T024, T024a 可并行 (依赖 T021, T022, T022a)
 - 后端 API: T025-T031 可部分并行 (依赖 T023, T024) → T031a, T031b, T031c 可并行 (依赖 T024a)
-- 前端页面: T032-T035 可并行 (依赖 T025-T031) → T035a (依赖 T031a-T031c)
+- 前端页面: T032-T035 可并行 (依赖 T025-T031) → T035a-T035e 可并行 (依赖 T031a-T031c, models/ 模块)
 - 服务逻辑: T036 → {T037, T037a} 可并行 → {T037c, T037b} 可并行 → {T038, T038a, T038b-1, T038b-2} 可并行 → T038c (集成测试)
 
 **验收标准**:
@@ -565,10 +569,10 @@
 - [ ] [T048] [US2] FSx for Lustre 路径管理 - `backend/src/application/services/fsx_service.py`,管理 FSx 挂载路径,自动同步 S3 到 FSx (≥5GB/s 吞吐量),数据预热逻辑
 
 ### 前端页面组件
-- [ ] [T049] [US2] [P] 数据集列表页面 - `frontend/src/pages/Datasets/List.tsx`,使用 Cloudscape Table,支持搜索/过滤/排序,显示存储类型和大小
-- [ ] [T050] [US2] [P] 数据集创建表单 - `frontend/src/pages/Datasets/Create.tsx`,使用 Cloudscape Form,支持文件上传 (drag & drop),显示上传进度,验证数据集格式
-- [ ] [T051] [US2] [P] 数据集版本管理页面 - `frontend/src/pages/Datasets/Versions.tsx`,显示版本历史时间线,支持版本对比和回滚
-- [ ] [T052] [US2] [P] 文件上传组件 - `frontend/src/components/FileUpload.tsx`,实现分片上传到 S3,显示上传进度条,支持取消和重试
+- [ ] [T049] [US2] [P] 数据集列表页面 - `frontend/src/features/datasets/pages/DatasetListPage.tsx`,使用 Cloudscape Table,支持搜索/过滤/排序,显示存储类型和大小,创建模块 API 层 `frontend/src/features/datasets/api/queries.ts`
+- [ ] [T050] [US2] [P] 数据集创建页面 - `frontend/src/features/datasets/pages/CreateDatasetPage.tsx`,使用 Cloudscape Form,支持文件上传 (drag & drop),显示上传进度,验证数据集格式
+- [ ] [T051] [US2] [P] 数据集版本管理页面 - `frontend/src/features/datasets/pages/DatasetVersionsPage.tsx`,显示版本历史时间线,支持版本对比和回滚
+- [ ] [T052] [US2] [P] 文件上传组件 - `frontend/src/features/datasets/components/DatasetUploader.tsx`,实现分片上传到 S3,显示上传进度条,支持取消和重试,创建上传 hook `frontend/src/features/datasets/hooks/useDatasetUpload.ts`
 
 **并行执行机会**:
 - 数据库迁移: T039 独立
@@ -618,11 +622,11 @@
 - [ ] [T068] [US3] 集群健康检查服务 - `backend/src/application/services/cluster_health_service.py`,定时任务 (1分钟) 检查 HyperPod 集群状态,更新 hyperpod_clusters 表,触发告警
 
 ### 前端页面组件
-- [ ] [T064] [US3] [P] 用户管理页面 - `frontend/src/pages/Admin/Users.tsx`,使用 Cloudscape Table,支持用户创建/编辑/禁用,显示配额使用情况
-- [ ] [T065] [US3] [P] 资源配额管理页面 - `frontend/src/pages/Admin/Quotas.tsx`,使用 Cloudscape Form,支持配额模板创建/编辑,显示配额分配统计
-- [ ] [T066] [US3] [P] 集群监控仪表盘 - `frontend/src/pages/Admin/ClusterMonitoring.tsx`,嵌入 Grafana 仪表盘 (iframe),显示实时指标图表,支持时间范围选择
-- [ ] [T067] [US3] [P] 实时指标图表组件 - `frontend/src/components/MetricsCharts.tsx`,使用 Recharts 渲染 Prometheus 指标,支持多种图表类型 (折线图、柱状图、饼图)
-- [ ] [T067a] [US3] [P] 审计日志查询页面 - `frontend/src/pages/Admin/AuditLogs.tsx`,使用 Cloudscape Table 展示审计日志,支持高级过滤 (用户、操作类型、资源类型、时间范围)、导出 CSV、管理员权限
+- [ ] [T064] [US3] [P] 用户管理页面 - `frontend/src/features/admin/pages/UserManagementPage.tsx`,使用 Cloudscape Table,支持用户创建/编辑/禁用,显示配额使用情况,创建模块 API 层 `frontend/src/features/admin/api/queries.ts`,创建模块类型定义 `frontend/src/features/admin/types/index.ts`
+- [ ] [T065] [US3] [P] 资源配额管理页面 - `frontend/src/features/resources/pages/QuotaManagementPage.tsx`,使用 Cloudscape Form,支持配额模板创建/编辑,显示配额分配统计,创建模块类型定义 `frontend/src/features/resources/types/index.ts`
+- [ ] [T066] [US3] [P] 集群监控仪表盘 - `frontend/src/features/monitoring/pages/MonitoringDashboardPage.tsx`,嵌入 Grafana 仪表盘 (iframe),显示实时指标图表,支持时间范围选择,创建模块 API 层 `frontend/src/features/monitoring/api/queries.ts`
+- [ ] [T067] [US3] [P] 实时指标图表组件 - `frontend/src/features/monitoring/components/MetricsCharts.tsx`,使用 Recharts 渲染 Prometheus 指标,支持多种图表类型 (折线图、柱状图、饼图)
+- [ ] [T067a] [US3] [P] 审计日志查询页面 - `frontend/src/features/admin/pages/AuditLogsPage.tsx`,使用 Cloudscape Table 展示审计日志,支持高级过滤 (用户、操作类型、资源类型、时间范围)、导出 CSV、管理员权限
 
 **并行执行机会**:
 - 数据库迁移: T053 独立
@@ -664,10 +668,10 @@
 - [ ] [T073] [US4] CloudWatch Logs 集成 - `backend/src/infrastructure/external/aws/cloudwatch_client.py`,封装 CloudWatch Logs Insights API,查询训练任务日志,支持 30天留存策略
 
 ### 前端页面组件
-- [ ] [T074] [US4] [P] 资源使用报表页面 - `frontend/src/pages/Reports/ResourceUsage.tsx`,使用 Cloudscape Container,展示资源使用图表和表格,支持导出 CSV
-- [ ] [T075] [US4] [P] 成本分析仪表盘 - `frontend/src/pages/Reports/CostAnalysis.tsx`,展示成本趋势图、成本分布饼图、成本预测,支持钻取到用户/项目级别
-- [ ] [T076] [US4] [P] 时间范围选择器组件 - `frontend/src/components/DateRangePicker.tsx`,使用 Cloudscape DateRangePicker,支持预设时间范围 (Last 7 days, Last 30 days, Custom)
-- [ ] [T077] [US4] [P] 成本趋势图表组件 - `frontend/src/components/CostTrendChart.tsx`,使用 Recharts 渲染成本趋势折线图,支持对比上一周期
+- [ ] [T074] [US4] [P] 资源使用报表页面 - `frontend/src/features/reports/pages/ResourceUsageReportPage.tsx`,使用 Cloudscape Container,展示资源使用图表和表格,支持导出 CSV,创建模块 API 层 `frontend/src/features/reports/api/queries.ts`,创建模块类型定义 `frontend/src/features/reports/types/index.ts`
+- [ ] [T075] [US4] [P] 成本分析仪表盘 - `frontend/src/features/reports/pages/CostAnalysisPage.tsx`,展示成本趋势图、成本分布饼图、成本预测,支持钻取到用户/项目级别
+- [ ] [T076] [US4] [P] 时间范围选择器组件 - `frontend/src/shared/components/forms/DateRangePicker.tsx`,使用 Cloudscape DateRangePicker,支持预设时间范围 (Last 7 days, Last 30 days, Custom),作为共享表单组件供多个功能模块复用
+- [ ] [T077] [US4] [P] 成本趋势图表组件 - `frontend/src/features/reports/components/CostTrendChart.tsx`,使用 Recharts 渲染成本趋势折线图,支持对比上一周期
 
 ### 报表导出功能
 - [ ] [T078] [US4] 报表导出功能 - `backend/src/application/services/report_export_service.py`,实现 CSV/PDF 导出,使用 pandas 和 reportlab,支持自定义报表模板
@@ -718,9 +722,9 @@
 - [ ] [T090] [US5] SageMaker Space 状态同步 - `backend/src/application/services/sagemaker_sync_service.py`,定时任务 (30秒) 调用 DescribeSpace API 同步状态到数据库,处理 InService/Pending/Failed 状态转换
 
 ### 前端页面组件
-- [ ] [T087] [US5] [P] IDE 启动页面 - `frontend/src/pages/IDE/Launch.tsx`,使用 Cloudscape Form,选择 IDE 类型 (JupyterLab/VS Code)、实例类型 (ml.g5.xlarge 默认/ml.g5.2xlarge,显示资源规格: CPU/内存/GPU,遵循 spec.md User Story 5 资源配额定义)、SageMaker Studio 镜像,显示启动进度和预估启动时间
-- [ ] [T088] [US5] [P] 在线开发环境列表页面 - `frontend/src/pages/IDE/Sessions.tsx`,使用 Cloudscape Table,显示 SageMaker Space 列表,支持启动/停止/删除操作,显示 Space 状态和启动耗时
-- [ ] [T089] [US5] [P] IDE 嵌入组件 - `frontend/src/components/IDEFrame.tsx`,使用 iframe 嵌入 SageMaker Studio URL (JupyterLab/VS Code),支持全屏模式
+- [ ] [T087] [US5] [P] 开发空间创建页面 - `frontend/src/features/spaces/pages/CreateSpacePage.tsx`,使用 Cloudscape Form,选择 IDE 类型 (JupyterLab/VS Code)、实例类型 (ml.g5.xlarge 默认/ml.g5.2xlarge,显示资源规格: CPU/内存/GPU,遵循 spec.md User Story 5 资源配额定义)、SageMaker Studio 镜像,显示启动进度和预估启动时间,创建模块 API 层 `frontend/src/features/spaces/api/queries.ts`
+- [ ] [T088] [US5] [P] 在线开发环境列表页面 - `frontend/src/features/spaces/pages/SpaceListPage.tsx`,使用 Cloudscape Table,显示 SageMaker Space 列表,支持启动/停止/删除操作,显示 Space 状态和启动耗时,创建模块类型定义 `frontend/src/features/spaces/types/index.ts`
+- [ ] [T089] [US5] [P] IDE 嵌入组件 - `frontend/src/features/spaces/components/IDEFrame.tsx`,使用 iframe 嵌入 SageMaker Studio URL (JupyterLab/VS Code),支持全屏模式
 
 **并行执行机会**:
 - 数据库迁移: T079 独立
@@ -761,8 +765,8 @@
 
 ### 错误处理和重试逻辑
 - [ ] [T097] [P] 统一错误处理中间件 - `backend/src/api/middleware/error_handler.py`,捕获所有异常,返回标准化错误响应 (RFC 7807 Problem Details),记录错误日志
-- [ ] [T098] [P] 请求重试逻辑 - `frontend/src/lib/apiClient.ts`,使用 TanStack Query retry 机制,配置指数退避策略 (1s, 2s, 4s),最多重试 3 次
-- [ ] [T099] [P] 前端错误边界组件 - `frontend/src/components/ErrorBoundary.tsx`,捕获 React 组件错误,显示友好错误页面,支持错误上报
+- [ ] [T098] [P] 请求重试逻辑 - `frontend/src/lib/api/client.ts`,使用 TanStack Query retry 机制,配置指数退避策略 (1s, 2s, 4s),最多重试 3 次,创建请求/响应拦截器 `frontend/src/lib/api/interceptors.ts`
+- [ ] [T099] [P] 前端错误边界组件 - `frontend/src/shared/components/feedback/ErrorBoundary.tsx`,捕获 React 组件错误,显示友好错误页面,支持错误上报,作为共享反馈组件供全局使用
 
 ### 日志和监控
 - [ ] [T100] 日志格式标准化 - 使用 structlog 配置 JSON 结构化日志,包含 trace_id, user_id, request_id 字段,输出到 CloudWatch Logs
@@ -865,6 +869,8 @@ Foundational (Phase 2)
 并行组3 (后端 API): T025, T026, T027, T028, T029, T030, T031 (依赖组2,部分并行)
   ↓
 并行组4 (前端页面): T032, T033, T034, T035 (依赖组3,同时执行)
+  ↓
+并行组4a (models/ 模块): T035a, T035b, T035c, T035d, T035e (依赖 T031a-T031c,同时执行)
   ↓
 串行 (服务逻辑): T036 → T037 → T038 (依赖组3,需串行)
 ```
