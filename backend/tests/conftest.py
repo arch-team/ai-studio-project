@@ -1,9 +1,10 @@
 """Pytest Configuration - Shared fixtures and configuration."""
 
-import pytest
 from typing import AsyncGenerator
 
-from httpx import AsyncClient, ASGITransport
+import pytest
+from httpx import ASGITransport, AsyncClient
+
 from src.main import app
 
 

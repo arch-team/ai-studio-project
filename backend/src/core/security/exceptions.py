@@ -36,7 +36,9 @@ class InvalidTokenError(SecurityError):
 class AccountLockedError(SecurityError):
     """Raised when an account is locked due to too many failed login attempts."""
 
-    def __init__(self, message: str = "Account is locked", locked_until: Optional[str] = None):
+    def __init__(
+        self, message: str = "Account is locked", locked_until: Optional[str] = None
+    ):
         self.locked_until = locked_until
         super().__init__(message, code="ACCOUNT_LOCKED")
 
@@ -76,7 +78,9 @@ class InsufficientPermissionsError(SecurityError):
 class SSOError(SecurityError):
     """Raised when SSO authentication fails."""
 
-    def __init__(self, message: str = "SSO authentication failed", degraded: bool = False):
+    def __init__(
+        self, message: str = "SSO authentication failed", degraded: bool = False
+    ):
         self.degraded = degraded
         super().__init__(message, code="SSO_ERROR")
 

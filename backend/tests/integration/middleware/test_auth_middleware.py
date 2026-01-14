@@ -250,9 +250,7 @@ class TestAuthenticationErrors:
     """Tests for authentication error responses."""
 
     @pytest.mark.asyncio
-    async def test_missing_auth_header_error_format(
-        self, client: AsyncClient
-    ) -> None:
+    async def test_missing_auth_header_error_format(self, client: AsyncClient) -> None:
         """Test error response format for missing auth header."""
         response = await client.get("/api/v1/auth/me")
 
@@ -279,6 +277,8 @@ class TestAuthenticationErrors:
 
         assert response.status_code == 401
         # Either WWW-Authenticate header or error body should be present
-        has_www_auth = "www-authenticate" in [h.lower() for h in response.headers.keys()]
+        has_www_auth = "www-authenticate" in [
+            h.lower() for h in response.headers.keys()
+        ]
         has_error_body = "error" in response.json() or "detail" in response.json()
         assert has_www_auth or has_error_body

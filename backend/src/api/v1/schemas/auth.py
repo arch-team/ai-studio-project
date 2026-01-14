@@ -55,7 +55,9 @@ class LocalAccountCreateRequest(BaseModel):
     username: str = Field(..., min_length=3, max_length=64, description="Username")
     email: EmailStr = Field(..., description="Email address")
     password: str = Field(..., min_length=12, description="Password")
-    display_name: Optional[str] = Field(None, max_length=128, description="Display name")
+    display_name: Optional[str] = Field(
+        None, max_length=128, description="Display name"
+    )
     role: str = Field(default="engineer", description="User role")
 
 
@@ -63,7 +65,9 @@ class LocalAccountUpdateRequest(BaseModel):
     """Update local account request schema."""
 
     email: Optional[EmailStr] = Field(None, description="Email address")
-    display_name: Optional[str] = Field(None, max_length=128, description="Display name")
+    display_name: Optional[str] = Field(
+        None, max_length=128, description="Display name"
+    )
     role: Optional[str] = Field(None, description="User role")
 
 

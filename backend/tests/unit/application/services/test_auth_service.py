@@ -1,16 +1,12 @@
 """Auth Service Unit Tests."""
 
 from datetime import datetime, timedelta, timezone
-from unittest.mock import AsyncMock, MagicMock, Mock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
 from src.application.services.auth_service import AuthResult, AuthService, TokenPair
-from src.core.security.constants import (
-    LOCKOUT_DURATION_MINUTES,
-    MAX_FAILED_LOGIN_ATTEMPTS,
-    PASSWORD_EXPIRY_DAYS,
-)
+from src.core.security.constants import MAX_FAILED_LOGIN_ATTEMPTS
 from src.core.security.exceptions import (
     AccountLockedError,
     AuthenticationError,
@@ -20,11 +16,8 @@ from src.core.security.exceptions import (
     PasswordTooWeakError,
     TokenExpiredError,
 )
-from src.core.security.jwt import JWTManager, TokenPayload, TokenType
-from src.core.security.password import PasswordHasher, PasswordValidator
 from src.domain.entities.user import UserRole
 from src.infrastructure.persistence.models import AuthType, UserStatus
-
 
 # =============================================================================
 # Fixtures
@@ -91,7 +84,9 @@ def mock_inactive_user(mock_user):
 
 
 @pytest.fixture
-def auth_service(mock_session, mock_jwt_manager, fast_password_hasher, password_validator):
+def auth_service(
+    mock_session, mock_jwt_manager, fast_password_hasher, password_validator
+):
     """Create AuthService with mocked dependencies."""
     return AuthService(
         session=mock_session,
@@ -120,9 +115,7 @@ class TestLocalLogin:
         mock_session.execute.return_value = mock_result
 
         # Mock password verification
-        with patch.object(
-            auth_service._hasher, "verify_password", return_value=True
-        ):
+        with patch.object(auth_service._hasher, "verify_password", return_value=True):
             result = await auth_service.local_login(
                 username="testuser",
                 password="TestP@ssw0rd123!",
@@ -151,7 +144,10 @@ class TestLocalLogin:
                 ip_address="127.0.0.1",
             )
 
-        assert "user_not_found" in str(exc_info.value).lower() or "invalid" in str(exc_info.value).lower()
+        assert (
+            "user_not_found" in str(exc_info.value).lower()
+            or "invalid" in str(exc_info.value).lower()
+        )
 
     @pytest.mark.asyncio
     async def test_local_login_invalid_password(
@@ -162,9 +158,7 @@ class TestLocalLogin:
         mock_result.scalar_one_or_none.return_value = mock_user
         mock_session.execute.return_value = mock_result
 
-        with patch.object(
-            auth_service._hasher, "verify_password", return_value=False
-        ):
+        with patch.object(auth_service._hasher, "verify_password", return_value=False):
             with pytest.raises(AuthenticationError):
                 await auth_service.local_login(
                     username="testuser",
@@ -192,16 +186,17 @@ class TestLocalLogin:
 
     @pytest.mark.asyncio
     async def test_local_login_password_expired(
-        self, auth_service: AuthService, mock_session: AsyncMock, mock_expired_password_user
+        self,
+        auth_service: AuthService,
+        mock_session: AsyncMock,
+        mock_expired_password_user,
     ) -> None:
         """Test login with expired password."""
         mock_result = MagicMock()
         mock_result.scalar_one_or_none.return_value = mock_expired_password_user
         mock_session.execute.return_value = mock_result
 
-        with patch.object(
-            auth_service._hasher, "verify_password", return_value=True
-        ):
+        with patch.object(auth_service._hasher, "verify_password", return_value=True):
             with pytest.raises(PasswordExpiredError):
                 await auth_service.local_login(
                     username="testuser",
@@ -225,7 +220,10 @@ class TestLocalLogin:
                 ip_address="127.0.0.1",
             )
 
-        assert "sso" in str(exc_info.value).lower() or "local" in str(exc_info.value).lower()
+        assert (
+            "sso" in str(exc_info.value).lower()
+            or "local" in str(exc_info.value).lower()
+        )
 
     @pytest.mark.asyncio
     async def test_local_login_inactive_account(
@@ -243,7 +241,10 @@ class TestLocalLogin:
                 ip_address="127.0.0.1",
             )
 
-        assert "inactive" in str(exc_info.value).lower() or "active" in str(exc_info.value).lower()
+        assert (
+            "inactive" in str(exc_info.value).lower()
+            or "active" in str(exc_info.value).lower()
+        )
 
     @pytest.mark.asyncio
     async def test_local_login_5_failures_triggers_lock(
@@ -255,9 +256,7 @@ class TestLocalLogin:
         mock_result.scalar_one_or_none.return_value = mock_user
         mock_session.execute.return_value = mock_result
 
-        with patch.object(
-            auth_service._hasher, "verify_password", return_value=False
-        ):
+        with patch.object(auth_service._hasher, "verify_password", return_value=False):
             with pytest.raises(AuthenticationError):
                 await auth_service.local_login(
                     username="testuser",
@@ -278,9 +277,7 @@ class TestLocalLogin:
         mock_result.scalar_one_or_none.return_value = mock_user
         mock_session.execute.return_value = mock_result
 
-        with patch.object(
-            auth_service._hasher, "verify_password", return_value=True
-        ):
+        with patch.object(auth_service._hasher, "verify_password", return_value=True):
             await auth_service.local_login(
                 username="testuser",
                 password="TestP@ssw0rd123!",
@@ -353,7 +350,7 @@ class TestCreateLocalAccount:
         mock_result.scalar_one_or_none.return_value = None
         mock_session.execute.return_value = mock_result
 
-        result = await auth_service.create_local_account(
+        await auth_service.create_local_account(
             username="newuser",
             email="new@example.com",
             password="NewP@ssw0rd123!",
@@ -395,7 +392,10 @@ class TestCreateLocalAccount:
                 role="engineer",
             )
 
-        assert "username" in str(exc_info.value).lower() or "exists" in str(exc_info.value).lower()
+        assert (
+            "username" in str(exc_info.value).lower()
+            or "exists" in str(exc_info.value).lower()
+        )
 
     @pytest.mark.asyncio
     async def test_create_local_account_duplicate_email(
@@ -417,7 +417,10 @@ class TestCreateLocalAccount:
                 role="engineer",
             )
 
-        assert "email" in str(exc_info.value).lower() or "exists" in str(exc_info.value).lower()
+        assert (
+            "email" in str(exc_info.value).lower()
+            or "exists" in str(exc_info.value).lower()
+        )
 
 
 # =============================================================================
@@ -437,9 +440,7 @@ class TestChangePassword:
         mock_result.scalar_one_or_none.return_value = mock_user
         mock_session.execute.return_value = mock_result
 
-        with patch.object(
-            auth_service._hasher, "verify_password", return_value=True
-        ):
+        with patch.object(auth_service._hasher, "verify_password", return_value=True):
             await auth_service.change_password(
                 user_id=1,
                 current_password="OldP@ssw0rd123!",
@@ -457,9 +458,7 @@ class TestChangePassword:
         mock_result.scalar_one_or_none.return_value = mock_user
         mock_session.execute.return_value = mock_result
 
-        with patch.object(
-            auth_service._hasher, "verify_password", return_value=False
-        ):
+        with patch.object(auth_service._hasher, "verify_password", return_value=False):
             with pytest.raises(AuthenticationError) as exc_info:
                 await auth_service.change_password(
                     user_id=1,
@@ -467,7 +466,10 @@ class TestChangePassword:
                     new_password="NewP@ssw0rd456!",
                 )
 
-            assert "current" in str(exc_info.value).lower() or "password" in str(exc_info.value).lower()
+            assert (
+                "current" in str(exc_info.value).lower()
+                or "password" in str(exc_info.value).lower()
+            )
 
     @pytest.mark.asyncio
     async def test_change_password_weak_new_password(
@@ -478,9 +480,7 @@ class TestChangePassword:
         mock_result.scalar_one_or_none.return_value = mock_user
         mock_session.execute.return_value = mock_result
 
-        with patch.object(
-            auth_service._hasher, "verify_password", return_value=True
-        ):
+        with patch.object(auth_service._hasher, "verify_password", return_value=True):
             with pytest.raises(PasswordTooWeakError):
                 await auth_service.change_password(
                     user_id=1,
@@ -490,7 +490,11 @@ class TestChangePassword:
 
     @pytest.mark.asyncio
     async def test_change_password_history_violation(
-        self, auth_service: AuthService, mock_session: AsyncMock, mock_user, fast_password_hasher
+        self,
+        auth_service: AuthService,
+        mock_session: AsyncMock,
+        mock_user,
+        fast_password_hasher,
     ) -> None:
         """Test password change with password from history."""
         # Setup password history
@@ -503,9 +507,7 @@ class TestChangePassword:
         mock_result.scalar_one_or_none.return_value = mock_user
         mock_session.execute.return_value = mock_result
 
-        with patch.object(
-            auth_service._hasher, "verify_password", return_value=True
-        ):
+        with patch.object(auth_service._hasher, "verify_password", return_value=True):
             with patch.object(
                 auth_service._validator,
                 "check_password_history",
@@ -551,7 +553,9 @@ class TestPasswordReset:
         mock_session.execute.return_value = mock_result
 
         # Should return None, not reveal user doesn't exist
-        token = await auth_service.request_password_reset(email="nonexistent@example.com")
+        token = await auth_service.request_password_reset(
+            email="nonexistent@example.com"
+        )
 
         assert token is None
 

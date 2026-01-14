@@ -9,6 +9,7 @@ from sqlalchemy.dialects.mysql import JSON
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from src.core.database import Base
+from src.core.utils import utc_now
 from src.infrastructure.persistence.models.base import TimestampMixin
 
 if TYPE_CHECKING:
@@ -209,13 +210,13 @@ class UserModel(Base, TimestampMixin):
         """Check if account is currently locked."""
         if self.locked_until is None:
             return False
-        return datetime.utcnow() < self.locked_until
+        return utc_now() < self.locked_until
 
     def is_password_expired(self) -> bool:
         """Check if password has expired."""
         if self.password_expires_at is None:
             return False
-        return datetime.utcnow() > self.password_expires_at
+        return utc_now() > self.password_expires_at
 
     def is_local_account(self) -> bool:
         """Check if this is a local authentication account."""

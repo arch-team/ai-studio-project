@@ -354,8 +354,12 @@ class TestExceptionInheritance:
         ]
 
         for exc in exceptions:
-            assert isinstance(exc, SecurityError), f"{type(exc).__name__} should inherit from SecurityError"
-            assert isinstance(exc, Exception), f"{type(exc).__name__} should inherit from Exception"
+            assert isinstance(
+                exc, SecurityError
+            ), f"{type(exc).__name__} should inherit from SecurityError"
+            assert isinstance(
+                exc, Exception
+            ), f"{type(exc).__name__} should inherit from Exception"
 
     def test_sso_degraded_inherits_from_sso_error(self) -> None:
         """Test SSODegradedModeError inherits from SSOError."""

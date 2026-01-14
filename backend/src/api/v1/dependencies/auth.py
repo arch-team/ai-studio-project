@@ -6,7 +6,6 @@ from fastapi import Depends, HTTPException, Request, status
 
 from src.api.middleware.auth import CurrentUser
 from src.application.services.rbac_service import Permission, get_rbac_service
-from src.core.security.exceptions import InsufficientPermissionsError
 
 
 def get_current_user(request: Request) -> Optional[CurrentUser]:

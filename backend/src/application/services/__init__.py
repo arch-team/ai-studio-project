@@ -9,7 +9,7 @@ Application services coordinate domain operations to fulfill use cases:
 - ClusterService: Cluster resource management
 """
 
-from src.application.services.auth_service import AuthService, AuthResult, TokenPair
+from src.application.services.auth_service import AuthResult, AuthService, TokenPair
 from src.application.services.rbac_service import (
     Permission,
     RBACService,

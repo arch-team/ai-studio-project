@@ -6,7 +6,6 @@ Infrastructure layer provides concrete implementations for S3 and FSx.
 
 from abc import ABC, abstractmethod
 from typing import Any, AsyncIterator, Dict, List, Optional
-from datetime import datetime
 
 
 class IStorageService(ABC):

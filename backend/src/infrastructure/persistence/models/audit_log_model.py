@@ -9,6 +9,7 @@ from sqlalchemy.dialects.mysql import JSON
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from src.core.database import Base
+from src.core.utils import utc_now
 
 if TYPE_CHECKING:
     from src.infrastructure.persistence.models.user_model import UserModel
@@ -144,4 +145,4 @@ class AuditLogModel(Base):
 def set_expires_at(mapper, connection, target):
     """Auto-set expires_at to 90 days after created_at."""
     if target.expires_at is None:
-        target.expires_at = datetime.utcnow() + timedelta(days=90)
+        target.expires_at = utc_now() + timedelta(days=90)

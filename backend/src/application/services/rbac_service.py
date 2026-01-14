@@ -65,43 +65,7 @@ class Permission(str, Enum):
 
 # Role to permission mapping
 ROLE_PERMISSIONS: Dict[str, Set[Permission]] = {
-    "admin": {
-        # Admin has all permissions
-        Permission.USER_VIEW,
-        Permission.USER_CREATE,
-        Permission.USER_UPDATE,
-        Permission.USER_DELETE,
-        Permission.TRAINING_JOB_VIEW,
-        Permission.TRAINING_JOB_CREATE,
-        Permission.TRAINING_JOB_UPDATE,
-        Permission.TRAINING_JOB_DELETE,
-        Permission.TRAINING_JOB_CANCEL,
-        Permission.DATASET_VIEW,
-        Permission.DATASET_CREATE,
-        Permission.DATASET_UPDATE,
-        Permission.DATASET_DELETE,
-        Permission.MODEL_VIEW,
-        Permission.MODEL_CREATE,
-        Permission.MODEL_UPDATE,
-        Permission.MODEL_DELETE,
-        Permission.MODEL_DEPLOY,
-        Permission.CLUSTER_VIEW,
-        Permission.CLUSTER_CREATE,
-        Permission.CLUSTER_UPDATE,
-        Permission.CLUSTER_DELETE,
-        Permission.CLUSTER_SCALE,
-        Permission.QUOTA_VIEW,
-        Permission.QUOTA_CREATE,
-        Permission.QUOTA_UPDATE,
-        Permission.QUOTA_DELETE,
-        Permission.DEV_SPACE_VIEW,
-        Permission.DEV_SPACE_CREATE,
-        Permission.DEV_SPACE_UPDATE,
-        Permission.DEV_SPACE_DELETE,
-        Permission.AUDIT_VIEW,
-        Permission.SYSTEM_CONFIG,
-        Permission.SYSTEM_MONITOR,
-    },
+    "admin": set(Permission),  # Admin has all permissions
     "project_manager": {
         # Project manager: manage jobs, datasets, models within project
         Permission.USER_VIEW,
@@ -223,9 +187,7 @@ class RBACService:
         """Get numeric level for a role."""
         return ROLE_HIERARCHY.get(role.lower(), 0)
 
-    def get_allowed_roles_for_permission(
-        self, permission: Permission
-    ) -> List[str]:
+    def get_allowed_roles_for_permission(self, permission: Permission) -> List[str]:
         """Get list of roles that have a specific permission."""
         return [
             role

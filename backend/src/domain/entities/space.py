@@ -5,6 +5,8 @@ from datetime import datetime
 from enum import Enum
 from typing import Optional
 
+from src.core.utils import utc_now
+
 
 class SpaceInstanceType(Enum):
     """Space instance type options."""
@@ -68,8 +70,8 @@ class Space:
     sagemaker_space_arn: Optional[str] = None
 
     # Timestamps
-    created_at: datetime = field(default_factory=datetime.utcnow)
-    updated_at: datetime = field(default_factory=datetime.utcnow)
+    created_at: datetime = field(default_factory=utc_now)
+    updated_at: datetime = field(default_factory=utc_now)
     deleted_at: Optional[datetime] = None
 
     def can_transition_to(self, new_status: SpaceStatus) -> bool:
@@ -88,10 +90,10 @@ class Space:
                 f"Invalid state transition: {self.status.value} -> {new_status.value}"
             )
         self.status = new_status
-        self.updated_at = datetime.utcnow()
+        self.updated_at = utc_now()
 
         if new_status == SpaceStatus.DELETED:
-            self.deleted_at = datetime.utcnow()
+            self.deleted_at = utc_now()
 
     def can_start(self) -> bool:
         """Check if space can be started."""
@@ -141,11 +143,31 @@ class Space:
         Returns dict with cpu_cores, memory_gb, gpu_count.
         """
         resource_map = {
-            SpaceInstanceType.ML_T3_MEDIUM: {"cpu_cores": 2, "memory_gb": 4, "gpu_count": 0},
-            SpaceInstanceType.ML_T3_LARGE: {"cpu_cores": 2, "memory_gb": 8, "gpu_count": 0},
-            SpaceInstanceType.ML_G4DN_XLARGE: {"cpu_cores": 4, "memory_gb": 16, "gpu_count": 1},
-            SpaceInstanceType.ML_G5_XLARGE: {"cpu_cores": 4, "memory_gb": 16, "gpu_count": 1},
-            SpaceInstanceType.ML_G5_2XLARGE: {"cpu_cores": 8, "memory_gb": 32, "gpu_count": 1},
+            SpaceInstanceType.ML_T3_MEDIUM: {
+                "cpu_cores": 2,
+                "memory_gb": 4,
+                "gpu_count": 0,
+            },
+            SpaceInstanceType.ML_T3_LARGE: {
+                "cpu_cores": 2,
+                "memory_gb": 8,
+                "gpu_count": 0,
+            },
+            SpaceInstanceType.ML_G4DN_XLARGE: {
+                "cpu_cores": 4,
+                "memory_gb": 16,
+                "gpu_count": 1,
+            },
+            SpaceInstanceType.ML_G5_XLARGE: {
+                "cpu_cores": 4,
+                "memory_gb": 16,
+                "gpu_count": 1,
+            },
+            SpaceInstanceType.ML_G5_2XLARGE: {
+                "cpu_cores": 8,
+                "memory_gb": 32,
+                "gpu_count": 1,
+            },
         }
         return resource_map.get(
             self.instance_type,
@@ -166,12 +188,21 @@ class Space:
         requirements = self.get_resource_requirements()
 
         if requirements["cpu_cores"] > available_cpu:
-            return False, f"Insufficient CPU: need {requirements['cpu_cores']}, have {available_cpu}"
+            return (
+                False,
+                f"Insufficient CPU: need {requirements['cpu_cores']}, have {available_cpu}",
+            )
 
         if requirements["memory_gb"] > available_memory_gb:
-            return False, f"Insufficient memory: need {requirements['memory_gb']}GB, have {available_memory_gb}GB"
+            return (
+                False,
+                f"Insufficient memory: need {requirements['memory_gb']}GB, have {available_memory_gb}GB",
+            )
 
         if requirements["gpu_count"] > available_gpu:
-            return False, f"Insufficient GPU: need {requirements['gpu_count']}, have {available_gpu}"
+            return (
+                False,
+                f"Insufficient GPU: need {requirements['gpu_count']}, have {available_gpu}",
+            )
 
         return True, None

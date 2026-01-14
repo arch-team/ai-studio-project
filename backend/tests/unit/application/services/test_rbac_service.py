@@ -4,9 +4,9 @@ import pytest
 
 from src.application.services.rbac_service import (
     K8S_RBAC_BINDINGS,
+    ROLE_PERMISSIONS,
     Permission,
     RBACService,
-    ROLE_PERMISSIONS,
     get_rbac_service,
 )
 from src.core.security.exceptions import InsufficientPermissionsError
@@ -23,9 +23,9 @@ class TestRBACServicePermissions:
     def test_has_permission_admin_all(self, rbac_service: RBACService) -> None:
         """Test that admin has all permissions."""
         for permission in Permission:
-            assert rbac_service.has_permission("admin", permission) is True, (
-                f"Admin should have {permission.name}"
-            )
+            assert (
+                rbac_service.has_permission("admin", permission) is True
+            ), f"Admin should have {permission.name}"
 
     def test_has_permission_viewer_limited(self, rbac_service: RBACService) -> None:
         """Test that viewer has only view permissions."""
@@ -40,9 +40,9 @@ class TestRBACServicePermissions:
             Permission.QUOTA_VIEW,
         ]
         for perm in view_permissions:
-            assert rbac_service.has_permission("viewer", perm) is True, (
-                f"Viewer should have {perm.name}"
-            )
+            assert (
+                rbac_service.has_permission("viewer", perm) is True
+            ), f"Viewer should have {perm.name}"
 
         # Viewer should not have create/update/delete permissions
         write_permissions = [
@@ -53,13 +53,15 @@ class TestRBACServicePermissions:
             Permission.CLUSTER_SCALE,
         ]
         for perm in write_permissions:
-            assert rbac_service.has_permission("viewer", perm) is False, (
-                f"Viewer should not have {perm.name}"
-            )
+            assert (
+                rbac_service.has_permission("viewer", perm) is False
+            ), f"Viewer should not have {perm.name}"
 
     def test_has_permission_invalid_role(self, rbac_service: RBACService) -> None:
         """Test that invalid role returns False."""
-        assert rbac_service.has_permission("invalid_role", Permission.USER_VIEW) is False
+        assert (
+            rbac_service.has_permission("invalid_role", Permission.USER_VIEW) is False
+        )
 
     def test_has_permission_engineer_permissions(
         self, rbac_service: RBACService
@@ -75,9 +77,9 @@ class TestRBACServicePermissions:
             Permission.MODEL_CREATE,
         ]
         for perm in engineer_perms:
-            assert rbac_service.has_permission("engineer", perm) is True, (
-                f"Engineer should have {perm.name}"
-            )
+            assert (
+                rbac_service.has_permission("engineer", perm) is True
+            ), f"Engineer should have {perm.name}"
 
         # Engineer should not have admin permissions
         admin_only = [
@@ -88,9 +90,9 @@ class TestRBACServicePermissions:
             Permission.SYSTEM_CONFIG,
         ]
         for perm in admin_only:
-            assert rbac_service.has_permission("engineer", perm) is False, (
-                f"Engineer should not have {perm.name}"
-            )
+            assert (
+                rbac_service.has_permission("engineer", perm) is False
+            ), f"Engineer should not have {perm.name}"
 
     def test_has_permission_project_manager_permissions(
         self, rbac_service: RBACService
@@ -105,9 +107,9 @@ class TestRBACServicePermissions:
             Permission.SYSTEM_MONITOR,
         ]
         for perm in pm_perms:
-            assert rbac_service.has_permission("project_manager", perm) is True, (
-                f"PM should have {perm.name}"
-            )
+            assert (
+                rbac_service.has_permission("project_manager", perm) is True
+            ), f"PM should have {perm.name}"
 
 
 class TestRBACServiceRoleLevel:
@@ -234,9 +236,7 @@ class TestRBACServiceK8sBinding:
         assert binding is not None
         assert binding["namespace_role"] == "edit"
 
-    def test_get_k8s_rbac_binding_invalid_role(
-        self, rbac_service: RBACService
-    ) -> None:
+    def test_get_k8s_rbac_binding_invalid_role(self, rbac_service: RBACService) -> None:
         """Test invalid role returns None."""
         binding = rbac_service.get_k8s_rbac_binding("invalid_role")
         assert binding is None
@@ -293,9 +293,7 @@ class TestRBACServiceHelpers:
         """Test get_role_level returns 0 for invalid role."""
         assert rbac_service.get_role_level("invalid") == 0
 
-    def test_get_allowed_roles_for_permission(
-        self, rbac_service: RBACService
-    ) -> None:
+    def test_get_allowed_roles_for_permission(self, rbac_service: RBACService) -> None:
         """Test getting roles allowed for a permission."""
         # USER_CREATE should be admin only (based on RBAC design)
         roles = rbac_service.get_allowed_roles_for_permission(Permission.USER_CREATE)

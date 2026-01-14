@@ -36,12 +36,7 @@ from src.core.security.exceptions import (
     SSOError,
     TokenExpiredError,
 )
-from src.core.security.jwt import (
-    JWTManager,
-    TokenPayload,
-    TokenType,
-    get_jwt_manager,
-)
+from src.core.security.jwt import JWTManager, TokenPayload, TokenType, get_jwt_manager
 from src.core.security.password import (
     PasswordHasher,
     PasswordValidator,

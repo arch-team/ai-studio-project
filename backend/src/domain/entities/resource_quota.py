@@ -5,6 +5,8 @@ from datetime import datetime
 from enum import Enum
 from typing import Optional
 
+from src.core.utils import utc_now
+
 
 class QuotaType(Enum):
     """Quota allocation type."""
@@ -59,19 +61,19 @@ class ResourceQuota:
 
     # Status and validity
     status: QuotaStatus = QuotaStatus.ACTIVE
-    valid_from: datetime = field(default_factory=datetime.utcnow)
+    valid_from: datetime = field(default_factory=utc_now)
     valid_until: Optional[datetime] = None
 
     # Audit fields
     created_by: Optional[int] = None
-    created_at: datetime = field(default_factory=datetime.utcnow)
-    updated_at: datetime = field(default_factory=datetime.utcnow)
+    created_at: datetime = field(default_factory=utc_now)
+    updated_at: datetime = field(default_factory=utc_now)
 
     def is_active(self) -> bool:
         """Check if quota is currently active and valid."""
         if self.status != QuotaStatus.ACTIVE:
             return False
-        now = datetime.utcnow()
+        now = utc_now()
         if now < self.valid_from:
             return False
         if self.valid_until and now > self.valid_until:
@@ -82,7 +84,7 @@ class ResourceQuota:
         """Check if quota has expired."""
         if self.valid_until is None:
             return False
-        return datetime.utcnow() > self.valid_until
+        return utc_now() > self.valid_until
 
     def can_allocate_gpu(self, requested: int) -> bool:
         """Check if GPU allocation is within quota limits."""
@@ -131,7 +133,10 @@ class ResourceQuota:
             return False, f"GPU request {gpu_count} exceeds quota {self.max_gpu_count}"
 
         if not self.can_allocate_memory(memory_gb):
-            return False, f"Memory request {memory_gb}GB exceeds quota {self.max_memory_gb}GB"
+            return (
+                False,
+                f"Memory request {memory_gb}GB exceeds quota {self.max_memory_gb}GB",
+            )
 
         if gpu_type and not self.is_gpu_type_allowed(gpu_type):
             return False, f"GPU type {gpu_type} not allowed. Allowed: {self.gpu_types}"
@@ -144,9 +149,9 @@ class ResourceQuota:
     def suspend(self) -> None:
         """Suspend quota."""
         self.status = QuotaStatus.SUSPENDED
-        self.updated_at = datetime.utcnow()
+        self.updated_at = utc_now()
 
     def activate(self) -> None:
         """Activate quota."""
         self.status = QuotaStatus.ACTIVE
-        self.updated_at = datetime.utcnow()
+        self.updated_at = utc_now()

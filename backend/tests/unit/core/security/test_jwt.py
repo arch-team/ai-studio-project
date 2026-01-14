@@ -1,11 +1,9 @@
 """JWT Manager Unit Tests."""
 
 from datetime import datetime, timedelta, timezone
-from unittest.mock import patch
 
 import pytest
 from authlib.jose import jwt as authlib_jwt
-from authlib.jose.errors import ExpiredTokenError as AuthlibExpiredTokenError
 
 from src.core.security.exceptions import InvalidTokenError, TokenExpiredError
 from src.core.security.jwt import JWTManager, TokenPayload, TokenType, get_jwt_manager

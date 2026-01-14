@@ -5,6 +5,8 @@ from datetime import datetime
 from enum import Enum
 from typing import Optional
 
+from src.core.utils import utc_now
+
 
 class UserStatus(Enum):
     """User account status."""
@@ -55,8 +57,8 @@ class User:
     iam_groups: list[str] = field(default_factory=list)
     resource_quota_id: Optional[int] = None
     last_login_at: Optional[datetime] = None
-    created_at: datetime = field(default_factory=datetime.utcnow)
-    updated_at: datetime = field(default_factory=datetime.utcnow)
+    created_at: datetime = field(default_factory=utc_now)
+    updated_at: datetime = field(default_factory=utc_now)
 
     def is_active(self) -> bool:
         """Check if user account is active."""
@@ -81,14 +83,14 @@ class User:
     def suspend(self) -> None:
         """Suspend user account."""
         self.status = UserStatus.SUSPENDED
-        self.updated_at = datetime.utcnow()
+        self.updated_at = utc_now()
 
     def activate(self) -> None:
         """Activate user account."""
         self.status = UserStatus.ACTIVE
-        self.updated_at = datetime.utcnow()
+        self.updated_at = utc_now()
 
     def record_login(self) -> None:
         """Record user login timestamp."""
-        self.last_login_at = datetime.utcnow()
-        self.updated_at = datetime.utcnow()
+        self.last_login_at = utc_now()
+        self.updated_at = utc_now()

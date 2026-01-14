@@ -16,6 +16,7 @@ from src.core.security.constants import (
     SSO_TIMEOUT_SECONDS,
 )
 from src.core.security.exceptions import SSODegradedModeError, SSOError
+from src.core.utils import utc_now
 
 
 @dataclass
@@ -56,7 +57,7 @@ class SSOHealthTracker:
         """Record successful SSO operation."""
         async with self._lock:
             self._state.consecutive_failures = 0
-            self._state.last_success_at = datetime.utcnow()
+            self._state.last_success_at = utc_now()
             if self._state.is_degraded:
                 self._state.is_degraded = False
 
@@ -64,7 +65,7 @@ class SSOHealthTracker:
         """Record failed SSO operation."""
         async with self._lock:
             self._state.consecutive_failures += 1
-            self._state.last_failure_at = datetime.utcnow()
+            self._state.last_failure_at = utc_now()
 
             if self._state.consecutive_failures >= SSO_MAX_CONSECUTIVE_FAILURES:
                 self._state.is_degraded = True
@@ -78,14 +79,14 @@ class SSOHealthTracker:
             return True
 
         recovery_interval = timedelta(minutes=SSO_RECOVERY_CHECK_INTERVAL_MINUTES)
-        time_since_check = datetime.utcnow() - self._state.last_recovery_check_at
+        time_since_check = utc_now() - self._state.last_recovery_check_at
 
         return time_since_check >= recovery_interval
 
     async def mark_recovery_check(self) -> None:
         """Mark that a recovery check was performed."""
         async with self._lock:
-            self._state.last_recovery_check_at = datetime.utcnow()
+            self._state.last_recovery_check_at = utc_now()
 
     def get_status(self) -> Dict:
         """Get current health status."""
@@ -226,7 +227,7 @@ class SSOService:
         """Get JWKS with caching."""
         # Check cache (5 minute cache)
         if self._jwks_cache and self._jwks_cache_time:
-            cache_age = datetime.utcnow() - self._jwks_cache_time
+            cache_age = utc_now() - self._jwks_cache_time
             if cache_age < timedelta(minutes=5):
                 return self._jwks_cache
 
@@ -236,7 +237,7 @@ class SSOService:
             response.raise_for_status()
 
             self._jwks_cache = response.json()
-            self._jwks_cache_time = datetime.utcnow()
+            self._jwks_cache_time = utc_now()
 
             return self._jwks_cache
 
@@ -267,7 +268,9 @@ DEFAULT_ROLE_MAPPING: Dict[str, str] = {
 }
 
 
-def map_groups_to_role(groups: List[str], role_mapping: Optional[Dict[str, str]] = None) -> str:
+def map_groups_to_role(
+    groups: List[str], role_mapping: Optional[Dict[str, str]] = None
+) -> str:
     """Map SSO groups to platform role (highest privilege wins)."""
     mapping = role_mapping or DEFAULT_ROLE_MAPPING
 

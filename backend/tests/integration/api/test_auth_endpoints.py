@@ -18,9 +18,7 @@ class TestLoginEndpoint:
         assert response.status_code in [400, 422]
 
     @pytest.mark.asyncio
-    async def test_login_local_invalid_credentials(
-        self, client: AsyncClient
-    ) -> None:
+    async def test_login_local_invalid_credentials(self, client: AsyncClient) -> None:
         """Test login with invalid credentials."""
         response = await client.post(
             "/api/v1/auth/login",
@@ -284,9 +282,7 @@ class TestPasswordResetEndpoints:
     """Tests for password reset endpoints."""
 
     @pytest.mark.asyncio
-    async def test_password_reset_request_any_email(
-        self, client: AsyncClient
-    ) -> None:
+    async def test_password_reset_request_any_email(self, client: AsyncClient) -> None:
         """Test password reset request doesn't reveal user existence."""
         response = await client.post(
             "/api/v1/auth/password-reset/request",
@@ -490,9 +486,7 @@ class TestInputValidation:
         assert response.status_code in [401, 422]
 
     @pytest.mark.asyncio
-    async def test_password_reset_email_validation(
-        self, client: AsyncClient
-    ) -> None:
+    async def test_password_reset_email_validation(self, client: AsyncClient) -> None:
         """Test password reset with various email formats."""
         invalid_emails = ["", "@", "test@", "@test.com", "test"]
 

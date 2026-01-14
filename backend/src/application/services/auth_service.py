@@ -1,8 +1,8 @@
 """Authentication Service - Core authentication logic for local and SSO accounts."""
 
 from dataclasses import dataclass
-from datetime import datetime, timedelta
-from typing import Optional, Tuple
+from datetime import timedelta
+from typing import Optional
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -27,6 +27,7 @@ from src.core.security.password import (
     get_password_hasher,
     get_password_validator,
 )
+from src.core.utils import utc_now
 from src.infrastructure.persistence.models import (
     AuthType,
     LoginAttemptModel,
@@ -110,9 +111,9 @@ class AuthService:
             if user.is_locked():
                 attempt.failure_reason = "account_locked"
                 raise AccountLockedError(
-                    locked_until=user.locked_until.isoformat()
-                    if user.locked_until
-                    else None
+                    locked_until=(
+                        user.locked_until.isoformat() if user.locked_until else None
+                    )
                 )
 
             # Verify password
@@ -186,7 +187,7 @@ class AuthService:
         password_hash = self._hasher.hash_password(password)
 
         # Calculate password expiry
-        password_expires_at = datetime.utcnow() + timedelta(days=PASSWORD_EXPIRY_DAYS)
+        password_expires_at = utc_now() + timedelta(days=PASSWORD_EXPIRY_DAYS)
 
         # Import UserRole enum
         from src.infrastructure.persistence.models.user_model import UserRole
@@ -215,6 +216,35 @@ class AuthService:
 
         return user
 
+    async def _validate_new_password(self, user_id: int, new_password: str) -> None:
+        """Validate password strength and check history."""
+        violations = self._validator.validate_strength(new_password)
+        if violations:
+            raise PasswordTooWeakError(violations)
+
+        password_history = await self._get_password_history(user_id)
+        history_hashes = [h.password_hash for h in password_history]
+
+        if not self._validator.check_password_history(
+            new_password, history_hashes, self._hasher
+        ):
+            raise PasswordHistoryViolationError()
+
+    async def _update_user_password(self, user: UserModel, new_password: str) -> None:
+        """Update user password and add to history."""
+        new_hash = self._hasher.hash_password(new_password)
+        user.password_hash = new_hash
+        user.password_expires_at = utc_now() + timedelta(days=PASSWORD_EXPIRY_DAYS)
+        user.failed_login_count = 0
+        user.locked_until = None
+
+        history = PasswordHistoryModel(
+            user_id=user.id,
+            password_hash=new_hash,
+        )
+        self._session.add(history)
+        await self._cleanup_password_history(user.id)
+
     async def change_password(
         self,
         user_id: int,
@@ -229,45 +259,13 @@ class AuthService:
         if not user.is_local_account():
             raise AuthenticationError("Cannot change password for SSO account")
 
-        # Verify current password
         if not user.password_hash or not self._hasher.verify_password(
             current_password, user.password_hash
         ):
             raise AuthenticationError("Current password is incorrect")
 
-        # Validate new password strength
-        violations = self._validator.validate_strength(new_password)
-        if violations:
-            raise PasswordTooWeakError(violations)
-
-        # Check password history
-        password_history = await self._get_password_history(user_id)
-        history_hashes = [h.password_hash for h in password_history]
-
-        if not self._validator.check_password_history(
-            new_password, history_hashes, self._hasher
-        ):
-            raise PasswordHistoryViolationError()
-
-        # Update password
-        new_hash = self._hasher.hash_password(new_password)
-        user.password_hash = new_hash
-        user.password_expires_at = datetime.utcnow() + timedelta(
-            days=PASSWORD_EXPIRY_DAYS
-        )
-        user.failed_login_count = 0
-        user.locked_until = None
-
-        # Add to history
-        history = PasswordHistoryModel(
-            user_id=user_id,
-            password_hash=new_hash,
-        )
-        self._session.add(history)
-
-        # Cleanup old history (keep only PASSWORD_HISTORY_COUNT)
-        await self._cleanup_password_history(user_id)
-
+        await self._validate_new_password(user_id, new_password)
+        await self._update_user_password(user, new_password)
         await self._session.commit()
 
     async def request_password_reset(self, email: str) -> Optional[str]:
@@ -289,7 +287,6 @@ class AuthService:
         new_password: str,
     ) -> None:
         """Confirm password reset with token."""
-        # Verify token
         payload = self._jwt.verify_token(reset_token, TokenType.PASSWORD_RESET)
         user_id = int(payload.sub)
 
@@ -300,37 +297,8 @@ class AuthService:
         if not user.is_local_account():
             raise AuthenticationError("Cannot reset password for SSO account")
 
-        # Validate new password
-        violations = self._validator.validate_strength(new_password)
-        if violations:
-            raise PasswordTooWeakError(violations)
-
-        # Check password history
-        password_history = await self._get_password_history(user_id)
-        history_hashes = [h.password_hash for h in password_history]
-
-        if not self._validator.check_password_history(
-            new_password, history_hashes, self._hasher
-        ):
-            raise PasswordHistoryViolationError()
-
-        # Update password
-        new_hash = self._hasher.hash_password(new_password)
-        user.password_hash = new_hash
-        user.password_expires_at = datetime.utcnow() + timedelta(
-            days=PASSWORD_EXPIRY_DAYS
-        )
-        user.failed_login_count = 0
-        user.locked_until = None
-
-        # Add to history
-        history = PasswordHistoryModel(
-            user_id=user_id,
-            password_hash=new_hash,
-        )
-        self._session.add(history)
-
-        await self._cleanup_password_history(user_id)
+        await self._validate_new_password(user_id, new_password)
+        await self._update_user_password(user, new_password)
         await self._session.commit()
 
     async def enable_account(self, user_id: int) -> None:
@@ -386,9 +354,7 @@ class AuthService:
         user.failed_login_count += 1
 
         if user.failed_login_count >= MAX_FAILED_LOGIN_ATTEMPTS:
-            user.locked_until = datetime.utcnow() + timedelta(
-                minutes=LOCKOUT_DURATION_MINUTES
-            )
+            user.locked_until = utc_now() + timedelta(minutes=LOCKOUT_DURATION_MINUTES)
 
         await self._session.commit()
 
@@ -396,7 +362,7 @@ class AuthService:
         """Handle successful login."""
         user.failed_login_count = 0
         user.locked_until = None
-        user.last_login_at = datetime.utcnow()
+        user.last_login_at = utc_now()
         await self._session.commit()
 
     async def _get_user_by_username(self, username: str) -> Optional[UserModel]:
@@ -420,9 +386,7 @@ class AuthService:
         )
         return result.scalar_one_or_none()
 
-    async def _get_password_history(
-        self, user_id: int
-    ) -> list[PasswordHistoryModel]:
+    async def _get_password_history(self, user_id: int) -> list[PasswordHistoryModel]:
         """Get password history for user."""
         result = await self._session.execute(
             select(PasswordHistoryModel)

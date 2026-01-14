@@ -2,7 +2,7 @@
 
 from datetime import datetime, timedelta, timezone
 from typing import Dict, List
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 
@@ -19,6 +19,7 @@ from src.core.security.constants import (
     SSO_RECOVERY_CHECK_INTERVAL_MINUTES,
 )
 from src.core.security.exceptions import SSODegradedModeError, SSOError
+from src.core.utils import utc_now
 
 
 class TestSSOHealthTracker:
@@ -101,7 +102,7 @@ class TestSSOHealthTracker:
             await health_tracker.record_failure()
 
         # Set last recovery check to past (use utcnow to match implementation)
-        health_tracker._state.last_recovery_check_at = datetime.utcnow() - timedelta(
+        health_tracker._state.last_recovery_check_at = utc_now() - timedelta(
             minutes=SSO_RECOVERY_CHECK_INTERVAL_MINUTES + 1
         )
 

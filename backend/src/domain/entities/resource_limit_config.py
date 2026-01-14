@@ -5,6 +5,8 @@ from datetime import datetime
 from enum import Enum
 from typing import Optional
 
+from src.core.utils import utc_now
+
 
 class LimitRole(Enum):
     """Role for resource limit configuration."""
@@ -59,8 +61,8 @@ class ResourceLimitConfig:
     priority_default: PriorityDefault = PriorityDefault.MEDIUM
 
     # Audit fields
-    created_at: datetime = field(default_factory=datetime.utcnow)
-    updated_at: datetime = field(default_factory=datetime.utcnow)
+    created_at: datetime = field(default_factory=utc_now)
+    updated_at: datetime = field(default_factory=utc_now)
 
     def is_global_config(self) -> bool:
         """Check if this is a global (not project-specific) config."""
@@ -86,13 +88,22 @@ class ResourceLimitConfig:
             return False, f"CPU cores {cpu_cores} exceeds limit {self.max_cpu_per_job}"
 
         if memory_gb > self.max_memory_gb_per_job:
-            return False, f"Memory {memory_gb}GB exceeds limit {self.max_memory_gb_per_job}GB"
+            return (
+                False,
+                f"Memory {memory_gb}GB exceeds limit {self.max_memory_gb_per_job}GB",
+            )
 
         if storage_gb > self.max_storage_gb_per_job:
-            return False, f"Storage {storage_gb}GB exceeds limit {self.max_storage_gb_per_job}GB"
+            return (
+                False,
+                f"Storage {storage_gb}GB exceeds limit {self.max_storage_gb_per_job}GB",
+            )
 
         if node_count > self.max_nodes_per_job:
-            return False, f"Node count {node_count} exceeds limit {self.max_nodes_per_job}"
+            return (
+                False,
+                f"Node count {node_count} exceeds limit {self.max_nodes_per_job}",
+            )
 
         return True, None
 
@@ -146,5 +157,5 @@ class ResourceLimitConfig:
             id=0,  # Temporary ID for default config
             config_name=f"default_{role.value}",
             role=role,
-            **role_defaults,
+            **role_defaults,  # type: ignore[arg-type]
         )

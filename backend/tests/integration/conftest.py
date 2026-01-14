@@ -1,21 +1,16 @@
 """Integration Test Configuration - Shared fixtures for integration tests."""
 
-from datetime import datetime, timedelta, timezone
+from datetime import timedelta
 from typing import Any, AsyncGenerator, Dict
-from unittest.mock import MagicMock, patch
 
 import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from src.core.security.constants import PASSWORD_BCRYPT_COST
 from src.core.security.jwt import JWTManager
 from src.core.security.password import PasswordHasher
-from src.domain.entities.user import UserRole, UserStatus
-from src.infrastructure.config import get_settings
 from src.main import app
-
 
 # =============================================================================
 # HTTP Client Fixtures

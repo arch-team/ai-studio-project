@@ -6,7 +6,8 @@ from datetime import datetime, timedelta, timezone
 from enum import Enum
 from typing import Any, Dict, Optional
 
-from authlib.jose import JoseError, jwt as authlib_jwt
+from authlib.jose import JoseError
+from authlib.jose import jwt as authlib_jwt
 from authlib.jose.errors import ExpiredTokenError as AuthlibExpiredTokenError
 
 from src.core.security.constants import (

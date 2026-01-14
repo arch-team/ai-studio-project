@@ -5,7 +5,7 @@ Following the Repository pattern from Domain-Driven Design.
 """
 
 from abc import ABC, abstractmethod
-from typing import Generic, TypeVar, Optional, List
+from typing import Generic, List, Optional, TypeVar
 from uuid import UUID
 
 # Type variable for entity types

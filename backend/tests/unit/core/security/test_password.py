@@ -1,8 +1,6 @@
 """Password Manager Unit Tests."""
 
-from typing import Dict, List
-
-import pytest
+from typing import List
 
 from src.core.security.constants import PASSWORD_BCRYPT_COST, PASSWORD_MIN_LENGTH
 from src.core.security.password import PasswordHasher, PasswordValidator
@@ -58,12 +56,8 @@ class TestPasswordHasher:
         password = "TestP@ssw0rd123!"
         hashed = fast_password_hasher.hash_password(password)
 
-        assert (
-            fast_password_hasher.verify_password("testp@ssw0rd123!", hashed) is False
-        )
-        assert (
-            fast_password_hasher.verify_password("TESTP@SSW0RD123!", hashed) is False
-        )
+        assert fast_password_hasher.verify_password("testp@ssw0rd123!", hashed) is False
+        assert fast_password_hasher.verify_password("TESTP@SSW0RD123!", hashed) is False
 
     def test_bcrypt_cost_factor_4_for_fast_tests(
         self, fast_password_hasher: PasswordHasher
@@ -226,9 +220,9 @@ class TestPasswordValidatorStrength:
             password = f"TestP@ss123{char}"
             violations = password_validator.validate_strength(password)
             # Should pass special char check
-            assert not any("特殊" in v or "special" in v.lower() for v in violations), (
-                f"Special char '{char}' should be accepted"
-            )
+            assert not any(
+                "特殊" in v or "special" in v.lower() for v in violations
+            ), f"Special char '{char}' should be accepted"
 
 
 class TestPasswordValidatorHistory:

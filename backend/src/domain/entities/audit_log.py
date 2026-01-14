@@ -5,6 +5,8 @@ from datetime import datetime, timedelta
 from enum import Enum
 from typing import Any, Optional
 
+from src.core.utils import utc_now
+
 
 class OperationType(Enum):
     """Operation type for audit logging."""
@@ -63,7 +65,7 @@ class AuditLog:
     user_agent: Optional[str] = None
 
     # Timestamps
-    created_at: datetime = field(default_factory=datetime.utcnow)
+    created_at: datetime = field(default_factory=utc_now)
     expires_at: datetime = field(default=None)  # type: ignore
 
     def __post_init__(self) -> None:
@@ -73,11 +75,11 @@ class AuditLog:
 
     def is_expired(self) -> bool:
         """Check if audit log has expired."""
-        return datetime.utcnow() > self.expires_at
+        return utc_now() > self.expires_at
 
     def days_until_expiration(self) -> int:
         """Get number of days until expiration."""
-        delta = self.expires_at - datetime.utcnow()
+        delta = self.expires_at - utc_now()
         return max(0, delta.days)
 
     def mark_as_failed(self, error_message: Optional[str] = None) -> None:

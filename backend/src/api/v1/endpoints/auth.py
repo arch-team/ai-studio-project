@@ -5,11 +5,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.api.middleware.auth import CurrentUser
 from src.api.middleware.sso import SSOUserInfo, get_sso_service, map_groups_to_role
+from src.api.v1.dependencies import get_auth_service
 from src.api.v1.dependencies.auth import get_current_active_user, require_admin
 from src.api.v1.schemas.auth import (
     ErrorResponse,
     LocalAccountCreateRequest,
-    LocalAccountUpdateRequest,
     LoginRequest,
     LoginResponse,
     MessageResponse,
@@ -83,6 +83,7 @@ async def login(
 
                 # For SSO, we need to create or get the user
                 from sqlalchemy import select
+
                 from src.infrastructure.persistence.models import (
                     AuthType,
                     UserModel,
@@ -90,12 +91,12 @@ async def login(
                 )
                 from src.infrastructure.persistence.models.user_model import UserRole
 
-                result = await session.execute(
+                query_result = await session.execute(
                     select(UserModel).where(
                         UserModel.iam_identity_id == user_info.identity_id
                     )
                 )
-                user = result.scalar_one_or_none()
+                user = query_result.scalar_one_or_none()
 
                 if not user:
                     # Create new SSO user
@@ -119,9 +120,8 @@ async def login(
                     await session.commit()
 
                 # Generate tokens
-                from src.core.security.jwt import get_jwt_manager
-                from src.application.services.auth_service import TokenPair
                 from src.core.security.constants import ACCESS_TOKEN_EXPIRE_MINUTES
+                from src.core.security.jwt import get_jwt_manager
 
                 jwt_manager = get_jwt_manager()
                 access_token = jwt_manager.create_access_token(
@@ -196,7 +196,11 @@ async def login(
     except AccountLockedError as e:
         raise HTTPException(
             status_code=status.HTTP_423_LOCKED,
-            detail=f"Account is locked until {e.locked_until}" if e.locked_until else "Account is locked",
+            detail=(
+                f"Account is locked until {e.locked_until}"
+                if e.locked_until
+                else "Account is locked"
+            ),
         )
     except PasswordExpiredError:
         raise HTTPException(
@@ -217,11 +221,10 @@ async def login(
 )
 async def refresh_token(
     refresh_data: RefreshTokenRequest,
-    session: AsyncSession = Depends(get_db),
+    auth_service: AuthService = Depends(get_auth_service),
 ):
     """Refresh access token using refresh token."""
     try:
-        auth_service = AuthService(session)
         tokens = await auth_service.refresh_access_token(refresh_data.refresh_token)
 
         return TokenResponse(
@@ -263,12 +266,11 @@ async def logout(
 )
 async def create_local_account(
     account_data: LocalAccountCreateRequest,
-    session: AsyncSession = Depends(get_db),
     current_user: CurrentUser = Depends(require_admin),
+    auth_service: AuthService = Depends(get_auth_service),
 ):
     """Create a new local authentication account (Admin only)."""
     try:
-        auth_service = AuthService(session)
         user = await auth_service.create_local_account(
             username=account_data.username,
             email=account_data.email,
@@ -305,12 +307,11 @@ async def create_local_account(
 )
 async def enable_account(
     user_id: int,
-    session: AsyncSession = Depends(get_db),
     current_user: CurrentUser = Depends(require_admin),
+    auth_service: AuthService = Depends(get_auth_service),
 ):
     """Enable a user account (Admin only)."""
     try:
-        auth_service = AuthService(session)
         await auth_service.enable_account(user_id)
         return MessageResponse(message="Account enabled successfully")
     except AuthenticationError as e:
@@ -327,12 +328,11 @@ async def enable_account(
 )
 async def disable_account(
     user_id: int,
-    session: AsyncSession = Depends(get_db),
     current_user: CurrentUser = Depends(require_admin),
+    auth_service: AuthService = Depends(get_auth_service),
 ):
     """Disable a user account (Admin only)."""
     try:
-        auth_service = AuthService(session)
         await auth_service.disable_account(user_id)
         return MessageResponse(message="Account disabled successfully")
     except AuthenticationError as e:
@@ -349,12 +349,11 @@ async def disable_account(
 )
 async def unlock_account(
     user_id: int,
-    session: AsyncSession = Depends(get_db),
     current_user: CurrentUser = Depends(require_admin),
+    auth_service: AuthService = Depends(get_auth_service),
 ):
     """Unlock a locked user account (Admin only)."""
     try:
-        auth_service = AuthService(session)
         await auth_service.unlock_account(user_id)
         return MessageResponse(message="Account unlocked successfully")
     except AuthenticationError as e:
@@ -374,12 +373,11 @@ async def unlock_account(
 )
 async def change_password(
     password_data: PasswordChangeRequest,
-    session: AsyncSession = Depends(get_db),
     current_user: CurrentUser = Depends(get_current_active_user),
+    auth_service: AuthService = Depends(get_auth_service),
 ):
     """Change password for the current user."""
     try:
-        auth_service = AuthService(session)
         await auth_service.change_password(
             user_id=current_user.user_id,
             current_password=password_data.current_password,
@@ -409,11 +407,11 @@ async def change_password(
 )
 async def request_password_reset(
     reset_data: PasswordResetRequest,
-    session: AsyncSession = Depends(get_db),
+    auth_service: AuthService = Depends(get_auth_service),
 ):
     """Request a password reset email."""
-    auth_service = AuthService(session)
-    token = await auth_service.request_password_reset(reset_data.email)
+    # Token would be used in production to send email with reset link
+    _ = await auth_service.request_password_reset(reset_data.email)
 
     # Note: In production, send email with reset link containing the token
     # For now, we just acknowledge the request
@@ -433,11 +431,10 @@ async def request_password_reset(
 )
 async def confirm_password_reset(
     reset_data: PasswordResetConfirmRequest,
-    session: AsyncSession = Depends(get_db),
+    auth_service: AuthService = Depends(get_auth_service),
 ):
     """Confirm password reset with token."""
     try:
-        auth_service = AuthService(session)
         await auth_service.confirm_password_reset(
             reset_token=reset_data.token,
             new_password=reset_data.new_password,
@@ -472,6 +469,7 @@ async def get_current_user_info(
 ):
     """Get current user information."""
     from sqlalchemy import select
+
     from src.infrastructure.persistence.models import UserModel
 
     result = await session.execute(

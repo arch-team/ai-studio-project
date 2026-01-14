@@ -10,7 +10,6 @@ from starlette.responses import JSONResponse, Response
 from src.core.security.exceptions import InvalidTokenError, TokenExpiredError
 from src.core.security.jwt import TokenPayload, TokenType, get_jwt_manager
 
-
 # Paths that don't require authentication
 EXEMPT_PATHS: List[str] = [
     "/health",

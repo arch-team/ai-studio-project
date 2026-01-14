@@ -11,7 +11,6 @@ from src.core.security.jwt import JWTManager, TokenPayload, TokenType
 from src.core.security.password import PasswordHasher, PasswordValidator
 from src.domain.entities.user import UserRole, UserStatus
 
-
 # =============================================================================
 # JWT Manager Fixtures
 # =============================================================================
