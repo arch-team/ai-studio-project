@@ -13,6 +13,15 @@ from alembic import context
 from src.core.database import Base
 from src.core.config import get_settings
 
+# Import all models to register them with Base.metadata (required for autogenerate)
+from src.infrastructure.persistence.models import (  # noqa: F401
+    UserModel,
+    ResourceQuotaModel,
+    ResourceLimitConfigModel,
+    AuditLogModel,
+    DevelopmentSpaceModel,
+)
+
 # this is the Alembic Config object
 config = context.config
 

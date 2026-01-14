@@ -171,3 +171,6 @@ Training Operator 需要在带有 sagemaker.amazonaws.com/compute-type: hyperpod
 
 
 由于本项目的constitution.md文件发生了变化，我在constitution.md 中增加了Clean Architecture (整洁架构)这一原则要求。请重新检查之前生成/speckit.plan相关的文件，是否符合Clean Architecture (整洁架构)这一原则要求。你只需要分析存在不一致的问题或者需要优化的地方，不要修改任何文件
+
+
+/speckit.implement ## Phase 2: Foundational - 基础设施 (23 tasks) 中的核心数据表迁移
