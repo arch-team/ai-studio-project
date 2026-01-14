@@ -102,8 +102,8 @@
 **前置条件**: Phase 0 SDK 验证完成,方法签名参考文档可用
 
 ### 后端项目结构
-- [ ] [T001] [P] 创建 backend/ 项目结构 - 使用 FastAPI + SQLAlchemy 2.0 异步架构,采用 Clean Architecture 四层架构,创建 `backend/src/` 目录结构 (domain/, application/, infrastructure/, api/, core/)
-- [ ] [T004] [P] 配置 backend/requirements.txt - 添加 fastapi==0.109.0, sqlalchemy==2.0+, alembic, aiomysql, pydantic==2.0+, boto3, sagemaker-hyperpod SDK
+- [X] [T001] [P] 创建 backend/ 项目结构 - 使用 FastAPI + SQLAlchemy 2.0 异步架构,采用 Clean Architecture 四层架构,创建 `backend/src/` 目录结构 (domain/, application/, infrastructure/, api/, core/)
+- [X] [T004] [P] 配置 backend/requirements.txt - 添加 fastapi==0.109.0, sqlalchemy==2.0+, alembic, aiomysql, pydantic==2.0+, boto3, sagemaker-hyperpod SDK
 
 ### 前端项目结构
 - [X] [T002] [P] 创建 frontend/ 项目结构 - 使用 Vite + React 18 + TypeScript,创建 `frontend/src/` 目录结构 (pages/, components/, layouts/, store/, lib/)

@@ -164,3 +164,10 @@ Training Operator 需要在带有 sagemaker.amazonaws.com/compute-type: hyperpod
 
 
 当前目录是一个AWS CDK的基础设施即代码的项目，用于创建基于SageMaker HyperPod on EKS的训练平台的AWS服务的部署，仔细分析理解这个项目，画出符合专业、规划的AWS部署架构图，采用AWS标准的图标（icon），最终的部署架构使用drawio格式输出,名为WS部署架构图-cc.drawio
+
+
+根据这个clean-architecture.md checklist对speckit生成的文档进行检查并处理，针对发现的所有这些问题，逐个逐个的进行处理，一个问题完整处理完成后进行下一个。针对每个问题必须遵循这样的流程：你给出可选的解决方案（标识其中的推荐方案）、由我最终选择对应的解决方案、然后你根据我选择的解决方案执行修改。 提供对人类阅读友好的交互方式
+
+
+
+由于本项目的constitution.md文件发生了变化，我在constitution.md 中增加了Clean Architecture (整洁架构)这一原则要求。请重新检查之前生成/speckit.plan相关的文件，是否符合Clean Architecture (整洁架构)这一原则要求。你只需要分析存在不一致的问题或者需要优化的地方，不要修改任何文件
