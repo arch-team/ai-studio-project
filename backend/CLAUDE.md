@@ -156,3 +156,92 @@ burst_factor = math.exp(-elapsed / TAU)
 - 非显而易见的业务规则
 - 临时解决方案 (需包含 TODO + issue 编号)
 - 性能优化的权衡说明
+
+## Test-Driven Development (TDD)
+
+本项目践行 TDD 实践，遵循 **Red-Green-Refactor** 循环。
+
+### TDD 工作流
+
+```
+1. 🔴 Red: 先写失败的测试
+   pytest tests/unit/domain/test_training_job.py -v
+
+2. 🟢 Green: 编写最少代码使测试通过
+   pytest tests/unit/domain/test_training_job.py -v
+
+3. 🔄 Refactor: 重构代码，保持测试通过
+   pytest tests/unit/ -v && black src/ && ruff check src/
+```
+
+### 测试分层策略
+
+| 层级 | 位置 | 测试对象 | Mock 策略 |
+|------|------|---------|----------|
+| **Unit** | `tests/unit/domain/` | 实体、值对象、域逻辑 | 无依赖，纯函数 |
+| **Unit** | `tests/unit/application/` | 应用服务 | Mock 仓库接口 |
+| **Integration** | `tests/integration/api/` | API 端点 | Mock 外部服务 |
+| **Integration** | `tests/integration/persistence/` | 仓库实现 | 真实数据库 |
+| **E2E** | `tests/e2e/` | 完整流程 | 最小化 Mock |
+
+### TDD 命令速查
+
+```bash
+# 监视模式 - 文件变更自动运行测试
+pytest tests/unit/ --watch              # 需安装 pytest-watch
+
+# 只运行上次失败的测试
+pytest --lf
+
+# 失败时立即停止
+pytest -x
+
+# 显示详细输出
+pytest -v --tb=short
+
+# 运行标记的测试
+pytest -m "unit and not slow"
+```
+
+### 测试命名规范
+
+```python
+# 文件命名: test_<module>.py
+tests/unit/domain/test_training_job.py
+
+# 测试函数命名: test_<method>_<scenario>_<expected>
+def test_submit_with_invalid_config_raises_validation_error():
+    ...
+
+def test_cancel_when_running_transitions_to_cancelled():
+    ...
+```
+
+### Fixture 组织
+
+```python
+# tests/conftest.py - 全局共享
+@pytest.fixture
+async def client() -> AsyncGenerator[AsyncClient, None]:
+    """异步 HTTP 测试客户端。"""
+    ...
+
+# tests/unit/conftest.py - 单元测试专用
+@pytest.fixture
+def mock_job_repository() -> Mock:
+    """Mock 训练作业仓库。"""
+    ...
+
+# tests/integration/conftest.py - 集成测试专用
+@pytest.fixture
+async def db_session() -> AsyncGenerator[AsyncSession, None]:
+    """真实数据库会话（事务回滚）。"""
+    ...
+```
+
+### 编写新功能的 TDD 流程
+
+1. **Domain 层优先**: 先为实体/值对象写测试
+2. **Application 层次之**: 测试业务用例（Mock 仓库）
+3. **API 层最后**: 测试 HTTP 接口（Mock 服务）
+4. **Integration 补充**: 验证真实数据库交互
