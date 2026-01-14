@@ -688,28 +688,135 @@ alembic downgrade -1
 
 ---
 
-## ORM 模型示例
+## Clean Architecture 代码示例
 
-### User 模型
+> 遵循 constitution.md Principle XII (Clean Architecture)，后端项目采用四层架构。
+> 以下示例展示领域实体、ORM 模型、仓储接口与实现的分离设计。
+
+### 领域层 (Domain Layer) 示例
+
+#### 领域实体 - User
 
 ```python
-# backend/src/models/user.py
-from sqlalchemy import Column, String, Enum, DateTime, BigInteger, func
+# backend/src/domain/entities/user.py
+"""用户领域实体 - 纯业务对象，MUST NOT 依赖任何框架"""
+from dataclasses import dataclass, field
+from datetime import datetime
+from enum import Enum
+from typing import Optional
+
+
+class UserStatus(Enum):
+    """用户状态枚举"""
+    ACTIVE = "active"
+    INACTIVE = "inactive"
+    SUSPENDED = "suspended"
+
+
+class UserRole(Enum):
+    """用户角色枚举"""
+    ADMIN = "admin"
+    USER = "user"
+    VIEWER = "viewer"
+
+
+@dataclass
+class User:
+    """用户领域实体"""
+    id: int
+    username: str
+    email: str
+    status: UserStatus
+    role: UserRole
+    display_name: Optional[str] = None
+    iam_identity_id: Optional[str] = None
+    iam_groups: list[str] = field(default_factory=list)
+    resource_quota_id: Optional[int] = None
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+    last_login_at: Optional[datetime] = None
+
+    def is_active(self) -> bool:
+        """检查用户是否处于活跃状态"""
+        return self.status == UserStatus.ACTIVE
+
+    def has_admin_privileges(self) -> bool:
+        """检查用户是否具有管理员权限"""
+        return self.role == UserRole.ADMIN
+
+    def can_create_training_job(self) -> bool:
+        """检查用户是否可以创建训练任务"""
+        return self.is_active() and self.role in (UserRole.ADMIN, UserRole.USER)
+```
+
+#### 仓储接口 - IUserRepository
+
+```python
+# backend/src/domain/repositories/user_repository.py
+"""用户仓储接口 - 定义数据访问契约"""
+from abc import ABC, abstractmethod
+from typing import Optional
+
+from backend.src.domain.entities.user import User
+
+
+class IUserRepository(ABC):
+    """用户仓储接口"""
+
+    @abstractmethod
+    async def get_by_id(self, user_id: int) -> Optional[User]:
+        """根据ID获取用户"""
+        pass
+
+    @abstractmethod
+    async def get_by_username(self, username: str) -> Optional[User]:
+        """根据用户名获取用户"""
+        pass
+
+    @abstractmethod
+    async def get_by_email(self, email: str) -> Optional[User]:
+        """根据邮箱获取用户"""
+        pass
+
+    @abstractmethod
+    async def create(self, user: User) -> User:
+        """创建用户"""
+        pass
+
+    @abstractmethod
+    async def update(self, user: User) -> User:
+        """更新用户"""
+        pass
+
+    @abstractmethod
+    async def delete(self, user_id: int) -> bool:
+        """删除用户"""
+        pass
+
+    @abstractmethod
+    async def list_all(self, limit: int = 100, offset: int = 0) -> list[User]:
+        """列出所有用户"""
+        pass
+```
+
+---
+
+### 基础设施层 (Infrastructure Layer) 示例
+
+#### ORM 模型 - UserModel
+
+```python
+# backend/src/infrastructure/persistence/models/user_model.py
+"""用户 ORM 模型 - SQLAlchemy 技术实现"""
+from sqlalchemy import Column, String, Enum, DateTime, BigInteger, JSON, ForeignKey, func
 from sqlalchemy.orm import relationship
-from backend.src.core.database import Base
-import enum
 
-class UserStatus(enum.Enum):
-    active = "active"
-    inactive = "inactive"
-    suspended = "suspended"
+from backend.src.infrastructure.persistence.models.base import Base
+from backend.src.domain.entities.user import UserStatus, UserRole
 
-class UserRole(enum.Enum):
-    admin = "admin"
-    user = "user"
-    viewer = "viewer"
 
-class User(Base):
+class UserModel(Base):
+    """用户 ORM 模型"""
     __tablename__ = "users"
 
     id = Column(BigInteger, primary_key=True, autoincrement=True, comment="用户ID")
@@ -720,8 +827,8 @@ class User(Base):
     iam_identity_id = Column(String(255), unique=True, comment="AWS IAM Identity Center 用户ID")
     iam_groups = Column(JSON, comment="IAM 用户组列表")
 
-    status = Column(Enum(UserStatus), nullable=False, default=UserStatus.active, comment="用户状态")
-    role = Column(Enum(UserRole), nullable=False, default=UserRole.user, comment="用户角色")
+    status = Column(Enum(UserStatus), nullable=False, default=UserStatus.ACTIVE, comment="用户状态")
+    role = Column(Enum(UserRole), nullable=False, default=UserRole.USER, comment="用户角色")
 
     resource_quota_id = Column(BigInteger, ForeignKey("resource_quotas.id"), comment="资源配额ID")
 
@@ -730,40 +837,236 @@ class User(Base):
     last_login_at = Column(DateTime(3), comment="最后登录时间")
 
     # 关系
-    resource_quota = relationship("ResourceQuota", back_populates="users")
-    training_jobs = relationship("TrainingJob", back_populates="owner", cascade="all, delete-orphan")
-    datasets = relationship("Dataset", back_populates="owner", cascade="all, delete-orphan")
+    resource_quota = relationship("ResourceQuotaModel", back_populates="users")
+    training_jobs = relationship("TrainingJobModel", back_populates="owner", cascade="all, delete-orphan")
+    datasets = relationship("DatasetModel", back_populates="owner", cascade="all, delete-orphan")
 ```
 
-### TrainingJob 模型
+#### 仓储实现 - SQLAlchemyUserRepository
 
 ```python
-# backend/src/models/training_job.py
-from sqlalchemy import Column, String, Enum, Integer, JSON, DateTime, BigInteger, ForeignKey, func
+# backend/src/infrastructure/persistence/repositories/user_repository.py
+"""用户仓储实现 - SQLAlchemy 实现"""
+from typing import Optional
+
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from backend.src.domain.entities.user import User
+from backend.src.domain.repositories.user_repository import IUserRepository
+from backend.src.infrastructure.persistence.models.user_model import UserModel
+
+
+class SQLAlchemyUserRepository(IUserRepository):
+    """SQLAlchemy 用户仓储实现"""
+
+    def __init__(self, session: AsyncSession):
+        self._session = session
+
+    async def get_by_id(self, user_id: int) -> Optional[User]:
+        """根据ID获取用户"""
+        stmt = select(UserModel).where(UserModel.id == user_id)
+        result = await self._session.execute(stmt)
+        model = result.scalar_one_or_none()
+        return self._to_entity(model) if model else None
+
+    async def get_by_username(self, username: str) -> Optional[User]:
+        """根据用户名获取用户"""
+        stmt = select(UserModel).where(UserModel.username == username)
+        result = await self._session.execute(stmt)
+        model = result.scalar_one_or_none()
+        return self._to_entity(model) if model else None
+
+    async def get_by_email(self, email: str) -> Optional[User]:
+        """根据邮箱获取用户"""
+        stmt = select(UserModel).where(UserModel.email == email)
+        result = await self._session.execute(stmt)
+        model = result.scalar_one_or_none()
+        return self._to_entity(model) if model else None
+
+    async def create(self, user: User) -> User:
+        """创建用户"""
+        model = self._to_model(user)
+        self._session.add(model)
+        await self._session.flush()
+        return self._to_entity(model)
+
+    async def update(self, user: User) -> User:
+        """更新用户"""
+        stmt = select(UserModel).where(UserModel.id == user.id)
+        result = await self._session.execute(stmt)
+        model = result.scalar_one()
+        self._update_model(model, user)
+        await self._session.flush()
+        return self._to_entity(model)
+
+    async def delete(self, user_id: int) -> bool:
+        """删除用户"""
+        stmt = select(UserModel).where(UserModel.id == user_id)
+        result = await self._session.execute(stmt)
+        model = result.scalar_one_or_none()
+        if model:
+            await self._session.delete(model)
+            return True
+        return False
+
+    async def list_all(self, limit: int = 100, offset: int = 0) -> list[User]:
+        """列出所有用户"""
+        stmt = select(UserModel).offset(offset).limit(limit)
+        result = await self._session.execute(stmt)
+        models = result.scalars().all()
+        return [self._to_entity(m) for m in models]
+
+    @staticmethod
+    def _to_entity(model: UserModel) -> User:
+        """ORM 模型转领域实体"""
+        return User(
+            id=model.id,
+            username=model.username,
+            email=model.email,
+            status=model.status,
+            role=model.role,
+            display_name=model.display_name,
+            iam_identity_id=model.iam_identity_id,
+            iam_groups=model.iam_groups or [],
+            resource_quota_id=model.resource_quota_id,
+            created_at=model.created_at,
+            updated_at=model.updated_at,
+            last_login_at=model.last_login_at,
+        )
+
+    @staticmethod
+    def _to_model(entity: User) -> UserModel:
+        """领域实体转 ORM 模型"""
+        return UserModel(
+            id=entity.id if entity.id else None,
+            username=entity.username,
+            email=entity.email,
+            status=entity.status,
+            role=entity.role,
+            display_name=entity.display_name,
+            iam_identity_id=entity.iam_identity_id,
+            iam_groups=entity.iam_groups,
+            resource_quota_id=entity.resource_quota_id,
+        )
+
+    @staticmethod
+    def _update_model(model: UserModel, entity: User) -> None:
+        """更新 ORM 模型字段"""
+        model.username = entity.username
+        model.email = entity.email
+        model.status = entity.status
+        model.role = entity.role
+        model.display_name = entity.display_name
+        model.iam_identity_id = entity.iam_identity_id
+        model.iam_groups = entity.iam_groups
+        model.resource_quota_id = entity.resource_quota_id
+```
+
+---
+
+### TrainingJob 完整示例
+
+#### 领域实体 - TrainingJob
+
+```python
+# backend/src/domain/entities/training_job.py
+"""训练任务领域实体 - 纯业务对象"""
+from dataclasses import dataclass, field
+from datetime import datetime
+from decimal import Decimal
+from enum import Enum
+from typing import Optional, Any
+
+
+class JobStatus(Enum):
+    """任务状态枚举"""
+    SUBMITTED = "submitted"
+    RUNNING = "running"
+    PAUSED = "paused"
+    PREEMPTED = "preempted"
+    COMPLETED = "completed"
+    FAILED = "failed"
+
+
+class JobPriority(Enum):
+    """任务优先级枚举"""
+    HIGH = "high"
+    MEDIUM = "medium"
+    LOW = "low"
+
+
+class DistributionStrategy(Enum):
+    """分布式训练策略枚举"""
+    DDP = "ddp"
+    FSDP = "fsdp"
+    DEEPSPEED = "deepspeed"
+    HOROVOD = "horovod"
+
+
+@dataclass
+class TrainingJob:
+    """训练任务领域实体"""
+    id: int
+    job_name: str
+    owner_id: int
+    image_uri: str
+    instance_type: str
+    node_count: int
+    tasks_per_node: int
+    entrypoint_command: list[str]
+    distribution_strategy: DistributionStrategy
+    priority: JobPriority
+    status: JobStatus
+
+    display_name: Optional[str] = None
+    description: Optional[str] = None
+    dataset_id: Optional[int] = None
+    environment_variables: dict[str, str] = field(default_factory=dict)
+    hyperparameters: dict[str, Any] = field(default_factory=dict)
+
+    hyperpod_status: Optional[str] = None
+    kueue_workload_name: Optional[str] = None
+    current_epoch: Optional[int] = None
+    latest_loss: Optional[Decimal] = None
+
+    submitted_at: Optional[datetime] = None
+    started_at: Optional[datetime] = None
+    completed_at: Optional[datetime] = None
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+
+    def is_running(self) -> bool:
+        """检查任务是否正在运行"""
+        return self.status == JobStatus.RUNNING
+
+    def can_be_paused(self) -> bool:
+        """检查任务是否可以暂停"""
+        return self.status == JobStatus.RUNNING
+
+    def can_be_resumed(self) -> bool:
+        """检查任务是否可以恢复"""
+        return self.status in (JobStatus.PAUSED, JobStatus.PREEMPTED)
+
+    def total_gpus(self) -> int:
+        """计算总 GPU 数量"""
+        return self.node_count * self.tasks_per_node
+```
+
+#### ORM 模型 - TrainingJobModel
+
+```python
+# backend/src/infrastructure/persistence/models/training_job_model.py
+"""训练任务 ORM 模型"""
+from sqlalchemy import Column, String, Enum, Integer, JSON, DateTime, BigInteger, ForeignKey, Text, DECIMAL, func
 from sqlalchemy.orm import relationship
-from backend.src.core.database import Base
-import enum
 
-class JobStatus(enum.Enum):
-    submitted = "submitted"
-    running = "running"
-    paused = "paused"
-    preempted = "preempted"
-    completed = "completed"
-    failed = "failed"
+from backend.src.infrastructure.persistence.models.base import Base
+from backend.src.domain.entities.training_job import JobStatus, JobPriority, DistributionStrategy
 
-class JobPriority(enum.Enum):
-    high = "high"
-    medium = "medium"
-    low = "low"
 
-class DistributionStrategy(enum.Enum):
-    ddp = "ddp"
-    fsdp = "fsdp"
-    deepspeed = "deepspeed"
-    horovod = "horovod"
-
-class TrainingJob(Base):
+class TrainingJobModel(Base):
+    """训练任务 ORM 模型"""
     __tablename__ = "training_jobs"
 
     id = Column(BigInteger, primary_key=True, autoincrement=True, comment="训练任务ID")
@@ -784,10 +1087,10 @@ class TrainingJob(Base):
     dataset_id = Column(BigInteger, ForeignKey("datasets.id", ondelete="SET NULL"), index=True, comment="数据集ID")
 
     hyperparameters = Column(JSON, comment="超参数")
-    distribution_strategy = Column(Enum(DistributionStrategy), nullable=False, default=DistributionStrategy.ddp, comment="分布式策略")
+    distribution_strategy = Column(Enum(DistributionStrategy), nullable=False, default=DistributionStrategy.DDP, comment="分布式策略")
 
-    priority = Column(Enum(JobPriority), nullable=False, default=JobPriority.medium, index=True, comment="任务优先级")
-    status = Column(Enum(JobStatus), nullable=False, default=JobStatus.submitted, index=True, comment="任务状态")
+    priority = Column(Enum(JobPriority), nullable=False, default=JobPriority.MEDIUM, index=True, comment="任务优先级")
+    status = Column(Enum(JobStatus), nullable=False, default=JobStatus.SUBMITTED, index=True, comment="任务状态")
     hyperpod_status = Column(String(64), index=True, comment="HyperPod Job 状态")
     kueue_workload_name = Column(String(128), index=True, comment="Kueue Workload 名称")
 
@@ -802,9 +1105,9 @@ class TrainingJob(Base):
     updated_at = Column(DateTime(3), nullable=False, server_default=func.now(), onupdate=func.now(), comment="更新时间")
 
     # 关系
-    owner = relationship("User", back_populates="training_jobs")
-    dataset = relationship("Dataset", back_populates="training_jobs")
-    checkpoints = relationship("Checkpoint", back_populates="training_job", cascade="all, delete-orphan")
+    owner = relationship("UserModel", back_populates="training_jobs")
+    dataset = relationship("DatasetModel", back_populates="training_jobs")
+    checkpoints = relationship("CheckpointModel", back_populates="training_job", cascade="all, delete-orphan")
 ```
 
 ---
