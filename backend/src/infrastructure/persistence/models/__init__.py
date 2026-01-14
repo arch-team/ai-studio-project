@@ -6,6 +6,8 @@ Database models for the AI Training Platform:
 - ResourceLimitConfigModel: Per-job resource limits
 - AuditLogModel: Audit trail records
 - DevelopmentSpaceModel: SageMaker Spaces records
+- PasswordHistoryModel: Password change history
+- LoginAttemptModel: Login attempt records
 """
 
 from src.core.database import Base
@@ -22,6 +24,10 @@ from src.infrastructure.persistence.models.development_space_model import (
     SpaceStatus,
     SpaceType,
 )
+from src.infrastructure.persistence.models.login_attempt_model import LoginAttemptModel
+from src.infrastructure.persistence.models.password_history_model import (
+    PasswordHistoryModel,
+)
 from src.infrastructure.persistence.models.resource_limit_config_model import (
     LimitRole,
     PriorityDefault,
@@ -33,6 +39,7 @@ from src.infrastructure.persistence.models.resource_quota_model import (
     ResourceQuotaModel,
 )
 from src.infrastructure.persistence.models.user_model import (
+    AuthType,
     UserModel,
     UserRole,
     UserStatus,
@@ -47,6 +54,10 @@ __all__ = [
     "UserModel",
     "UserStatus",
     "UserRole",
+    "AuthType",
+    # Authentication
+    "PasswordHistoryModel",
+    "LoginAttemptModel",
     # ResourceQuota
     "ResourceQuotaModel",
     "QuotaType",

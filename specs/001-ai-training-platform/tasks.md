@@ -367,12 +367,12 @@
 - [X] [T012a] 创建 AuditLog 模型 - 领域实体 `backend/src/domain/entities/audit_log.py` + ORM 模型 `backend/src/infrastructure/persistence/models/audit_log_model.py`,包含自动过期逻辑 (expires_at = created_at + 90天),关联 User,支持操作类型和资源类型枚举,实现审计日志查询优化
 
 ### 认证中间件
-- [ ] [T013] 实现基础认证中间件 - `backend/src/api/middleware/auth.py`,验证 IAM Identity Center token,提取用户信息
+- [X] [T013] 实现基础认证中间件 - `backend/src/api/middleware/auth.py`,验证 IAM Identity Center token,提取用户信息
 
 ### 企业级认证扩展
-- [ ] [T013a] SSO集成实现 - `backend/src/api/middleware/sso.py`,集成AWS IAM Identity Center (SAML 2.0/OIDC),配置IdP元数据,实现用户自动映射和角色同步
-- [ ] [T013b] RBAC策略管理 - `backend/src/application/services/rbac_service.py`,定义角色层次 (admin/project_manager/engineer/viewer),实现基于资源的权限检查,集成Kubernetes RBAC
-- [ ] [T013c] 本地账号管理API - `backend/src/api/v1/endpoints/auth.py`,实现POST/PUT /auth/local-accounts,支持密码重置和账号启用/禁用,作为SSO不可用时的备用认证,包含以下密码安全要求:
+- [X] [T013a] SSO集成实现 - `backend/src/api/middleware/sso.py`,集成AWS IAM Identity Center (SAML 2.0/OIDC),配置IdP元数据,实现用户自动映射和角色同步
+- [X] [T013b] RBAC策略管理 - `backend/src/application/services/rbac_service.py`,定义角色层次 (admin/project_manager/engineer/viewer),实现基于资源的权限检查,集成Kubernetes RBAC
+- [X] [T013c] 本地账号管理API - `backend/src/api/v1/endpoints/auth.py`,实现POST/PUT /auth/local-accounts,支持密码重置和账号启用/禁用,作为SSO不可用时的备用认证,包含以下密码安全要求:
   - **密码强度策略**: 最小长度 12 字符,必须包含大小写字母、数字和特殊字符
   - **密码哈希算法**: 使用 bcrypt (cost factor ≥12) 或 argon2id 存储密码哈希
   - **密码重置安全**: 生成临时令牌 (有效期 15 分钟),通过邮件发送重置链接,令牌使用后立即失效
