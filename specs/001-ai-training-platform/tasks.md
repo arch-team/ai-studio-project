@@ -384,8 +384,8 @@
   - **参考**: spec.md FR-015 企业级认证和 SC-015 安全标准
 
 ### AWS 客户端封装
-- [ ] [T014] [P] HyperPod SDK 客户端封装 - 接口 `backend/src/application/interfaces/hyperpod_client.py` (IHyperPodClient) + 实现 `backend/src/infrastructure/external/hyperpod/client.py`,封装 HyperPod Training 模块 API,使用 T000 验证的方法名实现训练任务生命周期管理 (提交、状态查询、暂停/恢复/终止),参考 `docs/hyperpod-sdk-reference.md` 获取准确的方法签名 (依赖 T000)
-- [ ] [T015] [P] S3 客户端封装 - 接口 `backend/src/application/interfaces/storage_service.py` (IStorageService) + 实现 `backend/src/infrastructure/external/s3/client.py`,封装 boto3 S3 操作 (upload_file, download_file, list_objects),支持 presigned URLs,继承 T008b 配置的 SSE-KMS 默认加密
+- [X] [T014] [P] HyperPod SDK 客户端封装 - 接口 `backend/src/application/interfaces/hyperpod_client.py` (IHyperPodClient) + 实现 `backend/src/infrastructure/external/hyperpod/client.py`,封装 HyperPod Training 模块 API,使用 T000 验证的方法名实现训练任务生命周期管理 (提交、状态查询、暂停/恢复/终止),参考 `docs/hyperpod-sdk-reference.md` 获取准确的方法签名 (依赖 T000)
+- [X] [T015] [P] S3 客户端封装 - 接口 `backend/src/application/interfaces/storage_service.py` (IStorageService) + 实现 `backend/src/infrastructure/external/s3/client.py`,封装 boto3 S3 操作 (upload_file, download_file, list_objects),支持 presigned URLs,继承 T008b 配置的 SSE-KMS 默认加密
 
 ### FastAPI 应用配置
 - [ ] [T016] 配置 FastAPI 应用入口 - `backend/src/main.py`,注册路由,配置 CORS,集成认证中间件,配置 OpenAPI docs (TLS 终止由 T008i ALB 处理,应用无需配置 HTTPS)

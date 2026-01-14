@@ -180,3 +180,12 @@ Training Operator 需要在带有 sagemaker.amazonaws.com/compute-type: hyperpod
 任务队列推荐 Celery + Redis：用于 HyperPod 训练任务的后台监控、状态轮询、失败重试。是否采纳？ → 不采纳
 
 仔细分析，这里的那些实体希望记录的信息是SageMaker HyperPod with EKS提供了持久化，哪些是需要应用层自己记录到数据中的
+
+
+
+
+
+/speckit.implement ## Phase 2: Foundational - 基础设施 (23 tasks) 中的 AWS 客户端封装, 每个任务按照TDD（测试驱动开发的流程进行）
+
+
+基于对当前项目的深度理解，请你就frontend这个企业级训练平台的前端项目这个代码的子项目，给出项目工程目录结构的最佳实践方式 
