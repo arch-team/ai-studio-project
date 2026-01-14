@@ -70,16 +70,32 @@ description: "Task list template for feature implementation"
 
 **SDK Verification Checkpoint**: Confirm SDK supports all required HyperPod interactions
 
+### Clean Architecture Setup (per Constitution Principle XII)
+
+**适用范围**: 以下任务 **仅适用于后端项目 (backend/)**。前端和基础设施项目不适用。
+
+- [ ] T009 Create four-layer directory structure (backend/ only):
+  - `backend/src/domain/` (entities, value_objects, exceptions, repositories)
+  - `backend/src/application/` (services, dto, interfaces)
+  - `backend/src/infrastructure/` (persistence, external, config)
+  - `backend/src/api/` (v1/endpoints, v1/schemas, v1/dependencies, middleware)
+- [ ] T010 [P] Setup dependency injection framework (FastAPI dependencies or dependency-injector)
+- [ ] T011 [P] Create base domain exceptions in `backend/src/domain/exceptions/`
+- [ ] T012 [P] Setup infrastructure config management in `backend/src/infrastructure/config/`
+- [ ] T013 Create repository interface base class in `backend/src/domain/repositories/base.py`
+- [ ] T014 Setup SQLAlchemy async session factory in `backend/src/infrastructure/persistence/`
+- [ ] T015 [P] Configure Alembic migrations in `backend/src/infrastructure/persistence/migrations/`
+
+**不适用范围**:
+- **前端项目 (frontend/)**: 采用 React 组件化架构 (pages/, components/, hooks/, store/)
+- **基础设施项目 (infrastructure/cdk/)**: 采用 AWS CDK Construct/Stack 模式
+
 ### Core Infrastructure Tasks
 
-Examples of foundational tasks (adjust based on your project):
-
-- [ ] T009 Setup database schema and migrations framework
-- [ ] T010 [P] Implement authentication/authorization framework
-- [ ] T011 [P] Setup API routing and middleware structure
-- [ ] T012 Create base models/entities that all stories depend on
-- [ ] T013 Configure error handling and logging infrastructure
-- [ ] T014 Setup environment configuration management
+- [ ] T016 [P] Implement authentication/authorization in `src/api/middleware/`
+- [ ] T017 [P] Setup API routing in `src/api/v1/router.py`
+- [ ] T018 Configure error handling and logging in `src/core/`
+- [ ] T019 Setup environment configuration in `src/infrastructure/config/settings.py`
 
 **Checkpoint**: Foundation ready - user story implementation can now begin in parallel
 
@@ -95,17 +111,34 @@ Examples of foundational tasks (adjust based on your project):
 
 > **NOTE: Write these tests FIRST, ensure they FAIL before implementation (TDD approach per Constitution Principle IX)**
 
-- [ ] T010 [P] [US1] Contract test for [endpoint] in tests/contract/test_[name].py
-- [ ] T011 [P] [US1] Integration test for [user journey] in tests/integration/test_[name].py
+- [ ] T020 [P] [US1] Unit test for domain entity in tests/unit/domain/test_[entity].py
+- [ ] T021 [P] [US1] Unit test for application service in tests/unit/application/test_[service].py
+- [ ] T022 [P] [US1] Contract test for [endpoint] in tests/contract/test_[name].py
+- [ ] T023 [P] [US1] Integration test for [user journey] in tests/integration/test_[name].py
 
-### Implementation for User Story 1
+### Domain Layer Tasks (per Constitution Principle XII)
 
-- [ ] T012 [P] [US1] Create [Entity1] model in src/models/[entity1].py
-- [ ] T013 [P] [US1] Create [Entity2] model in src/models/[entity2].py
-- [ ] T014 [US1] Implement [Service] in src/services/[service].py (depends on T012, T013)
-- [ ] T015 [US1] Implement [endpoint/feature] in src/[location]/[file].py
-- [ ] T016 [US1] Add validation and error handling
-- [ ] T017 [US1] Add logging for user story 1 operations
+- [ ] T024 [P] [US1] Create [Entity] in src/domain/entities/[entity].py
+- [ ] T025 [P] [US1] Create [ValueObject] in src/domain/value_objects/[vo].py
+- [ ] T026 [P] [US1] Create repository interface in src/domain/repositories/[entity]_repository.py
+- [ ] T027 [P] [US1] Create domain exception in src/domain/exceptions/[entity]_exceptions.py
+
+### Application Layer Tasks
+
+- [ ] T028 [US1] Create DTO in src/application/dto/[entity]_dto.py (depends on T024, T025)
+- [ ] T029 [US1] Implement [Service] in src/application/services/[entity]_service.py
+
+### Infrastructure Layer Tasks
+
+- [ ] T030 [P] [US1] Create SQLAlchemy model in src/infrastructure/persistence/models/[entity].py
+- [ ] T031 [US1] Implement repository in src/infrastructure/persistence/repositories/[entity]_repository.py (depends on T026, T030)
+
+### API Layer Tasks
+
+- [ ] T032 [P] [US1] Create Pydantic schemas in src/api/v1/schemas/[entity].py
+- [ ] T033 [US1] Implement endpoint in src/api/v1/endpoints/[entity].py (depends on T029, T032)
+- [ ] T034 [US1] Register endpoint router in src/api/v1/router.py
+- [ ] T035 [US1] Setup dependency injection for [Service] in src/api/v1/dependencies/
 
 **Checkpoint**: At this point, User Story 1 should be fully functional and testable independently
 

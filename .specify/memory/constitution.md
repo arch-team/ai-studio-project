@@ -2,34 +2,42 @@
 ===============================================================================
 SYNC IMPACT REPORT
 ===============================================================================
-Version change: 1.7.5 → 1.7.6 (Current)
-Version bump rationale: PATCH - 修正 SDK 优先原则的核心定义,明确原则目的是"避免重复造轮子",正确定位 sagemaker-hyperpod SDK 的适用范围
+Version change: 1.8.0 → 1.8.1 (Current)
+Version bump rationale: PATCH - 澄清 Principle XII: Clean Architecture 的适用范围,
+明确整洁架构仅适用于后端项目 (backend/),不适用于前端 (frontend/) 和基础设施 (infrastructure/) 项目
 
 Modified principles:
-  - I.B SDK 优先 (SDK-First)
-    * 修正核心原则定义: "尽可能使用 SDK 简化代码实现,避免重复造轮子"
-    * 正确定位 sagemaker-hyperpod SDK 为 HyperPod 四大功能模块的专用 SDK (而非泛化的"首选 SDK")
-    * 重构决策流程: 按功能域选择合适的 SDK,而非按 SDK 排列优先级
-    * 新增 sagemaker-hyperpod SDK 适用范围说明 (Cluster, Training, Inference, Space)
-    * 明确不同功能域的 SDK 选择指南
+  - XII. Clean Architecture (整洁架构)
+    * 添加 "适用范围" 章节,明确仅适用于 backend/ 目录
+    * 添加 "不适用范围" 章节,明确排除 frontend/ 和 infrastructure/ (IaC) 目录
+    * 添加各项目类型的架构指导说明
 
-Benefits:
-  - 原则目的更加清晰: 核心是避免重复造轮子
-  - 正确反映 sagemaker-hyperpod SDK 的定位: HyperPod 功能专用,非通用首选
-  - 消除团队对 SDK 选择的困惑: 按功能域选择而非按优先级排列
-  - 与官方文档一致: sagemaker-hyperpod SDK 明确支持 Cluster/Training/Inference/Space
+Clarifications:
+  - 前端项目 (frontend/) 采用 React/TypeScript 组件化架构,遵循 Cloudscape Design System
+  - 基础设施项目 (infrastructure/cdk/) 采用 AWS CDK 的 Construct 和 Stack 模式
+  - 整洁架构的四层分层 (domain → application → infrastructure → api) 仅约束后端代码
 
 Templates requiring updates:
-  ✅ .specify/templates/plan-template.md - 无需更新 (原则引用不变,描述更准确)
-  ✅ .specify/templates/spec-template.md - 无需更新 (原则引用不变)
-  ✅ .specify/templates/tasks-template.md - 无需更新 (原则引用不变)
+  ✅ .specify/templates/plan-template.md - 更新 Clean Architecture 检查项,添加适用范围说明
+  ✅ .specify/templates/spec-template.md - 更新 Clean Architecture 约束,添加适用范围说明
+  ✅ .specify/templates/tasks-template.md - 更新 Clean Architecture 任务,添加适用范围说明
 
 Follow-up TODOs:
-  - 无新增 TODO (本次为修正性澄清,不影响现有引用)
+  - 无 (所有模板已同步更新)
 
 ===============================================================================
 Previous Version History:
 ===============================================================================
+Version 1.8.0 (2026-01-12):
+  - MINOR: 新增 Principle XII: Clean Architecture (整洁架构),
+    规范后端项目目录结构和层次职责,强制执行领域驱动设计 (DDD) 分层架构
+  - 添加 DDD/整洁架构相关术语到 Glossary
+  - 添加后端架构约束表格到 Technology Constraints
+
+Version 1.7.6 (2026-01-03):
+  - PATCH: 修正 SDK 优先原则的核心定义,明确原则目的是"避免重复造轮子",
+    正确定位 sagemaker-hyperpod SDK 的适用范围
+
 Version 1.7.5 (2026-01-03):
   - PATCH: 重构 SDK 优先级为四级体系 (后续被 1.7.6 修正)
 
@@ -87,6 +95,43 @@ Version 1.7.0 (2026-01-03):
 - HyperPod 特有的扩展功能,超越标准 Kubernetes 能力
 - 包括: Checkpointless Training (无检查点训练), Elastic Training (弹性训练), Deep Health Checks (深度健康检查), Automatic Node Recovery (自动节点恢复)
 
+### 软件架构术语
+
+**Clean Architecture (整洁架构)**
+- Robert C. Martin 提出的软件架构模式
+- 核心原则: 依赖规则 (内层不依赖外层)
+- 四层结构: Domain → Application → Infrastructure → API
+
+**DDD (Domain-Driven Design / 领域驱动设计)**
+- Eric Evans 提出的软件设计方法论
+- 以业务领域为核心组织代码结构
+- 核心概念: Entity, Value Object, Aggregate, Repository
+
+**Domain Entity (领域实体)**
+- 具有唯一标识符的业务对象
+- 生命周期可追踪,状态可变
+- 示例: TrainingJob, Dataset, Model
+
+**Value Object (值对象)**
+- 无唯一标识符的不可变对象
+- 通过属性值定义相等性
+- 示例: JobStatus, Priority, Metrics
+
+**Repository (仓储)**
+- 领域对象的集合抽象
+- 提供持久化操作的接口
+- 领域层定义接口,基础设施层实现
+
+**DTO (Data Transfer Object / 数据传输对象)**
+- 跨层数据传输的载体
+- 不包含业务逻辑
+- 用于 API 响应和服务间通信
+
+**Dependency Inversion (依赖倒置)**
+- SOLID 原则之一
+- 高层模块不依赖低层模块,两者都依赖抽象
+- 整洁架构的核心实现机制
+
 ### 缩写对照表
 
 | 缩写 | 全称 | 说明 |
@@ -104,6 +149,9 @@ Version 1.7.0 (2026-01-03):
 | TDD | Test-Driven Development | 测试驱动开发 |
 | SOLID | Software Design Principles | 软件设计原则 (SRP, OCP, LSP, ISP, DIP) |
 | NFR | Non-Functional Requirement | 非功能性需求 |
+| DDD | Domain-Driven Design | 领域驱动设计 |
+| DTO | Data Transfer Object | 数据传输对象 |
+| DI | Dependency Injection | 依赖注入 |
 
 ## Core Principles
 
@@ -459,6 +507,257 @@ SDK和组件可以避免重复造轮子,利用社区智慧,获得持续更新和
 - Cloudscape Design System: https://cloudscape.design/
 - AWS Console UX Guidelines: https://aws.amazon.com/console/
 
+### XII. Clean Architecture (整洁架构)
+
+**适用范围**: 本原则 **仅适用于后端项目 (backend/)**，不适用于前端项目和基础设施项目。
+
+后端代码 MUST 遵循整洁架构 (Clean Architecture) 原则,采用领域驱动设计 (DDD) 的分层架构,
+确保代码结构清晰、职责分明、易于测试和维护。
+
+#### 适用范围说明
+
+| 项目类型 | 目录 | 适用架构 | Clean Architecture 适用? |
+|---------|------|---------|------------------------|
+| **后端** | `backend/` | 整洁架构 (四层分层) | ✅ **适用** |
+| **前端** | `frontend/` | React 组件化架构 | ❌ 不适用 |
+| **基础设施** | `infrastructure/cdk/` | AWS CDK Construct/Stack 模式 | ❌ 不适用 |
+
+**不适用范围的架构指导**:
+
+- **前端项目 (frontend/)**:
+  - 采用 React/TypeScript 组件化架构
+  - MUST 遵循 AWS Cloudscape Design System (Principle XI)
+  - 使用 Zustand 进行状态管理,TanStack Query 进行数据获取
+  - 按功能模块组织代码: pages/, components/, hooks/, store/, types/
+
+- **基础设施项目 (infrastructure/cdk/)**:
+  - 采用 AWS CDK 的 Construct 和 Stack 模式
+  - MUST 遵循 Infrastructure as Code 最佳实践 (Principle VIII)
+  - 按 AWS 资源类型和环境组织 Constructs
+  - 使用 CDK Aspects 进行合规检查
+
+#### A. 架构分层 (Architecture Layers)
+
+后端代码 MUST 采用以下四层架构,从内到外依次为:
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    api (最外层)                              │
+│              FastAPI endpoints, schemas                      │
+└──────────────────────────┬──────────────────────────────────┘
+                           │ 依赖
+┌──────────────────────────▼──────────────────────────────────┐
+│                   infrastructure                             │
+│         SQLAlchemy, HyperPod SDK, S3, MLflow 实现            │
+└──────────────────────────┬──────────────────────────────────┘
+                           │ 实现接口
+┌──────────────────────────▼──────────────────────────────────┐
+│                    application                               │
+│              Services, DTOs, Interfaces                      │
+└──────────────────────────┬──────────────────────────────────┘
+                           │ 依赖
+┌──────────────────────────▼──────────────────────────────────┐
+│                     domain (核心)                            │
+│         Entities, Value Objects, Repository 接口             │
+└─────────────────────────────────────────────────────────────┘
+```
+
+**层次职责定义**:
+
+| 层次 | 目录 | 职责 | 依赖规则 |
+|------|------|------|---------|
+| **domain** | `src/domain/` | 核心业务逻辑和规则 | 不依赖任何外层 |
+| **application** | `src/application/` | 用例编排、事务管理 | 仅依赖 domain |
+| **infrastructure** | `src/infrastructure/` | 技术实现、外部集成 | 实现 domain/application 接口 |
+| **api** | `src/api/` | HTTP 请求处理 | 依赖 application |
+
+#### B. 目录结构规范 (Directory Structure)
+
+后端项目 MUST 采用以下目录结构:
+
+```
+backend/src/
+├── domain/                     # 领域层 (核心业务逻辑)
+│   ├── entities/              # 领域实体 (TrainingJob, Dataset, Model 等)
+│   ├── value_objects/         # 值对象 (JobStatus, Priority, Metrics 等)
+│   ├── exceptions/            # 领域异常 (DomainException 等)
+│   ├── repositories/          # 仓储接口 (ITrainingJobRepository 等)
+│   └── events/                # [可选] 领域事件 (JobCreated, JobCompleted 等)
+│
+├── application/               # 应用层 (用例/业务编排)
+│   ├── services/             # 应用服务 (TrainingJobService 等)
+│   ├── dto/                  # 数据传输对象 (跨层传输)
+│   └── interfaces/           # 端口接口 (外部服务抽象)
+│
+├── infrastructure/            # 基础设施层 (技术实现)
+│   ├── persistence/          # 持久化实现
+│   │   ├── models/          # SQLAlchemy ORM 模型
+│   │   ├── repositories/    # 仓储实现 (SQLAlchemyTrainingJobRepository 等)
+│   │   └── migrations/      # 数据库迁移 (Alembic)
+│   ├── external/             # 外部服务适配器
+│   │   ├── hyperpod/        # HyperPod SDK 集成
+│   │   ├── s3/              # S3 存储适配器
+│   │   └── mlflow/          # MLflow 集成
+│   ├── messaging/            # [可选] 消息/事件总线
+│   └── config/               # 配置管理
+│
+├── api/                       # API 层 (输入适配器)
+│   ├── v1/
+│   │   ├── endpoints/       # REST 端点
+│   │   ├── schemas/         # Pydantic 请求/响应模式
+│   │   └── dependencies/    # FastAPI 依赖注入
+│   └── middleware/           # API 中间件
+│
+├── core/                      # 共享核心 (跨层工具)
+│   ├── security/             # 安全相关
+│   ├── logging/              # 日志配置
+│   └── utils/                # 通用工具
+│
+└── main.py                    # 应用入口和 DI 容器配置
+```
+
+#### C. 依赖规则 (Dependency Rules)
+
+**核心规则**: 依赖方向 MUST 从外层指向内层,内层 MUST NOT 依赖外层。
+
+**具体要求**:
+- **domain 层**: MUST NOT 导入 application、infrastructure、api 层的任何模块
+- **application 层**: MUST NOT 导入 infrastructure、api 层的任何模块
+- **infrastructure 层**: MAY 导入 domain 和 application 层的接口和抽象类
+- **api 层**: MAY 导入 application 层的服务和 DTO
+
+**依赖倒置实现**:
+- domain 层定义仓储接口 (如 `ITrainingJobRepository`)
+- infrastructure 层实现接口 (如 `SQLAlchemyTrainingJobRepository`)
+- application 层通过接口依赖 domain,运行时通过依赖注入获得 infrastructure 实现
+
+**代码示例**:
+```python
+# domain/repositories/training_job_repository.py
+from abc import ABC, abstractmethod
+from domain.entities.training_job import TrainingJob
+
+class ITrainingJobRepository(ABC):
+    @abstractmethod
+    async def get_by_id(self, job_id: str) -> TrainingJob | None:
+        pass
+
+    @abstractmethod
+    async def save(self, job: TrainingJob) -> TrainingJob:
+        pass
+
+# infrastructure/persistence/repositories/training_job_repository.py
+from domain.repositories.training_job_repository import ITrainingJobRepository
+from domain.entities.training_job import TrainingJob
+from infrastructure.persistence.models.training_job import TrainingJobModel
+
+class SQLAlchemyTrainingJobRepository(ITrainingJobRepository):
+    def __init__(self, session: AsyncSession):
+        self._session = session
+
+    async def get_by_id(self, job_id: str) -> TrainingJob | None:
+        # 实现细节
+        pass
+```
+
+#### D. 各层职责详述
+
+**1. Domain 层 (领域层)**
+- **entities/**: 领域实体,具有唯一标识符和生命周期
+  - MUST 包含业务规则和不变量验证
+  - MUST NOT 依赖任何框架或外部库
+  - 示例: `TrainingJob`, `Dataset`, `Model`, `User`
+- **value_objects/**: 值对象,无标识符的不可变对象
+  - MUST 通过属性值定义相等性
+  - 示例: `JobStatus`, `Priority`, `ResourceQuota`, `Metrics`
+- **exceptions/**: 领域异常
+  - 业务规则违反时抛出的异常
+  - 示例: `InsufficientQuotaError`, `InvalidJobStateError`
+- **repositories/**: 仓储接口 (抽象类)
+  - 定义数据访问的抽象接口
+  - MUST NOT 包含任何实现细节
+- **events/**: [可选] 领域事件
+  - MAY 用于解耦领域逻辑
+  - 示例: `TrainingJobCreated`, `TrainingJobCompleted`
+
+**2. Application 层 (应用层)**
+- **services/**: 应用服务
+  - 编排领域对象完成用例
+  - 管理事务边界
+  - 协调多个仓储和外部服务
+  - 示例: `TrainingJobService`, `DatasetService`
+- **dto/**: 数据传输对象
+  - 跨层数据传输的载体
+  - MUST NOT 包含业务逻辑
+  - 示例: `CreateTrainingJobDTO`, `TrainingJobResponseDTO`
+- **interfaces/**: 端口接口
+  - 外部服务的抽象接口
+  - 示例: `IHyperPodClient`, `IStorageService`
+
+**3. Infrastructure 层 (基础设施层)**
+- **persistence/**: 持久化实现
+  - **models/**: SQLAlchemy ORM 模型
+  - **repositories/**: 仓储接口的具体实现
+  - **migrations/**: Alembic 数据库迁移
+- **external/**: 外部服务适配器
+  - **hyperpod/**: HyperPod SDK 集成 (遵循 Principle I.B)
+  - **s3/**: S3 存储适配器
+  - **mlflow/**: MLflow 集成
+- **config/**: 配置管理
+  - 环境变量、配置文件解析
+
+**4. API 层 (接口层)**
+- **endpoints/**: REST API 端点
+  - FastAPI 路由定义
+  - 调用 application 层服务
+- **schemas/**: Pydantic 模式
+  - 请求/响应数据验证
+  - OpenAPI 文档生成
+- **dependencies/**: FastAPI 依赖注入
+  - 服务实例获取
+  - 认证/授权
+- **middleware/**: 中间件
+  - 日志、错误处理、CORS
+
+**5. Core (共享核心)**
+- 跨层共享的工具和配置
+- MUST NOT 包含业务逻辑
+- 示例: 日志配置、安全工具、通用异常
+
+#### E. 实施要求
+
+**代码组织**:
+- 新增后端功能 MUST 按照本原则组织代码
+- 现有代码 MUST 逐步迁移到新架构
+- 每个模块 MUST 有明确的 `__init__.py` 导出公共接口
+
+**依赖注入**:
+- MUST 使用依赖注入管理对象创建和生命周期
+- SHOULD 使用 FastAPI 的依赖注入系统或专用 DI 容器 (如 dependency-injector)
+- MUST NOT 在应用层或领域层直接实例化基础设施类
+
+**测试隔离**:
+- 领域层 MUST 可以独立测试,无需任何外部依赖
+- 应用层测试 SHOULD 使用仓储接口的 Mock 实现
+- 集成测试 MAY 使用真实的基础设施实现
+
+**代码审查**:
+- PR 审查 MUST 验证依赖规则是否正确
+- 违反依赖规则的代码 MUST NOT 合并
+- 新增模块 MUST 在正确的层级目录下
+
+**理由**:
+1. **关注点分离**: 业务逻辑与技术实现解耦,便于独立演进
+2. **可测试性**: 领域逻辑可独立测试,无需启动数据库或外部服务
+3. **可维护性**: 清晰的层次结构降低理解和修改代码的成本
+4. **可扩展性**: 通过接口抽象,可以轻松替换技术实现
+5. **团队协作**: 明确的职责划分便于团队分工协作
+
+**参考资料**:
+- Clean Architecture by Robert C. Martin
+- Domain-Driven Design by Eric Evans
+- Implementing Domain-Driven Design by Vaughn Vernon
+
 ## Technology Constraints
 
 ### 核心技术栈
@@ -747,4 +1046,4 @@ SDK和组件可以避免重复造轮子,利用社区智慧,获得持续更新和
 - 代码实现 MUST 优先验证 `sagemaker-hyperpod` SDK 支持
 - UI 实现 MUST 验证使用 Cloudscape 组件,禁止自定义实现
 
-**Version**: 1.7.6 | **Ratified**: 2025-12-23 | **Last Amended**: 2026-01-03
+**Version**: 1.8.1 | **Ratified**: 2025-12-23 | **Last Amended**: 2026-01-14

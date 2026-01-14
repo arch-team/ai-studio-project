@@ -149,6 +149,31 @@
 - Reference AWS SageMaker Console and AWS EKS Console for design patterns
 - MUST NOT use non-Cloudscape UI libraries (MUI, Ant Design, Element Plus, etc.)
 
+**Clean Architecture** (per Constitution Principle XII):
+
+**适用范围**: **仅适用于后端项目 (backend/)**。前端和基础设施项目不适用。
+
+- Backend code MUST follow four-layer architecture:
+  - **domain**: Core business logic (Entities, Value Objects, Repository interfaces)
+  - **application**: Use case orchestration (Services, DTOs, Port interfaces)
+  - **infrastructure**: Technical implementations (SQLAlchemy, HyperPod SDK adapters)
+  - **api**: HTTP request handling (FastAPI endpoints, Pydantic schemas)
+- Dependency rules MUST be enforced:
+  - Inner layers MUST NOT depend on outer layers
+  - Dependencies flow inward: api → infrastructure → application → domain
+  - Use dependency injection to provide infrastructure implementations
+- Repository pattern MUST be implemented:
+  - Interfaces in domain/repositories/
+  - Implementations in infrastructure/persistence/repositories/
+- Tests MUST respect layer boundaries:
+  - Domain tests: No external dependencies
+  - Application tests: Mock repository implementations
+  - Integration tests: Real infrastructure allowed
+
+**不适用范围**:
+- **前端项目 (frontend/)**: 采用 React 组件化架构,遵循 Cloudscape Design System
+- **基础设施项目 (infrastructure/cdk/)**: 采用 AWS CDK Construct/Stack 模式
+
 ## Success Criteria *(mandatory)*
 
 <!--

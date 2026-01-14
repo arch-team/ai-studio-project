@@ -99,6 +99,39 @@
 
 **If not using Cloudscape**: NOT ALLOWED - UI component library has no exceptions
 
+### Clean Architecture (Principle XII)
+
+**适用范围**: 本检查项 **仅适用于后端项目 (backend/)**。前端和基础设施项目不适用此检查。
+
+- [ ] **适用范围确认**: 此功能涉及后端代码 (backend/) → 需遵循 Clean Architecture
+- [ ] Backend code follows four-layer architecture:
+  - **domain**: Entities, Value Objects, Repository interfaces, Exceptions
+  - **application**: Services, DTOs, Port interfaces
+  - **infrastructure**: Persistence (SQLAlchemy), External adapters (HyperPod SDK, S3, MLflow)
+  - **api**: FastAPI endpoints, Pydantic schemas, Dependencies, Middleware
+- [ ] Dependency rules verified:
+  - domain layer has NO imports from application/infrastructure/api
+  - application layer has NO imports from infrastructure/api
+  - infrastructure implements domain/application interfaces
+  - api depends only on application layer
+- [ ] Repository pattern implemented:
+  - Interfaces defined in domain/repositories/
+  - Implementations in infrastructure/persistence/repositories/
+- [ ] Dependency injection configured:
+  - Services receive dependencies via constructor
+  - FastAPI dependencies or DI container used
+  - No direct instantiation of infrastructure in application/domain
+- [ ] Test isolation planned:
+  - Domain layer testable without external dependencies
+  - Application layer tests use mock repositories
+  - Integration tests use real infrastructure
+
+**不适用范围**:
+- **前端项目 (frontend/)**: 采用 React 组件化架构,遵循 Cloudscape Design System
+- **基础设施项目 (infrastructure/cdk/)**: 采用 AWS CDK Construct/Stack 模式
+
+**If violating dependency rules**: Document justification and get governance approval
+
 [Additional gates determined based on constitution file]
 
 ## Project Structure
