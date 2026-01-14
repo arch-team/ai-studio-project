@@ -61,8 +61,12 @@ Layer 5 (Ingress):     AlbStack
 - `app.py` - CDK app entry point, stack instantiation and CDK Nag suppressions
 - `config/environments.py` - Environment configs (dev/staging/prod) with dataclasses
 - `config/constants.py` - Centralized constants (EKS Add-on names, Helm Chart config, Timeouts, etc.)
-- `stacks/` - Individual stack implementations
-- `custom_constructs/` - Reusable L2/L3 constructs (e.g., GpuNodeGroupConstruct)
+- `stacks/` - Stack implementations organized by deployment layer:
+  - `foundation/` - Layer 1: NetworkStack, IamStack
+  - `data/` - Layer 2: DatabaseStack, StorageStack, FsxLustreStack
+  - `compute/` - Layer 3: EksStack, SagemakerHyperPodStack, HyperPodAddonsStack
+  - `networking/` - Layer 4: AlbStack
+- `cdk_constructs/` - Reusable L2/L3 constructs (e.g., GpuNodeGroupConstruct)
 - `utils/` - Utility modules:
   - `nag_suppressions.py` - Centralized CDK Nag suppressions
   - `tagging.py` - Standard tag application
@@ -70,17 +74,20 @@ Layer 5 (Ingress):     AlbStack
   - `s3_lifecycle.py` - S3 lifecycle policies
   - `outputs.py` - CloudFormation outputs helpers
 - `aspects/` - CDK Aspects (e.g., tagging aspect)
+- `resources/` - Static resources:
+  - `helm_charts/` - HyperPod Helm Charts
+  - `scripts/` - Setup and deployment scripts
 
 ### HyperPod Deployment
 
 The deployment flow for HyperPod with EKS:
 
-1. **前置条件**: 首次部署前运行 `./scripts/setup_helm_chart.sh` 下载 Helm Chart
+1. **前置条件**: 首次部署前运行 `./resources/scripts/setup_helm_chart.sh` 下载 Helm Chart
 2. Deploy `EksStack` (includes automatic Helm Chart installation via `addHelmChart()`)
 3. Deploy `SagemakerHyperPodStack`
 4. Deploy `HyperPodAddonsStack` (Training Operator, Task Governance, Observability)
 
-Note: The Helm Chart is bundled in `helm_charts/HyperPodHelmChart/` and deployed via CDK's `addHelmChart()` method with 15 分钟超时设置。
+Note: The Helm Chart is bundled in `resources/helm_charts/HyperPodHelmChart/` and deployed via CDK's `addHelmChart()` method with 15 分钟超时设置。
 
 ### HyperPod Add-ons
 

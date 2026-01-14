@@ -1,0 +1,250 @@
+# rbac.yaml
+---
+kind: ClusterRole
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: health-monitoring-agent
+rules:
+  - apiGroups:
+      - ""
+    resources:
+      - nodes
+    verbs:
+      - get
+  - apiGroups:
+      - ""
+    resources:
+      - nodes
+      - nodes/status
+    verbs:
+      - patch
+  - apiGroups:
+      - ""
+      - events.k8s.io
+    resources:
+      - events
+    verbs:
+      - create
+      - patch
+      - update
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: health-monitoring-agent
+  namespace: {{ .Values.namespace }}
+---
+kind: ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: health-monitoring-agent
+  namespace: {{ .Values.namespace }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: health-monitoring-agent
+subjects:
+- kind: ServiceAccount
+  name: health-monitoring-agent
+  namespace: {{ .Values.namespace }}
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: health-monitoring-agent
+  namespace: {{ .Values.namespace }}
+  labels:
+    app: health-monitoring-agent
+spec:
+  selector:
+    matchLabels:
+      app: health-monitoring-agent
+  template:
+    metadata:
+      labels:
+        app: health-monitoring-agent
+    spec:
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: node.kubernetes.io/instance-type
+                    operator: In
+                    values:
+                      - ml.p5en.48xlarge
+                      - ml.p5e.48xlarge
+                      - ml.p5.48xlarge
+                      - ml.p5.4xlarge
+                      - ml.p4d.24xlarge
+                      - ml.p4de.24xlarge
+                      - ml.g5.xlarge
+                      - ml.g5.2xlarge
+                      - ml.g5.4xlarge
+                      - ml.g5.8xlarge
+                      - ml.g5.12xlarge
+                      - ml.g5.16xlarge
+                      - ml.g5.24xlarge
+                      - ml.g5.48xlarge
+                      - ml.g6.xlarge
+                      - ml.g6.2xlarge
+                      - ml.g6.4xlarge
+                      - ml.g6.8xlarge
+                      - ml.g6.16xlarge
+                      - ml.g6.12xlarge
+                      - ml.g6.24xlarge
+                      - ml.g6.48xlarge
+                      - ml.gr6.4xlarge
+                      - ml.gr6.8xlarge
+                      - ml.g6e.xlarge
+                      - ml.g6e.2xlarge
+                      - ml.g6e.4xlarge
+                      - ml.g6e.8xlarge
+                      - ml.g6e.16xlarge
+                      - ml.g6e.12xlarge
+                      - ml.g6e.24xlarge
+                      - ml.g6e.48xlarge
+                      - ml.p6-b200.48xlarge
+                      - ml.p6e-gb200.36xlarge
+      containers:
+        - name: health-monitoring-agent
+          image: {{ include "health-monitoring-agent.imageUri" . }}
+          resources:
+            limits:
+              cpu: 500m
+              memory: 512Mi
+            requests:
+              cpu: 500m
+              memory: 512Mi
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            runAsUser: 1000
+            runAsGroup: 2000
+          env:
+            - name: NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+            - name: NODE_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.hostIP
+          volumeMounts:
+            - name: log
+              mountPath: /var/log
+            - name: kmsg
+              mountPath: /dev/kmsg
+              readOnly: true
+            # Make sure node problem detector is in the same timezone
+            # with the host.
+            - name: localtime
+              mountPath: /etc/localtime
+              readOnly: true
+      serviceAccountName: health-monitoring-agent
+      volumes:
+        - name: log
+          # Config `log` to your system log directory
+          hostPath:
+            path: /var/log/
+        - name: kmsg
+          hostPath:
+            path: /dev/kmsg
+        - name: localtime
+          hostPath:
+            path: /etc/localtime
+      tolerations:
+        - effect: NoSchedule
+          operator: Exists
+        - effect: NoExecute
+          operator: Exists
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: health-monitoring-agent-non-nvidia
+  namespace: {{ .Values.namespace }}
+  labels:
+    app: health-monitoring-agent-non-nvidia
+spec:
+  selector:
+    matchLabels:
+      app: health-monitoring-agent-non-nvidia
+  template:
+    metadata:
+      labels:
+        app: health-monitoring-agent-non-nvidia
+    spec:
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: node.kubernetes.io/instance-type
+                    operator: In
+                    values:
+                      - ml.inf2.xlarge
+                      - ml.inf2.8xlarge
+                      - ml.inf2.24xlarge
+                      - ml.inf2.48xlarge
+                      - ml.trn1.32xlarge
+                      - ml.trn1n.32xlarge
+                      - ml.trn2.3xlarge
+                      - ml.trn2.48xlarge
+      containers:
+        - name: health-monitoring-agent-non-nvidia
+          args:
+            - --enable-k8s-exporter=false
+            - --config.system-log-monitor=/config/system-message-monitor.json
+          image: {{ include "health-monitoring-agent.imageUri" . }}
+          resources:
+            limits:
+              cpu: 500m
+              memory: 512Mi
+            requests:
+              cpu: 500m
+              memory: 512Mi
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            runAsUser: 1000
+            runAsGroup: 2000
+          env:
+            - name: NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+            - name: NODE_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.hostIP
+            - name: NVIDIA_VISIBLE_DEVICES
+              value: "void"
+            - name: NVIDIA_DRIVER_CAPABILITIES
+              value: ""
+          volumeMounts:
+            - name: log
+              mountPath: /var/log
+            - name: kmsg
+              mountPath: /dev/kmsg
+              readOnly: true
+            # Make sure node problem detector is in the same timezone
+            # with the host.
+            - name: localtime
+              mountPath: /etc/localtime
+              readOnly: true
+      serviceAccountName: health-monitoring-agent
+      volumes:
+        - name: log
+          # Config `log` to your system log directory
+          hostPath:
+            path: /var/log/
+        - name: kmsg
+          hostPath:
+            path: /dev/kmsg
+        - name: localtime
+          hostPath:
+            path: /etc/localtime
+      tolerations:
+        - effect: NoSchedule
+          operator: Exists
+        - effect: NoExecute
+          operator: Exists

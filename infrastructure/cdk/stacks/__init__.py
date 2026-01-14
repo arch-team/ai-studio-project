@@ -22,15 +22,22 @@ Deployment Order:
 7. AlbStack
 """
 
-from .alb_stack import AlbStack
-from .database_stack import DatabaseStack
-from .eks_stack import EksStack
-from .fsx_stack import FsxLustreStack
-from .hyperpod_addons_stack import HyperPodAddonsStack
-from .iam_stack import IamStack
-from .network_stack import NetworkStack
-from .sagemaker_hyperpod_stack import SagemakerHyperPodStack
-from .storage_stack import StorageStack
+# Layer 1: Foundation
+from .foundation.network_stack import NetworkStack
+from .foundation.iam_stack import IamStack
+
+# Layer 2: Data
+from .data.database_stack import DatabaseStack
+from .data.storage_stack import StorageStack
+from .data.fsx_stack import FsxLustreStack
+
+# Layer 3: Compute
+from .compute.eks_stack import EksStack
+from .compute.sagemaker_hyperpod_stack import SagemakerHyperPodStack
+from .compute.hyperpod_addons_stack import HyperPodAddonsStack
+
+# Layer 4: Networking
+from .networking.alb_stack import AlbStack
 
 __all__ = [
     "NetworkStack",
