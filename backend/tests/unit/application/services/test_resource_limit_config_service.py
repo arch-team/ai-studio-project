@@ -143,7 +143,7 @@ class TestCreateConfig:
         with pytest.raises(DuplicateConfigError) as exc_info:
             await service.create_config(create_config_data)
 
-        assert "Config already exists" in str(exc_info.value)
+        assert "already exists" in str(exc_info.value)
         mock_repository.create.assert_not_called()
 
     @pytest.mark.asyncio

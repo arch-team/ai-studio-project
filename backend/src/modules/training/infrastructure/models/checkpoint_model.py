@@ -18,6 +18,7 @@ from src.modules.training.domain.value_objects import (
 
 if TYPE_CHECKING:
     from .training_job_model import TrainingJobModel
+    from src.modules.models.infrastructure.models import ModelModel
 
 
 class CheckpointModel(Base, TimestampMixin):
@@ -61,5 +62,6 @@ class CheckpointModel(Base, TimestampMixin):
 
     # Relationships
     training_job: Mapped["TrainingJobModel"] = relationship("TrainingJobModel", back_populates="checkpoints", foreign_keys=[training_job_id])
+    models: Mapped[list["ModelModel"]] = relationship("ModelModel", back_populates="checkpoint")
 
     __table_args__ = ({"comment": "检查点表"},)

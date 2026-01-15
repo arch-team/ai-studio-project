@@ -1,8 +1,9 @@
 """Training API request schemas."""
 
+import re
 from enum import Enum
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 class DistributionStrategyEnum(str, Enum):
@@ -59,6 +60,18 @@ class CreateTrainingJobRequest(BaseModel):
         default="/checkpoints", description="Checkpoint mount path"
     )
     checkpoint_interval: int | None = Field(None, ge=1, description="Checkpoint interval")
+
+    @field_validator("job_name")
+    @classmethod
+    def validate_job_name(cls, v: str) -> str:
+        """Validate job name format: lowercase alphanumeric with hyphens."""
+        pattern = r"^[a-z0-9][a-z0-9-]*[a-z0-9]$|^[a-z0-9]$"
+        if not re.match(pattern, v):
+            raise ValueError(
+                "Job name must be lowercase alphanumeric with hyphens, "
+                "start and end with alphanumeric characters"
+            )
+        return v
 
 
 class CreateCheckpointRequest(BaseModel):

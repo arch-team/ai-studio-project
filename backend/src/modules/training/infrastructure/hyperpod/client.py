@@ -109,7 +109,8 @@ class HyperPodClient(IHyperPodClient):
             if HyperPodPytorchJob is None:
                 raise RuntimeError("HyperPod SDK not available")
 
-            job = HyperPodPytorchJob.create(
+            # Create job instance with configuration
+            job = HyperPodPytorchJob(
                 name=job_name,
                 image_uri=job_config.get("image_uri"),
                 instance_type=job_config.get("instance_type"),
@@ -119,6 +120,8 @@ class HyperPodClient(IHyperPodClient):
                 environment=job_config.get("environment"),
                 volumes=job_config.get("volumes"),
             )
+            # Submit the job to HyperPod
+            job.create()
 
             return {
                 "job_name": job.name,

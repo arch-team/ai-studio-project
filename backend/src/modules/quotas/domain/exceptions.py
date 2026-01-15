@@ -1,17 +1,17 @@
 """Quotas domain exceptions."""
 
-from src.shared.domain.exceptions import DomainError
+from src.shared.domain.exceptions import DomainError, DuplicateEntityError, EntityNotFoundError
 
 
 class QuotaError(DomainError):
     """Base exception for quota-related errors."""
 
 
-class QuotaNotFoundError(QuotaError):
+class QuotaNotFoundError(EntityNotFoundError):
     """Raised when a quota is not found."""
 
     def __init__(self, identifier: str):
-        super().__init__(f"Quota not found: {identifier}")
+        super().__init__("ResourceLimitConfig", identifier)
         self.identifier = identifier
 
 
@@ -27,12 +27,10 @@ class QuotaExceededError(QuotaError):
         self.limit = limit
 
 
-class DuplicateConfigError(QuotaError):
+class DuplicateConfigError(DuplicateEntityError):
     """Raised when config with same role+project already exists."""
 
     def __init__(self, role: str, scope: str):
-        super().__init__(
-            f"Config already exists for role={role}, scope={scope}"
-        )
+        super().__init__("ResourceLimitConfig", f"role={role}, scope={scope}")
         self.role = role
         self.scope = scope

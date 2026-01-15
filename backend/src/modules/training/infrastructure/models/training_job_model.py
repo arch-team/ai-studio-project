@@ -29,6 +29,7 @@ from src.modules.training.domain.value_objects import (
 if TYPE_CHECKING:
     from .checkpoint_model import CheckpointModel
     from src.modules.auth.infrastructure.models import UserModel
+    from src.modules.models.infrastructure.models import ModelModel
 
 
 class TrainingJobModel(Base, TimestampMixin):
@@ -116,5 +117,6 @@ class TrainingJobModel(Base, TimestampMixin):
     # Relationships
     owner: Mapped["UserModel"] = relationship("UserModel", back_populates="training_jobs")
     checkpoints: Mapped[list["CheckpointModel"]] = relationship("CheckpointModel", back_populates="training_job", cascade="all, delete-orphan", foreign_keys="[CheckpointModel.training_job_id]")
+    models: Mapped[list["ModelModel"]] = relationship("ModelModel", back_populates="training_job")
 
     __table_args__ = ({"comment": "训练任务表"},)

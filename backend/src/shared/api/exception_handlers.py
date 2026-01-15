@@ -57,7 +57,20 @@ SECURITY_EXCEPTION_MAP: dict[type[SecurityError], int] = {
 
 async def domain_exception_handler(request: Request, exc: DomainError) -> JSONResponse:
     """Handle all Domain layer exceptions."""
-    status_code = DOMAIN_EXCEPTION_MAP.get(type(exc), status.HTTP_400_BAD_REQUEST)
+    # First try exact type match
+    status_code = DOMAIN_EXCEPTION_MAP.get(type(exc))
+
+    # If no exact match, check inheritance chain
+    if status_code is None:
+        for exc_type, code in DOMAIN_EXCEPTION_MAP.items():
+            if isinstance(exc, exc_type):
+                status_code = code
+                break
+
+    # Default to 400 if no match found
+    if status_code is None:
+        status_code = status.HTTP_400_BAD_REQUEST
+
     return JSONResponse(
         status_code=status_code,
         content={

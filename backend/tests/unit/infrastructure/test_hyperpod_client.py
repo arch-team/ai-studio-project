@@ -179,7 +179,8 @@ class TestHyperPodClient:
         mock_job = MagicMock()
         mock_job.name = "test-training-job"
         mock_job.status = "Pending"
-        mock_hyperpod_pytorch_job.create.return_value = mock_job
+        # Mock the constructor to return mock_job instance
+        mock_hyperpod_pytorch_job.return_value = mock_job
 
         result = await hyperpod_client.submit_training_job(
             cluster_name="test-cluster",
@@ -195,7 +196,9 @@ class TestHyperPodClient:
 
         assert result["job_name"] == "test-training-job"
         assert result["status"] == "submitted"  # Mapped from "Pending"
-        mock_hyperpod_pytorch_job.create.assert_called_once()
+        # Verify constructor was called and create() was called on the instance
+        mock_hyperpod_pytorch_job.assert_called_once()
+        mock_job.create.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_get_training_job_status_success(

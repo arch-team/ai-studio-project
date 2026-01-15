@@ -15,6 +15,10 @@ from ...domain.value_objects import AuthType, UserRole, UserStatus
 if TYPE_CHECKING:
     from .login_attempt_model import LoginAttemptModel
     from .password_history_model import PasswordHistoryModel
+    from src.modules.training.infrastructure.models import TrainingJobModel
+    from src.modules.models.infrastructure.models import ModelModel
+    from src.modules.spaces.infrastructure.models import DevelopmentSpaceModel
+    from src.modules.quotas.infrastructure.models import ResourceQuotaModel
 
 
 class TimestampMixin:
@@ -154,6 +158,26 @@ class UserModel(Base, TimestampMixin):
         "LoginAttemptModel",
         back_populates="user",
         cascade="all, delete-orphan",
+    )
+    training_jobs: Mapped[list["TrainingJobModel"]] = relationship(
+        "TrainingJobModel",
+        back_populates="owner",
+        cascade="all, delete-orphan",
+    )
+    models: Mapped[list["ModelModel"]] = relationship(
+        "ModelModel",
+        back_populates="owner",
+        cascade="all, delete-orphan",
+    )
+    development_spaces: Mapped[list["DevelopmentSpaceModel"]] = relationship(
+        "DevelopmentSpaceModel",
+        back_populates="owner",
+        cascade="all, delete-orphan",
+    )
+    resource_quota: Mapped["ResourceQuotaModel | None"] = relationship(
+        "ResourceQuotaModel",
+        back_populates="users",
+        foreign_keys=[resource_quota_id],
     )
 
     __table_args__ = ({"comment": "用户表"},)

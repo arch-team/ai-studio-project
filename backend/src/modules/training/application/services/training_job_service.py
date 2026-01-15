@@ -42,9 +42,11 @@ class TrainingJobService:
         if await self._repository.exists_by_name(job_name):
             raise DuplicateEntityError("TrainingJob", job_name)
 
-        # Map enums
-        distribution_strategy = DistributionStrategy(data.get("distribution_strategy", "DDP"))
-        priority = JobPriority(data.get("priority", "MEDIUM"))
+        # Map enums (convert to uppercase for domain layer)
+        distribution_strategy = DistributionStrategy(
+            data.get("distribution_strategy", "DDP").upper()
+        )
+        priority = JobPriority(data.get("priority", "MEDIUM").upper())
 
         # Create domain entity
         job = TrainingJob(

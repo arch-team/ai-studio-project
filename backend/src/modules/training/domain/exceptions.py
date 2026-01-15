@@ -1,25 +1,25 @@
 """Training domain exceptions."""
 
-from src.shared.domain.exceptions import DomainError
+from src.shared.domain.exceptions import DomainError, EntityNotFoundError
 
 
 class TrainingError(DomainError):
     """Base exception for training-related errors."""
 
 
-class TrainingJobNotFoundError(TrainingError):
+class TrainingJobNotFoundError(EntityNotFoundError):
     """Raised when a training job is not found."""
 
     def __init__(self, identifier: str):
-        super().__init__(f"Training job not found: {identifier}")
+        super().__init__("TrainingJob", identifier)
         self.identifier = identifier
 
 
-class CheckpointNotFoundError(TrainingError):
+class CheckpointNotFoundError(EntityNotFoundError):
     """Raised when a checkpoint is not found."""
 
     def __init__(self, identifier: str):
-        super().__init__(f"Checkpoint not found: {identifier}")
+        super().__init__("Checkpoint", identifier)
         self.identifier = identifier
 
 
