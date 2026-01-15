@@ -58,48 +58,6 @@ Layer 4: FsxLustreStack
 Layer 5: AlbStack
 ```
 
-## Common Commands
-
-```bash
-# ===== 后端开发 =====
-cd backend
-
-uvicorn src.main:app --reload                # 启动开发服务器
-
-# 数据库迁移
-alembic revision --autogenerate -m "description"
-alembic upgrade head
-
-# 运行测试
-pytest                              # 全部测试
-pytest tests/unit/                  # 单元测试
-pytest tests/integration/           # 集成测试
-pytest -m aws_integration           # AWS 集成测试 (需真实凭证)
-pytest -k "test_auth"               # 特定测试
-pytest --cov=src --cov-report=html  # 覆盖率报告
-
-# 代码检查
-black src/ tests/ && ruff check src/ tests/ && mypy src/
-
-# ===== 前端开发 =====
-cd frontend
-
-npm run dev                         # 开发服务器 (Vite)
-npm run build                       # 生产构建
-npm test                            # 运行测试
-npm run lint                        # ESLint
-
-# ===== Docker 开发环境 =====
-docker-compose up -d                # 启动所有服务
-
-# ===== CDK 基础设施 =====
-cd infrastructure/cdk
-
-cdk deploy --context env=dev
-cdk deploy --context env=staging
-cdk deploy --context env=prod
-```
-
 ## Key Development Principles
 
 ### SDK-First 原则
@@ -153,14 +111,3 @@ cdk deploy --context env=prod
 | **前端开发指南** | `frontend/CLAUDE.md` | React 架构、状态管理、设计规范 |
 | **CDK 部署指南** | `infrastructure/cdk/CLAUDE.md` | Stack 分层、HyperPod 部署流程 |
 
-## Environment Variables
-
-通过 `.env` 文件配置:
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `DATABASE_URL` | `mysql+aiomysql://...` | 数据库连接串 |
-| `AWS_REGION` | `us-east-1` | AWS 区域 |
-| `S3_BUCKET_NAME` | `ai-training-platform` | S3 桶名称 |
-| `SECRET_KEY` | - | JWT 密钥 (生产环境必须设置) |
-| `CORS_ORIGINS` | `["http://localhost:3000"]` | 允许的 CORS 源 |

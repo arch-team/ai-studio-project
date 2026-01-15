@@ -34,13 +34,83 @@
 
 ---
 
+## 数据持久化策略
+
+本节定义各实体的数据来源和持久化责任边界，明确 HyperPod/K8s 原生持久化与应用层数据库的职责分工。
+
+### 持久化层分类
+
+| 层级 | 持久化机制 | 数据特征 | 示例 |
+|------|-----------|---------|------|
+| **K8s/HyperPod 原生** | etcd + CRD | 训练任务运行时状态、Pod 调度 | HyperPodPytorchJob CR、Kueue Workload |
+| **共享存储** | FSx for Lustre / S3 | 大文件、二进制数据 | 检查点文件、数据集文件、模型文件 |
+| **应用数据库** | MySQL/Aurora | 业务元数据、审计、统计 | 用户信息、任务模板、成本记录 |
+
+### 各表持久化职责
+
+| 数据库表 | 分类 | Source of Truth | 应用层职责 |
+|---------|------|-----------------|-----------|
+| `training_jobs` | 缓存+增强 | K8s CRD | 状态缓存（快速查询）、历史保留（CRD删除后可查）、业务扩展（成本、模板关联） |
+| `checkpoints` | 完全负责 | 应用数据库 | 元数据索引（文件存储在 FSx，后端扫描构建索引） |
+| `datasets` | 完全负责 | 应用数据库 | 完整元数据管理（文件存储在 S3/FSx） |
+| `resource_quotas` | 映射+增强 | Kueue CR | 业务策略、审批流程、与 Kueue 双向同步 |
+| `users` | 完全负责 | 应用数据库 | 完整用户管理（K8s 无用户概念） |
+| `hyperpod_clusters` | 纯缓存 | HyperPod API | 减少 API 调用、提供快速查询 |
+| `job_templates` | 完全负责 | 应用数据库 | 任务模板管理（K8s/HyperPod 不提供） |
+| `audit_logs` | 完全负责 | 应用数据库 | 操作审计记录 |
+
+### 数据同步架构
+
+```
+┌─────────────────────┐                    ┌──────────────────────┐
+│   K8s/HyperPod      │      Watch         │   Application DB     │
+│   (Source)          │ ─────────────────▶ │   (Cache/Extend)     │
+│   - HyperPodJob CR  │                    │   - training_jobs    │
+│   - Kueue Workload  │                    │   - resource_quotas  │
+│   - Pod Status      │                    │   - hyperpod_clusters│
+└─────────────────────┘                    └──────────────────────┘
+
+┌─────────────────────┐                    ┌──────────────────────┐
+│   FSx Storage       │      Scan          │   Application DB     │
+│   (Files)           │ ─────────────────▶ │   (Metadata Index)   │
+│   - Checkpoint files│                    │   - checkpoints      │
+└─────────────────────┘                    └──────────────────────┘
+
+┌─────────────────────┐                    ┌──────────────────────┐
+│   User Input        │      Write         │   Application DB     │
+│   (API Request)     │ ─────────────────▶ │   (Source of Truth)  │
+│                     │                    │   - users            │
+│                     │                    │   - datasets         │
+│                     │                    │   - job_templates    │
+│                     │                    │   - audit_logs       │
+└─────────────────────┘                    └──────────────────────┘
+
+┌─────────────────────┐                    ┌──────────────────────┐
+│   Amazon Managed    │   Prometheus API   │   Frontend           │
+│   Prometheus (AMP)  │ ─────────────────▶ │   (训练指标展示)      │
+│   - Training Loss   │                    │   无需应用数据库存储   │
+│   - Accuracy        │                    │                      │
+└─────────────────────┘                    └──────────────────────┘
+```
+
+### 训练指标说明
+
+**训练指标（Loss、Accuracy 等）不存储在应用数据库**，原因：
+- HyperPod Observability Add-on 已提供完整方案
+- OpenTelemetry 采集 → Amazon Managed Prometheus（AMP）存储
+- 保留期 150 天，满足业务需求
+- 前端通过 Prometheus API (`/api/v1/query_range`) 查询展示
+- 参考 [research.md Section 2.3](./research.md#23-自定义训练指标-loss-accuracy-等)
+
+---
+
 ## 核心实体关系图 (ER Diagram)
 
 ```
-┌─────────────────┐
-│     Users       │
-│   (用户表)       │
-└────────┬────────┘
+┌─────────────────┐                              ┌─────────────────────┐
+│     Users       │ 1 ─────────────────────── N │   JobTemplates      │
+│   (用户表)       │                              │   (任务模板表)        │
+└────────┬────────┘                              └─────────────────────┘
          │ 1
          │
          │ N
@@ -61,10 +131,10 @@
 │   (资源配额表)           ├───────┤    (用户表)          │
 └─────────────────────────┘       └─────────────────────┘
 
-┌─────────────────────────┐
-│   HyperPodClusters      │
-│   (HyperPod 集群表)      │
-└─────────────────────────┘
+┌─────────────────────────┐       ┌─────────────────────┐
+│   HyperPodClusters      │       │   AuditLogs         │
+│   (HyperPod 集群表)      │       │   (审计日志表)        │
+└─────────────────────────┘       └─────────────────────┘
 ```
 
 ---
@@ -74,6 +144,11 @@
 ### 1. users (用户表)
 
 **用途**: 存储平台用户信息,支持 AWS IAM Identity Center (SSO) 集成。
+
+**数据来源说明**:
+- **数据来源**: 用户输入 (API 请求) / IAM Identity Center 同步
+- **同步策略**: Write-through（用户操作直接写入）
+- **Source of Truth**: ✅ 是（K8s 无用户管理概念）
 
 ```sql
 CREATE TABLE users (
@@ -128,6 +203,11 @@ CREATE TABLE users (
 ### 2. resource_quotas (资源配额表)
 
 **用途**: 定义用户或组的资源配额限制,支持多租户资源管理 (基于 Kueue)。
+
+**数据来源说明**:
+- **数据来源**: 用户输入 (管理员配置) + Kueue CR 状态同步
+- **同步策略**: 双向同步（创建/更新时同步到 Kueue CR，定期拉取 Kueue 使用量）
+- **Source of Truth**: ⚠️ 混合（配额定义由应用管理，实际使用量以 Kueue 为准）
 
 ```sql
 CREATE TABLE resource_quotas (
@@ -209,6 +289,11 @@ CREATE TABLE resource_quotas (
 
 **用途**: 存储训练数据集元数据,支持 FSx for Lustre 和 S3 数据源。
 
+**数据来源说明**:
+- **数据来源**: 用户输入 (API 请求)
+- **同步策略**: Write-through（元数据直接写入，实际文件存储在 S3/FSx）
+- **Source of Truth**: ✅ 是（K8s/HyperPod 不感知数据集概念）
+
 ```sql
 CREATE TABLE datasets (
     -- 主键
@@ -281,6 +366,11 @@ CREATE TABLE datasets (
 ### 4. training_jobs (训练任务表)
 
 **用途**: 存储训练任务元数据,对应 HyperPod SDK 的 `HyperPodPytorchJob` 资源。
+
+**数据来源说明**:
+- **数据来源**: K8s CRD (HyperPodPytorchJob) 状态 + 应用层业务扩展
+- **同步策略**: Watch（监听 K8s CRD 状态变化，实时更新数据库缓存）
+- **Source of Truth**: ❌ 否，缓存（运行时状态以 K8s CRD 为准，成本/模板等扩展字段由应用管理）
 
 ```sql
 CREATE TABLE training_jobs (
@@ -432,6 +522,11 @@ KUEUE_STATUS_MAPPING = {
 
 **用途**: 存储训练检查点元数据,后端扫描 FSx for Lustre 存储生成 (research.md Section 1.4)。
 
+**数据来源说明**:
+- **数据来源**: FSx 存储扫描（后端定期扫描 FSx 目录，解析检查点文件元数据）
+- **同步策略**: Scan（定时扫描 + 事件触发扫描）
+- **Source of Truth**: ✅ 是（HyperPod SDK 不提供检查点 API，元数据完全由应用管理）
+
 ```sql
 CREATE TABLE checkpoints (
     -- 主键
@@ -537,6 +632,11 @@ async def scan_checkpoints(job_id: int, checkpoint_dir: str):
 
 **用途**: 存储 HyperPod 集群信息,用于任务调度和资源管理。
 
+**数据来源说明**:
+- **数据来源**: HyperPod API / K8s API（集群状态、节点信息）
+- **同步策略**: Poll（定期轮询 HyperPod/K8s API 更新缓存）
+- **Source of Truth**: ❌ 否，纯缓存（所有数据来自 HyperPod/K8s API，用于减少 API 调用）
+
 ```sql
 CREATE TABLE hyperpod_clusters (
     -- 主键
@@ -610,6 +710,146 @@ CREATE TABLE hyperpod_clusters (
   }
 ]
 ```
+
+---
+
+### 7. job_templates (任务模板表)
+
+**用途**: 存储训练任务配置模板,方便用户复用常用的训练配置。
+
+**数据来源说明**:
+- **数据来源**: 用户输入 (API 请求)
+- **同步策略**: Write-through（模板直接写入数据库）
+- **Source of Truth**: ✅ 是（K8s/HyperPod 不提供模板管理功能）
+
+```sql
+CREATE TABLE job_templates (
+    -- 主键
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY COMMENT '模板ID',
+
+    -- 模板基本信息
+    name VARCHAR(128) NOT NULL COMMENT '模板名称',
+    description TEXT COMMENT '模板描述',
+
+    -- 归属信息
+    owner_id BIGINT UNSIGNED NOT NULL COMMENT '创建者用户ID',
+    visibility ENUM('private', 'team', 'public') NOT NULL DEFAULT 'private' COMMENT '可见性范围',
+
+    -- 训练配置 (JSON 格式)
+    training_config JSON NOT NULL COMMENT '训练配置 (包含 image, resources, env 等)',
+
+    -- 配置字段说明:
+    -- training_config = {
+    --   "image": "pytorch/pytorch:2.1.0-cuda11.8",
+    --   "script_path": "/mnt/fsx/scripts/train.py",
+    --   "instance_type": "ml.p4d.24xlarge",
+    --   "instance_count": 4,
+    --   "distributed_strategy": "ddp",  -- ddp | fsdp | deepspeed
+    --   "environment": {"NCCL_DEBUG": "INFO"},
+    --   "volumes": [{"name": "fsx", "mount_path": "/mnt/fsx"}]
+    -- }
+
+    -- 使用统计
+    usage_count INT UNSIGNED NOT NULL DEFAULT 0 COMMENT '使用次数',
+    last_used_at DATETIME(3) COMMENT '最后使用时间',
+
+    -- 审计字段
+    created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) COMMENT '创建时间',
+    updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3) COMMENT '更新时间',
+    deleted_at DATETIME(3) COMMENT '软删除时间',
+
+    -- 索引
+    INDEX idx_owner_id (owner_id),
+    INDEX idx_visibility (visibility),
+    INDEX idx_name (name),
+    INDEX idx_usage_count (usage_count DESC),
+    INDEX idx_deleted_at (deleted_at),
+
+    -- 外键
+    FOREIGN KEY (owner_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='任务模板表';
+```
+
+**字段说明**:
+- `training_config`: JSON 格式的训练配置,包含镜像、资源、分布式策略等
+- `visibility`: 模板可见性 (private=仅自己可见, team=团队可见, public=所有人可见)
+- `usage_count`: 模板被使用次数,用于推荐热门模板
+- `deleted_at`: 支持软删除,保留历史模板数据
+
+**索引策略**:
+- `owner_id`: 按用户查询模板
+- `visibility`: 按可见性筛选
+- `usage_count`: 热门模板排序
+
+---
+
+### 8. audit_logs (审计日志表)
+
+**用途**: 记录平台关键操作的审计日志,用于安全审计和问题追溯。
+
+**数据来源说明**:
+- **数据来源**: 应用层自动记录（通过审计中间件）
+- **同步策略**: Write-through（操作完成后异步写入）
+- **Source of Truth**: ✅ 是（审计日志由应用层完全管理）
+
+```sql
+CREATE TABLE audit_logs (
+    -- 主键
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY COMMENT '日志ID',
+
+    -- 操作者信息
+    user_id BIGINT UNSIGNED COMMENT '操作用户ID (NULL 表示系统操作)',
+    username VARCHAR(64) COMMENT '操作用户名 (冗余存储,防止用户删除后丢失)',
+    ip_address VARCHAR(45) COMMENT '客户端IP地址 (支持 IPv6)',
+    user_agent VARCHAR(512) COMMENT '客户端 User-Agent',
+
+    -- 操作信息
+    action VARCHAR(50) NOT NULL COMMENT '操作类型 (create/update/delete/submit/cancel 等)',
+    resource_type VARCHAR(50) NOT NULL COMMENT '资源类型 (training_job/dataset/checkpoint 等)',
+    resource_id VARCHAR(64) COMMENT '资源ID (可能是数字ID或UUID)',
+    resource_name VARCHAR(255) COMMENT '资源名称 (冗余存储)',
+
+    -- 操作详情
+    request_method VARCHAR(10) COMMENT 'HTTP 方法 (GET/POST/PUT/DELETE)',
+    request_path VARCHAR(512) COMMENT '请求路径',
+    request_body JSON COMMENT '请求体 (敏感字段脱敏)',
+    response_status INT COMMENT 'HTTP 响应状态码',
+
+    -- 变更记录
+    changes JSON COMMENT '字段变更记录 ({"field": {"old": "v1", "new": "v2"}})',
+
+    -- 结果信息
+    result ENUM('success', 'failure', 'partial') NOT NULL COMMENT '操作结果',
+    error_message TEXT COMMENT '错误信息 (失败时记录)',
+
+    -- 时间戳
+    created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) COMMENT '操作时间',
+
+    -- 索引
+    INDEX idx_user_id (user_id),
+    INDEX idx_action (action),
+    INDEX idx_resource (resource_type, resource_id),
+    INDEX idx_result (result),
+    INDEX idx_created_at (created_at),
+    INDEX idx_user_time (user_id, created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='审计日志表';
+```
+
+**字段说明**:
+- `action`: 操作类型枚举 (create/read/update/delete/submit/cancel/pause/resume 等)
+- `resource_type`: 资源类型 (training_job/dataset/checkpoint/user/resource_quota/job_template)
+- `changes`: JSON 格式的字段变更记录,用于追溯修改历史
+- `request_body`: 请求体内容,敏感字段需脱敏处理 (如密码、token)
+
+**索引策略**:
+- `user_id`: 按用户查询操作历史
+- `resource`: 按资源类型和ID查询操作记录
+- `created_at`: 按时间范围查询 (支持审计报表)
+- `user_time`: 复合索引,优化用户最近操作查询
+
+**数据保留策略**:
+- 建议保留期: 90-365 天 (根据合规要求)
+- 可配置按时间分区,定期归档到冷存储
 
 ---
 

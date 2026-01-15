@@ -2,7 +2,7 @@
 
 ## 概述
 
-本文档包含企业级AI训练平台的完整实施任务清单,共计 159 个任务,按用户故事和优先级组织。
+本文档包含企业级AI训练平台的完整实施任务清单,共计 165 个任务,按用户故事和优先级组织。
 
 **技术栈**:
 - 后端: Python 3.11, FastAPI 0.109+, SQLAlchemy 2.0+, Alembic, sagemaker-hyperpod SDK (包含 Space 模块), boto3 (AWS SDK for S3/CloudWatch/IAM 等非 HyperPod 服务)
@@ -16,7 +16,7 @@
 - **P1 (Must-Have)**: US1 训练任务管理, US2 数据集管理, US3 资源配额和集群监控
 - **P2 (Important)**: US4 资源使用报表和成本分析, US5 在线开发环境
 
-**MVP 范围**: Phase 0 (SDK 可行性研究) + Phase 1 (Setup + IaC) + Phase 2 (Foundational) + Phase 3 (US1) + Phase 4 (US2) + Phase 5 (US3) = 105 个任务,提供完整的 P1 核心功能集:HyperPod SDK 方法验证（Phase 0 研究阶段完成）及备选方案、项目基础结构、IaC 基础、HyperPod EKS 集群（拆分为基础配置/节点组/安全配置 3 个子任务）、HyperPod Add-ons (Training Operator/Kueue/Observability/Elastic Agent/Spaces)、FSx for Lustre 高性能存储、ALB 和 TLS 终止配置、基础设施验证测试、企业级认证、数据加密、训练任务管理、模型版本控制、数据集管理、资源配额、集群监控和审计日志。
+**MVP 范围**: Phase 0 (SDK 可行性研究) + Phase 1 (Setup + IaC) + Phase 2 (Foundational) + Phase 3 (US1) + Phase 4 (US2) + Phase 5 (US3) = 111 个任务,提供完整的 P1 核心功能集:HyperPod SDK 方法验证（Phase 0 研究阶段完成）及备选方案、项目基础结构、IaC 基础、HyperPod EKS 集群（拆分为基础配置/节点组/安全配置 3 个子任务）、HyperPod Add-ons (Training Operator/Kueue/Observability/Elastic Agent/Spaces)、FSx for Lustre 高性能存储、ALB 和 TLS 终止配置、基础设施验证测试、企业级认证、数据加密、训练任务管理、任务模板管理、模型版本控制、数据集管理、资源配额、集群监控、训练指标查询和审计日志。
 
 ---
 
@@ -406,7 +406,7 @@
 
 ---
 
-## Phase 3: US1 (P1) - 训练任务管理 (33 tasks)
+## Phase 3: US1 (P1) - 训练任务管理 (37 tasks)
 
 **用户故事**: 算法工程师提交和监控分布式训练任务,管理模型版本
 
@@ -544,6 +544,31 @@
 - SC-001: 支持 PyTorch DDP/FSDP/DeepSpeed ZeRO
 - SC-002: 检查点保存成功率 >99%
 
+### 任务模板管理 (FR-023 扩展)
+- [ ] [T200] 创建 job_templates 表迁移 - `backend/alembic/versions/xxx_create_job_templates.py`,字段: id, name, description, owner_id (FK users), visibility (enum: private/team/public), training_config (JSON), usage_count, last_used_at, created_at, updated_at, deleted_at
+  - **依赖**: T021 (users 表)
+  - **参考**: data-model.md job_templates 表结构, spec.md FR-023
+- [ ] [T201] 创建 JobTemplate SQLAlchemy 模型 - `backend/src/infrastructure/persistence/models/job_template_model.py`,包含 ORM 映射、关系定义 (owner → users)、软删除支持
+  - **依赖**: T200 (job_templates 表迁移)
+  - **领域实体**: `backend/src/domain/entities/job_template.py`
+  - **仓储接口**: `backend/src/domain/repositories/job_template_repository.py`
+- [ ] [T202] 任务模板 CRUD API 端点 - `backend/src/api/v1/endpoints/job_templates.py`,实现:
+  - POST /job-templates: 创建模板 (复制训练任务配置)
+  - GET /job-templates: 列表查询 (支持按可见性、热度排序)
+  - GET /job-templates/{id}: 获取模板详情
+  - PUT /job-templates/{id}: 更新模板
+  - DELETE /job-templates/{id}: 软删除模板
+  - POST /training-jobs/from-template/{template_id}: 基于模板创建训练任务
+  - **依赖**: T201 (JobTemplate 模型), T036 (HyperPod 客户端)
+  - **服务层**: `backend/src/application/services/job_template_service.py`
+- [ ] [T203] 任务模板前端页面 - `frontend/src/pages/job-templates/`,实现:
+  - 模板列表页面 (支持筛选、搜索)
+  - 模板详情/编辑页面
+  - "从模板创建任务"表单组件
+  - 热门模板推荐组件
+  - **依赖**: T202 (模板 API), T032 (训练任务创建页面)
+  - **Cloudscape 组件**: Table, Cards, Modal, FormField
+
 ---
 
 ## Phase 4: US2 (P1) - 数据集管理 (14 tasks)
@@ -589,7 +614,7 @@
 
 ---
 
-## Phase 5: US3 (P1) - 资源配额和集群监控 (19 tasks)
+## Phase 5: US3 (P1) - 资源配额和集群监控 (21 tasks)
 
 **用户故事**: 平台管理员配置资源配额、监控集群和查询审计日志
 
@@ -621,6 +646,19 @@
 - [ ] [T063] [US3] Grafana 仪表盘配置 - 创建 Grafana dashboard JSON 配置 (`infrastructure/grafana/dashboards/hyperpod-overview.json`),展示集群健康、资源利用率、训练任务分布
 - [ ] [T068] [US3] 集群健康检查服务 - `backend/src/application/services/cluster_health_service.py`,定时任务 (1分钟) 检查 HyperPod 集群状态,更新 hyperpod_clusters 表,触发告警
 
+### 训练指标服务 (FR-026)
+- [ ] [T220] [US1] 训练指标查询服务 - `backend/src/application/services/training_metrics_service.py`,扩展 Prometheus API 封装,专门查询训练相关指标 (Loss, Accuracy, Learning Rate, Throughput),支持时间范围过滤和多任务对比:
+  - **训练曲线数据**: 查询 Prometheus `/api/v1/query_range` 获取时序数据,支持 step 参数调整精度
+  - **指标聚合**: 支持 avg/max/min/last 聚合函数
+  - **缓存策略**: 已完成任务的指标数据缓存 1 小时,减少 Prometheus 查询压力
+  - **参考**: spec.md FR-026 Prometheus 指标查询 API, research.md Section 2.3 HyperPod Observability Add-on
+  - **依赖**: T008c (HyperPod Observability Add-on 部署), T062 (Prometheus 服务基础)
+- [ ] [T221] [US1] [P] 训练指标展示组件 - `frontend/src/features/training/components/TrainingMetricsChart.tsx`,在训练任务详情页展示 Loss/Accuracy 曲线图,使用 Recharts,支持多指标叠加、时间范围选择、数据点悬停提示:
+  - **图表功能**: 折线图展示训练曲线,支持缩放、导出 PNG
+  - **实时更新**: 训练中任务自动刷新 (30秒间隔)
+  - **多任务对比**: 支持选择多个任务叠加对比训练曲线
+  - **依赖**: T220 (训练指标查询服务), T067 (通用图表组件), T041 (训练任务详情页)
+
 ### 前端页面组件
 - [ ] [T064] [US3] [P] 用户管理页面 - `frontend/src/features/admin/pages/UserManagementPage.tsx`,使用 Cloudscape Table,支持用户创建/编辑/禁用,显示配额使用情况,创建模块 API 层 `frontend/src/features/admin/api/queries.ts`,创建模块类型定义 `frontend/src/features/admin/types/index.ts`
 - [ ] [T065] [US3] [P] 资源配额管理页面 - `frontend/src/features/resources/pages/QuotaManagementPage.tsx`,使用 Cloudscape Form,支持配额模板创建/编辑,显示配额分配统计,创建模块类型定义 `frontend/src/features/resources/types/index.ts`
@@ -632,8 +670,9 @@
 - 数据库迁移: T053 独立
 - SQLAlchemy 模型: T054 依赖 T053
 - 后端 API: T055-T061 可部分并行 (依赖 T054) → T061a, T061b 可并行
-- 监控服务: T062, T063, T068 可并行
-- 前端页面: T064-T067 可并行 (依赖 T055-T061) → T067a (依赖 T061a)
+- 监控服务: T062, T063, T068 可并行 → T220 (依赖 T062)
+- 训练指标: T220 → T221 (串行依赖)
+- 前端页面: T064-T067 可并行 (依赖 T055-T061) → T067a (依赖 T061a), T221 (依赖 T220, T067)
 
 **验收标准**:
 - FR-012: 配额检查延迟 <100ms
@@ -641,6 +680,7 @@
 - FR-014: 支持 ≥1000 并发用户
 - FR-020: 存储容量告警触发准确率 100% (80%/90% 双阈值)
 - FR-021: 网络延迟 P99 <10ms,带宽利用率 >80%
+- FR-026: 训练指标查询延迟 <2秒,支持 7 天历史数据
 - SC-008: Prometheus 指标保留期 ≥30天
 
 ---

@@ -2,8 +2,7 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Response Language
-**所有对话和文档必须（Must）使用中文。**
+> **回复语言要求参见根目录 `CLAUDE.md`**
 
 ## Project Overview
 AI Training Platform 后端服务 - 基于 AWS SageMaker HyperPod 的企业级 AI 训练平台 API。

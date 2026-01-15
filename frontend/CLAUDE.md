@@ -2,8 +2,7 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Response Language
-**所有对话和文档必须（Must）使用中文。**
+> **回复语言要求参见根目录 `CLAUDE.md`**
 
 ## Project Overview
 AI Training Platform 前端应用 - 基于 React + AWS Cloudscape Design System 的企业级 UI。

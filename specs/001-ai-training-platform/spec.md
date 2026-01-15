@@ -1052,8 +1052,13 @@ training_job_failures_total{failure_category="..."}
       "request_id": "API 请求唯一标识符"
     }
     ```
-  - **存储实现**: 应用层审计日志写入 CloudWatch Logs（日志组: `/ai-platform/audit-logs`），保留期配置为 90 天，AWS 原生审计由 CloudTrail 自动管理
-  - **查询能力**: 支持按 user_id、resource_type、operation_type、time_range 过滤查询（通过 CloudWatch Logs Insights）
+  - **存储实现**:
+    - **应用数据库**: 审计日志同时写入 `audit_logs` 表，支持快速关联查询和 API 访问（参考 data-model.md）
+    - **CloudWatch Logs**: 同步写入 CloudWatch Logs（日志组: `/ai-platform/audit-logs`），保留期 90 天，支持 Logs Insights 分析
+    - **AWS 原生审计**: CloudTrail 自动记录 AWS API 调用
+  - **查询能力**:
+    - 应用 API: 通过 `/api/v1/audit-logs` 端点查询，支持按 user_id、resource_type、action、time_range 过滤
+    - CloudWatch: 通过 Logs Insights 进行复杂日志分析
 - **FR-018**: 系统必须支持数据加密，包括静态数据加密（使用 S3 SSE-KMS）和传输中加密（所有网络通信使用 TLS 1.2 或更高版本）
 - **FR-019**: 系统必须根据用户角色和项目设置训练任务的默认资源限制，并允许管理员进行调整
 - **FR-020**: 系统必须实现分层存储容量监控和告警机制：
@@ -1078,6 +1083,22 @@ training_job_failures_total{failure_category="..."}
   - **震荡型训练处理**: 用户可在训练配置中设置 `disable_stall_detection: true` 禁用检测（适用于 GAN/RL 等场景）
 
   触发后发送告警并提供自动/手动终止选项
+
+- **FR-023**: 系统必须提供训练任务模板管理功能，支持创建、编辑、复制和删除训练配置模板，方便用户复用常用的训练配置。功能要求：
+  - **模板内容**: 模板包含训练镜像、资源配置(instance_type/count)、分布式策略、环境变量、存储卷配置等完整训练配置
+  - **可见性控制**: 支持三级可见性（private=仅创建者可见、team=团队可见、public=所有人可见）
+  - **模板复用**: 用户可基于模板快速创建训练任务，仅需修改数据集和超参数等差异配置
+  - **使用统计**: 记录模板使用次数和最后使用时间，支持热门模板推荐
+  - **版本管理**: 支持模板软删除，保留历史模板数据供审计
+  - 🔧 **实施约束**: 模板数据存储在应用数据库 `job_templates` 表中，创建训练任务时合并模板配置和用户覆盖配置后调用 HyperPod SDK
+
+- **FR-026**: 系统必须提供训练指标查询 API，封装对 Amazon Managed Prometheus (AMP) 的查询，支持前端展示训练曲线。功能要求：
+  - **查询接口**: 提供 `/api/v1/training-jobs/{job_id}/metrics` 端点，返回指定训练任务的指标数据（Loss、Accuracy 等）
+  - **时间范围**: 支持按时间范围查询（start_time、end_time 参数）
+  - **聚合粒度**: 支持指定聚合间隔（step 参数，默认 60 秒）
+  - **返回格式**: 返回 JSON 格式的时间序列数据，兼容前端图表组件
+  - **性能要求**: 查询响应时间 P99 < 2 秒
+  - 🔧 **实施约束**: 后端封装 Prometheus PromQL 查询，训练指标由 OpenTelemetry 采集存储在 AMP，**不在应用数据库存储指标数据**（参考 data-model.md 数据持久化策略章节）
 
 ### Non-Functional Requirements
 
@@ -1296,6 +1317,8 @@ GET /api/v1/training-jobs?status=Running&owner_id=user123&sort_by=created_at&ord
   - **Archived**: 已归档，不再使用
   - **状态转换规则**: Training → Registered（训练完成自动注册）→ Approved（人工批准）→ Deployed（部署到端点）→ Archived（废弃时归档），支持从 Approved/Deployed 直接归档
 - **资源限制配置（ResourceLimitConfig）**: 基于用户角色和项目的默认资源限制设置，包含最大GPU数、内存限制、存储空间等
+- **任务模板（JobTemplate）**: 可复用的训练任务配置模板，包含训练镜像、资源配置、分布式策略、环境变量等。支持 private/team/public 三级可见性，记录使用统计（对应 FR-023，存储在应用数据库 `job_templates` 表）
+- **审计日志（AuditLog）**: 记录平台关键操作的审计记录，包含操作者、操作类型、资源类型、操作结果等。用于安全审计和问题追溯（对应 FR-017，存储在应用数据库 `audit_logs` 表和 CloudWatch Logs）
 
 ## Success Criteria *(mandatory)*
 
