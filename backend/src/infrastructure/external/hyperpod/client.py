@@ -43,7 +43,7 @@ class HyperPodClient(IHyperPodClient):
 
     async def _run_in_executor(self, func: Callable[[], T]) -> T:
         """Run a blocking function in executor."""
-        loop = asyncio.get_event_loop()
+        loop = asyncio.get_running_loop()
         return await loop.run_in_executor(None, func)
 
     async def create_cluster(

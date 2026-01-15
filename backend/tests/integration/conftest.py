@@ -1,31 +1,15 @@
 """Integration Test Configuration - Shared fixtures for integration tests."""
 
 from datetime import timedelta
-from typing import Any, AsyncGenerator, Dict
+from typing import Any, Dict
 
 import pytest
-import pytest_asyncio
-from httpx import ASGITransport, AsyncClient
 
 from src.core.security.constants import PASSWORD_BCRYPT_COST
 from src.core.security.jwt import JWTManager
 from src.core.security.password import PasswordHasher
-from src.main import app
 
-# =============================================================================
-# HTTP Client Fixtures
-# =============================================================================
-
-
-@pytest_asyncio.fixture
-async def client() -> AsyncGenerator[AsyncClient, None]:
-    """Async HTTP client for testing API endpoints."""
-    async with AsyncClient(
-        transport=ASGITransport(app=app),
-        base_url="http://test",
-    ) as ac:
-        yield ac
-
+# Note: client fixture is inherited from tests/conftest.py
 
 # =============================================================================
 # Authentication Fixtures

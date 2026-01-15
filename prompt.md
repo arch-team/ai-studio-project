@@ -228,3 +228,6 @@ Training Operator 需要在带有 sagemaker.amazonaws.com/compute-type: hyperpod
 
 推荐模块化设计、简明逻辑、清晰接口和完善测试
 
+
+
+仔细分析，在理解当前项目的需求和数据库表和实体设计的基础上，确认哪些数据库表和实体的设计希望记录的信息是SageMaker HyperPod with EKS提供了持久化，哪些是需要应用层自己应该记录到数据库中的
