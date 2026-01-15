@@ -20,6 +20,13 @@ from src.application.services.rbac_service import (
     RBACService,
     get_rbac_service,
 )
+from src.application.services.hyperpod_service import (
+    HyperPodService,
+    HyperPodServiceError,
+    build_job_config,
+    build_volume_config,
+    map_hyperpod_status,
+)
 from src.application.services.resource_limit_config_service import (
     ResourceLimitConfigService,
 )
@@ -39,4 +46,10 @@ __all__ = [
     "get_rbac_service",
     # Resource Limit Config
     "ResourceLimitConfigService",
+    # HyperPod Service
+    "HyperPodService",
+    "HyperPodServiceError",
+    "build_job_config",
+    "build_volume_config",
+    "map_hyperpod_status",
 ]

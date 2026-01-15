@@ -32,6 +32,7 @@ from src.core.database import get_db
 from src.core.mapping import EnumMapper
 from src.core.utils import calculate_total_pages
 from src.domain.entities.training_job import JobPriority, JobStatus
+from src.infrastructure.config.settings import get_settings
 from src.infrastructure.external.hyperpod.client import HyperPodClient
 from src.infrastructure.persistence.repositories.training_job_repository_impl import (
     TrainingJobRepository,
@@ -58,9 +59,14 @@ async def get_training_job_service(
     session: AsyncSession = Depends(get_db),
 ) -> TrainingJobService:
     """Dependency for TrainingJobService."""
+    settings = get_settings()
     repository = TrainingJobRepository(session)
-    hyperpod_client = HyperPodClient()
-    return TrainingJobService(repository=repository, hyperpod_client=hyperpod_client)
+    hyperpod_client = HyperPodClient(region=settings.aws_region)
+    return TrainingJobService(
+        repository=repository,
+        hyperpod_client=hyperpod_client,
+        cluster_name=settings.hyperpod_cluster_name or "default-cluster",
+    )
 
 
 @router.post(

@@ -136,3 +136,18 @@ class IHyperPodClient(ABC):
             Stop confirmation response.
         """
         pass
+
+    @abstractmethod
+    async def list_training_job_pods(
+        self, cluster_name: str, job_name: str
+    ) -> list[dict[str, Any]]:
+        """List pods for a training job.
+
+        Args:
+            cluster_name: Cluster running the job.
+            job_name: Name of the training job.
+
+        Returns:
+            List of pod information including name, status, node.
+        """
+        pass

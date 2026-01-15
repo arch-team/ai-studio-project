@@ -10,11 +10,9 @@ from src.application.interfaces.hyperpod_client import IHyperPodClient
 
 # Conditional imports for testing environments
 try:
-    from sagemaker.hyperpod.cluster import Cluster
     from sagemaker.hyperpod.training import HyperPodPytorchJob
 except ImportError:
     HyperPodPytorchJob = None  # type: ignore
-    Cluster = None  # type: ignore
 
 
 STATUS_MAPPING = {
@@ -62,13 +60,10 @@ class HyperPodClient(IHyperPodClient):
         )
 
     async def describe_cluster(self, cluster_name: str) -> dict[str, Any]:
-        """Get cluster details using HyperPod SDK."""
+        """Get cluster details using boto3 SageMaker API."""
 
         def _describe() -> dict[str, Any]:
-            if Cluster is None:
-                # Fallback to boto3 if SDK is not available
-                return self._sagemaker_client.describe_cluster(ClusterName=cluster_name)
-            return Cluster.describe(cluster_name=cluster_name)
+            return self._sagemaker_client.describe_cluster(ClusterName=cluster_name)
 
         return await self._run_in_executor(_describe)
 
@@ -173,3 +168,17 @@ class HyperPodClient(IHyperPodClient):
             }
 
         return await self._run_in_executor(_stop)
+
+    async def list_training_job_pods(
+        self, cluster_name: str, job_name: str
+    ) -> list[dict[str, Any]]:
+        """List pods for a training job using HyperPod SDK."""
+
+        def _list_pods() -> list[dict[str, Any]]:
+            if HyperPodPytorchJob is None:
+                raise RuntimeError("HyperPod SDK not available")
+
+            job = HyperPodPytorchJob.get(name=job_name)
+            return job.list_pods()
+
+        return await self._run_in_executor(_list_pods)

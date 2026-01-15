@@ -457,8 +457,8 @@
 - [X] [T035e] [US1] [P] 模型版本对比组件 - `frontend/src/features/models/components/ModelVersionTable.tsx` 展示版本历史表格,`frontend/src/features/models/components/ModelMetricsCompare.tsx` 实现版本指标对比(metrics diff)可视化,创建 hooks `frontend/src/features/models/hooks/useModel.ts` 和 `frontend/src/features/models/hooks/useModelVersions.ts`
 
 ### HyperPod 集成服务
-- [ ] [T036] [US1] HyperPodPytorchJob 集成逻辑 - `backend/src/application/services/hyperpod_service.py`,封装 HyperPod SDK 训练任务生命周期管理,使用 T000 验证的 Training 模块方法实现训练任务提交、暂停、恢复、终止功能,实现错误处理和重试机制,参考 `docs/hyperpod-sdk-reference.md`。如该模块不支持特定训练模式,MAY 使用 boto3 (SageMaker API) 或 kubernetes-client (直接操作 PyTorchJob CRD) 作为备选方案,但 MUST 提交例外申请并获得平台治理委员会批准,在代码中注释说明理由 (遵循宪章 Principle I.B) (依赖 T000, T014)
-- [ ] [T036a] [US1] Gang Scheduling 行为验证 - `backend/tests/integration/test_gang_scheduling.py`,验证 FR-003 Gang Scheduling 机制正确工作:
+- [x] [T036] [US1] HyperPodPytorchJob 集成逻辑 - `backend/src/application/services/hyperpod_service.py`,封装 HyperPod SDK 训练任务生命周期管理,使用 T000 验证的 Training 模块方法实现训练任务提交、暂停、恢复、终止功能,实现错误处理和重试机制,参考 `docs/hyperpod-sdk-reference.md`。如该模块不支持特定训练模式,MAY 使用 boto3 (SageMaker API) 或 kubernetes-client (直接操作 PyTorchJob CRD) 作为备选方案,但 MUST 提交例外申请并获得平台治理委员会批准,在代码中注释说明理由 (遵循宪章 Principle I.B) (依赖 T000, T014)
+- [x] [T036a] [US1] Gang Scheduling 行为验证 - `backend/tests/integration/test_gang_scheduling.py`,验证 FR-003 Gang Scheduling 机制正确工作:
   - **验证场景 1**: 提交多节点分布式训练任务 (≥2 节点),验证所有 Pods 在 60 秒内同时就绪
   - **验证场景 2**: 模拟部分 Pod 调度失败,验证任务状态正确转为 Failed 且已创建的 Pods 自动清理
   - **验证场景 3**: 验证 HyperPod Training Operator 默认 Gang Scheduling 配置生效
