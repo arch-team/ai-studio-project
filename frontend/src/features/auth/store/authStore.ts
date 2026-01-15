@@ -21,6 +21,17 @@ interface AuthState {
   setLoading: (loading: boolean) => void;
 }
 
+// 开发模式默认用户
+const DEV_USER: User = {
+  id: 'dev-user-1',
+  name: '开发用户',
+  email: 'dev@example.com',
+  role: 'admin',
+};
+
+// 是否为开发模式
+const isDev = import.meta.env.DEV;
+
 /**
  * 创建 Auth Store
  *
@@ -30,10 +41,10 @@ interface AuthState {
  * - isLoading: 加载状态（用于认证检查中）
  */
 export const useAuthStore = create<AuthState>((set) => ({
-  // 初始状态
-  isAuthenticated: false,
-  user: null,
-  isLoading: true, // 初始加载状态，用于检查持久化的认证
+  // 初始状态 - 开发模式下自动认证
+  isAuthenticated: isDev,
+  user: isDev ? DEV_USER : null,
+  isLoading: false, // 开发模式下无需加载
 
   // 登录
   login: (user) =>

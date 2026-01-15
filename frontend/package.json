@@ -21,6 +21,7 @@
     "zustand": "^4.4.7"
   },
   "devDependencies": {
+    "@tanstack/react-query-devtools": "^5.91.2",
     "@testing-library/jest-dom": "^6.2.0",
     "@testing-library/react": "^14.1.2",
     "@types/react": "^18.2.48",
