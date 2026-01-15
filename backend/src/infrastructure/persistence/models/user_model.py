@@ -1,7 +1,7 @@
 """User ORM model - Platform user information with IAM integration."""
 
 from datetime import datetime
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 
 from sqlalchemy import BigInteger, DateTime, Enum, ForeignKey, Integer, String
 from sqlalchemy.dialects.mysql import JSON
@@ -141,7 +141,7 @@ class UserModel(Base, TimestampMixin):
     )
 
     # Relationships
-    resource_quota: Mapped[Optional["ResourceQuotaModel"]] = relationship(
+    resource_quota: Mapped["ResourceQuotaModel | None"] = relationship(
         "ResourceQuotaModel",
         back_populates="users",
         foreign_keys=[resource_quota_id],
@@ -198,15 +198,11 @@ class UserModel(Base, TimestampMixin):
 
     def is_locked(self) -> bool:
         """Check if account is currently locked."""
-        if self.locked_until is None:
-            return False
-        return utc_now() < self.locked_until
+        return self.locked_until is not None and utc_now() < self.locked_until
 
     def is_password_expired(self) -> bool:
         """Check if password has expired."""
-        if self.password_expires_at is None:
-            return False
-        return utc_now() > self.password_expires_at
+        return self.password_expires_at is not None and utc_now() > self.password_expires_at
 
     def is_local_account(self) -> bool:
         """Check if this is a local authentication account."""

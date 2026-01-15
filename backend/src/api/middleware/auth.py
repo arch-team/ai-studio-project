@@ -1,7 +1,6 @@
 """Authentication Middleware - JWT token validation for protected routes."""
 
 import re
-from typing import Optional
 
 from fastapi import Request
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
@@ -99,7 +98,7 @@ class CurrentUser:
         self.role = role
 
     @classmethod
-    def from_request(cls, request: Request) -> Optional["CurrentUser"]:
+    def from_request(cls, request: Request) -> "CurrentUser | None":
         """Create CurrentUser from request state."""
         if not hasattr(request.state, "user_id"):
             return None

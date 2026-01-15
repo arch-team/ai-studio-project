@@ -16,34 +16,28 @@ class IStorageService(ABC):
         metadata: dict[str, str] | None = None,
     ) -> str:
         """Upload a file to storage."""
-        pass
 
     @abstractmethod
     async def download_file(self, remote_path: str, local_path: str) -> str:
         """Download a file from storage."""
-        pass
 
     @abstractmethod
     async def delete_file(self, remote_path: str) -> bool:
         """Delete a file from storage."""
-        pass
 
     @abstractmethod
     async def list_files(
         self, prefix: str, max_results: int = 1000
     ) -> list[dict[str, Any]]:
         """List files with a given prefix."""
-        pass
 
     @abstractmethod
     async def get_file_metadata(self, remote_path: str) -> dict[str, Any]:
         """Get metadata for a file."""
-        pass
 
     @abstractmethod
     async def file_exists(self, remote_path: str) -> bool:
         """Check if a file exists."""
-        pass
 
     @abstractmethod
     async def generate_presigned_url(
@@ -53,16 +47,13 @@ class IStorageService(ABC):
         operation: str = "get",
     ) -> str:
         """Generate a presigned URL for direct access."""
-        pass
 
     @abstractmethod
     async def copy_file(self, source_path: str, dest_path: str) -> str:
         """Copy a file within storage."""
-        pass
 
     @abstractmethod
     async def stream_file(
         self, remote_path: str, chunk_size: int = 8192
     ) -> AsyncIterator[bytes]:
         """Stream file contents."""
-        pass
