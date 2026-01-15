@@ -32,6 +32,11 @@ const DEV_USER: User = {
 // 是否为开发模式
 const isDev = import.meta.env.DEV;
 
+// 开发模式下设置 mock token
+if (isDev && !localStorage.getItem('access_token')) {
+  localStorage.setItem('access_token', 'dev-mock-token');
+}
+
 /**
  * 创建 Auth Store
  *

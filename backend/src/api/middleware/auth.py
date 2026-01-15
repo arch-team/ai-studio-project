@@ -9,6 +9,10 @@ from starlette.responses import JSONResponse, Response
 from src.core.security.exceptions import InvalidTokenError, TokenExpiredError
 from src.core.security.jwt import TokenPayload, TokenType, get_jwt_manager
 from src.core.security.paths import AUTH_EXEMPT_PATHS, AUTH_EXEMPT_PATTERNS
+from src.infrastructure.config.settings import get_settings
+
+# Development mock token
+DEV_MOCK_TOKEN = "dev-mock-token"
 
 
 class AuthenticationMiddleware(BaseHTTPMiddleware):
@@ -75,6 +79,23 @@ class AuthenticationMiddleware(BaseHTTPMiddleware):
 
     def _validate_token(self, token: str) -> TokenPayload | None:
         """Validate JWT token and return payload."""
+        # Development mode: accept mock token
+        settings = get_settings()
+        if settings.environment == "development" and token == DEV_MOCK_TOKEN:
+            from datetime import datetime, timedelta, timezone
+
+            now = datetime.now(timezone.utc)
+            return TokenPayload(
+                sub="1",
+                username="dev_user",
+                email="dev@example.com",
+                role="admin",
+                exp=now + timedelta(hours=24),
+                iat=now,
+                token_type=TokenType.ACCESS,
+                jti="dev-mock-jti",
+            )
+
         try:
             jwt_manager = get_jwt_manager()
             return jwt_manager.verify_token(token, TokenType.ACCESS)
