@@ -6,5 +6,6 @@ layer provides concrete implementations.
 """
 
 from .base import IRepository
+from .resource_limit_config_repository import IResourceLimitConfigRepository
 
-__all__ = ["IRepository"]
+__all__ = ["IRepository", "IResourceLimitConfigRepository"]

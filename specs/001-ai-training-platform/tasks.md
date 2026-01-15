@@ -367,10 +367,10 @@
 - [X] [T012a] 创建 AuditLog 模型 - 领域实体 `backend/src/domain/entities/audit_log.py` + ORM 模型 `backend/src/infrastructure/persistence/models/audit_log_model.py`,包含自动过期逻辑 (expires_at = created_at + 90天),关联 User,支持操作类型和资源类型枚举,实现审计日志查询优化
 
 ### ResourceLimitConfig 管理 API (Admin)
-- [ ] [T012c] [Admin] GET /resource-limit-configs 端点实现 - `backend/src/api/v1/endpoints/resource_limit_configs.py`,支持分页、过滤 (role, project_id)、排序 (created_at),返回资源限制配置列表,仅 admin 角色可访问
-- [ ] [T012d] [Admin] POST /resource-limit-configs 端点实现 - 创建资源限制配置,验证角色和项目有效性,防止重复配置 (同一 role + project_id 组合唯一)
-- [ ] [T012e] [Admin] PUT /resource-limit-configs/{id} 端点实现 - 更新资源限制配置,支持部分更新,记录变更到审计日志
-- [ ] [T012f] [Admin] DELETE /resource-limit-configs/{id} 端点实现 - 删除资源限制配置,软删除策略,记录到审计日志
+- [X] [T012c] [Admin] GET /resource-limit-configs 端点实现 - `backend/src/api/v1/endpoints/resource_limit_configs.py`,支持分页、过滤 (role, project_id)、排序 (created_at),返回资源限制配置列表,仅 admin 角色可访问
+- [X] [T012d] [Admin] POST /resource-limit-configs 端点实现 - 创建资源限制配置,验证角色和项目有效性,防止重复配置 (同一 role + project_id 组合唯一)
+- [X] [T012e] [Admin] PUT /resource-limit-configs/{id} 端点实现 - 更新资源限制配置,支持部分更新,记录变更到审计日志
+- [X] [T012f] [Admin] DELETE /resource-limit-configs/{id} 端点实现 - 删除资源限制配置,软删除策略,记录到审计日志
 
 ### 认证中间件
 - [X] [T013] 实现基础认证中间件 - `backend/src/api/middleware/auth.py`,验证 IAM Identity Center token,提取用户信息

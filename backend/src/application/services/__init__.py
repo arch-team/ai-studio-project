@@ -9,6 +9,7 @@ Application services coordinate domain operations to fulfill use cases:
 - DatasetService: Handle dataset operations
 - ModelService: Model management and versioning
 - ClusterService: Cluster resource management
+- ResourceLimitConfigService: Resource limit config management
 """
 
 from src.application.services.account_service import AccountService
@@ -18,6 +19,9 @@ from src.application.services.rbac_service import (
     Permission,
     RBACService,
     get_rbac_service,
+)
+from src.application.services.resource_limit_config_service import (
+    ResourceLimitConfigService,
 )
 
 __all__ = [
@@ -33,4 +37,6 @@ __all__ = [
     "RBACService",
     "Permission",
     "get_rbac_service",
+    # Resource Limit Config
+    "ResourceLimitConfigService",
 ]

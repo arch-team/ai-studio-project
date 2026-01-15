@@ -5,4 +5,15 @@ Implements domain repository interfaces using SQLAlchemy:
 - DatasetRepository: Dataset CRUD
 - ModelRepository: Model CRUD
 - ClusterRepository: Cluster CRUD
+- ResourceLimitConfigRepository: Resource limit config CRUD
 """
+
+from src.infrastructure.persistence.repositories.resource_limit_config_repository_impl import (
+    ResourceLimitConfigRepository,
+    get_resource_limit_config_repository,
+)
+
+__all__ = [
+    "ResourceLimitConfigRepository",
+    "get_resource_limit_config_repository",
+]
