@@ -6,6 +6,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from src.api.middleware.audit import AuditMiddleware
 from src.api.middleware.auth import AuthenticationMiddleware
 from src.api.v1 import router as v1_router
 from src.infrastructure.config import get_settings
@@ -48,6 +49,9 @@ def create_app() -> FastAPI:
 
     # Add authentication middleware
     app.add_middleware(AuthenticationMiddleware)
+
+    # Add audit logging middleware (after auth to access user_id)
+    app.add_middleware(AuditMiddleware)
 
     # Register API routers
     app.include_router(v1_router, prefix="/api")

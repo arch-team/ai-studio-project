@@ -388,8 +388,8 @@
 - [X] [T015] [P] S3 客户端封装 - 接口 `backend/src/application/interfaces/storage_service.py` (IStorageService) + 实现 `backend/src/infrastructure/external/s3/client.py`,封装 boto3 S3 操作 (upload_file, download_file, list_objects),支持 presigned URLs,继承 T008b 配置的 SSE-KMS 默认加密
 
 ### FastAPI 应用配置
-- [ ] [T016] 配置 FastAPI 应用入口 - `backend/src/main.py`,注册路由,配置 CORS,集成认证中间件,配置 OpenAPI docs (TLS 终止由 T008i ALB 处理,应用无需配置 HTTPS)
-- [ ] [T016b] 审计日志中间件 - `backend/src/api/middleware/audit.py`,拦截所有 API 请求,自动记录操作日志 (user_id, operation_type, resource_type, request/response data),异步写入数据库,确保审计完整性
+- [X] [T016] 配置 FastAPI 应用入口 - `backend/src/main.py`,注册路由,配置 CORS,集成认证中间件,配置 OpenAPI docs (TLS 终止由 T008i ALB 处理,应用无需配置 HTTPS)
+- [X] [T016b] 审计日志中间件 - `backend/src/api/middleware/audit.py`,拦截所有 API 请求,自动记录操作日志 (user_id, operation_type, resource_type, request/response data),异步写入数据库,确保审计完整性
 
 ### 前端基础配置
 - [ ] [T017] [P] 配置 React Router - `frontend/src/app/App.tsx` 和 `frontend/src/app/router/index.tsx`,路由配置 (/training-jobs, /datasets, /admin, /reports, /ide),配置路由守卫 (AuthGuard, RoleGuard)
