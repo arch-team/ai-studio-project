@@ -11,7 +11,6 @@ import {
   Header,
   Pagination,
   SpaceBetween,
-  Spinner,
   StatusIndicator,
   Table,
 } from '@cloudscape-design/components';

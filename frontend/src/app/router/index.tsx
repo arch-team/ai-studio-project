@@ -14,17 +14,29 @@ import { AuthGuard } from './guards/AuthGuard';
 import { RoleGuard } from './guards/RoleGuard';
 import { ROUTES } from './routes';
 
-// 懒加载页面组件 (占位，实际页面待实现)
+// Training 模块页面
+import {
+  TrainingJobListPage,
+  CreateTrainingJobPage,
+  TrainingJobDetailPage,
+} from '@features/training';
+
+// Models 模块页面
+import {
+  ModelListPage,
+  ModelDetailPage,
+  ModelVersionsPage,
+} from '@features/models';
+
+// Resource Quotas 模块页面
+import { ResourceQuotasPage } from '@features/resource-quotas';
+
+// 占位页面组件 (待实现)
 const HomePage = () => <div>首页</div>;
 const LoginPage = () => <div>登录页</div>;
-const TrainingJobsPage = () => <div>训练任务列表</div>;
-const TrainingJobDetailPage = () => <div>训练任务详情</div>;
-const TrainingJobCreatePage = () => <div>创建训练任务</div>;
-const ModelsPage = () => <div>模型管理</div>;
 const DatasetsPage = () => <div>数据集列表</div>;
 const DatasetDetailPage = () => <div>数据集详情</div>;
 const CheckpointsPage = () => <div>检查点列表</div>;
-const ResourceQuotasPage = () => <div>资源配额</div>;
 const AdminPage = () => <div>管理后台</div>;
 const ReportsPage = () => <div>报表</div>;
 const IDEPage = () => <div>开发环境</div>;
@@ -68,11 +80,11 @@ export const router = createBrowserRouter([
       // 训练管理
       {
         path: ROUTES.TRAINING_JOBS,
-        element: <TrainingJobsPage />,
+        element: <TrainingJobListPage />,
       },
       {
         path: ROUTES.TRAINING_JOB_CREATE,
-        element: <TrainingJobCreatePage />,
+        element: <CreateTrainingJobPage />,
       },
       {
         path: ROUTES.TRAINING_JOB_DETAIL,
@@ -80,7 +92,15 @@ export const router = createBrowserRouter([
       },
       {
         path: ROUTES.MODELS,
-        element: <ModelsPage />,
+        element: <ModelListPage />,
+      },
+      {
+        path: ROUTES.MODEL_DETAIL,
+        element: <ModelDetailPage />,
+      },
+      {
+        path: ROUTES.MODEL_VERSIONS,
+        element: <ModelVersionsPage />,
       },
 
       // 数据管理

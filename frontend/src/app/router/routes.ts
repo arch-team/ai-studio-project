@@ -29,6 +29,8 @@ export const ROUTES = {
   TRAINING_JOB_DETAIL: '/training-jobs/:id',
   TRAINING_JOB_CREATE: '/training-jobs/create',
   MODELS: '/models',
+  MODEL_DETAIL: '/models/:id',
+  MODEL_VERSIONS: '/models/:id/versions',
 
   // 数据管理
   DATASETS: '/datasets',

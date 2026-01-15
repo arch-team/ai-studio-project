@@ -1,0 +1,157 @@
+/**
+ * Model List Page
+ *
+ * 模型列表页面 - 显示、过滤和管理模型
+ */
+
+import {
+  Box,
+  Button,
+  Container,
+  Header,
+  Select,
+  SpaceBetween,
+} from '@cloudscape-design/components';
+import { useState, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useModels } from '../api';
+import { ModelTable } from '../components';
+import type { ModelStatus, ModelFramework, ModelFilters } from '../types';
+import { MODEL_STATUS_LABELS, MODEL_FRAMEWORK_LABELS } from '../types';
+
+// 状态过滤选项
+const statusOptions = [
+  { label: '全部状态', value: '' },
+  ...Object.entries(MODEL_STATUS_LABELS).map(([value, label]) => ({
+    label,
+    value,
+  })),
+];
+
+// 框架过滤选项
+const frameworkOptions = [
+  { label: '全部框架', value: '' },
+  ...Object.entries(MODEL_FRAMEWORK_LABELS).map(([value, label]) => ({
+    label,
+    value,
+  })),
+];
+
+// 默认过滤条件
+const defaultFilters: ModelFilters = {
+  page: 1,
+  page_size: 20,
+};
+
+/**
+ * 模型列表页面
+ */
+export function ModelListPage() {
+  const navigate = useNavigate();
+  const [filters, setFilters] = useState<ModelFilters>(defaultFilters);
+  const [selectedStatus, setSelectedStatus] = useState<string>('');
+  const [selectedFramework, setSelectedFramework] = useState<string>('');
+
+  // 构建查询参数
+  const queryFilters: ModelFilters = {
+    ...filters,
+    status: selectedStatus ? (selectedStatus as ModelStatus) : undefined,
+    framework: selectedFramework ? (selectedFramework as ModelFramework) : undefined,
+  };
+
+  // 获取模型列表
+  const { data, isLoading, error, refetch } = useModels(queryFilters);
+
+  // 处理分页变化
+  const handlePageChange = useCallback((page: number) => {
+    setFilters((prev) => ({ ...prev, page }));
+  }, []);
+
+  // 处理状态过滤变化
+  const handleStatusChange = useCallback((value: string) => {
+    setSelectedStatus(value);
+    setFilters((prev) => ({ ...prev, page: 1 }));
+  }, []);
+
+  // 处理框架过滤变化
+  const handleFrameworkChange = useCallback((value: string) => {
+    setSelectedFramework(value);
+    setFilters((prev) => ({ ...prev, page: 1 }));
+  }, []);
+
+  // 跳转到模型详情
+  const handleModelClick = useCallback(
+    (modelId: number) => {
+      navigate(`/models/${modelId}`);
+    },
+    [navigate]
+  );
+
+  // 错误状态
+  if (error) {
+    return (
+      <Container>
+        <Box textAlign="center" color="text-status-error" padding="xl">
+          加载失败: {error.message}
+        </Box>
+      </Container>
+    );
+  }
+
+  return (
+    <SpaceBetween size="l">
+      {/* 页面标题和操作 */}
+      <Header
+        variant="h1"
+        actions={
+          <Button iconName="refresh" onClick={() => refetch()}>
+            刷新
+          </Button>
+        }
+      >
+        模型管理
+      </Header>
+
+      {/* 过滤器 */}
+      <Container>
+        <SpaceBetween direction="horizontal" size="m">
+          <Select
+            selectedOption={
+              statusOptions.find((opt) => opt.value === selectedStatus) ||
+              statusOptions[0]
+            }
+            onChange={({ detail }) =>
+              handleStatusChange(detail.selectedOption.value || '')
+            }
+            options={statusOptions}
+            placeholder="选择状态"
+          />
+          <Select
+            selectedOption={
+              frameworkOptions.find((opt) => opt.value === selectedFramework) ||
+              frameworkOptions[0]
+            }
+            onChange={({ detail }) =>
+              handleFrameworkChange(detail.selectedOption.value || '')
+            }
+            options={frameworkOptions}
+            placeholder="选择框架"
+          />
+        </SpaceBetween>
+      </Container>
+
+      {/* 模型表格 */}
+      <ModelTable
+        items={data?.items || []}
+        loading={isLoading}
+        totalCount={data?.total}
+        currentPage={filters.page || 1}
+        totalPages={data?.total_pages || 1}
+        onPageChange={handlePageChange}
+        onModelClick={handleModelClick}
+      />
+    </SpaceBetween>
+  );
+}
+
+export default ModelListPage;

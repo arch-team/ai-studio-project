@@ -9,7 +9,7 @@ import type { ResourceLimitConfigFilters } from './types';
 
 export function useResourceLimitConfigs(filters: ResourceLimitConfigFilters = {}) {
   return useQuery({
-    queryKey: queryKeys.resourceQuotas.list(filters),
+    queryKey: queryKeys.resourceQuotas.list(filters as Record<string, unknown>),
     queryFn: () => fetchResourceLimitConfigs(filters),
   });
 }

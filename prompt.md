@@ -226,7 +226,7 @@ Training Operator 需要在带有 sagemaker.amazonaws.com/compute-type: hyperpod
 
 # 标准
 
-推荐模块化设计、简明逻辑、清晰接口和完善测试
+推荐模块化设计、简明逻辑、清晰接口、职责单一
 
 
 
@@ -239,5 +239,23 @@ Training Operator 需要在带有 sagemaker.amazonaws.com/compute-type: hyperpod
 
 
 /speckit.implement ## Phase 2: Foundational - 基础设施 (23 tasks) 中的### ResourceLimitConfig 管理 API (Admin), 每个任务按照TDD（测试驱动开发的流程进行），完成后将相应的任务标记为完成状态。注意ResourceLimit 依赖于SageMaker HyperPod 原生的Task Governance 这个功能特性，因此你需要分析resource_limit_configs相关的信息哪些应该保存到应用数据库，哪些应该来自SageMaker HyperPod 原生的Task Governance组件提供的信息
+‘
 
 
+/Users/jinhuasu/.claude/plans/dapper-tumbling-widget.md。
+
+
+ 遵循模块化设计、简明逻辑、清晰接口、职责单一
+ RESTful 最佳实践
+
+
+  1. Domain 异常自带 status_code 和 error_code      │
+  2. 全局 exception_handler 统一处理                 │
+  3. 端点代码零 try-except   
+  4. 统一的endpoint层请求和响应参数的封装
+admin / Admin123!
+
+
+
+
+/speckit.implement ## Phase 3: US1 (P1) - 训练任务管理 (33 tasks) 中的前端页面组件, 每个任务按照TDD（测试驱动开发的流程进行），完成后将相应的任务标记为完成状态
