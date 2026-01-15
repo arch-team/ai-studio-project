@@ -3,9 +3,16 @@
 from datetime import datetime
 from decimal import Decimal
 from enum import Enum
+from typing import TYPE_CHECKING
+
 from pydantic import BaseModel, Field
 
+from src.api.v1.schemas.base import EntitySchema
 from src.api.v1.schemas.common import ErrorResponse
+from src.core.mapping import EnumMapper
+
+if TYPE_CHECKING:
+    from src.domain.entities.training_job import TrainingJob
 
 # === Enums ===
 
@@ -124,7 +131,7 @@ class CreateTrainingJobRequest(BaseModel):
 # === Response Schemas ===
 
 
-class TrainingJobSummary(BaseModel):
+class TrainingJobSummary(EntitySchema["TrainingJob"]):
     """Training job summary for list responses."""
 
     id: int
@@ -145,11 +152,29 @@ class TrainingJobSummary(BaseModel):
     duration_seconds: int | None = None
     estimated_cost_usd: Decimal | None = None
 
-    class Config:
-        from_attributes = True
+    @classmethod
+    def _map_entity_fields(cls, entity: "TrainingJob") -> dict:
+        """Map TrainingJob entity to summary schema fields."""
+        return {
+            "id": entity.id,
+            "job_name": entity.job_name,
+            "display_name": entity.display_name,
+            "owner_id": entity.owner_id,
+            "status": EnumMapper.to_api(entity.status, JobStatusEnum),
+            "priority": EnumMapper.to_api(entity.priority, JobPriorityEnum),
+            "instance_type": entity.instance_type,
+            "node_count": entity.node_count,
+            "current_epoch": entity.current_epoch,
+            "latest_loss": entity.latest_loss,
+            "submitted_at": entity.submitted_at,
+            "started_at": entity.started_at,
+            "completed_at": entity.completed_at,
+            "duration_seconds": entity.duration_seconds,
+            "estimated_cost_usd": entity.estimated_cost_usd,
+        }
 
 
-class TrainingJobDetail(BaseModel):
+class TrainingJobDetail(EntitySchema["TrainingJob"]):
     """Training job detail response."""
 
     # Basic info
@@ -224,8 +249,57 @@ class TrainingJobDetail(BaseModel):
     created_at: datetime
     updated_at: datetime
 
-    class Config:
-        from_attributes = True
+    @classmethod
+    def _map_entity_fields(cls, entity: "TrainingJob") -> dict:
+        """Map TrainingJob entity to detail schema fields."""
+        return {
+            "id": entity.id,
+            "job_name": entity.job_name,
+            "display_name": entity.display_name,
+            "description": entity.description,
+            "owner_id": entity.owner_id,
+            "status": EnumMapper.to_api(entity.status, JobStatusEnum),
+            "hyperpod_status": entity.hyperpod_status,
+            "kueue_workload_name": entity.kueue_workload_name,
+            "kueue_status": entity.kueue_status,
+            "image_uri": entity.image_uri,
+            "instance_type": entity.instance_type,
+            "node_count": entity.node_count,
+            "tasks_per_node": entity.tasks_per_node,
+            "entrypoint_command": entity.entrypoint_command,
+            "environment_variables": entity.environment_variables,
+            "dataset_id": entity.dataset_id,
+            "data_mount_path": entity.data_mount_path,
+            "checkpoint_mount_path": entity.checkpoint_mount_path,
+            "hyperparameters": entity.hyperparameters,
+            "max_epochs": entity.max_epochs,
+            "batch_size": entity.batch_size,
+            "learning_rate": entity.learning_rate,
+            "distribution_strategy": EnumMapper.to_api(
+                entity.distribution_strategy, DistributionStrategyEnum
+            ),
+            "priority": EnumMapper.to_api(entity.priority, JobPriorityEnum),
+            "mixed_precision": entity.mixed_precision,
+            "use_spot_instances": entity.use_spot_instances,
+            "total_pods": entity.total_pods,
+            "running_pods": entity.running_pods,
+            "failed_pods": entity.failed_pods,
+            "preemption_count": entity.preemption_count,
+            "current_epoch": entity.current_epoch,
+            "current_step": entity.current_step,
+            "latest_loss": entity.latest_loss,
+            "latest_accuracy": entity.latest_accuracy,
+            "submitted_at": entity.submitted_at,
+            "started_at": entity.started_at,
+            "completed_at": entity.completed_at,
+            "duration_seconds": entity.duration_seconds,
+            "total_gpu_hours": entity.total_gpu_hours,
+            "estimated_cost_usd": entity.estimated_cost_usd,
+            "error_message": entity.error_message,
+            "failure_reason": entity.failure_reason,
+            "created_at": entity.created_at,
+            "updated_at": entity.updated_at,
+        }
 
 
 class TrainingJobListResponse(BaseModel):

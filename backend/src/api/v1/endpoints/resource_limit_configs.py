@@ -1,6 +1,6 @@
 """ResourceLimitConfig Endpoints - Admin CRUD operations for resource limits."""
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.api.middleware.auth import CurrentUser
@@ -34,35 +34,11 @@ async def get_resource_limit_config_service(
     return ResourceLimitConfigService(repository=repository)
 
 
-def _map_role_enum(role: LimitRoleEnum | None) -> LimitRole | None:
-    """Map API role enum to domain role."""
+def _to_domain_role(role: LimitRoleEnum | None) -> LimitRole | None:
+    """Convert API role enum to domain role (same case, direct conversion)."""
     if role is None:
         return None
-    role_map = {
-        LimitRoleEnum.ADMIN: LimitRole.ADMIN,
-        LimitRoleEnum.PROJECT_MANAGER: LimitRole.PROJECT_MANAGER,
-        LimitRoleEnum.ENGINEER: LimitRole.ENGINEER,
-        LimitRoleEnum.VIEWER: LimitRole.VIEWER,
-    }
-    return role_map.get(role)
-
-
-def _config_to_response(config) -> ResourceLimitConfigResponse:
-    """Convert domain entity to response."""
-    return ResourceLimitConfigResponse(
-        id=config.id,
-        config_name=config.config_name,
-        role=LimitRoleEnum(config.role.value),
-        project_id=config.project_id,
-        max_gpu_per_job=config.max_gpu_per_job,
-        max_cpu_per_job=config.max_cpu_per_job,
-        max_memory_gb_per_job=config.max_memory_gb_per_job,
-        max_storage_gb_per_job=config.max_storage_gb_per_job,
-        max_nodes_per_job=config.max_nodes_per_job,
-        priority_default=PriorityDefaultEnum(config.priority_default.value),
-        created_at=config.created_at,
-        updated_at=config.updated_at,
-    )
+    return LimitRole(role.value)
 
 
 @router.get(
@@ -89,7 +65,7 @@ async def list_resource_limit_configs(
     Supports filtering by role and project_id, with pagination.
     """
     configs, total = await service.list_configs(
-        role=_map_role_enum(role),
+        role=_to_domain_role(role),
         project_id=project_id,
         page=page,
         page_size=page_size,
@@ -100,7 +76,7 @@ async def list_resource_limit_configs(
     total_pages = (total + page_size - 1) // page_size if total > 0 else 0
 
     return ResourceLimitConfigListResponse(
-        items=[_config_to_response(c) for c in configs],
+        items=[ResourceLimitConfigResponse.from_entity(c) for c in configs],
         total=total,
         page=page,
         page_size=page_size,
@@ -142,7 +118,7 @@ async def create_resource_limit_config(
     }
 
     config = await service.create_config(config_data)
-    return _config_to_response(config)
+    return ResourceLimitConfigResponse.from_entity(config)
 
 
 @router.get(
@@ -164,7 +140,7 @@ async def get_resource_limit_config(
     Admin-only endpoint for retrieving a specific configuration.
     """
     config = await service.get_config(config_id)
-    return _config_to_response(config)
+    return ResourceLimitConfigResponse.from_entity(config)
 
 
 @router.put(
@@ -210,7 +186,7 @@ async def update_resource_limit_config(
         update_data["priority_default"] = data.priority_default.value
 
     config = await service.update_config(config_id, update_data)
-    return _config_to_response(config)
+    return ResourceLimitConfigResponse.from_entity(config)
 
 
 @router.delete(

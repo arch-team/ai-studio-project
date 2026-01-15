@@ -47,53 +47,6 @@ async def get_model_service(
     )
 
 
-def _model_to_summary(model) -> ModelSummary:
-    """Convert domain entity to summary response."""
-    return ModelSummary(
-        id=model.id,
-        model_name=model.model_name,
-        version=model.version,
-        display_name=model.display_name,
-        owner_id=model.owner_id,
-        training_job_id=model.training_job_id,
-        status=ModelStatusEnum(model.status.value.lower()),
-        framework=ModelFrameworkEnum(model.framework.value.lower()),
-        metrics=model.metrics,
-        tags=model.tags,
-        created_at=model.created_at,
-        registered_at=model.registered_at,
-    )
-
-
-def _model_to_detail(model) -> ModelDetail:
-    """Convert domain entity to detail response."""
-    return ModelDetail(
-        id=model.id,
-        model_name=model.model_name,
-        version=model.version,
-        display_name=model.display_name,
-        description=model.description,
-        owner_id=model.owner_id,
-        training_job_id=model.training_job_id,
-        checkpoint_id=model.checkpoint_id,
-        model_uri=model.model_uri,
-        registry_arn=model.registry_arn,
-        registry_status=model.registry_status,
-        metrics=model.metrics,
-        hyperparameters=model.hyperparameters,
-        framework=ModelFrameworkEnum(model.framework.value.lower()),
-        framework_version=model.framework_version,
-        status=ModelStatusEnum(model.status.value.lower()),
-        size_bytes=model.size_bytes,
-        model_format=model.model_format,
-        tags=model.tags,
-        created_at=model.created_at,
-        updated_at=model.updated_at,
-        registered_at=model.registered_at,
-        archived_at=model.archived_at,
-    )
-
-
 @router.post(
     "",
     response_model=ModelDetail,
@@ -123,7 +76,7 @@ async def create_model(
     }
 
     model = await service.create_model(owner_id=current_user.user_id, data=model_data)
-    return _model_to_detail(model)
+    return ModelDetail.from_entity(model)
 
 
 @router.get(
@@ -169,7 +122,7 @@ async def list_models(
     total_pages = (total + page_size - 1) // page_size if total > 0 else 0
 
     return ModelListResponse(
-        items=[_model_to_summary(model) for model in models],
+        items=[ModelSummary.from_entity(model) for model in models],
         total=total,
         page=page,
         page_size=page_size,
@@ -201,7 +154,7 @@ async def get_model(
                 detail="You don't have permission to view this model",
             )
 
-    return _model_to_detail(model)
+    return ModelDetail.from_entity(model)
 
 
 @router.get(
@@ -313,4 +266,4 @@ async def archive_model(
             )
 
     model = await service.archive_model(model_id)
-    return _model_to_detail(model)
+    return ModelDetail.from_entity(model)
