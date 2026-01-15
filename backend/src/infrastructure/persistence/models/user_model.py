@@ -26,6 +26,10 @@ if TYPE_CHECKING:
     from src.infrastructure.persistence.models.resource_quota_model import (
         ResourceQuotaModel,
     )
+    from src.infrastructure.persistence.models.model_model import ModelModel
+    from src.infrastructure.persistence.models.training_job_model import (
+        TrainingJobModel,
+    )
 
 
 class UserStatus(enum.Enum):
@@ -185,6 +189,16 @@ class UserModel(Base, TimestampMixin):
     login_attempts: Mapped[list["LoginAttemptModel"]] = relationship(
         "LoginAttemptModel",
         back_populates="user",
+        cascade="all, delete-orphan",
+    )
+    training_jobs: Mapped[list["TrainingJobModel"]] = relationship(
+        "TrainingJobModel",
+        back_populates="owner",
+        cascade="all, delete-orphan",
+    )
+    models: Mapped[list["ModelModel"]] = relationship(
+        "ModelModel",
+        back_populates="owner",
         cascade="all, delete-orphan",
     )
 
