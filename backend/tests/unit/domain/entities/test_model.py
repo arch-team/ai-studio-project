@@ -18,6 +18,7 @@ from src.domain.entities.model import (
     ModelFramework,
     ModelStatus,
 )
+from src.domain.exceptions import InvalidStateTransitionError
 
 
 class TestModelFrameworkEnum:
@@ -128,19 +129,19 @@ class TestModelStateTransitions:
     def test_invalid_transition_training_to_deployed(self, model: Model) -> None:
         """Test invalid transition: TRAINING -> DEPLOYED (must register first)."""
         assert not model.can_transition_to(ModelStatus.DEPLOYED)
-        with pytest.raises(ValueError, match="Invalid state transition"):
+        with pytest.raises(InvalidStateTransitionError):
             model.transition_to(ModelStatus.DEPLOYED)
 
     def test_invalid_transition_training_to_archived(self, model: Model) -> None:
         """Test invalid transition: TRAINING -> ARCHIVED (must register first)."""
         assert not model.can_transition_to(ModelStatus.ARCHIVED)
-        with pytest.raises(ValueError, match="Invalid state transition"):
+        with pytest.raises(InvalidStateTransitionError):
             model.transition_to(ModelStatus.ARCHIVED)
 
-    def test_invalid_transition_raises_value_error(self, model: Model) -> None:
-        """Test that invalid transitions raise ValueError."""
+    def test_invalid_transition_raises_domain_exception(self, model: Model) -> None:
+        """Test that invalid transitions raise InvalidStateTransitionError."""
         model.transition_to(ModelStatus.FAILED)
-        with pytest.raises(ValueError):
+        with pytest.raises(InvalidStateTransitionError):
             model.transition_to(ModelStatus.REGISTERED)
 
 
@@ -292,7 +293,7 @@ class TestModelBusinessRules:
     def test_register_when_not_training_raises_error(self, model: Model) -> None:
         """Test register() raises error when not TRAINING."""
         model.transition_to(ModelStatus.FAILED)
-        with pytest.raises(ValueError, match="Cannot register model"):
+        with pytest.raises(InvalidStateTransitionError):
             model.register()
 
     def test_deploy(self, model: Model) -> None:
@@ -303,7 +304,7 @@ class TestModelBusinessRules:
 
     def test_deploy_when_not_registered_raises_error(self, model: Model) -> None:
         """Test deploy() raises error when not REGISTERED."""
-        with pytest.raises(ValueError, match="Cannot deploy model"):
+        with pytest.raises(InvalidStateTransitionError):
             model.deploy()
 
     def test_archive(self, model: Model) -> None:
@@ -316,7 +317,7 @@ class TestModelBusinessRules:
 
     def test_archive_when_not_deployable_state_raises_error(self, model: Model) -> None:
         """Test archive() raises error when in invalid state."""
-        with pytest.raises(ValueError, match="Cannot archive model"):
+        with pytest.raises(InvalidStateTransitionError):
             model.archive()
 
     def test_fail_sets_status(self, model: Model) -> None:

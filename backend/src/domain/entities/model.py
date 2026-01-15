@@ -5,6 +5,7 @@ from datetime import datetime
 from enum import Enum
 
 from src.core.utils import utc_now
+from src.domain.exceptions import InvalidStateTransitionError
 
 
 class ModelFramework(Enum):
@@ -94,11 +95,11 @@ class Model:
         """Transition to new status if valid.
 
         Raises:
-            ValueError: If transition is not allowed
+            InvalidStateTransitionError: If transition is not allowed
         """
         if not self.can_transition_to(new_status):
-            raise ValueError(
-                f"Invalid state transition: {self.status.value} -> {new_status.value}"
+            raise InvalidStateTransitionError(
+                "Model", self.status.value, new_status.value
             )
         self.status = new_status
         self.updated_at = utc_now()
@@ -131,10 +132,12 @@ class Model:
         """Register the model (transition from TRAINING to REGISTERED).
 
         Raises:
-            ValueError: If model cannot be registered
+            InvalidStateTransitionError: If model cannot be registered
         """
         if self.status != ModelStatus.TRAINING:
-            raise ValueError(f"Cannot register model in {self.status.value} status")
+            raise InvalidStateTransitionError(
+                "Model", self.status.value, ModelStatus.REGISTERED.value
+            )
         self.transition_to(ModelStatus.REGISTERED)
         self.registered_at = utc_now()
 
@@ -142,20 +145,24 @@ class Model:
         """Deploy the model.
 
         Raises:
-            ValueError: If model cannot be deployed
+            InvalidStateTransitionError: If model cannot be deployed
         """
         if not self.can_deploy():
-            raise ValueError(f"Cannot deploy model in {self.status.value} status")
+            raise InvalidStateTransitionError(
+                "Model", self.status.value, ModelStatus.DEPLOYED.value
+            )
         self.transition_to(ModelStatus.DEPLOYED)
 
     def archive(self) -> None:
         """Archive the model.
 
         Raises:
-            ValueError: If model cannot be archived
+            InvalidStateTransitionError: If model cannot be archived
         """
         if not self.can_transition_to(ModelStatus.ARCHIVED):
-            raise ValueError(f"Cannot archive model in {self.status.value} status")
+            raise InvalidStateTransitionError(
+                "Model", self.status.value, ModelStatus.ARCHIVED.value
+            )
         self.transition_to(ModelStatus.ARCHIVED)
         self.archived_at = utc_now()
 

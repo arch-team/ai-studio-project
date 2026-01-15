@@ -21,7 +21,6 @@ from src.api.v1.schemas.training_job import (
     TrainingJobDetail,
     TrainingJobListResponse,
     TrainingJobSummary,
-    UpdateTrainingJobRequest,
 )
 from src.application.services.checkpoint_service import CheckpointService
 from src.application.services.training_job_service import TrainingJobService
@@ -292,39 +291,102 @@ async def get_training_job(
         )
 
 
-@router.patch(
-    "/{job_id}",
+async def _check_job_permission(
+    job_id: int,
+    current_user: CurrentUser,
+    service: TrainingJobService,
+    action: str,
+):
+    """Check job exists and user has permission."""
+    job = await service.get_job(job_id)
+    if current_user.role not in ["admin", "manager"]:
+        if job.owner_id != current_user.user_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"You don't have permission to {action} this job",
+            )
+    return job
+
+
+@router.post(
+    "/{job_id}/pause",
     response_model=TrainingJobDetail,
     responses={
         404: {"model": ErrorResponse, "description": "Job not found"},
         409: {"model": ErrorResponse, "description": "Invalid state transition"},
     },
 )
-async def update_training_job(
+async def pause_training_job(
     job_id: int,
-    data: UpdateTrainingJobRequest,
     current_user: CurrentUser = Depends(require_engineer),
     service: TrainingJobService = Depends(get_training_job_service),
 ):
-    """Update training job (pause/resume/cancel)."""
+    """Pause a running training job."""
     try:
-        # First check if job exists and user has permission
-        job = await service.get_job(job_id)
-        if current_user.role not in ["admin", "manager"]:
-            if job.owner_id != current_user.user_id:
-                raise HTTPException(
-                    status_code=status.HTTP_403_FORBIDDEN,
-                    detail="You don't have permission to modify this job",
-                )
+        await _check_job_permission(job_id, current_user, service, "pause")
+        job = await service.pause_job(job_id)
+        return _job_to_detail(job)
 
-        # Perform the requested action
-        if data.action == "pause":
-            job = await service.pause_job(job_id)
-        elif data.action == "resume":
-            job = await service.resume_job(job_id)
-        elif data.action == "cancel":
-            job = await service.cancel_job(job_id)
+    except EntityNotFoundError:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Training job with id {job_id} not found",
+        )
+    except InvalidStateTransitionError as e:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=str(e),
+        )
 
+
+@router.post(
+    "/{job_id}/resume",
+    response_model=TrainingJobDetail,
+    responses={
+        404: {"model": ErrorResponse, "description": "Job not found"},
+        409: {"model": ErrorResponse, "description": "Invalid state transition"},
+    },
+)
+async def resume_training_job(
+    job_id: int,
+    current_user: CurrentUser = Depends(require_engineer),
+    service: TrainingJobService = Depends(get_training_job_service),
+):
+    """Resume a paused training job."""
+    try:
+        await _check_job_permission(job_id, current_user, service, "resume")
+        job = await service.resume_job(job_id)
+        return _job_to_detail(job)
+
+    except EntityNotFoundError:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Training job with id {job_id} not found",
+        )
+    except InvalidStateTransitionError as e:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=str(e),
+        )
+
+
+@router.post(
+    "/{job_id}/cancel",
+    response_model=TrainingJobDetail,
+    responses={
+        404: {"model": ErrorResponse, "description": "Job not found"},
+        409: {"model": ErrorResponse, "description": "Invalid state transition"},
+    },
+)
+async def cancel_training_job(
+    job_id: int,
+    current_user: CurrentUser = Depends(require_engineer),
+    service: TrainingJobService = Depends(get_training_job_service),
+):
+    """Cancel a training job."""
+    try:
+        await _check_job_permission(job_id, current_user, service, "cancel")
+        job = await service.cancel_job(job_id)
         return _job_to_detail(job)
 
     except EntityNotFoundError:

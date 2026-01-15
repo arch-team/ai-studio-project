@@ -3,8 +3,6 @@
 from datetime import datetime
 from decimal import Decimal
 from enum import Enum
-from typing import Literal
-
 from pydantic import BaseModel, Field
 
 from src.api.v1.schemas.common import ErrorResponse
@@ -121,14 +119,6 @@ class CreateTrainingJobRequest(BaseModel):
         default=False, description="Use mixed precision (AMP)"
     )
     use_spot_instances: bool = Field(default=False, description="Use spot instances")
-
-
-class UpdateTrainingJobRequest(BaseModel):
-    """Request body for updating a training job."""
-
-    action: Literal["pause", "resume", "cancel"] = Field(
-        ..., description="Action to perform on the job"
-    )
 
 
 # === Response Schemas ===

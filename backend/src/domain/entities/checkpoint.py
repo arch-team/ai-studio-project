@@ -6,6 +6,7 @@ from decimal import Decimal
 from enum import Enum
 
 from src.core.utils import utc_now
+from src.domain.exceptions import InvalidStateTransitionError
 
 
 class CheckpointType(Enum):
@@ -85,11 +86,11 @@ class Checkpoint:
         """Migrate to target storage tier.
 
         Raises:
-            ValueError: If migration is not allowed
+            InvalidStateTransitionError: If migration is not allowed
         """
         if not self.can_migrate_to(target_tier):
-            raise ValueError(
-                f"Invalid storage tier migration: {self.storage_tier.value} -> {target_tier.value}"
+            raise InvalidStateTransitionError(
+                "Checkpoint.storage_tier", self.storage_tier.value, target_tier.value
             )
         self.storage_tier = target_tier
         self.updated_at = utc_now()
@@ -123,10 +124,12 @@ class Checkpoint:
         """Archive the checkpoint.
 
         Raises:
-            ValueError: If checkpoint cannot be archived
+            InvalidStateTransitionError: If checkpoint cannot be archived
         """
         if not self.can_archive():
-            raise ValueError(f"Cannot archive checkpoint in {self.status.value} status")
+            raise InvalidStateTransitionError(
+                "Checkpoint", self.status.value, CheckpointStatus.ARCHIVED.value
+            )
         self.status = CheckpointStatus.ARCHIVED
         self.archived_at = utc_now()
         self.updated_at = utc_now()
@@ -135,10 +138,12 @@ class Checkpoint:
         """Soft delete the checkpoint.
 
         Raises:
-            ValueError: If checkpoint cannot be deleted
+            InvalidStateTransitionError: If checkpoint cannot be deleted
         """
         if not self.can_delete():
-            raise ValueError(f"Cannot delete checkpoint in {self.status.value} status")
+            raise InvalidStateTransitionError(
+                "Checkpoint", self.status.value, CheckpointStatus.DELETED.value
+            )
         self.status = CheckpointStatus.DELETED
         self.deleted_at = utc_now()
         self.updated_at = utc_now()

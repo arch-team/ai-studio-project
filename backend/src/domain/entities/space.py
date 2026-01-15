@@ -5,6 +5,7 @@ from datetime import datetime
 from enum import Enum
 
 from src.core.utils import utc_now
+from src.domain.exceptions import InvalidStateTransitionError
 
 
 class SpaceInstanceType(Enum):
@@ -79,11 +80,11 @@ class Space:
         """Transition to new status if valid.
 
         Raises:
-            ValueError: If transition is not allowed
+            InvalidStateTransitionError: If transition is not allowed
         """
         if not self.can_transition_to(new_status):
-            raise ValueError(
-                f"Invalid state transition: {self.status.value} -> {new_status.value}"
+            raise InvalidStateTransitionError(
+                "Space", self.status.value, new_status.value
             )
         self.status = new_status
         self.updated_at = utc_now()
@@ -106,19 +107,25 @@ class Space:
     def start(self) -> None:
         """Start the space."""
         if not self.can_start():
-            raise ValueError(f"Cannot start space in {self.status.value} status")
+            raise InvalidStateTransitionError(
+                "Space", self.status.value, SpaceStatus.RUNNING.value
+            )
         self.transition_to(SpaceStatus.RUNNING)
 
     def stop(self) -> None:
         """Stop the space."""
         if not self.can_stop():
-            raise ValueError(f"Cannot stop space in {self.status.value} status")
+            raise InvalidStateTransitionError(
+                "Space", self.status.value, SpaceStatus.STOPPED.value
+            )
         self.transition_to(SpaceStatus.STOPPED)
 
     def delete(self) -> None:
         """Mark space as deleted (soft delete)."""
         if not self.can_delete():
-            raise ValueError(f"Cannot delete space in {self.status.value} status")
+            raise InvalidStateTransitionError(
+                "Space", self.status.value, SpaceStatus.DELETED.value
+            )
         self.transition_to(SpaceStatus.DELETED)
 
     def mark_failed(self) -> None:

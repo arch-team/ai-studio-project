@@ -6,6 +6,7 @@ from decimal import Decimal
 from enum import Enum
 
 from src.core.utils import utc_now
+from src.domain.exceptions import InvalidStateTransitionError
 
 
 class JobStatus(Enum):
@@ -152,11 +153,11 @@ class TrainingJob:
         """Transition to new status if valid.
 
         Raises:
-            ValueError: If transition is not allowed
+            InvalidStateTransitionError: If transition is not allowed
         """
         if not self.can_transition_to(new_status):
-            raise ValueError(
-                f"Invalid state transition: {self.status.value} -> {new_status.value}"
+            raise InvalidStateTransitionError(
+                "TrainingJob", self.status.value, new_status.value
             )
 
         # Track preemption count
@@ -191,13 +192,17 @@ class TrainingJob:
     def pause(self) -> None:
         """Pause the training job."""
         if not self.can_pause():
-            raise ValueError(f"Cannot pause job in {self.status.value} status")
+            raise InvalidStateTransitionError(
+                "TrainingJob", self.status.value, JobStatus.PAUSED.value
+            )
         self.transition_to(JobStatus.PAUSED)
 
     def resume(self) -> None:
         """Resume a paused or preempted job."""
         if not self.can_resume():
-            raise ValueError(f"Cannot resume job in {self.status.value} status")
+            raise InvalidStateTransitionError(
+                "TrainingJob", self.status.value, JobStatus.RUNNING.value
+            )
         self.transition_to(JobStatus.RUNNING)
 
     def complete(self) -> None:

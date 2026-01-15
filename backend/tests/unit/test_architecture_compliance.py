@@ -259,6 +259,59 @@ class TestApiLayerDoesNotImportInfrastructureModels:
         )
 
 
+class TestDomainExceptionUsage:
+    """Test that domain entities use domain exceptions instead of ValueError."""
+
+    @pytest.fixture
+    def backend_src_path(self) -> Path:
+        """Get the backend src path."""
+        current = Path(__file__).parent
+        return current.parent.parent / "src"
+
+    @pytest.fixture
+    def domain_entity_files(self, backend_src_path: Path) -> list[Path]:
+        """Get all Python files in domain entities."""
+        entities_path = backend_src_path / "domain" / "entities"
+        return get_python_files(entities_path)
+
+    def test_domain_entities_do_not_use_valueerror_for_state_transitions(
+        self, domain_entity_files: list[Path]
+    ):
+        """Domain entities should use InvalidStateTransitionError, not ValueError.
+
+        State transition errors are domain-specific and should be expressed
+        using domain exceptions for better error handling and API responses.
+        """
+        violations = []
+
+        for file_path in domain_entity_files:
+            if file_path.name == "__init__.py":
+                continue
+
+            try:
+                with open(file_path, encoding="utf-8") as f:
+                    content = f.read()
+
+                lines = content.split("\n")
+                for i, line in enumerate(lines, 1):
+                    stripped = line.strip()
+                    if stripped.startswith("#"):
+                        continue
+                    # Check for ValueError usage in state transition context
+                    if "raise ValueError" in line:
+                        violations.append(
+                            f"{file_path.name}:{i}: uses ValueError instead of domain exception"
+                        )
+            except Exception:
+                pass
+
+        assert not violations, (
+            f"Domain entities should use domain exceptions (e.g., InvalidStateTransitionError).\n"
+            f"Found {len(violations)} violation(s):\n"
+            + "\n".join(f"  - {v}" for v in violations)
+        )
+
+
 class TestMiddlewareExecutionOrder:
     """Test that middleware is configured in the correct execution order.
 
@@ -301,6 +354,45 @@ class TestMiddlewareExecutionOrder:
             "Starlette middleware uses LIFO order, so to execute Audit AFTER Auth,\n"
             "Audit must be added first in the code.\n"
             f"Found: audit_pos={audit_add_pos}, auth_pos={auth_add_pos}"
+        )
+
+
+class TestCorsConfiguration:
+    """Test that CORS configuration is properly restricted."""
+
+    def test_cors_does_not_allow_all_methods(self):
+        """CORS should not allow all HTTP methods with wildcard.
+
+        Using allow_methods=["*"] is a security risk as it allows
+        any HTTP method including potentially dangerous ones.
+        """
+        import inspect
+
+        from src.main import create_app
+
+        source = inspect.getsource(create_app)
+
+        # Check for overly permissive method configuration
+        assert 'allow_methods=["*"]' not in source, (
+            "CORS should not use allow_methods=['*'].\n"
+            "Explicitly list allowed methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS']"
+        )
+
+    def test_cors_does_not_allow_all_headers(self):
+        """CORS should not allow all headers with wildcard.
+
+        Using allow_headers=["*"] is a security risk.
+        """
+        import inspect
+
+        from src.main import create_app
+
+        source = inspect.getsource(create_app)
+
+        # Check for overly permissive header configuration
+        assert 'allow_headers=["*"]' not in source, (
+            "CORS should not use allow_headers=['*'].\n"
+            "Explicitly list allowed headers: ['Content-Type', 'Authorization', ...]"
         )
 
 
@@ -383,4 +475,100 @@ class TestApiErrorResponseConsistency:
             f"Middleware should use 'code' field for error responses.\n"
             f"Found {len(violations)} violation(s):\n"
             + "\n".join(f"  - {v}" for v in violations)
+        )
+
+
+class TestApiStateTransitionEndpoints:
+    """Test that API uses dedicated endpoints for state transitions.
+
+    RESTful best practice: State transitions should use dedicated action endpoints
+    instead of generic PATCH with action parameter.
+
+    Bad:  PATCH /training-jobs/{id}  body: {"action": "pause"}
+    Good: POST  /training-jobs/{id}/pause
+    """
+
+    @pytest.fixture
+    def backend_src_path(self) -> Path:
+        """Get the backend src path."""
+        current = Path(__file__).parent
+        return current.parent.parent / "src"
+
+    def test_training_jobs_has_dedicated_pause_endpoint(
+        self, backend_src_path: Path
+    ):
+        """Training jobs API should have a dedicated POST /pause endpoint."""
+        endpoint_file = (
+            backend_src_path / "api" / "v1" / "endpoints" / "training_jobs.py"
+        )
+
+        with open(endpoint_file, encoding="utf-8") as f:
+            content = f.read()
+
+        # Check for dedicated pause endpoint
+        assert '/{job_id}/pause' in content or "/{job_id}/pause" in content, (
+            "Training jobs API should have a dedicated POST /{job_id}/pause endpoint.\n"
+            "State transitions should use dedicated action endpoints, not generic PATCH."
+        )
+
+    def test_training_jobs_has_dedicated_resume_endpoint(
+        self, backend_src_path: Path
+    ):
+        """Training jobs API should have a dedicated POST /resume endpoint."""
+        endpoint_file = (
+            backend_src_path / "api" / "v1" / "endpoints" / "training_jobs.py"
+        )
+
+        with open(endpoint_file, encoding="utf-8") as f:
+            content = f.read()
+
+        # Check for dedicated resume endpoint
+        assert '/{job_id}/resume' in content or "/{job_id}/resume" in content, (
+            "Training jobs API should have a dedicated POST /{job_id}/resume endpoint.\n"
+            "State transitions should use dedicated action endpoints, not generic PATCH."
+        )
+
+    def test_training_jobs_has_dedicated_cancel_endpoint(
+        self, backend_src_path: Path
+    ):
+        """Training jobs API should have a dedicated POST /cancel endpoint."""
+        endpoint_file = (
+            backend_src_path / "api" / "v1" / "endpoints" / "training_jobs.py"
+        )
+
+        with open(endpoint_file, encoding="utf-8") as f:
+            content = f.read()
+
+        # Check for dedicated cancel endpoint
+        assert '/{job_id}/cancel' in content or "/{job_id}/cancel" in content, (
+            "Training jobs API should have a dedicated POST /{job_id}/cancel endpoint.\n"
+            "State transitions should use dedicated action endpoints, not generic PATCH."
+        )
+
+    def test_no_generic_action_parameter_in_update_request(
+        self, backend_src_path: Path
+    ):
+        """UpdateTrainingJobRequest should not use generic action parameter.
+
+        The action parameter pattern indicates mixing multiple operations
+        in a single endpoint, which reduces API clarity.
+        """
+        schema_file = (
+            backend_src_path / "api" / "v1" / "schemas" / "training_job.py"
+        )
+
+        with open(schema_file, encoding="utf-8") as f:
+            content = f.read()
+
+        # Check that UpdateTrainingJobRequest doesn't use action field for state transitions
+        # We look for Literal["pause", "resume", "cancel"] pattern which indicates
+        # the anti-pattern of using a single endpoint for multiple state transitions
+        has_action_literal = (
+            'Literal["pause", "resume", "cancel"]' in content
+            or "Literal['pause', 'resume', 'cancel']" in content
+        )
+
+        assert not has_action_literal, (
+            "UpdateTrainingJobRequest should not use action: Literal['pause', 'resume', 'cancel'].\n"
+            "State transitions should use dedicated endpoints instead of generic action parameter."
         )

@@ -39,20 +39,30 @@ def create_app() -> FastAPI:
         lifespan=lifespan,
     )
 
-    # Configure CORS
+    # Middleware execution order (LIFO - Last In, First Out):
+    # Request:  CORS → Auth → Audit
+    # Response: Audit → Auth → CORS
+    #
+    # To achieve this, add in reverse order:
+    # 1. Audit (added first, executes last on request)
+    # 2. Auth  (added second)
+    # 3. CORS  (added last, executes first on request)
+
+    app.add_middleware(AuditMiddleware)
+    app.add_middleware(AuthenticationMiddleware)
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.cors_origins,
         allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
+        allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+        allow_headers=[
+            "Accept",
+            "Accept-Language",
+            "Authorization",
+            "Content-Type",
+            "X-Request-ID",
+        ],
     )
-
-    # Add authentication middleware
-    app.add_middleware(AuthenticationMiddleware)
-
-    # Add audit logging middleware (after auth to access user_id)
-    app.add_middleware(AuditMiddleware)
 
     # Register API routers
     app.include_router(v1_router, prefix="/api")

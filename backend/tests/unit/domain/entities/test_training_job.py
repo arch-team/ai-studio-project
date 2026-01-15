@@ -18,6 +18,7 @@ from src.domain.entities.training_job import (
     SpotInterruptionBehavior,
     TrainingJob,
 )
+from src.domain.exceptions import InvalidStateTransitionError
 
 
 class TestJobStatusEnum:
@@ -167,13 +168,13 @@ class TestTrainingJobStateTransitions:
     def test_invalid_transition_submitted_to_completed(self, job: TrainingJob) -> None:
         """Test invalid transition: SUBMITTED -> COMPLETED."""
         assert not job.can_transition_to(JobStatus.COMPLETED)
-        with pytest.raises(ValueError, match="Invalid state transition"):
+        with pytest.raises(InvalidStateTransitionError):
             job.transition_to(JobStatus.COMPLETED)
 
-    def test_invalid_transition_raises_value_error(self, job: TrainingJob) -> None:
-        """Test that invalid transitions raise ValueError."""
+    def test_invalid_transition_raises_domain_exception(self, job: TrainingJob) -> None:
+        """Test that invalid transitions raise InvalidStateTransitionError."""
         assert not job.can_transition_to(JobStatus.PAUSED)
-        with pytest.raises(ValueError):
+        with pytest.raises(InvalidStateTransitionError):
             job.transition_to(JobStatus.PAUSED)
 
 

@@ -19,6 +19,7 @@ from src.domain.entities.checkpoint import (
     CheckpointType,
     StorageTier,
 )
+from src.domain.exceptions import InvalidStateTransitionError
 
 
 class TestCheckpointTypeEnum:
@@ -112,21 +113,21 @@ class TestStorageTierMigration:
         """Test invalid reverse migration: FSX -> NVME."""
         checkpoint.storage_tier = StorageTier.FSX
         assert not checkpoint.can_migrate_to(StorageTier.NVME)
-        with pytest.raises(ValueError, match="Invalid storage tier migration"):
+        with pytest.raises(InvalidStateTransitionError):
             checkpoint.migrate_to(StorageTier.NVME)
 
     def test_reverse_migration_s3_to_fsx_invalid(self, checkpoint: Checkpoint) -> None:
         """Test invalid reverse migration: S3 -> FSX."""
         checkpoint.storage_tier = StorageTier.S3
         assert not checkpoint.can_migrate_to(StorageTier.FSX)
-        with pytest.raises(ValueError, match="Invalid storage tier migration"):
+        with pytest.raises(InvalidStateTransitionError):
             checkpoint.migrate_to(StorageTier.FSX)
 
     def test_reverse_migration_s3_to_nvme_invalid(self, checkpoint: Checkpoint) -> None:
         """Test invalid reverse migration: S3 -> NVME."""
         checkpoint.storage_tier = StorageTier.S3
         assert not checkpoint.can_migrate_to(StorageTier.NVME)
-        with pytest.raises(ValueError, match="Invalid storage tier migration"):
+        with pytest.raises(InvalidStateTransitionError):
             checkpoint.migrate_to(StorageTier.NVME)
 
     def test_get_next_tier_from_nvme(self, checkpoint: Checkpoint) -> None:
@@ -226,7 +227,7 @@ class TestCheckpointBusinessRules:
     ) -> None:
         """Test archive() raises error when not AVAILABLE."""
         checkpoint.status = CheckpointStatus.DELETED
-        with pytest.raises(ValueError, match="Cannot archive checkpoint"):
+        with pytest.raises(InvalidStateTransitionError):
             checkpoint.archive()
 
     def test_soft_delete_sets_status_and_timestamp(
