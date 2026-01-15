@@ -1,6 +1,7 @@
 """RBAC Service - Role-Based Access Control management."""
 
 from enum import Enum
+from functools import lru_cache
 
 from src.core.security.constants import ROLE_HIERARCHY
 from src.core.security.exceptions import InsufficientPermissionsError
@@ -191,13 +192,7 @@ class RBACService:
         ]
 
 
-# Singleton instance
-_rbac_service: RBACService | None = None
-
-
+@lru_cache
 def get_rbac_service() -> RBACService:
-    """Get or create RBAC service singleton."""
-    global _rbac_service
-    if _rbac_service is None:
-        _rbac_service = RBACService()
-    return _rbac_service
+    """Get cached RBAC service instance."""
+    return RBACService()

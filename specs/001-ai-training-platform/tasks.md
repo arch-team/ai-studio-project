@@ -416,9 +416,9 @@
 - [X] [T022a] 创建 models 表迁移 - `backend/alembic/versions/20260115_100200_create_models.py`,字段: id, model_name, version, training_job_id (FK), checkpoint_id (FK), model_uri (S3), registry_arn (SageMaker Model Registry), metrics (JSON: accuracy/loss), hyperparameters (JSON), framework (enum: pytorch/tensorflow), status (enum: training/registered/deployed/archived), created_at
 
 ### SQLAlchemy 模型
-- [ ] [T023] 创建 TrainingJob 模型 - 领域实体 `backend/src/domain/entities/training_job.py` + ORM 模型 `backend/src/infrastructure/persistence/models/training_job_model.py`,包含状态转换验证 (submitted → running → paused/completed/failed),关联 User 和 Checkpoint
-- [ ] [T024] 创建 Checkpoint 模型 - 领域实体 `backend/src/domain/entities/checkpoint.py` + ORM 模型 `backend/src/infrastructure/persistence/models/checkpoint_model.py`,包含存储层级自动迁移逻辑 (NVMe → FSx → S3)
-- [ ] [T024a] 创建 Model 模型 - 领域实体 `backend/src/domain/entities/model.py` + ORM 模型 `backend/src/infrastructure/persistence/models/model_model.py`,包含版本比较逻辑,关联 TrainingJob 和 Checkpoint,支持 SageMaker Model Registry ARN 存储,实现模型生命周期管理
+- [X] [T023] 创建 TrainingJob 模型 - 领域实体 `backend/src/domain/entities/training_job.py` + ORM 模型 `backend/src/infrastructure/persistence/models/training_job_model.py`,包含状态转换验证 (submitted → running → paused/completed/failed),关联 User 和 Checkpoint
+- [X] [T024] 创建 Checkpoint 模型 - 领域实体 `backend/src/domain/entities/checkpoint.py` + ORM 模型 `backend/src/infrastructure/persistence/models/checkpoint_model.py`,包含存储层级自动迁移逻辑 (NVMe → FSx → S3)
+- [X] [T024a] 创建 Model 模型 - 领域实体 `backend/src/domain/entities/model.py` + ORM 模型 `backend/src/infrastructure/persistence/models/model_model.py`,包含版本比较逻辑,关联 TrainingJob 和 Checkpoint,支持 SageMaker Model Registry ARN 存储,实现模型生命周期管理
 
 ### 后端 API 端点 (基于 contracts/training-jobs-api.yaml)
 - [ ] [T025] [US1] POST /training-jobs 端点实现 - `backend/src/api/v1/endpoints/training_jobs.py`,验证训练配置,检查资源配额,调用 HyperPod SDK 创建训练任务

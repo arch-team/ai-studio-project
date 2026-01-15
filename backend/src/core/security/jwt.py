@@ -4,6 +4,7 @@ import uuid
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from enum import Enum
+from functools import lru_cache
 from typing import Any
 
 from authlib.jose import JoseError
@@ -171,13 +172,7 @@ class JWTManager:
             raise InvalidTokenError(f"Cannot extract user ID: {str(e)}")
 
 
-# Singleton instance for convenience
-_jwt_manager: JWTManager | None = None
-
-
+@lru_cache
 def get_jwt_manager() -> JWTManager:
-    """Get or create JWT manager singleton."""
-    global _jwt_manager
-    if _jwt_manager is None:
-        _jwt_manager = JWTManager()
-    return _jwt_manager
+    """Get cached JWT manager instance."""
+    return JWTManager()

@@ -33,21 +33,55 @@ npm run lint                    # ESLint (--max-warnings 0)
 
 ## Architecture
 
+### Feature-Based Architecture (FSD)
+
+项目采用 Feature-Sliced Design 架构，按功能模块组织代码：
+
+```
+src/
+├── app/                    # 应用入口层
+│   ├── providers/         # 全局 Provider (Query, Theme)
+│   └── router/            # 路由配置和守卫
+│       └── guards/        # AuthGuard, RoleGuard
+├── features/              # 功能模块 (按业务领域划分)
+│   └── auth/             # 认证模块
+│       └── store/        # 模块级状态 (authStore)
+├── layouts/               # 布局组件
+│   ├── MainLayout/       # 主布局 (AppLayout + Navigation)
+│   └── AuthLayout/       # 认证页布局
+├── shared/                # 共享层
+│   └── components/       # 通用组件
+├── lib/                   # 基础设施层
+│   ├── api/              # API 客户端
+│   └── query/            # TanStack Query 配置和 queryKeys
+├── store/                 # 全局状态 (Zustand slices)
+│   └── slices/           # uiSlice, notificationSlice
+├── types/                 # TypeScript 类型定义
+└── tests/                 # 测试文件
+    └── unit/             # 单元测试 (镜像 src 结构)
+```
+
 ### 路径别名
 
-项目配置了 `@/` 路径别名指向 `src/` 目录：
+`tsconfig.json` 和 `vite.config.ts` 配置了以下别名：
+
+| 别名 | 路径 | 用途 |
+|------|------|------|
+| `@/` | `src/` | 通用引用 |
+| `@app/` | `src/app/` | 应用入口 |
+| `@features/` | `src/features/` | 功能模块 |
+| `@shared/` | `src/shared/` | 共享组件 |
+| `@layouts/` | `src/layouts/` | 布局组件 |
+| `@lib/` | `src/lib/` | 基础设施 |
+| `@store/` | `src/store/` | 全局状态 |
+| `@types/` | `src/types/` | 类型定义 |
 
 ```typescript
-// 使用路径别名 (tsconfig.json 配置)
-import { apiClient } from '@/lib/api';
-import { useTrainingJobs } from '@/hooks/useApi';
-import { TrainingJob } from '@/types';
-```
-
-### 目录结构
-
-```
-
+// 推荐使用语义化别名
+import { useAuthStore } from '@features/auth/store/authStore';
+import { MainLayout } from '@layouts/MainLayout';
+import { queryKeys } from '@lib/query';
+import { useUIStore } from '@store/slices/uiSlice';
 ```
 
 ## State Management Strategy
@@ -72,12 +106,9 @@ const useAppStore = create((set) => ({
 
 ## API Integration
 
-**API 客户端** (`src/lib/api.ts`):
-```typescript
-export const apiClient = new ApiClient(
-  import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1'
-);
-```
+**API 客户端** (`src/lib/api/`):
+
+Vite 开发服务器配置了 API 代理 (`/api` → `http://localhost:8000`)。
 
 **环境变量** (`.env`):
 ```
@@ -88,22 +119,24 @@ VITE_API_BASE_URL=http://localhost:8000/api/v1
 
 ### Query 键工厂
 
-使用 `src/lib/queryClient.ts` 中的 `queryKeys` 工厂函数管理缓存键：
+使用 `src/lib/query/queryKeys.ts` 中的 `queryKeys` 工厂函数管理缓存键：
 
 ```typescript
-import { queryKeys } from '@/lib/queryClient';
+import { queryKeys } from '@lib/query';
 
 // 使用示例
 const { data } = useQuery({
   queryKey: queryKeys.trainingJobs.list({ status: 'running' }),
-  queryFn: () => apiClient.get('/training-jobs', { status: 'running' }),
+  queryFn: () => fetchTrainingJobs({ status: 'running' }),
 });
 
-// 可用的键工厂
-queryKeys.trainingJobs.all          // ['training-jobs']
-queryKeys.trainingJobs.list(filters) // ['training-jobs', 'list', filters]
-queryKeys.trainingJobs.detail(id)    // ['training-jobs', 'detail', id]
-// 同样适用于: datasets, models, checkpoints, spaces, users, quotas, auditLogs, system
+// 键层级结构
+queryKeys.trainingJobs.all          // ['trainingJobs']
+queryKeys.trainingJobs.lists()      // ['trainingJobs', 'list']
+queryKeys.trainingJobs.list(filters) // ['trainingJobs', 'list', filters]
+queryKeys.trainingJobs.details()    // ['trainingJobs', 'detail']
+queryKeys.trainingJobs.detail(id)   // ['trainingJobs', 'detail', id]
+// 同样适用于: datasets, checkpoints, models, resourceQuotas, users
 ```
 
 ## Design Principles
@@ -245,6 +278,30 @@ const setTheme = (theme: 'light' | 'dark' | 'system') => {
 - [ ] 无自定义 CSS
 - [ ] 全部使用 Cloudscape 组件
 - [ ] 暗色模式下无显示异常
+
+## Testing
+
+### 测试配置
+
+- **框架**: Vitest + Testing Library
+- **测试文件位置**: `src/tests/unit/` (镜像源码目录结构)
+- **配置文件**: `vitest.config.ts`
+
+### Cloudscape 测试 Mock
+
+`src/tests/setup.ts` 预配置了 Cloudscape 组件所需的浏览器 API mock：
+- `window.matchMedia` (响应式布局)
+- `ResizeObserver` (组件尺寸观察)
+- `IntersectionObserver` (懒加载)
+
+### 运行测试
+
+```bash
+npm test                                    # 运行所有测试
+npm test -- src/tests/unit/store           # 运行特定目录
+npm test -- --watch                         # 监听模式
+npm run test:coverage                       # 覆盖率报告
+```
 
 ## Key Documentation
 
