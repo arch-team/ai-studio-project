@@ -105,6 +105,8 @@ coverage/
 .pytest_cache/
 test-results/
 junit.xml
+playwright-report/
+playwright/.cache/
 
 # Build artifacts
 *.tar.gz
