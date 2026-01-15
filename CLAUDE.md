@@ -104,3 +104,15 @@ cdk diff                                # 查看变更
 - 实施计划: `specs/001-ai-training-platform/plan.md`
 - 数据模型: `specs/001-ai-training-platform/data-model.md`
 - CDK 部署: `infrastructure/cdk/README.md`
+- **前端设计规范**: `frontend/DESIGN.md`（快速参考）
+- 前端设计详细指南: `specs/frontend-design-guide.md`（完整版）
+
+## Frontend Development Guidelines
+
+前端开发 MUST 遵循 `frontend/DESIGN.md` 中的设计规范：
+
+- **组件库**: 仅使用 AWS Cloudscape Design System，禁止自定义样式覆盖
+- **状态管理**: Zustand + TanStack Query
+- **代码风格**: TypeScript 严格模式，ESLint 无警告
+- **主题支持**: 支持亮色/暗色/跟随系统三种模式
+- **提交前**: 完成 `frontend/DESIGN.md` 中的检查清单
