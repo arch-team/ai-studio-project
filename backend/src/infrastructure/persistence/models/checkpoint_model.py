@@ -146,6 +146,7 @@ class CheckpointModel(Base, TimestampMixin):
     training_job: Mapped["TrainingJobModel"] = relationship(
         "TrainingJobModel",
         back_populates="checkpoints",
+        foreign_keys=[training_job_id],
     )
     models: Mapped[list["ModelModel"]] = relationship(
         "ModelModel",

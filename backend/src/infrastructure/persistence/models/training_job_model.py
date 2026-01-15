@@ -345,6 +345,7 @@ class TrainingJobModel(Base, TimestampMixin):
         "CheckpointModel",
         back_populates="training_job",
         cascade="all, delete-orphan",
+        foreign_keys="[CheckpointModel.training_job_id]",
     )
     models: Mapped[list["ModelModel"]] = relationship(
         "ModelModel",
