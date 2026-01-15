@@ -119,14 +119,12 @@ async def list_models(
         sort_order=sort_order,
     )
 
-    total_pages = (total + page_size - 1) // page_size if total > 0 else 0
-
     return ModelListResponse(
         items=[ModelSummary.from_entity(model) for model in models],
         total=total,
         page=page,
         page_size=page_size,
-        total_pages=total_pages,
+        total_pages=calculate_total_pages(total, page_size),
     )
 
 
