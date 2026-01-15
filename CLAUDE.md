@@ -7,112 +7,160 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 **除非有特殊说明,请用中文回答。** (Unless otherwise specified, please respond in Chinese.)
 
 ## Project Overview
-AI Training Platform - 基于 AWS SageMaker HyperPod 构建的企业级 AI 训练平台，支持分布式训练、资源调度、数据管理和多租户。
+AI Training Platform - 基于 AWS SageMaker HyperPod 构建的企业级 AI 训练平台。
 
-## Tech Stack
+**核心功能**:
+- 分布式训练管理 (PyTorch DDP, FSDP, DeepSpeed)
+- 资源调度 (Gang Scheduling, 优先级抢占)
+- 数据集管理 (版本控制, 大文件断点续传)
+- 检查点管理 (分层存储, 自动恢复)
+- 多租户支持 (RBAC, 资源配额)
 
-### 后端 (backend/)
-- **Runtime**: Python 3.11
-- **Framework**: FastAPI 0.109.0, uvicorn 0.27.0
-- **ORM**: SQLAlchemy 2.0.25 (异步), Alembic 1.13.1
-- **Validation**: Pydantic 2.5.3, pydantic-settings 2.1.0
-- **AWS SDK**: boto3 1.34.14, sagemaker-hyperpod 1.0.0
-- **Database Driver**: aiomysql 0.2.0
-- **Logging**: structlog 24.1.0
-- **Testing**: pytest, pytest-asyncio, pytest-cov
-- **Code Quality**: black, ruff, mypy
+## Architecture
 
-### 前端 (frontend/)
-- **Language**: TypeScript 5.3.3
-- **Framework**: React 18.2.0, react-router-dom 6.21.2
-- **State**: Zustand 4.4.7, TanStack Query 5.17.0
-- **UI**: AWS Cloudscape Design System 3.0.0
-- **Build**: Vite 5.0.12
-- **Testing**: Vitest 1.2.1, Testing Library
-- **Code Quality**: ESLint, TypeScript ESLint
+### 后端: Clean Architecture + DDD
 
-### 基础设施 (infrastructure/cdk/)
-- **IaC**: AWS CDK (Python) >= 2.170.0
-- **Security**: cdk-nag >= 2.28.0
-- **Compute**: EKS + SageMaker HyperPod
-- **Storage**: FSx for Lustre, S3
+```
+backend/src/
+├── api/                    # API 层 (HTTP 适配器)
+│   ├── v1/endpoints/      # REST 端点
+│   ├── v1/schemas/        # Pydantic 请求/响应
+│   ├── v1/dependencies/   # FastAPI 依赖注入
+│   └── middleware/        # 中间件 (auth, audit, sso)
+├── application/            # 应用层 (业务用例)
+│   ├── services/          # 用例实现
+│   ├── dto/               # 数据传输对象
+│   └── interfaces/        # 端口定义
+├── domain/                 # 域层 (核心业务)
+│   ├── entities/          # 业务实体
+│   ├── value_objects/     # 值对象
+│   ├── repositories/      # 仓库接口
+│   └── exceptions/        # 域异常
+├── infrastructure/         # 基础设施层
+│   ├── persistence/       # ORM 模型和仓库实现
+│   └── external/          # 外部适配器 (hyperpod/, s3/, kueue/)
+└── core/                   # 跨切关注点 (logging, security)
+```
 
-### 数据存储
-- **开发环境**: MySQL 8.0.28 (Docker)
-- **生产环境**: Amazon Aurora MySQL 3.04.x (兼容 MySQL 8.0)
-- **训练数据**: Amazon FSx for Lustre (≥5GB/s 吞吐量)
-- **模型制品**: Amazon S3 + SageMaker Model Registry
-- **检查点**: 分层存储 (NVMe → FSx for Lustre → S3)
+**依赖方向**: `API → Application → Domain ← Infrastructure`
+
+### 基础设施: CDK Stack 分层
+
+```
+Layer 1: NetworkStack, IamStack (并行)
+    ↓
+Layer 2: DatabaseStack, StorageStack (并行)
+    ↓
+Layer 3: EksStack → SagemakerHyperPodStack → HyperPodAddonsStack
+    ↓
+Layer 4: FsxLustreStack
+    ↓
+Layer 5: AlbStack
+```
 
 ## Common Commands
 
 ```bash
-# 后端开发
+# ===== 后端开发 =====
 cd backend
-pip install -r requirements.txt
-uvicorn src.main:app --reload          # 启动开发服务器
-alembic upgrade head                    # 数据库迁移
-pytest                                  # 运行测试
-black src/ && ruff check src/ && mypy src/  # 代码检查
 
-# 前端开发
+uvicorn src.main:app --reload                # 启动开发服务器
+
+# 数据库迁移
+alembic revision --autogenerate -m "description"
+alembic upgrade head
+
+# 运行测试
+pytest                              # 全部测试
+pytest tests/unit/                  # 单元测试
+pytest tests/integration/           # 集成测试
+pytest -m aws_integration           # AWS 集成测试 (需真实凭证)
+pytest -k "test_auth"               # 特定测试
+pytest --cov=src --cov-report=html  # 覆盖率报告
+
+# 代码检查
+black src/ tests/ && ruff check src/ tests/ && mypy src/
+
+# ===== 前端开发 =====
 cd frontend
-npm install
-npm run dev                             # 启动开发服务器 (Vite)
-npm run build                           # 构建生产版本
-npm test                                # 运行测试
 
-# Docker 开发环境
-docker-compose up -d                    # 启动所有服务
+npm run dev                         # 开发服务器 (Vite)
+npm run build                       # 生产构建
+npm test                            # 运行测试
+npm run lint                        # ESLint
 
-# CDK 基础设施
+# ===== Docker 开发环境 =====
+docker-compose up -d                # 启动所有服务
+
+# ===== CDK 基础设施 =====
 cd infrastructure/cdk
-source .venv/bin/activate
-cdk synth                               # 合成 CloudFormation
-cdk deploy --context env=dev            # 部署开发环境
-cdk diff                                # 查看变更
+
+cdk deploy --context env=dev
+cdk deploy --context env=staging
+cdk deploy --context env=prod
 ```
 
-## Project Structure
+## Key Development Principles
+
+### SDK-First 原则
+
+| 领域 | 推荐方案 | 说明 |
+|------|---------|------|
+| 训练任务 | HyperPod Task Governance API | 所有配置操作通过 SDK |
+| 调度状态查询 | kubernetes-client (例外) | 仅用于状态监控和故障诊断 |
+| 后台任务 | K8s CronJob + Watch API | 无需 Celery |
+| 日志 | structlog | 结构化 JSON |
+
+### TDD 工作流
 
 ```
-├── backend/                 # FastAPI 后端服务
-│   ├── src/                # 源代码
-│   │   ├── api/           # API 路由
-│   │   ├── models/        # SQLAlchemy 模型
-│   │   ├── schemas/       # Pydantic 模式
-│   │   ├── services/      # 业务逻辑
-│   │   └── core/          # 核心配置
-│   └── alembic/           # 数据库迁移
-├── frontend/               # React 前端应用
-│   └── src/
-│       ├── pages/         # 页面组件
-│       ├── layouts/       # 布局组件
-│       ├── hooks/         # 自定义 Hooks
-│       ├── store/         # Zustand 状态
-│       └── types/         # TypeScript 类型
-├── infrastructure/         # 基础设施代码
-│   ├── cdk/               # AWS CDK (Python)
-│   └── k8s/               # Kubernetes 资源
-├── specs/                  # 功能规范文档
-│   └── 001-ai-training-platform/
-└── claudedocs/            # 项目文档
+1. 🔴 Red: 先写失败的测试
+2. 🟢 Green: 编写最少代码使测试通过
+3. 🔄 Refactor: 重构代码，保持测试通过
 ```
+
+**测试分层**:
+- Unit (`tests/unit/`): 实体、值对象、域逻辑
+- Integration (`tests/integration/`): API 端点、仓库实现
+- AWS Integration (`-m aws_integration`): HyperPod, S3 集成
+
+## Terminology Standards
+
+详细术语规范参见 `specs/001-ai-training-platform/spec.md`
+
+**核心实体命名**:
+
+| 中文术语 | Python 类 | 数据库表 | API 路径 |
+|---------|----------|---------|---------|
+| 训练任务 | `TrainingJob` | `training_jobs` | `/training-jobs` |
+| 数据集 | `Dataset` | `datasets` | `/datasets` |
+| 检查点 | `Checkpoint` | `checkpoints` | `/checkpoints` |
+| 模型 | `Model` | `models` | `/models` |
+| 资源配额 | `ResourceQuota` | `resource_quotas` | `/resource-quotas` |
+| 开发空间 | `Space` | `development_spaces` | `/spaces` |
+
+**训练任务状态**:
+`submitted` → `running` → `completed` / `failed` / `paused` / `preempted`
 
 ## Key Documentation
-- 功能规范: `specs/001-ai-training-platform/spec.md`
-- 实施计划: `specs/001-ai-training-platform/plan.md`
-- 数据模型: `specs/001-ai-training-platform/data-model.md`
-- CDK 部署: `infrastructure/cdk/README.md`
-- **前端设计规范**: `frontend/DESIGN.md`（快速参考）
-- 前端设计详细指南: `specs/frontend-design-guide.md`（完整版）
 
-## Frontend Development Guidelines
+| 文档 | 位置 | 用途 |
+|------|------|------|
+| **功能规范** | `specs/001-ai-training-platform/spec.md` | 完整功能需求和术语标准 |
+| **实施计划** | `specs/001-ai-training-platform/plan.md` | 开发里程碑和任务分解 |
+| **数据模型** | `specs/001-ai-training-platform/data-model.md` | 数据库设计和实体关系 |
+| **后端开发指南** | `backend/CLAUDE.md` | TDD 流程、SDK 原则、代码风格 |
+| **前端开发指南** | `frontend/CLAUDE.md` | React 架构、状态管理、设计规范 |
+| **CDK 部署指南** | `infrastructure/cdk/CLAUDE.md` | Stack 分层、HyperPod 部署流程 |
 
-前端开发 MUST 遵循 `frontend/DESIGN.md` 中的设计规范：
+## Environment Variables
 
-- **组件库**: 仅使用 AWS Cloudscape Design System，禁止自定义样式覆盖
-- **状态管理**: Zustand + TanStack Query
-- **代码风格**: TypeScript 严格模式，ESLint 无警告
-- **主题支持**: 支持亮色/暗色/跟随系统三种模式
-- **提交前**: 完成 `frontend/DESIGN.md` 中的检查清单
+通过 `.env` 文件配置:
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `DATABASE_URL` | `mysql+aiomysql://...` | 数据库连接串 |
+| `AWS_REGION` | `us-east-1` | AWS 区域 |
+| `S3_BUCKET_NAME` | `ai-training-platform` | S3 桶名称 |
+| `SECRET_KEY` | - | JWT 密钥 (生产环境必须设置) |
+| `CORS_ORIGINS` | `["http://localhost:3000"]` | 允许的 CORS 源 |
