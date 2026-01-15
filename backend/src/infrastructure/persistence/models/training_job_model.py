@@ -136,6 +136,15 @@ class TrainingJobModel(Base, TimestampMixin):
         comment="检查点保存间隔 (epoch)",
     )
 
+    # Auto-recovery configuration (HyperPod Elastic Agent)
+    auto_resume_checkpoint_id: Mapped[int | None] = mapped_column(
+        BigInteger,
+        ForeignKey("checkpoints.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+        comment="自动恢复检查点ID (HyperPod Elastic Agent 恢复时使用)",
+    )
+
     # Training parameters
     hyperparameters: Mapped[dict | None] = mapped_column(
         JSON,

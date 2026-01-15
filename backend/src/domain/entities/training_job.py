@@ -105,6 +105,9 @@ class TrainingJob:
     checkpoint_mount_path: str | None = None
     checkpoint_interval: int | None = None
 
+    # === Auto-recovery configuration (HyperPod Elastic Agent) ===
+    auto_resume_checkpoint_id: int | None = None
+
     # === HyperPod/Kueue status ===
     hyperpod_status: str | None = None
     kueue_workload_name: str | None = None

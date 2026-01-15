@@ -235,4 +235,9 @@ Training Operator 需要在带有 sagemaker.amazonaws.com/compute-type: hyperpod
 ──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
 ❯ 当前项目中Claude code的context内容过大，导致很容易出现memory压缩，分析有什么可以优化的地方
 
-当前项目中tasks.md中已经实现的任务，分析当前项目中的代码实现是否跟这些任务中的要求和标准保持了一致
+对当前项目中tasks.md中已经实现的任务，分析当前项目中的代码实现是否跟这些任务中的要求和标准保持了一致
+
+
+/speckit.implement ## Phase 2: Foundational - 基础设施 (23 tasks) 中的### ResourceLimitConfig 管理 API (Admin), 每个任务按照TDD（测试驱动开发的流程进行），完成后将相应的任务标记为完成状态。注意ResourceLimit 依赖于SageMaker HyperPod 原生的Task Governance 这个功能特性，因此你需要分析resource_limit_configs相关的信息哪些应该保存到应用数据库，哪些应该来自SageMaker HyperPod 原生的Task Governance组件提供的信息
+
+

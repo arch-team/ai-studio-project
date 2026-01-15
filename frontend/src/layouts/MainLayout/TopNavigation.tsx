@@ -7,7 +7,8 @@
  * 顶部导航栏组件，使用 Cloudscape TopNavigation
  */
 
-import { TopNavigation, TopNavigationProps } from '@cloudscape-design/components';
+import { Input, TopNavigation, TopNavigationProps } from '@cloudscape-design/components';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 /**
@@ -22,6 +23,7 @@ import { useNavigate } from 'react-router-dom';
  */
 export function TopNav() {
   const navigate = useNavigate();
+  const [searchValue, setSearchValue] = useState('');
 
   const utilities: TopNavigationProps.Utility[] = [
     {
@@ -75,16 +77,12 @@ export function TopNav() {
         },
       }}
       search={
-        <input
+        <Input
           type="search"
           placeholder="搜索..."
-          aria-label="搜索"
-          style={{
-            padding: '8px 12px',
-            border: '1px solid #aab7b8',
-            borderRadius: '4px',
-            width: '300px',
-          }}
+          ariaLabel="搜索"
+          value={searchValue}
+          onChange={({ detail }) => setSearchValue(detail.value)}
         />
       }
       utilities={utilities}
