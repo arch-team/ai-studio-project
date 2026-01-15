@@ -19,7 +19,6 @@ from src.application.services.resource_limit_config_service import (
 )
 from src.core.database import get_db
 from src.domain.entities.resource_limit_config import LimitRole
-from src.domain.exceptions import DuplicateEntityError, EntityNotFoundError
 from src.infrastructure.persistence.repositories.resource_limit_config_repository_impl import (
     ResourceLimitConfigRepository,
 )
@@ -130,27 +129,20 @@ async def create_resource_limit_config(
     Admin-only endpoint for creating new resource limit configurations.
     The (role, project_id) combination must be unique.
     """
-    try:
-        config_data = {
-            "config_name": data.config_name,
-            "role": data.role.value,
-            "project_id": data.project_id,
-            "max_gpu_per_job": data.max_gpu_per_job,
-            "max_cpu_per_job": data.max_cpu_per_job,
-            "max_memory_gb_per_job": data.max_memory_gb_per_job,
-            "max_storage_gb_per_job": data.max_storage_gb_per_job,
-            "max_nodes_per_job": data.max_nodes_per_job,
-            "priority_default": data.priority_default.value,
-        }
+    config_data = {
+        "config_name": data.config_name,
+        "role": data.role.value,
+        "project_id": data.project_id,
+        "max_gpu_per_job": data.max_gpu_per_job,
+        "max_cpu_per_job": data.max_cpu_per_job,
+        "max_memory_gb_per_job": data.max_memory_gb_per_job,
+        "max_storage_gb_per_job": data.max_storage_gb_per_job,
+        "max_nodes_per_job": data.max_nodes_per_job,
+        "priority_default": data.priority_default.value,
+    }
 
-        config = await service.create_config(config_data)
-        return _config_to_response(config)
-
-    except DuplicateEntityError as e:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail=str(e),
-        )
+    config = await service.create_config(config_data)
+    return _config_to_response(config)
 
 
 @router.get(
@@ -171,15 +163,8 @@ async def get_resource_limit_config(
 
     Admin-only endpoint for retrieving a specific configuration.
     """
-    try:
-        config = await service.get_config(config_id)
-        return _config_to_response(config)
-
-    except EntityNotFoundError:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"ResourceLimitConfig with id {config_id} not found",
-        )
+    config = await service.get_config(config_id)
+    return _config_to_response(config)
 
 
 @router.put(
@@ -203,41 +188,29 @@ async def update_resource_limit_config(
     Admin-only endpoint for updating existing configurations.
     Supports partial updates. Changes are recorded in audit logs.
     """
-    try:
-        # Build update data from non-None fields
-        update_data = {}
-        if data.config_name is not None:
-            update_data["config_name"] = data.config_name
-        if data.role is not None:
-            update_data["role"] = data.role.value
-        if data.project_id is not None:
-            update_data["project_id"] = data.project_id
-        if data.max_gpu_per_job is not None:
-            update_data["max_gpu_per_job"] = data.max_gpu_per_job
-        if data.max_cpu_per_job is not None:
-            update_data["max_cpu_per_job"] = data.max_cpu_per_job
-        if data.max_memory_gb_per_job is not None:
-            update_data["max_memory_gb_per_job"] = data.max_memory_gb_per_job
-        if data.max_storage_gb_per_job is not None:
-            update_data["max_storage_gb_per_job"] = data.max_storage_gb_per_job
-        if data.max_nodes_per_job is not None:
-            update_data["max_nodes_per_job"] = data.max_nodes_per_job
-        if data.priority_default is not None:
-            update_data["priority_default"] = data.priority_default.value
+    # Build update data from non-None fields
+    update_data = {}
+    if data.config_name is not None:
+        update_data["config_name"] = data.config_name
+    if data.role is not None:
+        update_data["role"] = data.role.value
+    if data.project_id is not None:
+        update_data["project_id"] = data.project_id
+    if data.max_gpu_per_job is not None:
+        update_data["max_gpu_per_job"] = data.max_gpu_per_job
+    if data.max_cpu_per_job is not None:
+        update_data["max_cpu_per_job"] = data.max_cpu_per_job
+    if data.max_memory_gb_per_job is not None:
+        update_data["max_memory_gb_per_job"] = data.max_memory_gb_per_job
+    if data.max_storage_gb_per_job is not None:
+        update_data["max_storage_gb_per_job"] = data.max_storage_gb_per_job
+    if data.max_nodes_per_job is not None:
+        update_data["max_nodes_per_job"] = data.max_nodes_per_job
+    if data.priority_default is not None:
+        update_data["priority_default"] = data.priority_default.value
 
-        config = await service.update_config(config_id, update_data)
-        return _config_to_response(config)
-
-    except EntityNotFoundError:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"ResourceLimitConfig with id {config_id} not found",
-        )
-    except DuplicateEntityError as e:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail=str(e),
-        )
+    config = await service.update_config(config_id, update_data)
+    return _config_to_response(config)
 
 
 @router.delete(
@@ -259,12 +232,5 @@ async def delete_resource_limit_config(
     Admin-only endpoint for deleting configurations (soft delete).
     Deletion is recorded in audit logs.
     """
-    try:
-        await service.delete_config(config_id)
-        return None
-
-    except EntityNotFoundError:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"ResourceLimitConfig with id {config_id} not found",
-        )
+    await service.delete_config(config_id)
+    return None

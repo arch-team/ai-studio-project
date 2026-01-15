@@ -19,10 +19,6 @@ from src.api.v1.schemas.model import (
 )
 from src.application.services.model_service import ModelService
 from src.core.database import get_db
-from src.domain.exceptions import (
-    EntityNotFoundError,
-    InvalidStateTransitionError,
-)
 from src.infrastructure.persistence.repositories.model_repository_impl import (
     ModelRepository,
 )
@@ -113,28 +109,21 @@ async def create_model(
     service: ModelService = Depends(get_model_service),
 ):
     """Create/register a new model (T031a)."""
-    try:
-        model_data = {
-            "training_job_id": data.training_job_id,
-            "checkpoint_id": data.checkpoint_id,
-            "model_name": data.model_name,
-            "display_name": data.display_name,
-            "description": data.description,
-            "framework": data.framework.value if data.framework else "pytorch",
-            "framework_version": data.framework_version,
-            "metrics": data.metrics,
-            "hyperparameters": data.hyperparameters,
-            "tags": data.tags,
-        }
+    model_data = {
+        "training_job_id": data.training_job_id,
+        "checkpoint_id": data.checkpoint_id,
+        "model_name": data.model_name,
+        "display_name": data.display_name,
+        "description": data.description,
+        "framework": data.framework.value if data.framework else "pytorch",
+        "framework_version": data.framework_version,
+        "metrics": data.metrics,
+        "hyperparameters": data.hyperparameters,
+        "tags": data.tags,
+    }
 
-        model = await service.create_model(owner_id=current_user.user_id, data=model_data)
-        return _model_to_detail(model)
-
-    except EntityNotFoundError as e:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=str(e),
-        )
+    model = await service.create_model(owner_id=current_user.user_id, data=model_data)
+    return _model_to_detail(model)
 
 
 @router.get(
@@ -202,24 +191,17 @@ async def get_model(
     service: ModelService = Depends(get_model_service),
 ):
     """Get model details by ID."""
-    try:
-        model = await service.get_model(model_id)
+    model = await service.get_model(model_id)
 
-        # Check ownership for non-admin users
-        if current_user.role not in ["admin", "manager"]:
-            if model.owner_id != current_user.user_id:
-                raise HTTPException(
-                    status_code=status.HTTP_403_FORBIDDEN,
-                    detail="You don't have permission to view this model",
-                )
+    # Check ownership for non-admin users
+    if current_user.role not in ["admin", "manager"]:
+        if model.owner_id != current_user.user_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="You don't have permission to view this model",
+            )
 
-        return _model_to_detail(model)
-
-    except EntityNotFoundError:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Model with id {model_id} not found",
-        )
+    return _model_to_detail(model)
 
 
 @router.get(
@@ -236,56 +218,49 @@ async def get_model_versions(
     service: ModelService = Depends(get_model_service),
 ):
     """Get all versions of a model with optional comparison (T031c)."""
-    try:
-        # First check if base model exists
-        model = await service.get_model(model_id)
+    # First check if base model exists
+    model = await service.get_model(model_id)
 
-        # Check ownership for non-admin users
-        if current_user.role not in ["admin", "manager"]:
-            if model.owner_id != current_user.user_id:
-                raise HTTPException(
-                    status_code=status.HTTP_403_FORBIDDEN,
-                    detail="You don't have permission to view this model's versions",
-                )
-
-        result = await service.get_model_versions(model_id, compare_with)
-
-        # Convert to response format
-        versions = [
-            ModelVersionSummary(
-                id=v["id"],
-                version=v["version"],
-                status=ModelStatusEnum(v["status"].value.lower()),
-                metrics=v["metrics"],
-                hyperparameters=v["hyperparameters"],
-                created_at=v["created_at"],
-                registered_at=v["registered_at"],
-            )
-            for v in result["versions"]
-        ]
-
-        comparison = None
-        if "comparison" in result and result["comparison"]:
-            comp_data = result["comparison"]
-            comparison = VersionComparison(
-                metrics_diff=comp_data.get("metrics_diff", {}),
-                hyperparams_changed=comp_data.get("hyperparams_changed", []),
-                framework_changed=comp_data.get("framework_changed", False),
-                tags_added=comp_data.get("tags_added", []),
-                tags_removed=comp_data.get("tags_removed", []),
+    # Check ownership for non-admin users
+    if current_user.role not in ["admin", "manager"]:
+        if model.owner_id != current_user.user_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="You don't have permission to view this model's versions",
             )
 
-        return ModelVersionsResponse(
-            model_name=model.model_name,
-            versions=versions,
-            comparison=comparison,
+    result = await service.get_model_versions(model_id, compare_with)
+
+    # Convert to response format
+    versions = [
+        ModelVersionSummary(
+            id=v["id"],
+            version=v["version"],
+            status=ModelStatusEnum(v["status"].value.lower()),
+            metrics=v["metrics"],
+            hyperparameters=v["hyperparameters"],
+            created_at=v["created_at"],
+            registered_at=v["registered_at"],
+        )
+        for v in result["versions"]
+    ]
+
+    comparison = None
+    if "comparison" in result and result["comparison"]:
+        comp_data = result["comparison"]
+        comparison = VersionComparison(
+            metrics_diff=comp_data.get("metrics_diff", {}),
+            hyperparams_changed=comp_data.get("hyperparams_changed", []),
+            framework_changed=comp_data.get("framework_changed", False),
+            tags_added=comp_data.get("tags_added", []),
+            tags_removed=comp_data.get("tags_removed", []),
         )
 
-    except EntityNotFoundError:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Model with id {model_id} not found",
-        )
+    return ModelVersionsResponse(
+        model_name=model.model_name,
+        versions=versions,
+        comparison=comparison,
+    )
 
 
 @router.delete(
@@ -301,24 +276,17 @@ async def delete_model(
     service: ModelService = Depends(get_model_service),
 ):
     """Delete/archive a model."""
-    try:
-        # First check if model exists and user has permission
-        model = await service.get_model(model_id)
-        if current_user.role not in ["admin", "manager"]:
-            if model.owner_id != current_user.user_id:
-                raise HTTPException(
-                    status_code=status.HTTP_403_FORBIDDEN,
-                    detail="You don't have permission to delete this model",
-                )
+    # First check if model exists and user has permission
+    model = await service.get_model(model_id)
+    if current_user.role not in ["admin", "manager"]:
+        if model.owner_id != current_user.user_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="You don't have permission to delete this model",
+            )
 
-        await service.delete_model(model_id)
-        return None
-
-    except EntityNotFoundError:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Model with id {model_id} not found",
-        )
+    await service.delete_model(model_id)
+    return None
 
 
 @router.post(
@@ -335,26 +303,14 @@ async def archive_model(
     service: ModelService = Depends(get_model_service),
 ):
     """Archive a model."""
-    try:
-        # First check if model exists and user has permission
-        model = await service.get_model(model_id)
-        if current_user.role not in ["admin", "manager"]:
-            if model.owner_id != current_user.user_id:
-                raise HTTPException(
-                    status_code=status.HTTP_403_FORBIDDEN,
-                    detail="You don't have permission to archive this model",
-                )
+    # First check if model exists and user has permission
+    model = await service.get_model(model_id)
+    if current_user.role not in ["admin", "manager"]:
+        if model.owner_id != current_user.user_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="You don't have permission to archive this model",
+            )
 
-        model = await service.archive_model(model_id)
-        return _model_to_detail(model)
-
-    except EntityNotFoundError:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Model with id {model_id} not found",
-        )
-    except InvalidStateTransitionError as e:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail=str(e),
-        )
+    model = await service.archive_model(model_id)
+    return _model_to_detail(model)

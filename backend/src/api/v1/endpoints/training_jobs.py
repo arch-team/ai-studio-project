@@ -26,11 +26,6 @@ from src.application.services.checkpoint_service import CheckpointService
 from src.application.services.training_job_service import TrainingJobService
 from src.core.database import get_db
 from src.domain.entities.training_job import JobPriority, JobStatus
-from src.domain.exceptions import (
-    DuplicateEntityError,
-    EntityNotFoundError,
-    InvalidStateTransitionError,
-)
 from src.infrastructure.external.hyperpod.client import HyperPodClient
 from src.infrastructure.persistence.repositories.training_job_repository_impl import (
     TrainingJobRepository,
@@ -167,43 +162,34 @@ async def create_training_job(
     service: TrainingJobService = Depends(get_training_job_service),
 ):
     """Create a new training job."""
-    try:
-        job_data = {
-            "job_name": data.job_name,
-            "display_name": data.display_name,
-            "description": data.description,
-            "image_uri": data.image_uri,
-            "instance_type": data.instance_type,
-            "node_count": data.node_count,
-            "tasks_per_node": data.tasks_per_node,
-            "entrypoint_command": data.entrypoint_command,
-            "environment_variables": data.environment_variables,
-            "dataset_id": data.dataset_id,
-            "data_mount_path": data.data_mount_path,
-            "checkpoint_mount_path": data.checkpoint_mount_path,
-            "checkpoint_interval": data.checkpoint_interval,
-            "hyperparameters": data.hyperparameters,
-            "max_epochs": data.max_epochs,
-            "batch_size": data.batch_size,
-            "learning_rate": data.learning_rate,
-            "distribution_strategy": (
-                data.distribution_strategy.value
-                if data.distribution_strategy
-                else "ddp"
-            ),
-            "priority": data.priority.value if data.priority else "medium",
-            "mixed_precision": data.mixed_precision,
-            "use_spot_instances": data.use_spot_instances,
-        }
+    job_data = {
+        "job_name": data.job_name,
+        "display_name": data.display_name,
+        "description": data.description,
+        "image_uri": data.image_uri,
+        "instance_type": data.instance_type,
+        "node_count": data.node_count,
+        "tasks_per_node": data.tasks_per_node,
+        "entrypoint_command": data.entrypoint_command,
+        "environment_variables": data.environment_variables,
+        "dataset_id": data.dataset_id,
+        "data_mount_path": data.data_mount_path,
+        "checkpoint_mount_path": data.checkpoint_mount_path,
+        "checkpoint_interval": data.checkpoint_interval,
+        "hyperparameters": data.hyperparameters,
+        "max_epochs": data.max_epochs,
+        "batch_size": data.batch_size,
+        "learning_rate": data.learning_rate,
+        "distribution_strategy": (
+            data.distribution_strategy.value if data.distribution_strategy else "ddp"
+        ),
+        "priority": data.priority.value if data.priority else "medium",
+        "mixed_precision": data.mixed_precision,
+        "use_spot_instances": data.use_spot_instances,
+    }
 
-        job = await service.create_job(owner_id=current_user.user_id, data=job_data)
-        return _job_to_detail(job)
-
-    except DuplicateEntityError as e:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail=str(e),
-        )
+    job = await service.create_job(owner_id=current_user.user_id, data=job_data)
+    return _job_to_detail(job)
 
 
 @router.get(
@@ -271,24 +257,17 @@ async def get_training_job(
     service: TrainingJobService = Depends(get_training_job_service),
 ):
     """Get training job details by ID."""
-    try:
-        job = await service.get_job(job_id)
+    job = await service.get_job(job_id)
 
-        # Check ownership for non-admin users
-        if current_user.role not in ["admin", "manager"]:
-            if job.owner_id != current_user.user_id:
-                raise HTTPException(
-                    status_code=status.HTTP_403_FORBIDDEN,
-                    detail="You don't have permission to view this job",
-                )
+    # Check ownership for non-admin users
+    if current_user.role not in ["admin", "manager"]:
+        if job.owner_id != current_user.user_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="You don't have permission to view this job",
+            )
 
-        return _job_to_detail(job)
-
-    except EntityNotFoundError:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Training job with id {job_id} not found",
-        )
+    return _job_to_detail(job)
 
 
 async def _check_job_permission(
@@ -322,21 +301,9 @@ async def pause_training_job(
     service: TrainingJobService = Depends(get_training_job_service),
 ):
     """Pause a running training job."""
-    try:
-        await _check_job_permission(job_id, current_user, service, "pause")
-        job = await service.pause_job(job_id)
-        return _job_to_detail(job)
-
-    except EntityNotFoundError:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Training job with id {job_id} not found",
-        )
-    except InvalidStateTransitionError as e:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail=str(e),
-        )
+    await _check_job_permission(job_id, current_user, service, "pause")
+    job = await service.pause_job(job_id)
+    return _job_to_detail(job)
 
 
 @router.post(
@@ -353,21 +320,9 @@ async def resume_training_job(
     service: TrainingJobService = Depends(get_training_job_service),
 ):
     """Resume a paused training job."""
-    try:
-        await _check_job_permission(job_id, current_user, service, "resume")
-        job = await service.resume_job(job_id)
-        return _job_to_detail(job)
-
-    except EntityNotFoundError:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Training job with id {job_id} not found",
-        )
-    except InvalidStateTransitionError as e:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail=str(e),
-        )
+    await _check_job_permission(job_id, current_user, service, "resume")
+    job = await service.resume_job(job_id)
+    return _job_to_detail(job)
 
 
 @router.post(
@@ -384,21 +339,9 @@ async def cancel_training_job(
     service: TrainingJobService = Depends(get_training_job_service),
 ):
     """Cancel a training job."""
-    try:
-        await _check_job_permission(job_id, current_user, service, "cancel")
-        job = await service.cancel_job(job_id)
-        return _job_to_detail(job)
-
-    except EntityNotFoundError:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Training job with id {job_id} not found",
-        )
-    except InvalidStateTransitionError as e:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail=str(e),
-        )
+    await _check_job_permission(job_id, current_user, service, "cancel")
+    job = await service.cancel_job(job_id)
+    return _job_to_detail(job)
 
 
 @router.delete(
@@ -414,24 +357,17 @@ async def delete_training_job(
     service: TrainingJobService = Depends(get_training_job_service),
 ):
     """Delete a training job."""
-    try:
-        # First check if job exists and user has permission
-        job = await service.get_job(job_id)
-        if current_user.role not in ["admin", "manager"]:
-            if job.owner_id != current_user.user_id:
-                raise HTTPException(
-                    status_code=status.HTTP_403_FORBIDDEN,
-                    detail="You don't have permission to delete this job",
-                )
+    # First check if job exists and user has permission
+    job = await service.get_job(job_id)
+    if current_user.role not in ["admin", "manager"]:
+        if job.owner_id != current_user.user_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="You don't have permission to delete this job",
+            )
 
-        await service.delete_job(job_id)
-        return None
-
-    except EntityNotFoundError:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Training job with id {job_id} not found",
-        )
+    await service.delete_job(job_id)
+    return None
 
 
 # === Checkpoint Endpoints ===
@@ -454,74 +390,65 @@ async def create_manual_checkpoint(
     checkpoint_service: CheckpointService = Depends(get_checkpoint_service),
 ):
     """Create a manual checkpoint for a running training job (T031d)."""
-    try:
-        # Check job exists and is running
-        job = await service.get_job(job_id)
+    # Check job exists and is running
+    job = await service.get_job(job_id)
 
-        # Check ownership
-        if current_user.role not in ["admin", "manager"]:
-            if job.owner_id != current_user.user_id:
-                raise HTTPException(
-                    status_code=status.HTTP_403_FORBIDDEN,
-                    detail="You don't have permission to create checkpoints for this job",
-                )
-
-        # Job must be running to create a manual checkpoint
-        if job.status != JobStatus.RUNNING:
+    # Check ownership
+    if current_user.role not in ["admin", "manager"]:
+        if job.owner_id != current_user.user_id:
             raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail=f"Cannot create checkpoint for job in {job.status.value} state. "
-                "Job must be running.",
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="You don't have permission to create checkpoints for this job",
             )
 
-        # Generate checkpoint name
-        checkpoint_name = (
-            data.checkpoint_name
-            if data and data.checkpoint_name
-            else f"manual-checkpoint-{datetime.utcnow().strftime('%Y%m%d-%H%M%S')}"
-        )
-
-        # Generate storage path
-        storage_path = (
-            f"{job.checkpoint_mount_path or '/checkpoints'}/"
-            f"{job.job_name}/{checkpoint_name}.pt"
-        )
-
-        # Create checkpoint via CheckpointService
-        checkpoint = await checkpoint_service.create_manual_checkpoint(
-            training_job_id=job_id,
-            checkpoint_name=checkpoint_name,
-            storage_path=storage_path,
-            epoch=job.current_epoch,
-            step=job.current_step,
-            loss=job.latest_loss,
-            accuracy=job.latest_accuracy,
-        )
-
-        # TODO: In production, trigger actual checkpoint save via HyperPod signal
-        # This would involve sending a signal to the training pods to save state
-
-        return CheckpointResponse(
-            id=checkpoint.id,
-            training_job_id=checkpoint.training_job_id,
-            checkpoint_name=checkpoint.checkpoint_name,
-            storage_path=checkpoint.storage_path,
-            checkpoint_type=CheckpointTypeEnum(
-                checkpoint.checkpoint_type.value.lower()
-            ),
-            epoch=checkpoint.epoch,
-            step=checkpoint.step,
-            size_bytes=checkpoint.size_bytes,
-            loss=checkpoint.loss,
-            accuracy=checkpoint.accuracy,
-            storage_tier=StorageTierEnum(checkpoint.storage_tier.value.lower()),
-            status=CheckpointStatusEnum(checkpoint.status.value.lower()),
-            metadata=None,
-            created_at=checkpoint.created_at,
-        )
-
-    except EntityNotFoundError:
+    # Job must be running to create a manual checkpoint
+    if job.status != JobStatus.RUNNING:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Training job with id {job_id} not found",
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Cannot create checkpoint for job in {job.status.value} state. "
+            "Job must be running.",
         )
+
+    # Generate checkpoint name
+    checkpoint_name = (
+        data.checkpoint_name
+        if data and data.checkpoint_name
+        else f"manual-checkpoint-{datetime.utcnow().strftime('%Y%m%d-%H%M%S')}"
+    )
+
+    # Generate storage path
+    storage_path = (
+        f"{job.checkpoint_mount_path or '/checkpoints'}/"
+        f"{job.job_name}/{checkpoint_name}.pt"
+    )
+
+    # Create checkpoint via CheckpointService
+    checkpoint = await checkpoint_service.create_manual_checkpoint(
+        training_job_id=job_id,
+        checkpoint_name=checkpoint_name,
+        storage_path=storage_path,
+        epoch=job.current_epoch,
+        step=job.current_step,
+        loss=job.latest_loss,
+        accuracy=job.latest_accuracy,
+    )
+
+    # TODO: In production, trigger actual checkpoint save via HyperPod signal
+    # This would involve sending a signal to the training pods to save state
+
+    return CheckpointResponse(
+        id=checkpoint.id,
+        training_job_id=checkpoint.training_job_id,
+        checkpoint_name=checkpoint.checkpoint_name,
+        storage_path=checkpoint.storage_path,
+        checkpoint_type=CheckpointTypeEnum(checkpoint.checkpoint_type.value.lower()),
+        epoch=checkpoint.epoch,
+        step=checkpoint.step,
+        size_bytes=checkpoint.size_bytes,
+        loss=checkpoint.loss,
+        accuracy=checkpoint.accuracy,
+        storage_tier=StorageTierEnum(checkpoint.storage_tier.value.lower()),
+        status=CheckpointStatusEnum(checkpoint.status.value.lower()),
+        metadata=None,
+        created_at=checkpoint.created_at,
+    )

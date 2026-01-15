@@ -156,6 +156,92 @@ burst_factor = math.exp(-elapsed / TAU)
 - 临时解决方案 (需包含 TODO + issue 编号)
 - 性能优化的权衡说明
 
+## Design Principles
+
+遵循以下核心设计原则，确保代码的可维护性和可扩展性。
+
+### 模块化设计 (Modular Design)
+
+```python
+# ❌ 功能混杂在一起
+class UserService:
+    def authenticate(self, username, password): ...
+    def hash_password(self, password): ...
+    def send_email(self, user, subject, body): ...
+    def generate_report(self, user_id): ...
+
+# ✅ 按职责拆分模块
+class AuthService:          # 认证逻辑
+    def authenticate(self, credentials: Credentials) -> AuthResult: ...
+
+class PasswordService:      # 密码处理
+    def hash(self, password: str) -> str: ...
+    def verify(self, password: str, hash: str) -> bool: ...
+```
+
+**模块边界检查清单**：
+- 每个模块文件 < 300 行（超过则考虑拆分）
+- 每个类 < 10 个公开方法
+- 模块间通过接口通信，不直接依赖实现
+
+### 简明逻辑 (Simple Logic)
+**简明逻辑检查清单**：
+- 函数圈复杂度 ≤ 10
+- 嵌套层级 ≤ 3
+- 每个函数只做一件事
+
+### 清晰接口 (Clear Interfaces)
+
+```python
+# ❌ 参数模糊、返回值不明确
+def create_job(data, flags, options=None):
+    ...  # 调用者不知道传什么、返回什么
+
+# ✅ 类型明确、契约清晰
+async def create_job(
+    request: CreateJobRequest,
+    user_id: UUID,
+) -> TrainingJob:
+    """创建训练任务。
+
+    Raises:
+        ResourceQuotaExceeded: 配额不足
+        ValidationError: 请求参数无效
+    """
+```
+
+**接口设计检查清单**：
+- 所有公开方法有完整类型标注
+- 可能抛出的异常在 docstring 中声明
+- 避免 `dict`/`Any` 作为参数或返回值类型
+
+### 职责单一 (Single Responsibility)
+
+| 层级 | 职责 | 禁止 |
+|------|------|------|
+| **Entity** | 业务规则、状态转换 | 数据库访问、外部调用 |
+| **Service** | 用例编排、事务协调 | HTTP 处理、SQL 语句 |
+| **Repository** | 数据持久化 | 业务逻辑、验证规则 |
+| **Endpoint** | HTTP 转换、参数验证 | 业务逻辑、直接数据库访问 |
+
+```python
+# ❌ 职责混乱 - Service 包含 HTTP 逻辑
+class TrainingJobService:
+    async def create(self, request: Request):  # 不应接收 HTTP Request
+        data = await request.json()            # 不应解析 HTTP
+        job = TrainingJob(**data)
+        await self.db.execute(...)             # 不应直接操作数据库
+
+# ✅ 职责清晰
+class TrainingJobService:
+    def __init__(self, repository: ITrainingJobRepository):
+        self._repository = repository
+
+    async def create(self, command: CreateJobCommand) -> TrainingJob:
+        job = TrainingJob.create(command)      # 实体负责创建逻辑
+        return await self._repository.save(job) # 仓库负责持久化
+```
+
 ## Test-Driven Development (TDD)
 
 本项目践行 TDD 实践，遵循 **Red-Green-Refactor** 循环。

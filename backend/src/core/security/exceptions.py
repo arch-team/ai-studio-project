@@ -17,6 +17,28 @@ class AuthenticationError(SecurityError):
         super().__init__(message, code="AUTHENTICATION_FAILED")
 
 
+class UserNotFoundError(SecurityError):
+    """Raised when user is not found (for enable/disable account)."""
+
+    def __init__(self, user_id: str):
+        self.user_id = user_id
+        super().__init__(f"User with id '{user_id}' not found", code="USER_NOT_FOUND")
+
+
+class InvalidCredentialsError(SecurityError):
+    """Raised when login credentials are invalid."""
+
+    def __init__(self, message: str = "Invalid username or password"):
+        super().__init__(message, code="INVALID_CREDENTIALS")
+
+
+class AccountValidationError(SecurityError):
+    """Raised when account validation fails (for create account)."""
+
+    def __init__(self, message: str):
+        super().__init__(message, code="ACCOUNT_VALIDATION_FAILED")
+
+
 class TokenExpiredError(SecurityError):
     """Raised when a token has expired."""
 

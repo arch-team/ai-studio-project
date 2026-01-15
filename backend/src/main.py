@@ -7,7 +7,13 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
+from src.api.exception_handlers import (
+    domain_exception_handler,
+    security_exception_handler,
+)
 from src.api.middleware.audit import AuditMiddleware
+from src.core.security.exceptions import SecurityError
+from src.domain.exceptions import DomainError
 from src.api.middleware.auth import AuthenticationMiddleware
 from src.api.v1 import router as v1_router
 from src.infrastructure.config import get_settings
@@ -66,6 +72,10 @@ def create_app() -> FastAPI:
 
     # Register API routers
     app.include_router(v1_router, prefix="/api")
+
+    # Register exception handlers (more specific first)
+    app.add_exception_handler(DomainError, domain_exception_handler)
+    app.add_exception_handler(SecurityError, security_exception_handler)
 
     # Global exception handler for unhandled exceptions
     @app.exception_handler(Exception)

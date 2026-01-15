@@ -189,25 +189,14 @@ async def refresh_token(
     auth_service: AuthService = Depends(get_auth_service),
 ):
     """Refresh access token using refresh token."""
-    try:
-        tokens = await auth_service.refresh_access_token(refresh_data.refresh_token)
+    tokens = await auth_service.refresh_access_token(refresh_data.refresh_token)
 
-        return TokenResponse(
-            access_token=tokens.access_token,
-            refresh_token=tokens.refresh_token,
-            token_type=tokens.token_type,
-            expires_in=tokens.expires_in,
-        )
-    except (InvalidTokenError, TokenExpiredError) as e:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail=str(e),
-        )
-    except AuthenticationError as e:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail=str(e),
-        )
+    return TokenResponse(
+        access_token=tokens.access_token,
+        refresh_token=tokens.refresh_token,
+        token_type=tokens.token_type,
+        expires_in=tokens.expires_in,
+    )
 
 
 @router.post("/logout", response_model=MessageResponse)
