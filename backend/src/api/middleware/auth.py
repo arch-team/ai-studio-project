@@ -30,7 +30,7 @@ class AuthenticationMiddleware(BaseHTTPMiddleware):
             return JSONResponse(
                 status_code=401,
                 content={
-                    "error": "UNAUTHORIZED",
+                    "code": "UNAUTHORIZED",
                     "message": "Authorization header required",
                 },
             )
@@ -41,7 +41,7 @@ class AuthenticationMiddleware(BaseHTTPMiddleware):
             return JSONResponse(
                 status_code=401,
                 content={
-                    "error": "INVALID_TOKEN",
+                    "code": "INVALID_TOKEN",
                     "message": "Invalid or expired token",
                 },
             )

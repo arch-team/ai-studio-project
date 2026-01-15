@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.api.middleware.auth import CurrentUser
 from src.api.v1.dependencies.auth import get_current_active_user, require_engineer
+from src.api.v1.dependencies.services import get_checkpoint_service
 from src.api.v1.schemas.training_job import (
     CheckpointResponse,
     CheckpointStatusEnum,
@@ -22,6 +23,7 @@ from src.api.v1.schemas.training_job import (
     TrainingJobSummary,
     UpdateTrainingJobRequest,
 )
+from src.application.services.checkpoint_service import CheckpointService
 from src.application.services.training_job_service import TrainingJobService
 from src.core.database import get_db
 from src.domain.entities.training_job import JobPriority, JobStatus
@@ -387,16 +389,9 @@ async def create_manual_checkpoint(
     data: CreateCheckpointRequest | None = None,
     current_user: CurrentUser = Depends(require_engineer),
     service: TrainingJobService = Depends(get_training_job_service),
-    session: AsyncSession = Depends(get_db),
+    checkpoint_service: CheckpointService = Depends(get_checkpoint_service),
 ):
     """Create a manual checkpoint for a running training job (T031d)."""
-    from src.domain.entities.checkpoint import (
-        CheckpointStatus,
-        CheckpointType,
-        StorageTier,
-    )
-    from src.infrastructure.persistence.models.checkpoint_model import CheckpointModel
-
     try:
         # Check job exists and is running
         job = await service.get_job(job_id)
@@ -430,24 +425,16 @@ async def create_manual_checkpoint(
             f"{job.job_name}/{checkpoint_name}.pt"
         )
 
-        # Create checkpoint record
-        checkpoint = CheckpointModel(
+        # Create checkpoint via CheckpointService
+        checkpoint = await checkpoint_service.create_manual_checkpoint(
             training_job_id=job_id,
             checkpoint_name=checkpoint_name,
             storage_path=storage_path,
-            checkpoint_type=CheckpointType.MANUAL,
             epoch=job.current_epoch,
             step=job.current_step,
-            size_bytes=0,  # Will be updated when actual checkpoint is saved
             loss=job.latest_loss,
             accuracy=job.latest_accuracy,
-            storage_tier=StorageTier.FSX,
-            status=CheckpointStatus.AVAILABLE,
         )
-
-        session.add(checkpoint)
-        await session.commit()
-        await session.refresh(checkpoint)
 
         # TODO: In production, trigger actual checkpoint save via HyperPod signal
         # This would involve sending a signal to the training pods to save state

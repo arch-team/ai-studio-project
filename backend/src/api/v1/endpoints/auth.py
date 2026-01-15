@@ -1,8 +1,6 @@
 """Authentication Endpoints - Login, logout, password management."""
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
-from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.api.middleware.auth import CurrentUser
 from src.api.middleware.sso import SSOUserInfo, get_sso_service, map_groups_to_role
@@ -28,7 +26,6 @@ from src.api.v1.schemas.auth import (
 from src.application.services.account_service import AccountService
 from src.application.services.auth_service import AuthService
 from src.application.services.password_service import PasswordService
-from src.core.database import get_db
 from src.core.security.exceptions import (
     AccountLockedError,
     AuthenticationError,
@@ -40,8 +37,6 @@ from src.core.security.exceptions import (
     SSOError,
     TokenExpiredError,
 )
-from src.domain.value_objects import AuthType, UserRole, UserStatus
-from src.infrastructure.persistence.models import UserModel
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
@@ -51,41 +46,6 @@ def _get_client_ip(request: Request) -> str:
     if forwarded := request.headers.get("X-Forwarded-For"):
         return forwarded.split(",")[0].strip()
     return request.client.host if request.client else "unknown"
-
-
-async def _get_or_create_sso_user(
-    session: AsyncSession,
-    user_info: SSOUserInfo,
-    role: str,
-) -> UserModel:
-    """Get or create SSO user."""
-    query_result = await session.execute(
-        select(UserModel).where(UserModel.iam_identity_id == user_info.identity_id)
-    )
-    user = query_result.scalar_one_or_none()
-
-    if not user:
-        # Create new SSO user
-        user = UserModel(
-            username=user_info.username,
-            email=user_info.email,
-            display_name=user_info.display_name,
-            iam_identity_id=user_info.identity_id,
-            iam_groups=user_info.groups,
-            auth_type=AuthType.SSO,
-            status=UserStatus.ACTIVE,
-            role=UserRole(role),
-        )
-        session.add(user)
-        await session.commit()
-        await session.refresh(user)
-    else:
-        # Update existing user's groups and role
-        user.iam_groups = user_info.groups
-        user.role = UserRole(role)
-        await session.commit()
-
-    return user
 
 
 @router.post(
@@ -99,10 +59,10 @@ async def _get_or_create_sso_user(
 async def login(
     request: Request,
     login_data: LoginRequest,
-    session: AsyncSession = Depends(get_db),
+    auth_service: AuthService = Depends(get_auth_service),
+    account_service: AccountService = Depends(get_account_service),
 ):
     """Authenticate user via local credentials or SSO token."""
-    auth_service = AuthService(session)
     ip_address = _get_client_ip(request)
     user_agent = request.headers.get("User-Agent")
 
@@ -121,11 +81,18 @@ async def login(
                     login_data.id_token
                 )
 
-                # Map groups to role and create/get user
+                # Map groups to role and create/get user via AccountService
                 role = map_groups_to_role(user_info.groups)
 
-                # Get or create SSO user
-                user = await _get_or_create_sso_user(session, user_info, role)
+                # Get or create SSO user using AccountService
+                user = await account_service.get_or_create_sso_user(
+                    iam_identity_id=user_info.identity_id,
+                    username=user_info.username,
+                    email=user_info.email,
+                    display_name=user_info.display_name,
+                    groups=user_info.groups,
+                    role=role,
+                )
 
                 # Generate tokens using auth_service helper
                 tokens = auth_service._create_token_pair(user)
@@ -463,13 +430,10 @@ async def confirm_password_reset(
 @router.get("/me", response_model=UserResponse)
 async def get_current_user_info(
     current_user: CurrentUser = Depends(get_current_active_user),
-    session: AsyncSession = Depends(get_db),
+    auth_service: AuthService = Depends(get_auth_service),
 ):
     """Get current user information."""
-    result = await session.execute(
-        select(UserModel).where(UserModel.id == current_user.user_id)
-    )
-    user = result.scalar_one_or_none()
+    user = await auth_service.get_user_by_id(current_user.user_id)
 
     if not user:
         raise HTTPException(

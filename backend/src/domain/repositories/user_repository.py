@@ -35,3 +35,7 @@ class IUserRepository(ABC):
     @abstractmethod
     async def exists_by_email(self, email: str) -> bool:
         """Check if a user with the given email exists."""
+
+    @abstractmethod
+    async def get_by_iam_identity_id(self, iam_identity_id: str) -> User | None:
+        """Get user by IAM identity ID (for SSO users)."""

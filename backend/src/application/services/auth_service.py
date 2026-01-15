@@ -141,6 +141,10 @@ class AuthService:
 
         return self._create_token_pair(user)
 
+    async def get_user_by_id(self, user_id: int) -> User | None:
+        """Get user by ID."""
+        return await self._user_repo.get_by_id(user_id)
+
     def _create_token_pair(self, user: User) -> TokenPair:
         """Create access and refresh token pair."""
         access_token = self._jwt.create_access_token(

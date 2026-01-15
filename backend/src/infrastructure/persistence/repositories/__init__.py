@@ -9,8 +9,13 @@ Implements domain repository interfaces using SQLAlchemy:
 - UserRepository: User CRUD
 - LoginAttemptRepository: Login attempt CRUD
 - PasswordHistoryRepository: Password history CRUD
+- CheckpointRepository: Checkpoint CRUD
 """
 
+from src.infrastructure.persistence.repositories.checkpoint_repository_impl import (
+    CheckpointRepository,
+    get_checkpoint_repository,
+)
 from src.infrastructure.persistence.repositories.login_attempt_repository_impl import (
     LoginAttemptRepository,
     get_login_attempt_repository,
@@ -29,6 +34,8 @@ from src.infrastructure.persistence.repositories.user_repository_impl import (
 )
 
 __all__ = [
+    "CheckpointRepository",
+    "get_checkpoint_repository",
     "LoginAttemptRepository",
     "get_login_attempt_repository",
     "PasswordHistoryRepository",

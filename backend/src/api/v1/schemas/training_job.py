@@ -7,6 +7,8 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
+from src.api.v1.schemas.common import ErrorResponse
+
 # === Enums ===
 
 
@@ -412,14 +414,7 @@ class KueueDebugResponse(BaseModel):
 
 
 # === Error Schemas ===
-
-
-class ErrorResponse(BaseModel):
-    """Standard error response."""
-
-    code: str
-    message: str
-    details: dict | None = None
+# ErrorResponse is imported from common.py
 
 
 class QuotaExceededErrorResponse(BaseModel):

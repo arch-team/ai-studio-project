@@ -97,6 +97,42 @@ class AccountService:
         user.reset_login_failures()
         await self._user_repo.update(user)
 
+    async def get_or_create_sso_user(
+        self,
+        iam_identity_id: str,
+        username: str,
+        email: str,
+        display_name: str | None = None,
+        groups: list[str] | None = None,
+        role: str = "engineer",
+    ) -> User:
+        """Get or create an SSO user by IAM identity ID.
+
+        If user exists, updates their groups and role.
+        If user doesn't exist, creates a new SSO user.
+        """
+        existing_user = await self._user_repo.get_by_iam_identity_id(iam_identity_id)
+
+        if existing_user:
+            # Update existing user's groups and role
+            existing_user.iam_groups = groups or []
+            existing_user.role = UserRole(role)
+            return await self._user_repo.update(existing_user)
+
+        # Create new SSO user
+        user = User(
+            id=0,  # Will be set by repository
+            username=username,
+            email=email,
+            display_name=display_name,
+            iam_identity_id=iam_identity_id,
+            iam_groups=groups or [],
+            auth_type=AuthType.SSO,
+            status=UserStatus.ACTIVE,
+            role=UserRole(role),
+        )
+        return await self._user_repo.create(user)
+
     async def _ensure_user_exists(self, user_id: int) -> User:
         """Get user by ID, raising error if not found."""
         user = await self._user_repo.get_by_id(user_id)

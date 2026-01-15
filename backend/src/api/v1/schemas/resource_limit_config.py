@@ -5,6 +5,18 @@ from enum import Enum
 
 from pydantic import BaseModel, Field
 
+from src.api.v1.schemas.common import ErrorResponse
+
+__all__ = [
+    "LimitRoleEnum",
+    "PriorityDefaultEnum",
+    "CreateResourceLimitConfigRequest",
+    "UpdateResourceLimitConfigRequest",
+    "ResourceLimitConfigResponse",
+    "ResourceLimitConfigListResponse",
+    "ErrorResponse",
+]
+
 # === Enums ===
 
 
@@ -161,12 +173,4 @@ class ResourceLimitConfigListResponse(BaseModel):
     total_pages: int
 
 
-# === Error Schemas ===
-
-
-class ErrorResponse(BaseModel):
-    """Standard error response."""
-
-    code: str
-    message: str
-    details: dict | None = None
+# ErrorResponse is imported from common.py

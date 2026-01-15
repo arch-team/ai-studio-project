@@ -140,6 +140,16 @@ class UserRepository(IUserRepository):
         count = result.scalar() or 0
         return count > 0
 
+    async def get_by_iam_identity_id(self, iam_identity_id: str) -> User | None:
+        """Get user by IAM identity ID (for SSO users)."""
+        result = await self._session.execute(
+            select(UserModel).where(UserModel.iam_identity_id == iam_identity_id)
+        )
+        model = result.scalar_one_or_none()
+        if model is None:
+            return None
+        return self._model_to_entity(model)
+
 
 async def get_user_repository(session: AsyncSession) -> UserRepository:
     """Factory function for dependency injection."""

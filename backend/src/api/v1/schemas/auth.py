@@ -2,6 +2,23 @@
 
 from pydantic import BaseModel, EmailStr, Field
 
+from src.api.v1.schemas.common import ErrorResponse
+
+__all__ = [
+    "LoginRequest",
+    "TokenResponse",
+    "UserResponse",
+    "LoginResponse",
+    "RefreshTokenRequest",
+    "LocalAccountCreateRequest",
+    "LocalAccountUpdateRequest",
+    "PasswordChangeRequest",
+    "PasswordResetRequest",
+    "PasswordResetConfirmRequest",
+    "MessageResponse",
+    "ErrorResponse",
+]
+
 
 class LoginRequest(BaseModel):
     """Login request schema."""
@@ -89,11 +106,3 @@ class MessageResponse(BaseModel):
     """Generic message response schema."""
 
     message: str = Field(..., description="Response message")
-
-
-class ErrorResponse(BaseModel):
-    """Error response schema."""
-
-    error: str = Field(..., description="Error code")
-    message: str = Field(..., description="Error message")
-    details: dict | None = Field(None, description="Additional error details")

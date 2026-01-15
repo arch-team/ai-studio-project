@@ -6,6 +6,7 @@ layer provides concrete implementations.
 """
 
 from .base import IRepository
+from .checkpoint_repository import ICheckpointRepository
 from .login_attempt_repository import ILoginAttemptRepository
 from .password_history_repository import IPasswordHistoryRepository
 from .resource_limit_config_repository import IResourceLimitConfigRepository
@@ -14,6 +15,7 @@ from .user_repository import IUserRepository
 
 __all__ = [
     "IRepository",
+    "ICheckpointRepository",
     "ILoginAttemptRepository",
     "IPasswordHistoryRepository",
     "IResourceLimitConfigRepository",
