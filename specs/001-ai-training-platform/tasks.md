@@ -2,7 +2,7 @@
 
 ## 概述
 
-本文档包含企业级AI训练平台的完整实施任务清单,共计 165 个任务,按用户故事和优先级组织。
+本文档包含企业级AI训练平台的完整实施任务清单,共计 180 个任务,按用户故事和优先级组织。
 
 **技术栈**:
 - 后端: Python 3.11, FastAPI 0.109+, SQLAlchemy 2.0+, Alembic, sagemaker-hyperpod SDK (包含 Space 模块), boto3 (AWS SDK for S3/CloudWatch/IAM 等非 HyperPod 服务)
@@ -349,10 +349,10 @@
 - [X] [T010] 创建 resource_quotas 表迁移 - `backend/alembic/versions/20260114_221056_206d5baf77c1_create_core_tables_users_resource_.py`,字段: id, name, quota_type, max_cpu_cores, max_gpu_count, max_memory_gb, max_storage_gb
 - [X] [T010b] 创建 resource_limit_configs 表迁移 - `backend/alembic/versions/20260114_221056_206d5baf77c1_create_core_tables_users_resource_.py`,字段: id, config_name, role (enum: admin/project_manager/engineer/viewer), project_id (FK, nullable), max_gpu_per_job, max_cpu_per_job, max_memory_gb_per_job, max_storage_gb_per_job, max_nodes_per_job, priority_default (enum: high/medium/low), created_at, updated_at
 - [X] [T010a] 创建 audit_logs 表迁移 - `backend/alembic/versions/20260114_221056_206d5baf77c1_create_core_tables_users_resource_.py`,字段: id, user_id (FK), operation_type (enum: create/update/delete/login/logout), resource_type (enum: training_job/dataset/model/user/quota/space), resource_id, request_data (JSON), response_data (JSON), ip_address, user_agent, status (enum: success/failed), created_at, expires_at (created_at + 90天)
-- [X] [T010c] 创建 development_spaces 表迁移 - `backend/alembic/versions/20260114_221056_206d5baf77c1_create_core_tables_users_resource_.py`,字段: id (UUID), space_name (VARCHAR 255), owner_id (FK users), instance_type (enum: ml.t3.medium/ml.t3.large/ml.g4dn.xlarge), space_type (enum: jupyter/vscode/rstudio), status (enum: pending/running/stopped/failed/deleted), storage_size_gb (INT), lifecycle_config_arn (VARCHAR), sagemaker_space_arn (VARCHAR), created_at (TIMESTAMP), updated_at (TIMESTAMP), deleted_at (TIMESTAMP, nullable)
+- [X] [T010c] 创建 development_spaces 表迁移 - `backend/alembic/versions/20260114_221056_206d5baf77c1_create_core_tables_users_resource_.py`,字段: id (UUID), space_name (VARCHAR 255), owner_id (FK users), instance_type (enum: ml.g5.xlarge/ml.g5.2xlarge), space_type (enum: jupyter/vscode/rstudio), status (enum: pending/running/stopped/failed/deleted), storage_size_gb (INT), lifecycle_config_arn (VARCHAR), sagemaker_space_arn (VARCHAR), created_at (TIMESTAMP), updated_at (TIMESTAMP), deleted_at (TIMESTAMP, nullable)
 - [X] [T010d] 创建训练任务状态转换约束 - `backend/alembic/versions/20260114_221209_7778e77de8a6_create_training_job_state_transition_.py`,实现数据库级状态转换验证,防止非法状态转换 (如 Completed → Running):
   - **状态转换矩阵表**: 创建 `training_job_state_transitions` 表存储合法状态转换规则 (from_status, to_status, is_allowed),根据 spec.md Training Job State Model L533-547 定义的状态转换规则初始化数据
-  - **CHECK 约束**: 在 `training_jobs` 表添加 CHECK 约束验证状态枚举值有效性 (Submitted/Running/Paused/Preempted/Completed/Failed)
+  - **CHECK 约束**: 在 `training_jobs` 表添加 CHECK 约束验证状态枚举值有效性 (submitted/running/paused/preempted/completed/failed)
   - **更新触发器**: 创建 BEFORE UPDATE 触发器 `validate_training_job_state_transition`,在状态更新前查询状态转换矩阵表,验证 (OLD.status → NEW.status) 是否合法,非法转换抛出异常并记录到审计日志
   - **终态保护**: 确保 Completed 和 Failed 状态不可转换到其他状态 (is_terminal=true 标记)
   - **性能优化**: 为状态转换矩阵表创建复合索引 (from_status, to_status),确保触发器性能开销 <5ms
@@ -365,6 +365,12 @@
 - [X] [T012] 创建 ResourceQuota 模型 - 领域实体 `backend/src/domain/entities/resource_quota.py` + ORM 模型 `backend/src/infrastructure/persistence/models/resource_quota_model.py`,包含配额验证逻辑
 - [X] [T012b] 创建 ResourceLimitConfig 模型 - 领域实体 `backend/src/domain/entities/resource_limit_config.py` + ORM 模型 `backend/src/infrastructure/persistence/models/resource_limit_config_model.py`,包含限制验证逻辑,关联 User (通过 role),支持项目级和全局级配置 (project_id nullable),实现默认限制查询方法 (根据 user role + project 查找适用配置),提供配额检查和应用默认限制的服务接口
 - [X] [T012a] 创建 AuditLog 模型 - 领域实体 `backend/src/domain/entities/audit_log.py` + ORM 模型 `backend/src/infrastructure/persistence/models/audit_log_model.py`,包含自动过期逻辑 (expires_at = created_at + 90天),关联 User,支持操作类型和资源类型枚举,实现审计日志查询优化
+
+### ResourceLimitConfig 管理 API (Admin)
+- [ ] [T012c] [Admin] GET /resource-limit-configs 端点实现 - `backend/src/api/v1/endpoints/resource_limit_configs.py`,支持分页、过滤 (role, project_id)、排序 (created_at),返回资源限制配置列表,仅 admin 角色可访问
+- [ ] [T012d] [Admin] POST /resource-limit-configs 端点实现 - 创建资源限制配置,验证角色和项目有效性,防止重复配置 (同一 role + project_id 组合唯一)
+- [ ] [T012e] [Admin] PUT /resource-limit-configs/{id} 端点实现 - 更新资源限制配置,支持部分更新,记录变更到审计日志
+- [ ] [T012f] [Admin] DELETE /resource-limit-configs/{id} 端点实现 - 删除资源限制配置,软删除策略,记录到审计日志
 
 ### 认证中间件
 - [X] [T013] 实现基础认证中间件 - `backend/src/api/middleware/auth.py`,验证 IAM Identity Center token,提取用户信息
@@ -382,6 +388,12 @@
   - **审计日志集成**: 记录所有密码操作 (创建、重置、修改) 到 audit_logs 表
   - **安全响应头**: API 返回错误时使用通用消息 (避免泄露账号存在性信息)
   - **参考**: spec.md FR-015 企业级认证和 SC-015 安全标准
+- [ ] [T013d] SSO 故障转移集成测试 - `backend/tests/integration/test_sso_failover.py`,验证 SSO 不可用时自动切换到本地账号认证:
+  - **场景 1**: 模拟 IdP 超时 (连接超时 >5s),验证系统降级到本地认证并记录告警
+  - **场景 2**: 验证 SSO 恢复后自动切换回 SSO 认证 (健康检查通过后)
+  - **场景 3**: 验证降级期间审计日志正确记录 (operation_type: auth_failover)
+  - **场景 4**: 验证本地账号不存在时返回适当错误 (不泄露账号存在性)
+  - **依赖**: T013a (SSO 集成), T013c (本地账号 API)
 
 ### AWS 客户端封装
 - [X] [T014] [P] HyperPod SDK 客户端封装 - 接口 `backend/src/application/interfaces/hyperpod_client.py` (IHyperPodClient) + 实现 `backend/src/infrastructure/external/hyperpod/client.py`,封装 HyperPod Training 模块 API,使用 T000 验证的方法名实现训练任务生命周期管理 (提交、状态查询、暂停/恢复/终止),参考 `docs/hyperpod-sdk-reference.md` 获取准确的方法签名 (依赖 T000)
@@ -421,17 +433,17 @@
 - [X] [T024a] 创建 Model 模型 - 领域实体 `backend/src/domain/entities/model.py` + ORM 模型 `backend/src/infrastructure/persistence/models/model_model.py`,包含版本比较逻辑,关联 TrainingJob 和 Checkpoint,支持 SageMaker Model Registry ARN 存储,实现模型生命周期管理
 
 ### 后端 API 端点 (基于 contracts/training-jobs-api.yaml)
-- [ ] [T025] [US1] POST /training-jobs 端点实现 - `backend/src/api/v1/endpoints/training_jobs.py`,验证训练配置,检查资源配额,调用 HyperPod SDK 创建训练任务
-- [ ] [T026] [US1] GET /training-jobs 端点实现 - 支持分页、过滤 (status, owner_id)、排序 (created_at, priority)
-- [ ] [T027] [US1] GET /training-jobs/{id} 端点实现 - 返回训练任务详情,包含实时指标 (GPU 利用率,训练进度)
-- [ ] [T028] [US1] PUT /training-jobs/{id} 端点实现 - 更新训练配置 (仅允许 priority, training_config 字段)
-- [ ] [T029] [US1] DELETE /training-jobs/{id} 端点实现 - 软删除训练任务,终止 HyperPod 训练任务
-- [ ] [T030] [US1] POST /training-jobs/{id}/pause 端点实现 - 暂停训练任务,保存检查点,更新状态为 paused
-- [ ] [T031] [US1] POST /training-jobs/{id}/resume 端点实现 - 恢复训练任务,从最新检查点恢复,更新状态为 running
-- [ ] [T031a] [US1] POST /models 端点实现 - `backend/src/api/v1/endpoints/models.py`,注册训练完成的模型,自动从 checkpoint 提升,集成 SageMaker Model Registry,记录模型元数据(metrics, hyperparameters)
-- [ ] [T031b] [US1] GET /models 端点实现 - 支持分页、过滤 (training_job_id, status)、排序 (version, created_at),返回模型版本列表
-- [ ] [T031c] [US1] GET /models/{id}/versions 端点实现 - 返回模型版本历史,支持版本对比 (metrics diff, hyperparameter changes)
-- [ ] [T031d] [US1] POST /training-jobs/{id}/checkpoints 端点实现 - `backend/src/api/v1/endpoints/training_jobs.py`,支持用户手动触发检查点创建,验证任务状态 (仅 Running 状态可创建),调用 checkpoint_service 创建检查点,返回检查点 ID 和存储路径 (依赖 T038)
+- [X] [T025] [US1] POST /training-jobs 端点实现 - `backend/src/api/v1/endpoints/training_jobs.py`,验证训练配置,检查资源配额,调用 HyperPod SDK 创建训练任务
+- [X] [T026] [US1] GET /training-jobs 端点实现 - 支持分页、过滤 (status, owner_id)、排序 (created_at, priority)
+- [X] [T027] [US1] GET /training-jobs/{id} 端点实现 - 返回训练任务详情,包含实时指标 (GPU 利用率,训练进度)
+- [X] [T028] [US1] PUT /training-jobs/{id} 端点实现 - 更新训练配置 (仅允许 priority, training_config 字段)
+- [X] [T029] [US1] DELETE /training-jobs/{id} 端点实现 - 软删除训练任务,终止 HyperPod 训练任务
+- [X] [T030] [US1] POST /training-jobs/{id}/pause 端点实现 - 暂停训练任务,保存检查点,更新状态为 paused
+- [X] [T031] [US1] POST /training-jobs/{id}/resume 端点实现 - 恢复训练任务,从最新检查点恢复,更新状态为 running
+- [X] [T031a] [US1] POST /models 端点实现 - `backend/src/api/v1/endpoints/models.py`,注册训练完成的模型,自动从 checkpoint 提升,集成 SageMaker Model Registry,记录模型元数据(metrics, hyperparameters)
+- [X] [T031b] [US1] GET /models 端点实现 - 支持分页、过滤 (training_job_id, status)、排序 (version, created_at),返回模型版本列表
+- [X] [T031c] [US1] GET /models/{id}/versions 端点实现 - 返回模型版本历史,支持版本对比 (metrics diff, hyperparameter changes)
+- [X] [T031d] [US1] POST /training-jobs/{id}/checkpoints 端点实现 - `backend/src/api/v1/endpoints/training_jobs.py`,支持用户手动触发检查点创建,验证任务状态 (仅 Running 状态可创建),调用 checkpoint_service 创建检查点,返回检查点 ID 和存储路径 (依赖 T038)
 
 ### 前端页面组件
 - [ ] [T032] [US1] [P] 训练任务列表页面 - `frontend/src/features/training/pages/TrainingJobListPage.tsx`,使用 Cloudscape Table 组件,支持分页/过滤/排序,实时状态更新,创建模块 API 层 `frontend/src/features/training/api/queries.ts`
@@ -742,10 +754,10 @@
 **技术选型**: Amazon SageMaker Spaces Add-on (JupyterLab/VS Code IDE)
 
 ### 数据表迁移
-- [ ] [T079] [US5] 在线开发环境表迁移 - `backend/alembic/versions/007_create_dev_environments.py`,字段: id, environment_name, owner_id (FK users), ide_type (enum: jupyterlab/vscode), sagemaker_space_name, sagemaker_space_arn, instance_type (enum: ml.g5.xlarge/ml.g5.2xlarge,默认 ml.g5.xlarge,遵循 spec.md User Story 5 资源配额定义), status (enum: Pending/InService/Stopping/Stopped/Failed), studio_url, created_at, updated_at
+- [X] [T079] [US5] ~~在线开发环境表迁移~~ → **与 T010c 重复** (`development_spaces` 表已在 Phase 2 创建,参见 T010c)
 
 ### SQLAlchemy 模型
-- [ ] [T080] [US5] DevEnvironment 模型 - 领域实体 `backend/src/domain/entities/dev_environment.py` + ORM 模型 `backend/src/infrastructure/persistence/models/dev_environment_model.py`,包含 SageMaker Space 生命周期管理 (Pending → InService → Stopped),关联 User,存储 Space ARN 和 Studio URL
+- [X] [T080] [US5] ~~DevEnvironment 模型~~ → **与 T011c 重复** (`Space` 模型已在 Phase 2 创建,参见 T011c)
 
 ### 后端 API 端点
 - [ ] [T081] [US5] POST /ide/sessions 端点实现 - `backend/src/api/v1/endpoints/ide.py`,验证 IDE 配置,调用 SageMaker Spaces API 创建 Space,配置实例类型 (ml.g5.xlarge 默认/ml.g5.2xlarge,遵循 spec.md User Story 5 资源配额定义),验证用户配额 (GPU/CPU/内存,计入 FR-008 整体配额),返回 SageMaker Studio URL

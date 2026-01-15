@@ -628,7 +628,107 @@ async def scan_checkpoints(job_id: int, checkpoint_dir: str):
 
 ---
 
-### 6. hyperpod_clusters (HyperPod 集群表)
+### 6. models (模型表)
+
+**用途**: 存储训练产出的模型信息，包含模型版本、SageMaker Model Registry 同步状态、训练指标等。
+
+**数据来源说明**:
+- **数据来源**: 应用服务（训练完成后创建模型记录）
+- **写入时机**: 训练任务完成时，从检查点提升为模型
+- **Source of Truth**: ✅ 是（模型元数据由应用管理，Registry ARN 从 SageMaker 同步）
+
+```sql
+CREATE TABLE models (
+    -- 主键
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY COMMENT '模型ID',
+
+    -- 模型标识
+    model_name VARCHAR(256) NOT NULL COMMENT '模型名称 (例如: bert-base-chinese)',
+    version VARCHAR(32) NOT NULL COMMENT '模型版本 (语义化版本，例如: v1.0.0)',
+
+    -- 关联训练任务和检查点
+    training_job_id BIGINT UNSIGNED NOT NULL COMMENT '来源训练任务ID',
+    checkpoint_id BIGINT UNSIGNED COMMENT '来源检查点ID (从检查点提升为模型)',
+
+    -- 模型制品存储
+    model_uri VARCHAR(512) NOT NULL COMMENT 'S3 模型制品路径 (例如: s3://bucket/models/bert-v1.0.0/model.pt)',
+
+    -- SageMaker Model Registry 集成
+    registry_arn VARCHAR(512) COMMENT 'SageMaker Model Registry ARN',
+    registry_status ENUM('pending', 'synced', 'failed') DEFAULT 'pending' COMMENT 'Registry 同步状态',
+
+    -- 训练指标
+    metrics JSON COMMENT '训练指标 (例如: {"accuracy": 0.95, "loss": 0.05, "f1_score": 0.93})',
+
+    -- 超参数记录
+    hyperparameters JSON COMMENT '训练超参数 (例如: {"learning_rate": 0.001, "batch_size": 32, "epochs": 100})',
+
+    -- 框架信息
+    framework ENUM('pytorch', 'tensorflow', 'jax', 'other') NOT NULL DEFAULT 'pytorch' COMMENT '训练框架',
+    framework_version VARCHAR(32) COMMENT '框架版本 (例如: 2.1.0)',
+
+    -- 模型状态 (生命周期)
+    status ENUM('training', 'registered', 'approved', 'deployed', 'archived', 'rejected') NOT NULL DEFAULT 'training' COMMENT '模型状态',
+
+    -- 审计字段
+    created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) COMMENT '创建时间',
+    updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3) COMMENT '更新时间',
+    approved_at DATETIME(3) COMMENT '审批时间',
+    deployed_at DATETIME(3) COMMENT '部署时间',
+    archived_at DATETIME(3) COMMENT '归档时间',
+
+    -- 唯一约束
+    UNIQUE KEY uk_model_version (model_name, version),
+
+    -- 索引
+    INDEX idx_training_job_id (training_job_id),
+    INDEX idx_checkpoint_id (checkpoint_id),
+    INDEX idx_status (status),
+    INDEX idx_framework (framework),
+    INDEX idx_created_at (created_at),
+    INDEX idx_registry_status (registry_status),
+
+    -- 外键
+    FOREIGN KEY (training_job_id) REFERENCES training_jobs(id) ON DELETE RESTRICT,
+    FOREIGN KEY (checkpoint_id) REFERENCES checkpoints(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='模型表';
+```
+
+**字段说明**:
+- `model_name`: 模型名称，通常与训练项目相关 (例如: `bert-base-chinese`)
+- `version`: 语义化版本号 (例如: `v1.0.0`, `v1.1.0`)
+- `model_uri`: S3 存储路径，指向模型制品文件
+- `registry_arn`: SageMaker Model Registry 中的 ARN，用于生产部署
+- `metrics`: JSON 格式的训练指标，支持灵活的指标类型
+- `hyperparameters`: JSON 格式的超参数记录，便于模型复现
+- `status`: 模型生命周期状态:
+  - `training`: 训练中 (关联训练任务仍在执行)
+  - `registered`: 已注册到 Model Registry，待审批
+  - `approved`: 已通过审批，可部署
+  - `deployed`: 已部署到推理端点
+  - `archived`: 已归档，不再使用
+  - `rejected`: 审批未通过
+
+**状态转换规则** (参考 spec.md L1318):
+```
+training → registered (训练完成，自动注册)
+registered → approved (人工审批通过)
+registered → rejected (人工审批拒绝)
+approved → deployed (部署到推理端点)
+deployed → archived (废弃时归档)
+approved → archived (直接归档)
+```
+
+**索引策略**:
+- `uk_model_version`: 同一模型名称不允许重复版本
+- `training_job_id`: 查询训练任务产出的所有模型
+- `checkpoint_id`: 追溯模型来源检查点
+- `status`: 按状态筛选模型 (如查询所有待审批模型)
+- `registry_status`: 监控 SageMaker Registry 同步状态
+
+---
+
+### 7. hyperpod_clusters (HyperPod 集群表)
 
 **用途**: 存储 HyperPod 集群信息,用于任务调度和资源管理。
 
@@ -713,7 +813,7 @@ CREATE TABLE hyperpod_clusters (
 
 ---
 
-### 7. job_templates (任务模板表)
+### 8. job_templates (任务模板表)
 
 **用途**: 存储训练任务配置模板,方便用户复用常用的训练配置。
 
@@ -783,7 +883,7 @@ CREATE TABLE job_templates (
 
 ---
 
-### 8. audit_logs (审计日志表)
+### 9. audit_logs (审计日志表)
 
 **用途**: 记录平台关键操作的审计日志,用于安全审计和问题追溯。
 
