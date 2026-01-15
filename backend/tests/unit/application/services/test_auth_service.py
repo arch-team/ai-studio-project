@@ -5,17 +5,17 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from src.application.services.auth_service import AuthResult, AuthService, TokenPair
-from src.core.security.constants import MAX_FAILED_LOGIN_ATTEMPTS
-from src.core.security.exceptions import (
+from src.modules.auth.application.services.auth_service import AuthResult, AuthService, TokenPair
+from src.shared.infrastructure.security.constants import MAX_FAILED_LOGIN_ATTEMPTS
+from src.modules.auth.domain.exceptions import (
     AccountLockedError,
-    AuthenticationError,
+    InvalidCredentialsError,
     InvalidTokenError,
     PasswordExpiredError,
     TokenExpiredError,
 )
-from src.domain.entities.user import User
-from src.domain.value_objects import AuthType, UserRole, UserStatus
+from src.modules.auth.domain.entities.user import User
+from src.modules.auth.domain.value_objects import AuthType, UserRole, UserStatus
 
 # =============================================================================
 # Fixtures
@@ -169,7 +169,7 @@ class TestLocalLogin:
         """Test login with non-existent user."""
         mock_user_repository.get_by_username.return_value = None
 
-        with pytest.raises(AuthenticationError) as exc_info:
+        with pytest.raises(InvalidCredentialsError) as exc_info:
             await auth_service.local_login(
                 username="nonexistent",
                 password="password",
@@ -193,7 +193,7 @@ class TestLocalLogin:
         mock_user_repository.update.return_value = mock_user
 
         with patch.object(auth_service._hasher, "verify_password", return_value=False):
-            with pytest.raises(AuthenticationError):
+            with pytest.raises(InvalidCredentialsError):
                 await auth_service.local_login(
                     username="testuser",
                     password="wrong_password",
@@ -247,7 +247,7 @@ class TestLocalLogin:
         """Test local login with SSO account fails."""
         mock_user_repository.get_by_username.return_value = mock_sso_user
 
-        with pytest.raises(AuthenticationError) as exc_info:
+        with pytest.raises(InvalidCredentialsError) as exc_info:
             await auth_service.local_login(
                 username="testuser",
                 password="password",
@@ -269,7 +269,7 @@ class TestLocalLogin:
         """Test login with inactive account."""
         mock_user_repository.get_by_username.return_value = mock_inactive_user
 
-        with pytest.raises(AuthenticationError) as exc_info:
+        with pytest.raises(InvalidCredentialsError) as exc_info:
             await auth_service.local_login(
                 username="testuser",
                 password="password",
@@ -302,7 +302,7 @@ class TestLocalLogin:
         mock_user_repository.update.return_value = user
 
         with patch.object(auth_service._hasher, "verify_password", return_value=False):
-            with pytest.raises(AuthenticationError):
+            with pytest.raises(InvalidCredentialsError):
                 await auth_service.local_login(
                     username="testuser",
                     password="wrong",

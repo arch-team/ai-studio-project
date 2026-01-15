@@ -6,10 +6,10 @@ from fastapi import Request
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 from starlette.responses import JSONResponse, Response
 
-from src.core.security.exceptions import InvalidTokenError, TokenExpiredError
-from src.core.security.jwt import TokenPayload, TokenType, get_jwt_manager
-from src.core.security.paths import AUTH_EXEMPT_PATHS, AUTH_EXEMPT_PATTERNS
-from src.infrastructure.config.settings import get_settings
+from src.shared.infrastructure.security.exceptions import InvalidTokenError, TokenExpiredError
+from src.shared.infrastructure.security.jwt import TokenPayload, TokenType, get_jwt_manager
+from src.shared.infrastructure.security.paths import AUTH_EXEMPT_PATHS, AUTH_EXEMPT_PATTERNS
+from src.shared.infrastructure import get_settings
 
 # Development mock token
 DEV_MOCK_TOKEN = "dev-mock-token"
@@ -56,6 +56,13 @@ class AuthenticationMiddleware(BaseHTTPMiddleware):
         request.state.email = payload.email
         request.state.role = payload.role
         request.state.token_payload = payload
+        # Also set as a dict for CurrentUser.from_request compatibility
+        request.state.user = {
+            "user_id": int(payload.sub),
+            "username": payload.username,
+            "email": payload.email,
+            "role": payload.role,
+        }
 
         return await call_next(request)
 
@@ -133,14 +140,14 @@ class CurrentUser:
 
     def has_role(self, role: str) -> bool:
         """Check if user has at least the specified role level."""
-        from src.application.services.rbac_service import get_rbac_service
+        from src.modules.auth.application.services import get_rbac_service
 
         rbac = get_rbac_service()
         return rbac.has_role_level(self.role, role)
 
     def has_permission(self, permission: str) -> bool:
         """Check if user has a specific permission."""
-        from src.application.services.rbac_service import Permission, get_rbac_service
+        from src.modules.auth.application.services import Permission, get_rbac_service
 
         rbac = get_rbac_service()
         try:

@@ -523,8 +523,8 @@ def test_cluster_name() -> str:
 @pytest_asyncio.fixture
 async def real_hyperpod_service(aws_region: str, test_cluster_name: str) -> Any:
     """Create real HyperPodService for AWS tests."""
-    from src.application.services.hyperpod_service import HyperPodService
-    from src.infrastructure.external.hyperpod.client import HyperPodClient
+    from src.modules.training.application.services.hyperpod_service import HyperPodService
+    from src.modules.training.infrastructure.hyperpod.client import HyperPodClient
 
     client = HyperPodClient(region=aws_region)
     return HyperPodService(
@@ -583,7 +583,7 @@ class TestGangSchedulingRealAWS:
 
         This read-only test validates cluster configuration before write tests.
         """
-        from src.infrastructure.external.hyperpod.client import HyperPodClient
+        from src.modules.training.infrastructure.hyperpod.client import HyperPodClient
 
         client = HyperPodClient(region=aws_region)
         cluster_info = await client.describe_cluster(test_cluster_name)

@@ -4,7 +4,7 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 
-from src.core.security.exceptions import (
+from src.shared.infrastructure.security.exceptions import (
     AccountLockedError,
     AuthenticationError,
     InsufficientPermissionsError,

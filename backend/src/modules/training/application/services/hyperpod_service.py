@@ -7,9 +7,9 @@ Encapsulates HyperPod SDK operations with retry mechanism and error handling.
 import asyncio
 from typing import Any
 
-from src.application.interfaces.hyperpod_client import IHyperPodClient
-from src.domain.entities.training_job import TrainingJob
-from src.domain.exceptions import EntityNotFoundError
+from src.modules.training.application.interfaces import IHyperPodClient
+from src.modules.training.domain.entities.training_job import TrainingJob
+from src.shared.domain.exceptions import EntityNotFoundError
 
 # Status mapping: HyperPod SDK status -> Platform standard status
 STATUS_MAPPING = {

@@ -5,15 +5,15 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from src.application.services.password_service import PasswordService
-from src.core.security.exceptions import (
-    AuthenticationError,
+from src.modules.auth.application.services.password_service import PasswordService
+from src.modules.auth.domain.exceptions import (
+    InvalidCredentialsError,
     InvalidTokenError,
     PasswordTooWeakError,
     TokenExpiredError,
 )
-from src.domain.entities.user import User
-from src.domain.value_objects import AuthType, UserRole, UserStatus
+from src.modules.auth.domain.entities.user import User
+from src.modules.auth.domain.value_objects import AuthType, UserRole, UserStatus
 
 
 @pytest.fixture
@@ -119,7 +119,7 @@ class TestChangePassword:
         with patch.object(
             password_service._hasher, "verify_password", return_value=False
         ):
-            with pytest.raises(AuthenticationError) as exc_info:
+            with pytest.raises(InvalidCredentialsError) as exc_info:
                 await password_service.change_password(
                     user_id=1,
                     current_password="WrongPassword",

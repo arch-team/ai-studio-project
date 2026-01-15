@@ -2,7 +2,7 @@
 
 import pytest
 
-from src.domain.value_objects.pod_statistics import PodStatistics
+from src.modules.training.domain.value_objects.pod_statistics import PodStatistics
 
 
 class TestPodStatisticsCreation:

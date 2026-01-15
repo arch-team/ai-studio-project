@@ -5,10 +5,14 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from src.application.services.account_service import AccountService
-from src.core.security.exceptions import AuthenticationError, PasswordTooWeakError
-from src.domain.entities.user import User
-from src.domain.value_objects import AuthType, UserRole, UserStatus
+from src.modules.auth.application.services.account_service import AccountService
+from src.modules.auth.domain.exceptions import (
+    InvalidCredentialsError,
+    PasswordTooWeakError,
+    UserNotFoundError,
+)
+from src.modules.auth.domain.entities.user import User
+from src.modules.auth.domain.value_objects import AuthType, UserRole, UserStatus
 
 
 @pytest.fixture
@@ -114,7 +118,7 @@ class TestCreateLocalAccount:
         """Test account creation with duplicate username."""
         mock_user_repository.exists_by_username.return_value = True
 
-        with pytest.raises(AuthenticationError) as exc_info:
+        with pytest.raises(InvalidCredentialsError) as exc_info:
             await account_service.create_local_account(
                 username="testuser",
                 email="new@example.com",
@@ -202,7 +206,7 @@ class TestAccountManagement:
         """Test enabling nonexistent account raises error."""
         mock_user_repository.get_by_id.return_value = None
 
-        with pytest.raises(AuthenticationError) as exc_info:
+        with pytest.raises(UserNotFoundError) as exc_info:
             await account_service.enable_account(999)
 
         assert "not found" in str(exc_info.value).lower()

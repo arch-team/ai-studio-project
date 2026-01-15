@@ -10,7 +10,7 @@ Tests cover:
 
 import pytest
 
-from src.domain.entities.training_job import (
+from src.modules.training.domain.entities.training_job import (
     TRAINING_JOB_STATE_TRANSITIONS,
     DistributionStrategy,
     JobPriority,
@@ -18,7 +18,7 @@ from src.domain.entities.training_job import (
     SpotInterruptionBehavior,
     TrainingJob,
 )
-from src.domain.exceptions import InvalidStateTransitionError
+from src.shared.domain.exceptions import InvalidStateTransitionError
 
 
 class TestJobStatusEnum:

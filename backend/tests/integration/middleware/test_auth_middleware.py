@@ -95,7 +95,9 @@ class TestProtectedPaths:
         response = await client.get("/api/v1/auth/me")
 
         assert response.status_code == 401
-        assert "error" in response.json() or "detail" in response.json()
+        # Middleware returns {"code": "...", "message": "..."}
+        data = response.json()
+        assert "code" in data or "error" in data or "detail" in data
 
     @pytest.mark.asyncio
     async def test_protected_path_invalid_token(self, client: AsyncClient) -> None:
@@ -279,5 +281,7 @@ class TestAuthenticationErrors:
         has_www_auth = "www-authenticate" in [
             h.lower() for h in response.headers.keys()
         ]
-        has_error_body = "error" in response.json() or "detail" in response.json()
+        # Middleware returns {"code": "...", "message": "..."} format
+        data = response.json()
+        has_error_body = any(k in data for k in ("code", "error", "detail", "message"))
         assert has_www_auth or has_error_body

@@ -9,12 +9,12 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from src.domain.entities.resource_limit_config import (
+from src.modules.quotas.domain.entities.resource_limit_config import (
     LimitRole,
     PriorityDefault,
     ResourceLimitConfig,
 )
-from src.domain.exceptions import DuplicateEntityError, EntityNotFoundError
+from src.modules.quotas.domain.exceptions import DuplicateConfigError, QuotaNotFoundError
 
 # === Fixtures ===
 
@@ -93,7 +93,7 @@ def create_config_data() -> dict[str, Any]:
 
 def get_service(mock_repository: AsyncMock):
     """Create ResourceLimitConfigService with mocked dependencies."""
-    from src.application.services.resource_limit_config_service import (
+    from src.modules.quotas.application.services.resource_limit_config_service import (
         ResourceLimitConfigService,
     )
 
@@ -140,10 +140,10 @@ class TestCreateConfig:
         service = get_service(mock_repository)
 
         # Act & Assert
-        with pytest.raises(DuplicateEntityError) as exc_info:
+        with pytest.raises(DuplicateConfigError) as exc_info:
             await service.create_config(create_config_data)
 
-        assert "ResourceLimitConfig" in str(exc_info.value)
+        assert "Config already exists" in str(exc_info.value)
         mock_repository.create.assert_not_called()
 
     @pytest.mark.asyncio
@@ -234,7 +234,7 @@ class TestGetConfig:
         service = get_service(mock_repository)
 
         # Act & Assert
-        with pytest.raises(EntityNotFoundError) as exc_info:
+        with pytest.raises(QuotaNotFoundError) as exc_info:
             await service.get_config(config_id=999)
 
         assert "not found" in str(exc_info.value).lower()
@@ -412,7 +412,7 @@ class TestUpdateConfig:
         service = get_service(mock_repository)
 
         # Act & Assert
-        with pytest.raises(EntityNotFoundError):
+        with pytest.raises(QuotaNotFoundError):
             await service.update_config(config_id=999, data={"config_name": "new"})
 
     @pytest.mark.asyncio
@@ -429,7 +429,7 @@ class TestUpdateConfig:
         service = get_service(mock_repository)
 
         # Act & Assert
-        with pytest.raises(DuplicateEntityError):
+        with pytest.raises(DuplicateConfigError):
             await service.update_config(
                 config_id=1,
                 data={"role": "engineer", "project_id": 100},
@@ -495,7 +495,7 @@ class TestDeleteConfig:
         service = get_service(mock_repository)
 
         # Act & Assert
-        with pytest.raises(EntityNotFoundError):
+        with pytest.raises(QuotaNotFoundError):
             await service.delete_config(config_id=999)
 
 

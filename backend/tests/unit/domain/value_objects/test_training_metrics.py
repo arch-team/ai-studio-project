@@ -4,7 +4,7 @@ from decimal import Decimal
 
 import pytest
 
-from src.domain.value_objects.training_metrics import TrainingMetrics
+from src.modules.training.domain.value_objects.training_metrics import TrainingMetrics
 
 
 class TestTrainingMetricsCreation:

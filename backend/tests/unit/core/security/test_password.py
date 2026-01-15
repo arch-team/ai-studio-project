@@ -1,8 +1,8 @@
 """Password Manager Unit Tests."""
 
 
-from src.core.security.constants import PASSWORD_BCRYPT_COST, PASSWORD_MIN_LENGTH
-from src.core.security.password import PasswordHasher, PasswordValidator
+from src.shared.infrastructure.security.constants import PASSWORD_BCRYPT_COST, PASSWORD_MIN_LENGTH
+from src.shared.infrastructure.security.password import PasswordHasher, PasswordValidator
 
 
 class TestPasswordHasher:

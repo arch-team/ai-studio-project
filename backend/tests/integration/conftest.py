@@ -5,9 +5,9 @@ from typing import Any
 
 import pytest
 
-from src.core.security.constants import PASSWORD_BCRYPT_COST
-from src.core.security.jwt import JWTManager
-from src.core.security.password import PasswordHasher
+from src.shared.infrastructure.security.constants import PASSWORD_BCRYPT_COST
+from src.shared.infrastructure.security.jwt import JWTManager
+from src.shared.infrastructure.security.password import PasswordHasher
 
 # Note: client fixture is inherited from tests/conftest.py
 

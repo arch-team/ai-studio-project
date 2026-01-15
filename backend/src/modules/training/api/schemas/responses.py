@@ -16,29 +16,29 @@ if TYPE_CHECKING:
 class JobStatusEnum(str, Enum):
     """Job status."""
 
-    SUBMITTED = "SUBMITTED"
-    RUNNING = "RUNNING"
-    PAUSED = "PAUSED"
-    PREEMPTED = "PREEMPTED"
-    COMPLETED = "COMPLETED"
-    FAILED = "FAILED"
+    SUBMITTED = "submitted"
+    RUNNING = "running"
+    PAUSED = "paused"
+    PREEMPTED = "preempted"
+    COMPLETED = "completed"
+    FAILED = "failed"
 
 
 class JobPriorityEnum(str, Enum):
     """Job priority."""
 
-    HIGH = "HIGH"
-    MEDIUM = "MEDIUM"
-    LOW = "LOW"
+    HIGH = "high"
+    MEDIUM = "medium"
+    LOW = "low"
 
 
 class DistributionStrategyEnum(str, Enum):
     """Distribution strategy."""
 
-    DDP = "DDP"
-    FSDP = "FSDP"
-    DEEPSPEED = "DEEPSPEED"
-    HOROVOD = "HOROVOD"
+    DDP = "ddp"
+    FSDP = "fsdp"
+    DEEPSPEED = "deepspeed"
+    HOROVOD = "horovod"
 
 
 class CheckpointTypeEnum(str, Enum):

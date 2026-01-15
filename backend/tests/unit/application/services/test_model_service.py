@@ -9,12 +9,12 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from src.domain.entities.model import (
+from src.modules.models.domain.entities.model import (
     Model,
     ModelFramework,
     ModelStatus,
 )
-from src.domain.exceptions import (
+from src.shared.domain.exceptions import (
     DuplicateEntityError,
     EntityNotFoundError,
     InvalidStateTransitionError,
@@ -151,7 +151,7 @@ def get_service(
     mock_checkpoint_repository: AsyncMock | None = None,
 ):
     """Create ModelService with mocked dependencies."""
-    from src.application.services.model_service import ModelService
+    from src.modules.models.application.services.model_service import ModelService
 
     return ModelService(
         model_repository=mock_model_repository,

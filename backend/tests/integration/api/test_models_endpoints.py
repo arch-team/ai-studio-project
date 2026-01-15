@@ -512,7 +512,8 @@ class TestModelsResponseFormat:
         response = await client.get("/api/v1/models")
         assert response.status_code == 401
         data = response.json()
-        assert "detail" in data or "error" in data
+        # Middleware returns {"code": "...", "message": "..."}
+        assert "code" in data or "detail" in data or "error" in data
 
     @pytest.mark.asyncio
     async def test_422_response_format(

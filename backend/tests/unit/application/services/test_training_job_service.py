@@ -5,17 +5,17 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from src.domain.entities.training_job import (
+from src.modules.training.domain.entities.training_job import (
     DistributionStrategy,
     JobPriority,
     JobStatus,
     TrainingJob,
 )
-from src.domain.exceptions import (
+from src.shared.domain.exceptions import (
     DuplicateEntityError,
-    EntityNotFoundError,
     InvalidStateTransitionError,
 )
+from src.modules.training.domain.exceptions import TrainingJobNotFoundError
 
 # === Fixtures ===
 
@@ -112,8 +112,8 @@ def create_job_data() -> dict:
         "node_count": 2,
         "tasks_per_node": 8,
         "entrypoint_command": ["torchrun", "--nproc_per_node=8", "train.py"],
-        "distribution_strategy": "ddp",
-        "priority": "medium",
+        "distribution_strategy": "DDP",
+        "priority": "MEDIUM",
     }
 
 
@@ -123,7 +123,7 @@ def create_job_data() -> dict:
 
 def get_service(mock_repository: AsyncMock, mock_hyperpod_client: AsyncMock):
     """Create TrainingJobService with mocked dependencies."""
-    from src.application.services.training_job_service import TrainingJobService
+    from src.modules.training.application.services.training_job_service import TrainingJobService
 
     return TrainingJobService(
         repository=mock_repository,
@@ -219,7 +219,7 @@ class TestGetTrainingJob:
         service = get_service(mock_repository, mock_hyperpod_client)
 
         # Act & Assert
-        with pytest.raises(EntityNotFoundError) as exc_info:
+        with pytest.raises(TrainingJobNotFoundError) as exc_info:
             await service.get_job(job_id=999)
 
         assert "not found" in str(exc_info.value)
@@ -458,5 +458,5 @@ class TestDeleteJob:
         service = get_service(mock_repository, mock_hyperpod_client)
 
         # Act & Assert
-        with pytest.raises(EntityNotFoundError):
+        with pytest.raises(TrainingJobNotFoundError):
             await service.delete_job(job_id=999)

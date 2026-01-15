@@ -2,14 +2,14 @@
 
 import pytest
 
-from src.application.services.rbac_service import (
+from src.modules.auth.application.services.rbac_service import (
     K8S_RBAC_BINDINGS,
     ROLE_PERMISSIONS,
     Permission,
     RBACService,
     get_rbac_service,
 )
-from src.core.security.exceptions import InsufficientPermissionsError
+from src.modules.auth.domain.exceptions import InsufficientPermissionsError
 
 
 class TestRBACServicePermissions:

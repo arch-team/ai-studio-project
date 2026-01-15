@@ -12,13 +12,13 @@ from datetime import datetime
 
 import pytest
 
-from src.domain.entities.model import (
+from src.modules.models.domain.entities.model import (
     MODEL_STATE_TRANSITIONS,
     Model,
     ModelFramework,
     ModelStatus,
 )
-from src.domain.exceptions import InvalidStateTransitionError
+from src.shared.domain.exceptions import InvalidStateTransitionError
 
 
 class TestModelFrameworkEnum:

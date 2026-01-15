@@ -12,13 +12,13 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from src.domain.entities.training_job import (
+from src.modules.training.domain.entities.training_job import (
     DistributionStrategy,
     JobPriority,
     JobStatus,
     TrainingJob,
 )
-from src.domain.exceptions import (
+from src.shared.domain.exceptions import (
     EntityNotFoundError,
 )
 
@@ -118,7 +118,7 @@ class TestHyperPodServiceSubmit:
         self, mock_hyperpod_client: AsyncMock, job_config: dict[str, Any]
     ) -> None:
         """Submit job successfully via HyperPod SDK."""
-        from src.application.services.hyperpod_service import HyperPodService
+        from src.modules.training.application.services.hyperpod_service import HyperPodService
 
         service = HyperPodService(
             hyperpod_client=mock_hyperpod_client,
@@ -143,7 +143,7 @@ class TestHyperPodServiceSubmit:
         self, mock_hyperpod_client: AsyncMock, job_config: dict[str, Any]
     ) -> None:
         """Submit job with retry on transient SDK errors."""
-        from src.application.services.hyperpod_service import HyperPodService
+        from src.modules.training.application.services.hyperpod_service import HyperPodService
 
         # First call fails, second succeeds
         mock_hyperpod_client.submit_training_job.side_effect = [
@@ -175,7 +175,7 @@ class TestHyperPodServiceSubmit:
         self, mock_hyperpod_client: AsyncMock, job_config: dict[str, Any]
     ) -> None:
         """Submit job fails after max retries exceeded."""
-        from src.application.services.hyperpod_service import (
+        from src.modules.training.application.services.hyperpod_service import (
             HyperPodService,
             HyperPodServiceError,
         )
@@ -208,7 +208,7 @@ class TestHyperPodServiceGetStatus:
         self, mock_hyperpod_client: AsyncMock
     ) -> None:
         """Get job status successfully."""
-        from src.application.services.hyperpod_service import HyperPodService
+        from src.modules.training.application.services.hyperpod_service import HyperPodService
 
         service = HyperPodService(
             hyperpod_client=mock_hyperpod_client,
@@ -229,7 +229,7 @@ class TestHyperPodServiceGetStatus:
         self, mock_hyperpod_client: AsyncMock
     ) -> None:
         """Get status for non-existent job."""
-        from src.application.services.hyperpod_service import HyperPodService
+        from src.modules.training.application.services.hyperpod_service import HyperPodService
 
         mock_hyperpod_client.get_training_job_status.side_effect = RuntimeError(
             "Job not found"
@@ -250,7 +250,7 @@ class TestHyperPodServiceTerminate:
     @pytest.mark.asyncio
     async def test_terminate_job_success(self, mock_hyperpod_client: AsyncMock) -> None:
         """Terminate running job successfully."""
-        from src.application.services.hyperpod_service import HyperPodService
+        from src.modules.training.application.services.hyperpod_service import HyperPodService
 
         service = HyperPodService(
             hyperpod_client=mock_hyperpod_client,
@@ -270,7 +270,7 @@ class TestHyperPodServiceTerminate:
         self, mock_hyperpod_client: AsyncMock
     ) -> None:
         """Terminate job with retry on transient errors."""
-        from src.application.services.hyperpod_service import HyperPodService
+        from src.modules.training.application.services.hyperpod_service import HyperPodService
 
         mock_hyperpod_client.stop_training_job.side_effect = [
             RuntimeError("Transient error"),
@@ -306,7 +306,7 @@ class TestHyperPodServicePause:
         self, mock_hyperpod_client: AsyncMock
     ) -> None:
         """Pause job triggers checkpoint signal and stops job."""
-        from src.application.services.hyperpod_service import HyperPodService
+        from src.modules.training.application.services.hyperpod_service import HyperPodService
 
         service = HyperPodService(
             hyperpod_client=mock_hyperpod_client,
@@ -330,7 +330,7 @@ class TestHyperPodServiceResume:
         self, mock_hyperpod_client: AsyncMock, job_config: dict[str, Any]
     ) -> None:
         """Resume job resubmits with checkpoint configuration."""
-        from src.application.services.hyperpod_service import HyperPodService
+        from src.modules.training.application.services.hyperpod_service import HyperPodService
 
         service = HyperPodService(
             hyperpod_client=mock_hyperpod_client,
@@ -359,7 +359,7 @@ class TestHyperPodServiceListPods:
     @pytest.mark.asyncio
     async def test_list_job_pods_success(self, mock_hyperpod_client: AsyncMock) -> None:
         """List pods for a training job."""
-        from src.application.services.hyperpod_service import HyperPodService
+        from src.modules.training.application.services.hyperpod_service import HyperPodService
 
         mock_hyperpod_client.list_training_job_pods = AsyncMock(
             return_value=[
@@ -404,7 +404,7 @@ class TestHyperPodServiceStatusMapping:
         self, hyperpod_status: str, expected_platform_status: str
     ) -> None:
         """Map HyperPod status to platform status."""
-        from src.application.services.hyperpod_service import map_hyperpod_status
+        from src.modules.training.application.services.hyperpod_service import map_hyperpod_status
 
         assert map_hyperpod_status(hyperpod_status) == expected_platform_status
 
@@ -414,7 +414,7 @@ class TestHyperPodServiceVolumeConfig:
 
     def test_build_fsx_volume_config(self) -> None:
         """Build FSx for Lustre volume configuration."""
-        from src.application.services.hyperpod_service import build_volume_config
+        from src.modules.training.application.services.hyperpod_service import build_volume_config
 
         volumes = build_volume_config(
             data_path="/fsx/training-data",
@@ -434,7 +434,7 @@ class TestHyperPodServiceJobConfig:
 
     def test_build_job_config_from_entity(self, sample_job: TrainingJob) -> None:
         """Build HyperPod job config from TrainingJob entity."""
-        from src.application.services.hyperpod_service import build_job_config
+        from src.modules.training.application.services.hyperpod_service import build_job_config
 
         config = build_job_config(sample_job)
 

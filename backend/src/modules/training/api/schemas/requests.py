@@ -8,18 +8,18 @@ from pydantic import BaseModel, Field
 class DistributionStrategyEnum(str, Enum):
     """Distributed training strategy."""
 
-    DDP = "DDP"
-    FSDP = "FSDP"
-    DEEPSPEED = "DEEPSPEED"
-    HOROVOD = "HOROVOD"
+    DDP = "ddp"
+    FSDP = "fsdp"
+    DEEPSPEED = "deepspeed"
+    HOROVOD = "horovod"
 
 
 class JobPriorityEnum(str, Enum):
     """Job priority for scheduling."""
 
-    HIGH = "HIGH"
-    MEDIUM = "MEDIUM"
-    LOW = "LOW"
+    HIGH = "high"
+    MEDIUM = "medium"
+    LOW = "low"
 
 
 class CreateTrainingJobRequest(BaseModel):

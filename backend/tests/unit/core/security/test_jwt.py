@@ -5,8 +5,8 @@ from datetime import UTC, datetime, timedelta
 import pytest
 from authlib.jose import jwt as authlib_jwt
 
-from src.core.security.exceptions import InvalidTokenError, TokenExpiredError
-from src.core.security.jwt import JWTManager, TokenPayload, TokenType, get_jwt_manager
+from src.shared.infrastructure.security.exceptions import InvalidTokenError, TokenExpiredError
+from src.shared.infrastructure.security.jwt import JWTManager, TokenPayload, TokenType, get_jwt_manager
 
 
 class TestJWTManagerTokenCreation:

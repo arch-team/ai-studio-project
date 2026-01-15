@@ -5,13 +5,13 @@ from fastapi import status
 from starlette.requests import Request
 from starlette.testclient import TestClient
 
-from src.api.exception_handlers import (
+from src.shared.api.exception_handlers import (
     DOMAIN_EXCEPTION_MAP,
     SECURITY_EXCEPTION_MAP,
     domain_exception_handler,
     security_exception_handler,
 )
-from src.core.security.exceptions import (
+from src.shared.infrastructure.security.exceptions import (
     AccountLockedError,
     AuthenticationError,
     InvalidCredentialsError,
@@ -25,7 +25,7 @@ from src.core.security.exceptions import (
     TokenExpiredError,
     UserNotFoundError,
 )
-from src.domain.exceptions import (
+from src.shared.domain.exceptions import (
     DomainError,
     DuplicateEntityError,
     EntityNotFoundError,

@@ -12,7 +12,7 @@ from starlette.responses import JSONResponse, Response
 from starlette.routing import Route
 from starlette.testclient import TestClient
 
-from src.domain.entities.audit_log import OperationType, ResourceType
+from src.modules.audit.domain.value_objects import OperationType, ResourceType
 
 
 # Test fixtures
@@ -55,7 +55,7 @@ class TestAuditMiddlewareExemptPaths:
 
     def test_skips_health_endpoint(self, mock_audit_repository: AsyncMock) -> None:
         """Health endpoint should not be audited."""
-        from src.api.middleware.audit import AuditMiddleware
+        from src.modules.audit.api.middleware import AuditMiddleware
 
         app = self._create_test_app(AuditMiddleware)
         client = TestClient(app)
@@ -67,7 +67,7 @@ class TestAuditMiddlewareExemptPaths:
 
     def test_skips_docs_endpoint(self, mock_audit_repository: AsyncMock) -> None:
         """OpenAPI docs should not be audited."""
-        from src.api.middleware.audit import AuditMiddleware
+        from src.modules.audit.api.middleware import AuditMiddleware
 
         app = self._create_test_app(AuditMiddleware)
         client = TestClient(app)
@@ -79,7 +79,7 @@ class TestAuditMiddlewareExemptPaths:
 
     def test_skips_redoc_endpoint(self, mock_audit_repository: AsyncMock) -> None:
         """ReDoc endpoint should not be audited."""
-        from src.api.middleware.audit import AuditMiddleware
+        from src.modules.audit.api.middleware import AuditMiddleware
 
         app = self._create_test_app(AuditMiddleware)
         client = TestClient(app)
@@ -91,7 +91,7 @@ class TestAuditMiddlewareExemptPaths:
 
     def test_skips_openapi_json(self, mock_audit_repository: AsyncMock) -> None:
         """OpenAPI JSON should not be audited."""
-        from src.api.middleware.audit import AuditMiddleware
+        from src.modules.audit.api.middleware import AuditMiddleware
 
         app = self._create_test_app(AuditMiddleware)
         client = TestClient(app)
@@ -133,7 +133,7 @@ class TestAuditMiddlewareHttpMethods:
 
     def test_skips_get_requests(self, mock_audit_repository: AsyncMock) -> None:
         """GET requests should not be audited (read-only)."""
-        from src.api.middleware.audit import AuditMiddleware
+        from src.modules.audit.api.middleware import AuditMiddleware
 
         app = self._create_test_app(AuditMiddleware, mock_audit_repository)
         client = TestClient(app)
@@ -145,7 +145,7 @@ class TestAuditMiddlewareHttpMethods:
 
     def test_skips_head_requests(self, mock_audit_repository: AsyncMock) -> None:
         """HEAD requests should not be audited."""
-        from src.api.middleware.audit import AuditMiddleware
+        from src.modules.audit.api.middleware import AuditMiddleware
 
         app = self._create_test_app(AuditMiddleware, mock_audit_repository)
         client = TestClient(app)
@@ -157,7 +157,7 @@ class TestAuditMiddlewareHttpMethods:
 
     def test_skips_options_requests(self, mock_audit_repository: AsyncMock) -> None:
         """OPTIONS requests should not be audited."""
-        from src.api.middleware.audit import AuditMiddleware
+        from src.modules.audit.api.middleware import AuditMiddleware
 
         app = self._create_test_app(AuditMiddleware, mock_audit_repository)
         client = TestClient(app)
@@ -173,7 +173,7 @@ class TestAuditMiddlewareHttpMethods:
         sample_request_body: dict[str, Any],
     ) -> None:
         """POST requests should be recorded as CREATE operations."""
-        from src.api.middleware.audit import AuditMiddleware
+        from src.modules.audit.api.middleware import AuditMiddleware
 
         app = self._create_test_app(AuditMiddleware, mock_audit_repository)
         client = TestClient(app)
@@ -195,7 +195,7 @@ class TestAuditMiddlewareHttpMethods:
         sample_request_body: dict[str, Any],
     ) -> None:
         """PUT requests should be recorded as UPDATE operations."""
-        from src.api.middleware.audit import AuditMiddleware
+        from src.modules.audit.api.middleware import AuditMiddleware
 
         app = self._create_test_app(AuditMiddleware, mock_audit_repository)
         client = TestClient(app)
@@ -217,7 +217,7 @@ class TestAuditMiddlewareHttpMethods:
         sample_request_body: dict[str, Any],
     ) -> None:
         """PATCH requests should be recorded as UPDATE operations."""
-        from src.api.middleware.audit import AuditMiddleware
+        from src.modules.audit.api.middleware import AuditMiddleware
 
         app = self._create_test_app(AuditMiddleware, mock_audit_repository)
         client = TestClient(app)
@@ -238,7 +238,7 @@ class TestAuditMiddlewareHttpMethods:
         mock_audit_repository: AsyncMock,
     ) -> None:
         """DELETE requests should be recorded as DELETE operations."""
-        from src.api.middleware.audit import AuditMiddleware
+        from src.modules.audit.api.middleware import AuditMiddleware
 
         app = self._create_test_app(AuditMiddleware, mock_audit_repository)
         client = TestClient(app)
@@ -319,7 +319,7 @@ class TestAuditMiddlewareResourceTypeMapping:
         expected_type: ResourceType,
     ) -> None:
         """Correctly map API paths to resource types."""
-        from src.api.middleware.audit import AuditMiddleware
+        from src.modules.audit.api.middleware import AuditMiddleware
 
         middleware = AuditMiddleware(app=MagicMock())
         resource_type = middleware._get_resource_type(path)
@@ -331,7 +331,7 @@ class TestAuditMiddlewareResourceTypeMapping:
         mock_audit_repository: AsyncMock,
     ) -> None:
         """Return None for paths that don't match known resources."""
-        from src.api.middleware.audit import AuditMiddleware
+        from src.modules.audit.api.middleware import AuditMiddleware
 
         middleware = AuditMiddleware(app=MagicMock())
         resource_type = middleware._get_resource_type("/api/v1/unknown-resource")
@@ -347,7 +347,7 @@ class TestAuditMiddlewareUserExtraction:
         mock_audit_repository: AsyncMock,
     ) -> None:
         """Extract user_id from request.state (set by auth middleware)."""
-        from src.api.middleware.audit import AuditMiddleware
+        from src.modules.audit.api.middleware import AuditMiddleware
 
         app = self._create_test_app_with_user(
             AuditMiddleware,
@@ -369,7 +369,7 @@ class TestAuditMiddlewareUserExtraction:
         mock_audit_repository: AsyncMock,
     ) -> None:
         """Handle requests without authenticated user."""
-        from src.api.middleware.audit import AuditMiddleware
+        from src.modules.audit.api.middleware import AuditMiddleware
 
         app = self._create_test_app_with_user(
             AuditMiddleware,
@@ -422,7 +422,7 @@ class TestAuditMiddlewareRequestCapture:
         sample_request_body: dict[str, Any],
     ) -> None:
         """Capture and store request body in audit log."""
-        from src.api.middleware.audit import AuditMiddleware
+        from src.modules.audit.api.middleware import AuditMiddleware
 
         app = self._create_test_app(AuditMiddleware, mock_audit_repository)
         client = TestClient(app)
@@ -441,7 +441,7 @@ class TestAuditMiddlewareRequestCapture:
         large_request_body: dict[str, Any],
     ) -> None:
         """Truncate request body exceeding max size (64KB)."""
-        from src.api.middleware.audit import AuditMiddleware
+        from src.modules.audit.api.middleware import AuditMiddleware
 
         app = self._create_test_app(AuditMiddleware, mock_audit_repository)
         client = TestClient(app)
@@ -463,7 +463,7 @@ class TestAuditMiddlewareRequestCapture:
         sensitive_request_body: dict[str, Any],
     ) -> None:
         """Sanitize sensitive fields (password, token, etc.)."""
-        from src.api.middleware.audit import AuditMiddleware
+        from src.modules.audit.api.middleware import AuditMiddleware
 
         app = self._create_test_app(AuditMiddleware, mock_audit_repository)
         client = TestClient(app)
@@ -489,7 +489,7 @@ class TestAuditMiddlewareRequestCapture:
         mock_audit_repository: AsyncMock,
     ) -> None:
         """Handle non-JSON request bodies gracefully."""
-        from src.api.middleware.audit import AuditMiddleware
+        from src.modules.audit.api.middleware import AuditMiddleware
 
         app = self._create_test_app(AuditMiddleware, mock_audit_repository)
         client = TestClient(app)
@@ -531,8 +531,8 @@ class TestAuditMiddlewareResponseCapture:
         mock_audit_repository: AsyncMock,
     ) -> None:
         """Record successful response status."""
-        from src.api.middleware.audit import AuditMiddleware
-        from src.domain.entities.audit_log import AuditStatus
+        from src.modules.audit.api.middleware import AuditMiddleware
+        from src.modules.audit.domain.value_objects import AuditStatus
 
         app = self._create_test_app(
             AuditMiddleware, mock_audit_repository, status_code=201
@@ -552,8 +552,8 @@ class TestAuditMiddlewareResponseCapture:
         mock_audit_repository: AsyncMock,
     ) -> None:
         """Record client error (4xx) as failed status."""
-        from src.api.middleware.audit import AuditMiddleware
-        from src.domain.entities.audit_log import AuditStatus
+        from src.modules.audit.api.middleware import AuditMiddleware
+        from src.modules.audit.domain.value_objects import AuditStatus
 
         app = self._create_test_app(
             AuditMiddleware, mock_audit_repository, status_code=400
@@ -573,8 +573,8 @@ class TestAuditMiddlewareResponseCapture:
         mock_audit_repository: AsyncMock,
     ) -> None:
         """Record server error (5xx) as failed status."""
-        from src.api.middleware.audit import AuditMiddleware
-        from src.domain.entities.audit_log import AuditStatus
+        from src.modules.audit.api.middleware import AuditMiddleware
+        from src.modules.audit.domain.value_objects import AuditStatus
 
         app = self._create_test_app(
             AuditMiddleware, mock_audit_repository, status_code=500
@@ -594,7 +594,7 @@ class TestAuditMiddlewareResponseCapture:
         mock_audit_repository: AsyncMock,
     ) -> None:
         """Include response status code in response_data."""
-        from src.api.middleware.audit import AuditMiddleware
+        from src.modules.audit.api.middleware import AuditMiddleware
 
         app = self._create_test_app(
             AuditMiddleware, mock_audit_repository, status_code=201
@@ -642,7 +642,7 @@ class TestAuditMiddlewareAsyncBehavior:
         mock_audit_repository: AsyncMock,
     ) -> None:
         """Audit write should not block the response."""
-        from src.api.middleware.audit import AuditMiddleware
+        from src.modules.audit.api.middleware import AuditMiddleware
 
         # Configure mock to delay
         async def slow_create(*args, **kwargs):
@@ -669,7 +669,7 @@ class TestAuditMiddlewareAsyncBehavior:
         mock_audit_repository: AsyncMock,
     ) -> None:
         """Request should succeed even if audit write fails."""
-        from src.api.middleware.audit import AuditMiddleware
+        from src.modules.audit.api.middleware import AuditMiddleware
 
         # Configure mock to raise exception
         mock_audit_repository.create.side_effect = Exception("Database error")
@@ -710,7 +710,7 @@ class TestAuditMiddlewareClientInfo:
         mock_audit_repository: AsyncMock,
     ) -> None:
         """Extract client IP from X-Forwarded-For header."""
-        from src.api.middleware.audit import AuditMiddleware
+        from src.modules.audit.api.middleware import AuditMiddleware
 
         app = self._create_test_app(AuditMiddleware, mock_audit_repository)
         client = TestClient(app)
@@ -732,7 +732,7 @@ class TestAuditMiddlewareClientInfo:
         mock_audit_repository: AsyncMock,
     ) -> None:
         """Fall back to client host when no X-Forwarded-For."""
-        from src.api.middleware.audit import AuditMiddleware
+        from src.modules.audit.api.middleware import AuditMiddleware
 
         app = self._create_test_app(AuditMiddleware, mock_audit_repository)
         client = TestClient(app)
@@ -754,7 +754,7 @@ class TestAuditMiddlewareClientInfo:
         mock_audit_repository: AsyncMock,
     ) -> None:
         """Capture User-Agent header."""
-        from src.api.middleware.audit import AuditMiddleware
+        from src.modules.audit.api.middleware import AuditMiddleware
 
         app = self._create_test_app(AuditMiddleware, mock_audit_repository)
         client = TestClient(app)
@@ -799,7 +799,7 @@ class TestAuditMiddlewareResourceIdExtraction:
         mock_audit_repository: AsyncMock,
     ) -> None:
         """Extract resource ID from URL path."""
-        from src.api.middleware.audit import AuditMiddleware
+        from src.modules.audit.api.middleware import AuditMiddleware
 
         app = self._create_test_app(AuditMiddleware, mock_audit_repository)
         client = TestClient(app)
@@ -817,7 +817,7 @@ class TestAuditMiddlewareResourceIdExtraction:
         mock_audit_repository: AsyncMock,
     ) -> None:
         """Handle collection endpoints (no resource ID)."""
-        from src.api.middleware.audit import AuditMiddleware
+        from src.modules.audit.api.middleware import AuditMiddleware
 
         app = self._create_test_app(AuditMiddleware, mock_audit_repository)
         client = TestClient(app)

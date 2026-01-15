@@ -214,16 +214,13 @@ class TestGetTrainingJobEndpoint:
         assert response.status_code == 422
 
 
-class TestUpdateTrainingJobEndpoint:
-    """Tests for PATCH /api/v1/training-jobs/{job_id} endpoint."""
+class TestJobStateTransitionEndpoints:
+    """Tests for job state transition endpoints (pause/resume/cancel)."""
 
     @pytest.mark.asyncio
-    async def test_update_job_requires_auth(self, client: AsyncClient) -> None:
-        """Test updating job requires authentication."""
-        response = await client.patch(
-            "/api/v1/training-jobs/1",
-            json={"action": "pause"},
-        )
+    async def test_pause_requires_auth(self, client: AsyncClient) -> None:
+        """Test pause endpoint requires authentication."""
+        response = await client.post("/api/v1/training-jobs/1/pause")
         assert response.status_code == 401
 
     @pytest.mark.asyncio
@@ -233,43 +230,52 @@ class TestUpdateTrainingJobEndpoint:
         engineer_auth_headers: dict[str, str],
     ) -> None:
         """Test pausing non-existent job returns 404."""
-        response = await client.patch(
-            "/api/v1/training-jobs/99999",
-            json={"action": "pause"},
+        response = await client.post(
+            "/api/v1/training-jobs/99999/pause",
             headers=engineer_auth_headers,
         )
         assert response.status_code in [404, 500]
 
     @pytest.mark.asyncio
-    async def test_update_job_invalid_action(
+    async def test_resume_job_not_found(
         self,
         client: AsyncClient,
         engineer_auth_headers: dict[str, str],
     ) -> None:
-        """Test update with invalid action returns 422."""
-        response = await client.patch(
-            "/api/v1/training-jobs/1",
-            json={"action": "invalid_action"},
+        """Test resuming non-existent job returns 404."""
+        response = await client.post(
+            "/api/v1/training-jobs/99999/resume",
             headers=engineer_auth_headers,
         )
-        assert response.status_code == 422
+        assert response.status_code in [404, 500]
 
     @pytest.mark.asyncio
-    async def test_update_job_valid_actions(
+    async def test_cancel_job_not_found(
         self,
         client: AsyncClient,
         engineer_auth_headers: dict[str, str],
     ) -> None:
-        """Test valid action values are accepted."""
-        valid_actions = ["pause", "resume", "cancel"]
-        for action in valid_actions:
-            response = await client.patch(
-                "/api/v1/training-jobs/99999",
-                json={"action": action},
-                headers=engineer_auth_headers,
-            )
-            # Should be 404 (job not found) or 500 (DB error), not 422
-            assert response.status_code in [404, 409, 500]
+        """Test cancelling non-existent job returns 404."""
+        response = await client.post(
+            "/api/v1/training-jobs/99999/cancel",
+            headers=engineer_auth_headers,
+        )
+        assert response.status_code in [404, 500]
+
+    @pytest.mark.asyncio
+    async def test_all_state_endpoints_require_auth(
+        self,
+        client: AsyncClient,
+    ) -> None:
+        """Test all state transition endpoints require authentication."""
+        endpoints = [
+            "/api/v1/training-jobs/1/pause",
+            "/api/v1/training-jobs/1/resume",
+            "/api/v1/training-jobs/1/cancel",
+        ]
+        for endpoint in endpoints:
+            response = await client.post(endpoint)
+            assert response.status_code == 401, f"Failed for {endpoint}"
 
 
 class TestDeleteTrainingJobEndpoint:
@@ -317,7 +323,8 @@ class TestTrainingJobsResponseFormat:
         response = await client.get("/api/v1/training-jobs")
         assert response.status_code == 401
         data = response.json()
-        assert "detail" in data or "error" in data
+        # Middleware returns {"code": "...", "message": "..."}
+        assert "code" in data or "detail" in data or "error" in data
 
     @pytest.mark.asyncio
     async def test_422_response_format(

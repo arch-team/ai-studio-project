@@ -6,10 +6,10 @@ from unittest.mock import AsyncMock, MagicMock, Mock, patch
 
 import pytest
 
-from src.core.security.constants import PASSWORD_BCRYPT_COST
-from src.core.security.jwt import JWTManager, TokenPayload, TokenType
-from src.core.security.password import PasswordHasher, PasswordValidator
-from src.domain.entities.user import UserRole, UserStatus
+from src.shared.infrastructure.security.constants import PASSWORD_BCRYPT_COST
+from src.shared.infrastructure.security.jwt import JWTManager, TokenPayload, TokenType
+from src.shared.infrastructure.security.password import PasswordHasher, PasswordValidator
+from src.modules.auth.domain.entities.user import UserRole, UserStatus
 
 # =============================================================================
 # JWT Manager Fixtures
@@ -34,7 +34,7 @@ def mock_settings(jwt_secret_key: str) -> MagicMock:
 @pytest.fixture
 def jwt_manager(mock_settings: MagicMock) -> JWTManager:
     """Real JWTManager instance for testing with mocked settings."""
-    with patch("src.core.security.jwt.get_settings", return_value=mock_settings):
+    with patch("src.shared.infrastructure.security.jwt.get_settings", return_value=mock_settings):
         return JWTManager()
 
 

@@ -12,14 +12,14 @@ from decimal import Decimal
 
 import pytest
 
-from src.domain.entities.checkpoint import (
+from src.modules.training.domain.entities.checkpoint import (
     STORAGE_TIER_HIERARCHY,
     Checkpoint,
     CheckpointStatus,
     CheckpointType,
     StorageTier,
 )
-from src.domain.exceptions import InvalidStateTransitionError
+from src.shared.domain.exceptions import InvalidStateTransitionError
 
 
 class TestCheckpointTypeEnum:

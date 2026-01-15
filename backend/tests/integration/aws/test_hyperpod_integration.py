@@ -12,7 +12,7 @@ import os
 import pytest
 import pytest_asyncio
 
-from src.infrastructure.external.hyperpod.client import HyperPodClient
+from src.modules.training.infrastructure.hyperpod.client import HyperPodClient
 
 pytestmark = [
     pytest.mark.aws_integration,

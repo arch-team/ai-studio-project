@@ -16,12 +16,12 @@ from typing import Any
 import pytest
 import pytest_asyncio
 
-from src.application.services.hyperpod_service import (
+from src.modules.training.application.services.hyperpod_service import (
     HyperPodService,
     HyperPodServiceError,
 )
-from src.domain.exceptions import EntityNotFoundError
-from src.infrastructure.external.hyperpod.client import HyperPodClient
+from src.shared.domain.exceptions import EntityNotFoundError
+from src.modules.training.infrastructure.hyperpod.client import HyperPodClient
 
 # Mark all tests as AWS integration tests
 pytestmark = [
@@ -295,7 +295,7 @@ class TestHyperPodServiceStatusMapping:
 
     def test_status_mapping_values(self) -> None:
         """Verify all expected status mappings exist."""
-        from src.application.services.hyperpod_service import map_hyperpod_status
+        from src.modules.training.application.services.hyperpod_service import map_hyperpod_status
 
         assert map_hyperpod_status("Pending") == "submitted"
         assert map_hyperpod_status("Running") == "running"
@@ -310,7 +310,7 @@ class TestHyperPodServiceVolumeConfig:
 
     def test_build_volume_config_with_data_path(self) -> None:
         """Verify volume config is built correctly."""
-        from src.application.services.hyperpod_service import build_volume_config
+        from src.modules.training.application.services.hyperpod_service import build_volume_config
 
         volumes = build_volume_config(
             data_path="/fsx/training-data",
@@ -326,7 +326,7 @@ class TestHyperPodServiceVolumeConfig:
 
     def test_build_volume_config_partial(self) -> None:
         """Verify partial volume config works."""
-        from src.application.services.hyperpod_service import build_volume_config
+        from src.modules.training.application.services.hyperpod_service import build_volume_config
 
         volumes = build_volume_config(data_path="/fsx/data")
         assert len(volumes) == 1

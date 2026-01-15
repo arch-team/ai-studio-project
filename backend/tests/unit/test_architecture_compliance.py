@@ -498,8 +498,9 @@ class TestApiStateTransitionEndpoints:
         self, backend_src_path: Path
     ):
         """Training jobs API should have a dedicated POST /pause endpoint."""
+        # Updated path for modular architecture
         endpoint_file = (
-            backend_src_path / "api" / "v1" / "endpoints" / "training_jobs.py"
+            backend_src_path / "modules" / "training" / "api" / "endpoints.py"
         )
 
         with open(endpoint_file, encoding="utf-8") as f:
@@ -515,8 +516,9 @@ class TestApiStateTransitionEndpoints:
         self, backend_src_path: Path
     ):
         """Training jobs API should have a dedicated POST /resume endpoint."""
+        # Updated path for modular architecture
         endpoint_file = (
-            backend_src_path / "api" / "v1" / "endpoints" / "training_jobs.py"
+            backend_src_path / "modules" / "training" / "api" / "endpoints.py"
         )
 
         with open(endpoint_file, encoding="utf-8") as f:
@@ -532,8 +534,9 @@ class TestApiStateTransitionEndpoints:
         self, backend_src_path: Path
     ):
         """Training jobs API should have a dedicated POST /cancel endpoint."""
+        # Updated path for modular architecture
         endpoint_file = (
-            backend_src_path / "api" / "v1" / "endpoints" / "training_jobs.py"
+            backend_src_path / "modules" / "training" / "api" / "endpoints.py"
         )
 
         with open(endpoint_file, encoding="utf-8") as f:
@@ -553,8 +556,9 @@ class TestApiStateTransitionEndpoints:
         The action parameter pattern indicates mixing multiple operations
         in a single endpoint, which reduces API clarity.
         """
+        # Updated path for modular architecture
         schema_file = (
-            backend_src_path / "api" / "v1" / "schemas" / "training_job.py"
+            backend_src_path / "modules" / "training" / "api" / "schemas" / "requests.py"
         )
 
         with open(schema_file, encoding="utf-8") as f:
