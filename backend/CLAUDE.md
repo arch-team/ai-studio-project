@@ -242,6 +242,84 @@ class TrainingJobService:
         return await self._repository.save(job) # 仓库负责持久化
 ```
 
+## Exception Handling
+
+本项目采用 **全局异常处理器** 模式，将异常到 HTTP 响应的映射集中管理。
+
+### 架构概述
+
+```
+┌─────────────────────────────────────────────────┐
+│ API 端点 - 无需 try-except                       │
+│ (异常自动传播到全局处理器)                        │
+├─────────────────────────────────────────────────┤
+│ 全局异常处理器 (src/api/exception_handlers.py)  │
+│ - domain_exception_handler: DomainError → HTTP  │
+│ - security_exception_handler: SecurityError → HTTP │
+└─────────────────────────────────────────────────┘
+```
+
+### 异常映射表
+
+**Domain 异常** (`src/domain/exceptions/`):
+
+| 异常类型 | HTTP 状态码 | 场景 |
+|---------|------------|------|
+| `EntityNotFoundError` | 404 | 资源不存在 |
+| `DuplicateEntityError` | 409 | 资源已存在 |
+| `InvalidStateTransitionError` | 409 | 状态转换无效 |
+| `ValidationError` | 422 | 业务验证失败 |
+| `ResourceQuotaExceededError` | 429 | 配额超限 |
+
+**Security 异常** (`src/core/security/exceptions.py`):
+
+| 异常类型 | HTTP 状态码 | 场景 |
+|---------|------------|------|
+| `AuthenticationError` | 401 | 认证失败 |
+| `InvalidCredentialsError` | 401 | 凭证无效 |
+| `TokenExpiredError` | 401 | Token 过期 |
+| `UserNotFoundError` | 404 | 用户不存在 |
+| `AccountLockedError` | 423 | 账户锁定 |
+| `InsufficientPermissionsError` | 403 | 权限不足 |
+| `SSODegradedModeError` | 503 | SSO 服务降级 |
+
+### 端点代码规范
+
+```python
+# ❌ 禁止：手动转换异常
+@router.post("")
+async def create_job(data: CreateRequest, service: Service = Depends(...)):
+    try:
+        job = await service.create_job(data)
+        return job
+    except DuplicateEntityError as e:
+        raise HTTPException(status_code=409, detail=str(e))
+
+# ✅ 正确：让异常自动传播
+@router.post("")
+async def create_job(data: CreateRequest, service: Service = Depends(...)):
+    job = await service.create_job(data)
+    return job
+```
+
+**例外情况**：仅在需要自定义响应格式（如 SSO 降级消息）时保留 try-except。
+
+### 新增异常指南
+
+1. **定义异常类**：
+   - Domain 异常 → `src/domain/exceptions/__init__.py`
+   - Security 异常 → `src/core/security/exceptions.py`
+
+2. **添加映射**：在 `src/api/exception_handlers.py` 的映射表中添加一行：
+   ```python
+   DOMAIN_EXCEPTION_MAP: dict[type[DomainError], int] = {
+       # ... 现有映射
+       NewCustomError: status.HTTP_4XX_XXX,  # 新增
+   }
+   ```
+
+3. **测试**：在 `tests/unit/api/test_exception_handlers.py` 添加映射测试。
+
 ## Test-Driven Development (TDD)
 
 本项目践行 TDD 实践，遵循 **Red-Green-Refactor** 循环。
