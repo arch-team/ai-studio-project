@@ -446,15 +446,15 @@
 - [X] [T031d] [US1] POST /training-jobs/{id}/checkpoints 端点实现 - `backend/src/api/v1/endpoints/training_jobs.py`,支持用户手动触发检查点创建,验证任务状态 (仅 Running 状态可创建),调用 checkpoint_service 创建检查点,返回检查点 ID 和存储路径 (依赖 T038)
 
 ### 前端页面组件
-- [ ] [T032] [US1] [P] 训练任务列表页面 - `frontend/src/features/training/pages/TrainingJobListPage.tsx`,使用 Cloudscape Table 组件,支持分页/过滤/排序,实时状态更新,创建模块 API 层 `frontend/src/features/training/api/queries.ts`
-- [ ] [T033] [US1] [P] 训练任务创建表单 - `frontend/src/features/training/pages/CreateTrainingJobPage.tsx`,使用 Cloudscape Form 组件,验证训练配置 (实例类型,节点数,训练脚本路径),配额实时检查,创建表单组件 `frontend/src/features/training/components/TrainingJobForm.tsx`
-- [ ] [T034] [US1] [P] 训练任务详情页面 - `frontend/src/features/training/pages/TrainingJobDetailPage.tsx`,展示训练配置、实时指标、日志流、检查点列表,支持暂停/恢复/终止操作
-- [ ] [T035] [US1] [P] 训练状态监控组件 - `frontend/src/features/training/components/TrainingStatusMonitor.tsx`,实时显示 GPU 利用率、训练进度、损失曲线,30秒刷新间隔
-- [ ] [T035a] [US1] [P] 模型版本管理页面 - `frontend/src/features/models/pages/ModelVersionsPage.tsx`,使用 Cloudscape Table 展示模型版本历史,支持版本对比(metrics diff)、模型回滚、SageMaker Model Registry 同步状态显示,创建模块类型定义 `frontend/src/features/models/types/index.ts`
-- [ ] [T035b] [US1] [P] 模型列表页面 - `frontend/src/features/models/pages/ModelListPage.tsx`,使用 Cloudscape Table 组件,支持分页/过滤(training_job_id, status)/排序,显示模型名称、版本数、Registry 同步状态,创建模块 API 层 `frontend/src/features/models/api/modelApi.ts` 和 `frontend/src/features/models/api/queries.ts`
-- [ ] [T035c] [US1] [P] 模型详情页面 - `frontend/src/features/models/pages/ModelDetailPage.tsx`,展示模型元数据(metrics, hyperparameters)、关联训练任务、Registry ARN,支持跳转至版本管理页面
-- [ ] [T035d] [US1] [P] 模型列表组件 - `frontend/src/features/models/components/ModelTable.tsx`,复用 Cloudscape Table,支持行选择和批量操作,创建 `frontend/src/features/models/components/RegistrySyncStatus.tsx` 显示 SageMaker Model Registry 同步状态指示器
-- [ ] [T035e] [US1] [P] 模型版本对比组件 - `frontend/src/features/models/components/ModelVersionTable.tsx` 展示版本历史表格,`frontend/src/features/models/components/ModelMetricsCompare.tsx` 实现版本指标对比(metrics diff)可视化,创建 hooks `frontend/src/features/models/hooks/useModel.ts` 和 `frontend/src/features/models/hooks/useModelVersions.ts`
+- [X] [T032] [US1] [P] 训练任务列表页面 - `frontend/src/features/training/pages/TrainingJobListPage.tsx`,使用 Cloudscape Table 组件,支持分页/过滤/排序,实时状态更新,创建模块 API 层 `frontend/src/features/training/api/queries.ts`
+- [X] [T033] [US1] [P] 训练任务创建表单 - `frontend/src/features/training/pages/CreateTrainingJobPage.tsx`,使用 Cloudscape Form 组件,验证训练配置 (实例类型,节点数,训练脚本路径),配额实时检查,创建表单组件 `frontend/src/features/training/components/TrainingJobForm.tsx`
+- [X] [T034] [US1] [P] 训练任务详情页面 - `frontend/src/features/training/pages/TrainingJobDetailPage.tsx`,展示训练配置、实时指标、日志流、检查点列表,支持暂停/恢复/终止操作
+- [X] [T035] [US1] [P] 训练状态监控组件 - `frontend/src/features/training/components/TrainingStatusMonitor.tsx`,实时显示 GPU 利用率、训练进度、损失曲线,30秒刷新间隔
+- [X] [T035a] [US1] [P] 模型版本管理页面 - `frontend/src/features/models/pages/ModelVersionsPage.tsx`,使用 Cloudscape Table 展示模型版本历史,支持版本对比(metrics diff)、模型回滚、SageMaker Model Registry 同步状态显示,创建模块类型定义 `frontend/src/features/models/types/index.ts`
+- [X] [T035b] [US1] [P] 模型列表页面 - `frontend/src/features/models/pages/ModelListPage.tsx`,使用 Cloudscape Table 组件,支持分页/过滤(training_job_id, status)/排序,显示模型名称、版本数、Registry 同步状态,创建模块 API 层 `frontend/src/features/models/api/modelApi.ts` 和 `frontend/src/features/models/api/queries.ts`
+- [X] [T035c] [US1] [P] 模型详情页面 - `frontend/src/features/models/pages/ModelDetailPage.tsx`,展示模型元数据(metrics, hyperparameters)、关联训练任务、Registry ARN,支持跳转至版本管理页面
+- [X] [T035d] [US1] [P] 模型列表组件 - `frontend/src/features/models/components/ModelTable.tsx`,复用 Cloudscape Table,支持行选择和批量操作,创建 `frontend/src/features/models/components/RegistrySyncStatus.tsx` 显示 SageMaker Model Registry 同步状态指示器
+- [X] [T035e] [US1] [P] 模型版本对比组件 - `frontend/src/features/models/components/ModelVersionTable.tsx` 展示版本历史表格,`frontend/src/features/models/components/ModelMetricsCompare.tsx` 实现版本指标对比(metrics diff)可视化,创建 hooks `frontend/src/features/models/hooks/useModel.ts` 和 `frontend/src/features/models/hooks/useModelVersions.ts`
 
 ### HyperPod 集成服务
 - [ ] [T036] [US1] HyperPodPytorchJob 集成逻辑 - `backend/src/application/services/hyperpod_service.py`,封装 HyperPod SDK 训练任务生命周期管理,使用 T000 验证的 Training 模块方法实现训练任务提交、暂停、恢复、终止功能,实现错误处理和重试机制,参考 `docs/hyperpod-sdk-reference.md`。如该模块不支持特定训练模式,MAY 使用 boto3 (SageMaker API) 或 kubernetes-client (直接操作 PyTorchJob CRD) 作为备选方案,但 MUST 提交例外申请并获得平台治理委员会批准,在代码中注释说明理由 (遵循宪章 Principle I.B) (依赖 T000, T014)
