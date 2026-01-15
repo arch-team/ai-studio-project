@@ -67,19 +67,7 @@ async def create_model(
     service: ModelService = Depends(get_model_service),
 ):
     """Create/register a new model (T031a)."""
-    model_data = {
-        "training_job_id": data.training_job_id,
-        "checkpoint_id": data.checkpoint_id,
-        "model_name": data.model_name,
-        "display_name": data.display_name,
-        "description": data.description,
-        "framework": data.framework.value if data.framework else "pytorch",
-        "framework_version": data.framework_version,
-        "metrics": data.metrics,
-        "hyperparameters": data.hyperparameters,
-        "tags": data.tags,
-    }
-
+    model_data = data.model_dump(mode="json")
     model = await service.create_model(owner_id=current_user.user_id, data=model_data)
     return ModelDetail.from_entity(model)
 

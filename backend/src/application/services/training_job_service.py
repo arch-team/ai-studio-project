@@ -3,6 +3,8 @@
 from datetime import datetime
 
 from src.application.interfaces.hyperpod_client import IHyperPodClient
+from src.application.services.base import EntityServiceMixin
+from src.core.mapping import EnumMapper
 from src.domain.entities.training_job import (
     DistributionStrategy,
     JobPriority,
@@ -11,14 +13,15 @@ from src.domain.entities.training_job import (
 )
 from src.domain.exceptions import (
     DuplicateEntityError,
-    EntityNotFoundError,
     InvalidStateTransitionError,
 )
 from src.domain.repositories.training_job_repository import ITrainingJobRepository
 
 
-class TrainingJobService:
+class TrainingJobService(EntityServiceMixin[TrainingJob]):
     """Service for managing training jobs."""
+
+    _entity_name = "TrainingJob"
 
     def __init__(
         self,
@@ -38,28 +41,17 @@ class TrainingJobService:
         if await self._repository.exists_by_name(job_name):
             raise DuplicateEntityError("TrainingJob", job_name)
 
-        # Map distribution strategy
-        distribution_strategy = DistributionStrategy.DDP
-        if data.get("distribution_strategy"):
-            strategy_map = {
-                "ddp": DistributionStrategy.DDP,
-                "fsdp": DistributionStrategy.FSDP,
-                "deepspeed": DistributionStrategy.DEEPSPEED,
-                "horovod": DistributionStrategy.HOROVOD,
-            }
-            distribution_strategy = strategy_map.get(
-                data["distribution_strategy"].lower(), DistributionStrategy.DDP
-            )
-
-        # Map priority
-        priority = JobPriority.MEDIUM
-        if data.get("priority"):
-            priority_map = {
-                "high": JobPriority.HIGH,
-                "medium": JobPriority.MEDIUM,
-                "low": JobPriority.LOW,
-            }
-            priority = priority_map.get(data["priority"].lower(), JobPriority.MEDIUM)
+        # Map enums from string values
+        distribution_strategy = EnumMapper.from_string(
+            data.get("distribution_strategy"),
+            DistributionStrategy,
+            default=DistributionStrategy.DDP,
+        )
+        priority = EnumMapper.from_string(
+            data.get("priority"),
+            JobPriority,
+            default=JobPriority.MEDIUM,
+        )
 
         # Create domain entity
         job = TrainingJob(
@@ -110,10 +102,7 @@ class TrainingJobService:
 
     async def get_job(self, job_id: int) -> TrainingJob:
         """Get training job by ID."""
-        job = await self._repository.get_by_id(job_id)
-        if job is None:
-            raise EntityNotFoundError("TrainingJob", str(job_id))
-        return job
+        return await self._get_or_raise(job_id)
 
     async def list_jobs(
         self,
@@ -142,9 +131,7 @@ class TrainingJobService:
 
     async def pause_job(self, job_id: int) -> TrainingJob:
         """Pause a running training job."""
-        job = await self._repository.get_by_id(job_id)
-        if job is None:
-            raise EntityNotFoundError("TrainingJob", str(job_id))
+        job = await self._get_or_raise(job_id)
 
         if not job.can_pause():
             raise InvalidStateTransitionError(
@@ -163,9 +150,7 @@ class TrainingJobService:
 
     async def resume_job(self, job_id: int) -> TrainingJob:
         """Resume a paused or preempted training job."""
-        job = await self._repository.get_by_id(job_id)
-        if job is None:
-            raise EntityNotFoundError("TrainingJob", str(job_id))
+        job = await self._get_or_raise(job_id)
 
         if not job.can_resume():
             raise InvalidStateTransitionError(
@@ -193,9 +178,7 @@ class TrainingJobService:
 
     async def cancel_job(self, job_id: int) -> TrainingJob:
         """Cancel a training job."""
-        job = await self._repository.get_by_id(job_id)
-        if job is None:
-            raise EntityNotFoundError("TrainingJob", str(job_id))
+        job = await self._get_or_raise(job_id)
 
         if job.is_terminal():
             raise InvalidStateTransitionError(
@@ -217,9 +200,7 @@ class TrainingJobService:
 
     async def delete_job(self, job_id: int) -> None:
         """Delete a training job (soft delete)."""
-        job = await self._repository.get_by_id(job_id)
-        if job is None:
-            raise EntityNotFoundError("TrainingJob", str(job_id))
+        job = await self._get_or_raise(job_id)
 
         # Cancel if running
         if job.status in (JobStatus.RUNNING, JobStatus.SUBMITTED):

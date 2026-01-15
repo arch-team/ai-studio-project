@@ -2,6 +2,8 @@
 
 from typing import Any
 
+from src.application.services.base import EntityServiceMixin
+from src.core.mapping import EnumMapper
 from src.core.utils import utc_now
 from src.domain.entities.model import Model, ModelFramework, ModelStatus
 from src.domain.exceptions import (
@@ -11,8 +13,10 @@ from src.domain.exceptions import (
 from src.domain.repositories.model_repository import IModelRepository
 
 
-class ModelService:
+class ModelService(EntityServiceMixin[Model]):
     """Service for managing ML models."""
+
+    _entity_name = "Model"
 
     def __init__(
         self,
@@ -21,6 +25,7 @@ class ModelService:
         checkpoint_repository: Any | None = None,
     ):
         self._model_repository = model_repository
+        self._repository = model_repository  # Alias for EntityServiceMixin
         self._training_job_repository = training_job_repository
         self._checkpoint_repository = checkpoint_repository
 
@@ -56,18 +61,12 @@ class ModelService:
         if latest_model:
             version = Model.increment_version(latest_model.version)
 
-        # Map framework
-        framework = ModelFramework.PYTORCH
-        if data.get("framework"):
-            framework_map = {
-                "pytorch": ModelFramework.PYTORCH,
-                "tensorflow": ModelFramework.TENSORFLOW,
-                "jax": ModelFramework.JAX,
-                "other": ModelFramework.OTHER,
-            }
-            framework = framework_map.get(
-                data["framework"].lower(), ModelFramework.PYTORCH
-            )
+        # Map framework from string
+        framework = EnumMapper.from_string(
+            data.get("framework"),
+            ModelFramework,
+            default=ModelFramework.PYTORCH,
+        )
 
         # Create domain entity
         model = Model(
@@ -93,10 +92,7 @@ class ModelService:
 
     async def get_model(self, model_id: int) -> Model:
         """Get model by ID."""
-        model = await self._model_repository.get_by_id(model_id)
-        if model is None:
-            raise EntityNotFoundError("Model", str(model_id))
-        return model
+        return await self._get_or_raise(model_id)
 
     async def list_models(
         self,
@@ -134,9 +130,7 @@ class ModelService:
             Dictionary with versions list and optional comparison
         """
         # Get the base model
-        model = await self._model_repository.get_by_id(model_id)
-        if model is None:
-            raise EntityNotFoundError("Model", str(model_id))
+        model = await self._get_or_raise(model_id)
 
         # Get all versions
         versions = await self._model_repository.list_versions(model.model_name)
@@ -177,13 +171,8 @@ class ModelService:
         Returns:
             Comparison result with metrics diff and hyperparameter changes
         """
-        model_1 = await self._model_repository.get_by_id(model_id_1)
-        if model_1 is None:
-            raise EntityNotFoundError("Model", str(model_id_1))
-
-        model_2 = await self._model_repository.get_by_id(model_id_2)
-        if model_2 is None:
-            raise EntityNotFoundError("Model", str(model_id_2))
+        model_1 = await self._get_or_raise(model_id_1)
+        model_2 = await self._get_or_raise(model_id_2)
 
         # Calculate metrics diff
         metrics_diff: dict[str, Any] = {}
@@ -236,9 +225,7 @@ class ModelService:
 
     async def register_model(self, model_id: int) -> Model:
         """Register a model (transition from TRAINING to REGISTERED)."""
-        model = await self._model_repository.get_by_id(model_id)
-        if model is None:
-            raise EntityNotFoundError("Model", str(model_id))
+        model = await self._get_or_raise(model_id)
 
         if model.status != ModelStatus.TRAINING:
             raise InvalidStateTransitionError(
@@ -250,9 +237,7 @@ class ModelService:
 
     async def archive_model(self, model_id: int) -> Model:
         """Archive a model."""
-        model = await self._model_repository.get_by_id(model_id)
-        if model is None:
-            raise EntityNotFoundError("Model", str(model_id))
+        model = await self._get_or_raise(model_id)
 
         if not model.can_transition_to(ModelStatus.ARCHIVED):
             raise InvalidStateTransitionError(
@@ -264,9 +249,6 @@ class ModelService:
 
     async def delete_model(self, model_id: int) -> None:
         """Delete a model (soft delete)."""
-        model = await self._model_repository.get_by_id(model_id)
-        if model is None:
-            raise EntityNotFoundError("Model", str(model_id))
-
+        await self._get_or_raise(model_id)  # Verify model exists
         # Soft delete (archive)
         await self._model_repository.soft_delete(model_id)

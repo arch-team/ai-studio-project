@@ -78,32 +78,7 @@ async def create_training_job(
     service: TrainingJobService = Depends(get_training_job_service),
 ):
     """Create a new training job."""
-    job_data = {
-        "job_name": data.job_name,
-        "display_name": data.display_name,
-        "description": data.description,
-        "image_uri": data.image_uri,
-        "instance_type": data.instance_type,
-        "node_count": data.node_count,
-        "tasks_per_node": data.tasks_per_node,
-        "entrypoint_command": data.entrypoint_command,
-        "environment_variables": data.environment_variables,
-        "dataset_id": data.dataset_id,
-        "data_mount_path": data.data_mount_path,
-        "checkpoint_mount_path": data.checkpoint_mount_path,
-        "checkpoint_interval": data.checkpoint_interval,
-        "hyperparameters": data.hyperparameters,
-        "max_epochs": data.max_epochs,
-        "batch_size": data.batch_size,
-        "learning_rate": data.learning_rate,
-        "distribution_strategy": (
-            data.distribution_strategy.value if data.distribution_strategy else "ddp"
-        ),
-        "priority": data.priority.value if data.priority else "medium",
-        "mixed_precision": data.mixed_precision,
-        "use_spot_instances": data.use_spot_instances,
-    }
-
+    job_data = data.model_dump(mode="json")
     job = await service.create_job(owner_id=current_user.user_id, data=job_data)
     return TrainingJobDetail.from_entity(job)
 

@@ -1,10 +1,11 @@
 """Bidirectional enum mapper for Domain ↔ API enum conversion."""
 
 from enum import Enum
-from typing import TypeVar
+from typing import TypeVar, overload
 
 DomainEnumT = TypeVar("DomainEnumT", bound=Enum)
 ApiEnumT = TypeVar("ApiEnumT", bound=Enum)
+EnumT = TypeVar("EnumT", bound=Enum)
 
 
 class EnumMapper:
@@ -37,3 +38,59 @@ class EnumMapper:
             return None
         domain_value = api_enum.value.upper()
         return domain_enum_class(domain_value)
+
+    @overload
+    @staticmethod
+    def from_string(
+        value: str | None,
+        enum_class: type[EnumT],
+        default: EnumT,
+    ) -> EnumT: ...
+
+    @overload
+    @staticmethod
+    def from_string(
+        value: str | None,
+        enum_class: type[EnumT],
+        default: None = None,
+    ) -> EnumT | None: ...
+
+    @staticmethod
+    def from_string(
+        value: str | None,
+        enum_class: type[EnumT],
+        default: EnumT | None = None,
+    ) -> EnumT | None:
+        """Convert string to Domain enum (case-insensitive).
+
+        Tries to match by enum name first (e.g., "ddp" → DDP), then by value.
+
+        Args:
+            value: String value to convert (case-insensitive)
+            enum_class: Target enum class
+            default: Default value if conversion fails
+
+        Returns:
+            Matching enum member or default
+
+        Example:
+            from_string("ddp", DistributionStrategy) → DistributionStrategy.DDP
+            from_string("DDP", DistributionStrategy) → DistributionStrategy.DDP
+        """
+        if value is None:
+            return default
+
+        upper_value = value.upper()
+
+        # Try matching by name
+        try:
+            return enum_class[upper_value]
+        except KeyError:
+            pass
+
+        # Try matching by value
+        for member in enum_class:
+            if member.value.upper() == upper_value:
+                return member
+
+        return default
