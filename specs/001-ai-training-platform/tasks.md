@@ -392,10 +392,10 @@
 - [X] [T016b] 审计日志中间件 - `backend/src/api/middleware/audit.py`,拦截所有 API 请求,自动记录操作日志 (user_id, operation_type, resource_type, request/response data),异步写入数据库,确保审计完整性
 
 ### 前端基础配置
-- [ ] [T017] [P] 配置 React Router - `frontend/src/app/App.tsx` 和 `frontend/src/app/router/index.tsx`,路由配置 (/training-jobs, /datasets, /admin, /reports, /ide),配置路由守卫 (AuthGuard, RoleGuard)
-- [ ] [T018] [P] 创建 Cloudscape Layout - `frontend/src/layouts/MainLayout/MainLayout.tsx`,使用 AppLayout 组件,配置侧边导航 (Navigation.tsx) 和顶部导航 (TopNavigation.tsx)
-- [ ] [T019] [P] 配置 Zustand store - `frontend/src/store/slices/`,创建 uiSlice.ts (UI 状态), notificationSlice.ts (通知状态),按功能模块划分状态切片
-- [ ] [T020] [P] 配置 TanStack Query - `frontend/src/lib/query/queryClient.ts` 和 `frontend/src/lib/query/queryKeys.ts`,配置全局 query client,设置重试策略和缓存策略,创建 Query Key 工厂
+- [X] [T017] [P] 配置 React Router - `frontend/src/app/App.tsx` 和 `frontend/src/app/router/index.tsx`,路由配置 (/training-jobs, /datasets, /admin, /reports, /ide),配置路由守卫 (AuthGuard, RoleGuard)
+- [X] [T018] [P] 创建 Cloudscape Layout - `frontend/src/layouts/MainLayout/MainLayout.tsx`,使用 AppLayout 组件,配置侧边导航 (Navigation.tsx) 和顶部导航 (TopNavigation.tsx)
+- [X] [T019] [P] 配置 Zustand store - `frontend/src/store/slices/`,创建 uiSlice.ts (UI 状态), notificationSlice.ts (通知状态),按功能模块划分状态切片
+- [X] [T020] [P] 配置 TanStack Query - `frontend/src/lib/query/queryClient.ts` 和 `frontend/src/lib/query/queryKeys.ts`,配置全局 query client,设置重试策略和缓存策略,创建 Query Key 工厂
 
 **并行执行机会**:
 - 数据库迁移: T009 → T010 → T010b → T010a → T010c 串行执行 (确保 Alembic 版本号正确)
@@ -411,9 +411,9 @@
 **用户故事**: 算法工程师提交和监控分布式训练任务,管理模型版本
 
 ### 数据表迁移
-- [ ] [T021] 创建 training_jobs 表迁移 - `backend/alembic/versions/003_create_training_jobs.py`,字段: id, job_name, owner_id (FK users), instance_type, node_count, status (enum: submitted/running/paused/preempted/completed/failed), priority, training_config (JSON), created_at, updated_at
-- [ ] [T022] 创建 checkpoints 表迁移 - `backend/alembic/versions/004_create_checkpoints.py`,字段: id, training_job_id (FK), checkpoint_name, storage_path, epoch, global_step, storage_tier (enum: nvme/fsx/s3), created_at
-- [ ] [T022a] 创建 models 表迁移 - `backend/alembic/versions/005_create_models.py`,字段: id, model_name, version, training_job_id (FK), checkpoint_id (FK), model_uri (S3), registry_arn (SageMaker Model Registry), metrics (JSON: accuracy/loss), hyperparameters (JSON), framework (enum: pytorch/tensorflow), status (enum: training/registered/deployed/archived), created_at
+- [X] [T021] 创建 training_jobs 表迁移 - `backend/alembic/versions/20260115_100000_create_training_jobs.py`,字段: id, job_name, owner_id (FK users), instance_type, node_count, status (enum: submitted/running/paused/preempted/completed/failed), priority, training_config (JSON), created_at, updated_at
+- [X] [T022] 创建 checkpoints 表迁移 - `backend/alembic/versions/20260115_100100_create_checkpoints.py`,字段: id, training_job_id (FK), checkpoint_name, storage_path, epoch, global_step, storage_tier (enum: nvme/fsx/s3), created_at
+- [X] [T022a] 创建 models 表迁移 - `backend/alembic/versions/20260115_100200_create_models.py`,字段: id, model_name, version, training_job_id (FK), checkpoint_id (FK), model_uri (S3), registry_arn (SageMaker Model Registry), metrics (JSON: accuracy/loss), hyperparameters (JSON), framework (enum: pytorch/tensorflow), status (enum: training/registered/deployed/archived), created_at
 
 ### SQLAlchemy 模型
 - [ ] [T023] 创建 TrainingJob 模型 - 领域实体 `backend/src/domain/entities/training_job.py` + ORM 模型 `backend/src/infrastructure/persistence/models/training_job_model.py`,包含状态转换验证 (submitted → running → paused/completed/failed),关联 User 和 Checkpoint
