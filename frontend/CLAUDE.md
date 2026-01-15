@@ -47,22 +47,7 @@ import { TrainingJob } from '@/types';
 ### 目录结构
 
 ```
-src/
-├── main.tsx              # 应用入口
-├── App.tsx               # 根组件
-├── pages/                # 页面组件
-│   └── HomePage.tsx
-├── layouts/              # 布局组件
-│   └── MainLayout.tsx
-├── hooks/                # 自定义 Hooks
-│   └── useApi.ts        # API 调用 Hook
-├── store/                # Zustand 状态存储
-│   └── index.ts
-├── lib/                  # 工具库
-│   ├── api.ts           # API 客户端 (fetch 封装)
-│   └── queryClient.ts   # TanStack Query 配置
-└── types/                # TypeScript 类型定义
-    └── index.ts
+
 ```
 
 ## State Management Strategy
