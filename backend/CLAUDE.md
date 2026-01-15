@@ -46,41 +46,257 @@ docker build --target production -t backend:prod .
 
 ## Architecture
 
-项目采用 **Clean Architecture + Ports & Adapters** 模式：
+项目采用 **Modular Monolith** 架构模式，结合 Clean Architecture 原则：
 
 ```
 src/
-├── api/                    # API 层 (最外层)
-│   ├── v1/endpoints/      # REST 端点
-│   ├── v1/schemas/        # Pydantic 请求/响应模型
-│   └── v1/dependencies/   # FastAPI 依赖注入
-├── application/            # 应用层
-│   ├── services/          # 业务用例实现
-│   ├── dto/               # 数据传输对象
-│   └── interfaces/        # 端口定义 (HyperPod, Storage)
-├── domain/                 # 域层 (核心业务)
-│   ├── entities/          # 业务实体
-│   ├── value_objects/     # 值对象
-│   ├── repositories/      # 仓库接口 (IRepository)
-│   ├── exceptions/        # 域异常
-│   └── events/            # 域事件
-├── infrastructure/         # 基础设施层
-│   ├── config/            # Settings (Pydantic BaseSettings)
-│   ├── persistence/       # ORM 模型和仓库实现
-│   └── external/          # 外部适配器 (hyperpod/, s3/, kueue/)
-└── core/                   # 跨切关注点
-    ├── logging/           # structlog 配置
-    ├── security/          # 认证/授权
-    └── utils/             # 工具函数
+├── modules/                           # 功能模块 (Feature Modules)
+│   ├── auth/                          # 认证授权模块
+│   │   ├── api/                       # HTTP 端点、Schema、依赖
+│   │   ├── application/               # 业务服务
+│   │   ├── domain/                    # 实体、值对象、仓库接口
+│   │   └── infrastructure/            # ORM 模型、仓库实现
+│   ├── training/                      # 训练任务模块
+│   ├── models/                        # 模型管理模块
+│   ├── quotas/                        # 资源配额模块
+│   ├── datasets/                      # 数据集管理模块
+│   ├── spaces/                        # 开发空间模块
+│   ├── monitoring/                    # 监控告警模块
+│   ├── billing/                       # 成本分析模块
+│   └── audit/                         # 审计日志模块
+│
+├── shared/                            # 共享内核 (Shared Kernel)
+│   ├── domain/                        # 基础实体、仓库接口、域事件
+│   ├── infrastructure/                # 数据库、配置、安全
+│   ├── api/                           # 中间件、异常处理、分页
+│   └── utils/                         # 工具函数
+│
+├── main.py                            # 应用入口
+└── router.py                          # 路由聚合
 ```
 
-**依赖方向**: API → Application → Domain ← Infrastructure
+### 模块结构规范
+
+每个功能模块遵循统一的内部结构（按实体分文件）：
+
+```
+modules/<module_name>/
+├── __init__.py                        # 模块公开 API
+├── api/
+│   ├── __init__.py
+│   ├── endpoints.py                   # REST 端点 (FastAPI Router)
+│   ├── schemas/                       # Pydantic 请求/响应模型
+│   │   ├── __init__.py               # 导出所有 Schema
+│   │   ├── requests.py               # 请求模型
+│   │   └── responses.py              # 响应模型
+│   └── dependencies.py                # 模块专属依赖注入
+├── application/
+│   ├── __init__.py
+│   ├── services/                      # 业务用例实现
+│   │   ├── __init__.py
+│   │   ├── <entity>_service.py       # 每个聚合根一个服务
+│   │   └── ...
+│   └── interfaces.py                  # 端口定义 (可选)
+├── domain/
+│   ├── __init__.py
+│   ├── entities/                      # 业务实体
+│   │   ├── __init__.py               # 导出所有实体
+│   │   ├── <entity>.py               # 每个实体一个文件
+│   │   └── ...
+│   ├── value_objects/                 # 值对象
+│   │   ├── __init__.py
+│   │   ├── <value_object>.py
+│   │   └── ...
+│   ├── repositories/                  # 仓库接口
+│   │   ├── __init__.py
+│   │   ├── <entity>_repository.py    # 每个聚合根一个仓库接口
+│   │   └── ...
+│   └── exceptions.py                  # 模块专属异常
+└── infrastructure/
+    ├── __init__.py
+    ├── models/                        # SQLAlchemy ORM 模型
+    │   ├── __init__.py
+    │   ├── <entity>_model.py
+    │   └── ...
+    └── repositories/                  # 仓库实现
+        ├── __init__.py
+        ├── <entity>_repository_impl.py
+        └── ...
+```
+
+### 示例：training 模块
+
+```
+modules/training/
+├── __init__.py
+├── api/
+│   ├── __init__.py
+│   ├── endpoints.py
+│   ├── schemas/
+│   │   ├── __init__.py
+│   │   ├── requests.py               # CreateJobRequest, UpdateJobRequest
+│   │   └── responses.py              # JobResponse, JobListResponse
+│   └── dependencies.py
+├── application/
+│   ├── __init__.py
+│   ├── services/
+│   │   ├── __init__.py
+│   │   ├── training_job_service.py
+│   │   ├── checkpoint_service.py
+│   │   └── hyperpod_service.py
+│   └── interfaces.py                  # IHyperPodClient
+├── domain/
+│   ├── __init__.py
+│   ├── entities/
+│   │   ├── __init__.py               # from .training_job import TrainingJob
+│   │   ├── training_job.py
+│   │   └── checkpoint.py
+│   ├── value_objects/
+│   │   ├── __init__.py
+│   │   ├── job_status.py
+│   │   ├── training_config.py
+│   │   └── training_metrics.py
+│   ├── repositories/
+│   │   ├── __init__.py
+│   │   ├── training_job_repository.py
+│   │   └── checkpoint_repository.py
+│   └── exceptions.py
+└── infrastructure/
+    ├── __init__.py
+    ├── models/
+    │   ├── __init__.py
+    │   ├── training_job_model.py
+    │   └── checkpoint_model.py
+    ├── repositories/
+    │   ├── __init__.py
+    │   ├── training_job_repository_impl.py
+    │   └── checkpoint_repository_impl.py
+    └── hyperpod_client.py             # IHyperPodClient 实现
+```
+
+### 文件命名规范
+
+| 类型 | 命名规则 | 示例 |
+|------|---------|------|
+| 实体 | `<entity>.py` | `training_job.py`, `user.py` |
+| 值对象 | `<value_object>.py` | `job_status.py`, `training_metrics.py` |
+| 仓库接口 | `<entity>_repository.py` | `training_job_repository.py` |
+| 仓库实现 | `<entity>_repository_impl.py` | `training_job_repository_impl.py` |
+| ORM 模型 | `<entity>_model.py` | `training_job_model.py` |
+| 服务 | `<entity>_service.py` | `training_job_service.py` |
+
+### `__init__.py` 导出规范
+
+每个目录的 `__init__.py` 应导出该目录下的所有公开 API：
+
+```python
+# modules/training/domain/entities/__init__.py
+from .training_job import TrainingJob
+from .checkpoint import Checkpoint
+
+__all__ = ["TrainingJob", "Checkpoint"]
+```
+
+这样可以保持导入路径简洁：
+
+```python
+# ✅ 推荐
+from modules.training.domain.entities import TrainingJob
+
+# ❌ 避免
+from modules.training.domain.entities.training_job import TrainingJob
+```
+
+### 模块依赖规则
+
+```
+┌─────────────────────────────────────────────────────┐
+│                    modules/                          │
+│  ┌─────────┐  ┌─────────┐  ┌─────────┐              │
+│  │  auth   │  │training │  │ models  │  ...         │
+│  └────┬────┘  └────┬────┘  └────┬────┘              │
+│       │            │            │                    │
+│       └────────────┼────────────┘                    │
+│                    ↓                                 │
+│              ┌──────────┐                            │
+│              │  shared/ │                            │
+│              └──────────┘                            │
+└─────────────────────────────────────────────────────┘
+
+规则:
+1. 模块只能依赖 shared/，禁止横向依赖
+2. 模块间通信通过 shared/domain/events.py 中的域事件
+3. shared/ 不依赖任何模块
+```
+
+### 模块间通信
+
+**禁止**: 模块 A 直接调用模块 B 的服务
+
+```python
+# ❌ 禁止：training 模块直接调用 auth 模块
+from modules.auth.application.services import AuthService
+
+class TrainingJobService:
+    def __init__(self, auth_service: AuthService):  # 禁止
+        ...
+```
+
+**推荐**: 通过域事件解耦
+
+```python
+# ✅ 推荐：通过事件解耦
+# shared/domain/events.py
+@dataclass
+class TrainingJobCompletedEvent:
+    job_id: UUID
+    user_id: UUID
+    completed_at: datetime
+
+# modules/training/application/services.py
+class TrainingJobService:
+    def complete_job(self, job_id: UUID):
+        job.complete()
+        self._event_bus.publish(TrainingJobCompletedEvent(...))
+
+# modules/billing/application/services.py
+class BillingService:
+    @event_handler(TrainingJobCompletedEvent)
+    async def on_job_completed(self, event: TrainingJobCompletedEvent):
+        await self._calculate_cost(event.job_id)
+```
+
+### 路由聚合
+
+```python
+# src/router.py
+from fastapi import APIRouter
+from modules.auth.api.endpoints import router as auth_router
+from modules.training.api.endpoints import router as training_router
+from modules.models.api.endpoints import router as models_router
+from modules.quotas.api.endpoints import router as quotas_router
+from modules.datasets.api.endpoints import router as datasets_router
+from modules.spaces.api.endpoints import router as spaces_router
+from modules.audit.api.endpoints import router as audit_router
+
+api_router = APIRouter(prefix="/api/v1")
+api_router.include_router(auth_router, prefix="/auth", tags=["认证"])
+api_router.include_router(training_router, prefix="/training-jobs", tags=["训练任务"])
+api_router.include_router(models_router, prefix="/models", tags=["模型"])
+api_router.include_router(quotas_router, prefix="/resource-quotas", tags=["资源配额"])
+api_router.include_router(datasets_router, prefix="/datasets", tags=["数据集"])
+api_router.include_router(spaces_router, prefix="/spaces", tags=["开发空间"])
+api_router.include_router(audit_router, prefix="/audit-logs", tags=["审计日志"])
+```
 
 ## Key Interfaces
 
-- `IRepository<T>`: 通用仓库接口 (`src/domain/repositories/base.py`)
-- `IHyperPodClient`: SageMaker HyperPod 操作 (`src/application/interfaces/hyperpod_client.py`)
-- `IStorageService`: S3/FSx 存储操作 (`src/application/interfaces/storage_service.py`)
+共享内核中的关键接口：
+
+- `IRepository<T>`: 通用仓库接口 (`shared/domain/base_repository.py`)
+- `IEventBus`: 域事件发布接口 (`shared/domain/events.py`)
+- `IHyperPodClient`: SageMaker HyperPod 操作 (`modules/training/application/interfaces.py`)
+- `IStorageService`: S3/FSx 存储操作 (`shared/infrastructure/storage.py`)
 
 ## Environment Variables
 
@@ -494,9 +710,49 @@ spec:
 
 ### 待实现表（根据 spec.md）
 
-| 表名 | 用途 | 备注 |
-|------|------|------|
-| `training_jobs` | 训练任务业务元数据 | HyperPod 管理运行时状态 |
-| `datasets` | 数据集版本和权限管理 | - |
-| `checkpoints` | 检查点元数据索引 | S3/FSx 存储实际数据 |
-| `models` | 模型元数据 | 可选，评估 Model Registry 能力是否足够 |
+| 表名 | 所属模块 | 用途 | 备注 |
+|------|---------|------|------|
+| `training_jobs` | training | 训练任务业务元数据 | HyperPod 管理运行时状态 |
+| `datasets` | datasets | 数据集版本和权限管理 | - |
+| `checkpoints` | training | 检查点元数据索引 | S3/FSx 存储实际数据 |
+| `models` | models | 模型元数据 | 可选，评估 Model Registry 能力是否足够 |
+
+## Module Responsibility Matrix
+
+| 模块 | 职责 | 核心实体 | 外部依赖 |
+|------|------|---------|---------|
+| **auth** | 用户认证、授权、RBAC | User, LoginAttempt, PasswordHistory | SSO Provider |
+| **training** | 训练任务生命周期管理 | TrainingJob, Checkpoint | HyperPod, Kueue |
+| **models** | 模型版本控制、审批 | Model, ModelVersion | Model Registry |
+| **quotas** | 资源配额配置与管理 | ResourceQuota, ResourceLimitConfig | Kueue ClusterQueue |
+| **datasets** | 数据集上传、版本控制 | Dataset, DatasetVersion | S3, FSx |
+| **spaces** | 在线开发环境管理 | Space | SageMaker Spaces |
+| **monitoring** | 集群监控、告警 | Alert, Metric | CloudWatch, Prometheus |
+| **billing** | 成本分析、预算管理 | CostRecord, Budget | Cost Explorer |
+| **audit** | 审计日志记录与查询 | AuditLog | - |
+
+## Migration Notes
+
+### 从 Layered Architecture 迁移
+
+当前代码库正在从按层划分迁移到 Modular Monolith。迁移期间：
+
+1. **新功能**: 直接在 `modules/` 下对应模块中开发
+2. **现有代码**: 按计划逐步迁移到对应模块
+3. **共享代码**: 提取到 `shared/` 中
+
+### 迁移检查清单
+
+迁移单个模块时的检查项：
+
+- [ ] 创建模块目录结构 (`api/`, `application/`, `domain/`, `infrastructure/`)
+- [ ] 迁移端点到 `api/endpoints.py`
+- [ ] 迁移 Schema 到 `api/schemas.py`
+- [ ] 迁移服务到 `application/services.py`
+- [ ] 迁移实体到 `domain/entities.py`
+- [ ] 迁移仓库接口到 `domain/repositories.py`
+- [ ] 迁移 ORM 模型到 `infrastructure/models.py`
+- [ ] 迁移仓库实现到 `infrastructure/repositories.py`
+- [ ] 更新导入路径
+- [ ] 运行单元测试和集成测试
+- [ ] 更新 `router.py` 路由注册

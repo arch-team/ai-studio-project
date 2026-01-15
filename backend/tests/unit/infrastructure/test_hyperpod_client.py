@@ -7,7 +7,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from src.application.interfaces.hyperpod_client import IHyperPodClient
+from src.modules.training.application.interfaces import IHyperPodClient
 
 
 class TestHyperPodClient:
@@ -24,14 +24,8 @@ class TestHyperPodClient:
     def mock_hyperpod_pytorch_job(self) -> MagicMock:
         """Mock HyperPodPytorchJob class."""
         with patch(
-            "src.infrastructure.external.hyperpod.client.HyperPodPytorchJob"
+            "src.modules.training.infrastructure.hyperpod.client.HyperPodPytorchJob"
         ) as mock:
-            yield mock
-
-    @pytest.fixture
-    def mock_cluster(self) -> MagicMock:
-        """Mock Cluster class."""
-        with patch("src.infrastructure.external.hyperpod.client.Cluster") as mock:
             yield mock
 
     @pytest.fixture
@@ -39,10 +33,9 @@ class TestHyperPodClient:
         self,
         mock_boto3_client: MagicMock,
         mock_hyperpod_pytorch_job: MagicMock,
-        mock_cluster: MagicMock,
     ) -> "HyperPodClient":
         """Create HyperPodClient instance with mocked dependencies."""
-        from src.infrastructure.external.hyperpod.client import HyperPodClient
+        from src.modules.training.infrastructure.hyperpod.client import HyperPodClient
 
         client = HyperPodClient(region="us-west-2")
         # Replace the internal boto3 client with the mock
@@ -87,10 +80,10 @@ class TestHyperPodClient:
     async def test_describe_cluster_success(
         self,
         hyperpod_client: "HyperPodClient",
-        mock_cluster: MagicMock,
+        mock_boto3_client: MagicMock,
     ) -> None:
         """Test successful cluster description."""
-        mock_cluster.describe.return_value = {
+        mock_boto3_client.describe_cluster.return_value = {
             "ClusterName": "test-cluster",
             "ClusterArn": "arn:aws:sagemaker:us-west-2:123456:cluster/test-cluster",
             "ClusterStatus": "InService",
@@ -107,7 +100,7 @@ class TestHyperPodClient:
 
         assert result["ClusterName"] == "test-cluster"
         assert result["ClusterStatus"] == "InService"
-        mock_cluster.describe.assert_called_once_with(cluster_name="test-cluster")
+        mock_boto3_client.describe_cluster.assert_called_once_with(ClusterName="test-cluster")
 
     @pytest.mark.asyncio
     async def test_list_clusters_success(
@@ -315,12 +308,12 @@ class TestHyperPodClient:
     async def test_client_handles_cluster_not_found(
         self,
         hyperpod_client: "HyperPodClient",
-        mock_cluster: MagicMock,
+        mock_boto3_client: MagicMock,
     ) -> None:
         """Test error handling when cluster is not found."""
         from botocore.exceptions import ClientError
 
-        mock_cluster.describe.side_effect = ClientError(
+        mock_boto3_client.describe_cluster.side_effect = ClientError(
             {"Error": {"Code": "ResourceNotFound", "Message": "Cluster not found"}},
             "DescribeCluster",
         )
