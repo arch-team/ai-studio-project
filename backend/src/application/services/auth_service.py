@@ -3,9 +3,6 @@
 from dataclasses import dataclass
 from datetime import timedelta
 
-from sqlalchemy.ext.asyncio import AsyncSession
-
-from src.application.services.mixins import UserQueryMixin
 from src.core.security.constants import (
     ACCESS_TOKEN_EXPIRE_MINUTES,
     LOCKOUT_DURATION_MINUTES,
@@ -19,8 +16,11 @@ from src.core.security.exceptions import (
 from src.core.security.jwt import JWTManager, TokenType, get_jwt_manager
 from src.core.security.password import PasswordHasher, get_password_hasher
 from src.core.utils import utc_now
+from src.domain.entities.login_attempt import LoginAttempt
+from src.domain.entities.user import User
+from src.domain.repositories.login_attempt_repository import ILoginAttemptRepository
+from src.domain.repositories.user_repository import IUserRepository
 from src.domain.value_objects import AuthType, UserStatus
-from src.infrastructure.persistence.models import LoginAttemptModel, UserModel
 
 
 @dataclass
@@ -44,16 +44,18 @@ class AuthResult:
     tokens: TokenPair
 
 
-class AuthService(UserQueryMixin):
+class AuthService:
     """Authentication service for login and token management."""
 
     def __init__(
         self,
-        session: AsyncSession,
+        user_repository: IUserRepository,
+        login_attempt_repository: ILoginAttemptRepository,
         jwt_manager: JWTManager | None = None,
         password_hasher: PasswordHasher | None = None,
     ):
-        self._session = session
+        self._user_repo = user_repository
+        self._attempt_repo = login_attempt_repository
         self._jwt = jwt_manager or get_jwt_manager()
         self._hasher = password_hasher or get_password_hasher()
 
@@ -65,14 +67,17 @@ class AuthService(UserQueryMixin):
         user_agent: str | None = None,
     ) -> AuthResult:
         """Authenticate with username and password."""
-        user = await self._get_user_by_username(username)
+        user = await self._user_repo.get_by_username(username)
 
-        attempt = LoginAttemptModel(
+        # Create login attempt record (initially failed)
+        attempt = LoginAttempt(
+            id=None,
             user_id=user.id if user else None,
             username=username,
             ip_address=ip_address,
             user_agent=user_agent,
             success=False,
+            failure_reason=None,
         )
 
         try:
@@ -107,6 +112,7 @@ class AuthService(UserQueryMixin):
                 attempt.failure_reason = "password_expired"
                 raise PasswordExpiredError()
 
+            # Login successful
             attempt.success = True
             await self._handle_successful_login(user)
 
@@ -121,21 +127,21 @@ class AuthService(UserQueryMixin):
             )
 
         finally:
-            self._session.add(attempt)
-            await self._session.commit()
+            # Always record the login attempt
+            await self._attempt_repo.create(attempt)
 
     async def refresh_access_token(self, refresh_token: str) -> TokenPair:
         """Refresh access token using refresh token."""
         payload = self._jwt.verify_token(refresh_token, TokenType.REFRESH)
         user_id = int(payload.sub)
 
-        user = await self._get_user_by_id(user_id)
+        user = await self._user_repo.get_by_id(user_id)
         if not user or user.status != UserStatus.ACTIVE:
             raise AuthenticationError("User not found or inactive")
 
         return self._create_token_pair(user)
 
-    def _create_token_pair(self, user: UserModel) -> TokenPair:
+    def _create_token_pair(self, user: User) -> TokenPair:
         """Create access and refresh token pair."""
         access_token = self._jwt.create_access_token(
             user_id=user.id,
@@ -151,18 +157,17 @@ class AuthService(UserQueryMixin):
             expires_in=ACCESS_TOKEN_EXPIRE_MINUTES * 60,
         )
 
-    async def _handle_failed_login(self, user: UserModel) -> None:
+    async def _handle_failed_login(self, user: User) -> None:
         """Handle failed login attempt."""
-        user.failed_login_count += 1
+        user.record_failed_login()
 
         if user.failed_login_count >= MAX_FAILED_LOGIN_ATTEMPTS:
-            user.locked_until = utc_now() + timedelta(minutes=LOCKOUT_DURATION_MINUTES)
+            user.lock_account(utc_now() + timedelta(minutes=LOCKOUT_DURATION_MINUTES))
 
-        await self._session.commit()
+        await self._user_repo.update(user)
 
-    async def _handle_successful_login(self, user: UserModel) -> None:
+    async def _handle_successful_login(self, user: User) -> None:
         """Handle successful login."""
-        user.failed_login_count = 0
-        user.locked_until = None
-        user.last_login_at = utc_now()
-        await self._session.commit()
+        user.reset_login_failures()
+        user.record_login()
+        await self._user_repo.update(user)

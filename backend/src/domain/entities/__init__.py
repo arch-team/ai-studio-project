@@ -21,12 +21,14 @@ from src.domain.entities.checkpoint import (
     CheckpointType,
     StorageTier,
 )
+from src.domain.entities.login_attempt import LoginAttempt
 from src.domain.entities.model import (
     MODEL_STATE_TRANSITIONS,
     Model,
     ModelFramework,
     ModelStatus,
 )
+from src.domain.entities.password_history import PasswordHistory
 from src.domain.entities.resource_limit_config import (
     LimitRole,
     PriorityDefault,
@@ -50,6 +52,10 @@ __all__ = [
     "User",
     "UserStatus",
     "UserRole",
+    # LoginAttempt
+    "LoginAttempt",
+    # PasswordHistory
+    "PasswordHistory",
     # ResourceQuota
     "ResourceQuota",
     "QuotaType",

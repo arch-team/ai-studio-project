@@ -1,34 +1,54 @@
 """Account Service Unit Tests."""
 
-from datetime import UTC
-from unittest.mock import AsyncMock, MagicMock
+from datetime import UTC, datetime, timedelta
+from unittest.mock import AsyncMock
 
 import pytest
 
 from src.application.services.account_service import AccountService
 from src.core.security.exceptions import AuthenticationError, PasswordTooWeakError
-from src.domain.value_objects import UserRole, UserStatus
+from src.domain.entities.user import User
+from src.domain.value_objects import AuthType, UserRole, UserStatus
 
 
 @pytest.fixture
-def mock_user():
-    """Create a mock user object."""
-    user = MagicMock()
-    user.id = 1
-    user.username = "testuser"
-    user.email = "test@example.com"
-    user.status = UserStatus.ACTIVE
-    user.role = UserRole.ENGINEER
-    user.locked_until = None
-    user.failed_login_count = 0
-    return user
+def mock_user() -> User:
+    """Create a mock user entity."""
+    return User(
+        id=1,
+        username="testuser",
+        email="test@example.com",
+        status=UserStatus.ACTIVE,
+        role=UserRole.ENGINEER,
+        auth_type=AuthType.LOCAL,
+        locked_until=None,
+        failed_login_count=0,
+    )
 
 
 @pytest.fixture
-def account_service(mock_session, fast_password_hasher, password_validator):
+def mock_user_repository() -> AsyncMock:
+    """Create a mock user repository."""
+    return AsyncMock()
+
+
+@pytest.fixture
+def mock_password_history_repository() -> AsyncMock:
+    """Create a mock password history repository."""
+    return AsyncMock()
+
+
+@pytest.fixture
+def account_service(
+    mock_user_repository: AsyncMock,
+    mock_password_history_repository: AsyncMock,
+    fast_password_hasher,
+    password_validator,
+) -> AccountService:
     """Create AccountService with mocked dependencies."""
     return AccountService(
-        session=mock_session,
+        user_repository=mock_user_repository,
+        password_history_repository=mock_password_history_repository,
         password_hasher=fast_password_hasher,
         password_validator=password_validator,
     )
@@ -39,26 +59,40 @@ class TestCreateLocalAccount:
 
     @pytest.mark.asyncio
     async def test_create_local_account_success(
-        self, account_service: AccountService, mock_session: AsyncMock
+        self,
+        account_service: AccountService,
+        mock_user_repository: AsyncMock,
+        mock_password_history_repository: AsyncMock,
     ) -> None:
         """Test successful account creation."""
-        mock_result = MagicMock()
-        mock_result.scalar_one_or_none.return_value = None
-        mock_session.execute.return_value = mock_result
+        mock_user_repository.exists_by_username.return_value = False
+        mock_user_repository.exists_by_email.return_value = False
 
-        await account_service.create_local_account(
+        created_user = User(
+            id=1,
+            username="newuser",
+            email="new@example.com",
+            role=UserRole.ENGINEER,
+            status=UserStatus.ACTIVE,
+            auth_type=AuthType.LOCAL,
+        )
+        mock_user_repository.create.return_value = created_user
+
+        result = await account_service.create_local_account(
             username="newuser",
             email="new@example.com",
             password="NewP@ssw0rd123!",
             role="engineer",
         )
 
-        assert mock_session.add.called
-        assert mock_session.commit.called
+        assert result.username == "newuser"
+        mock_user_repository.create.assert_called_once()
+        mock_password_history_repository.create.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_create_local_account_weak_password(
-        self, account_service: AccountService, mock_session: AsyncMock
+        self,
+        account_service: AccountService,
     ) -> None:
         """Test account creation with weak password."""
         with pytest.raises(PasswordTooWeakError) as exc_info:
@@ -73,12 +107,12 @@ class TestCreateLocalAccount:
 
     @pytest.mark.asyncio
     async def test_create_local_account_duplicate_username(
-        self, account_service: AccountService, mock_session: AsyncMock, mock_user
+        self,
+        account_service: AccountService,
+        mock_user_repository: AsyncMock,
     ) -> None:
         """Test account creation with duplicate username."""
-        mock_result = MagicMock()
-        mock_result.scalar_one_or_none.return_value = mock_user
-        mock_session.execute.return_value = mock_result
+        mock_user_repository.exists_by_username.return_value = True
 
         with pytest.raises(AuthenticationError) as exc_info:
             await account_service.create_local_account(
@@ -96,60 +130,77 @@ class TestAccountManagement:
 
     @pytest.mark.asyncio
     async def test_enable_account(
-        self, account_service: AccountService, mock_session: AsyncMock, mock_user
+        self,
+        account_service: AccountService,
+        mock_user_repository: AsyncMock,
     ) -> None:
         """Test enabling a user account."""
-        mock_user.status = UserStatus.INACTIVE
-        mock_result = MagicMock()
-        mock_result.scalar_one_or_none.return_value = mock_user
-        mock_session.execute.return_value = mock_result
+        user = User(
+            id=1,
+            username="testuser",
+            email="test@example.com",
+            status=UserStatus.INACTIVE,
+            role=UserRole.ENGINEER,
+            auth_type=AuthType.LOCAL,
+        )
+        mock_user_repository.get_by_id.return_value = user
+        mock_user_repository.update.return_value = user
 
         await account_service.enable_account(1)
 
-        assert mock_user.status == UserStatus.ACTIVE
-        assert mock_session.commit.called
+        assert user.status == UserStatus.ACTIVE
+        mock_user_repository.update.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_disable_account(
-        self, account_service: AccountService, mock_session: AsyncMock, mock_user
+        self,
+        account_service: AccountService,
+        mock_user_repository: AsyncMock,
+        mock_user: User,
     ) -> None:
         """Test disabling a user account."""
-        mock_result = MagicMock()
-        mock_result.scalar_one_or_none.return_value = mock_user
-        mock_session.execute.return_value = mock_result
+        mock_user_repository.get_by_id.return_value = mock_user
+        mock_user_repository.update.return_value = mock_user
 
         await account_service.disable_account(1)
 
         assert mock_user.status == UserStatus.INACTIVE
-        assert mock_session.commit.called
+        mock_user_repository.update.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_unlock_account(
-        self, account_service: AccountService, mock_session: AsyncMock, mock_user
+        self,
+        account_service: AccountService,
+        mock_user_repository: AsyncMock,
     ) -> None:
         """Test unlocking a locked account."""
-        from datetime import datetime, timedelta
-
-        mock_user.locked_until = datetime.now(UTC) + timedelta(minutes=30)
-        mock_user.failed_login_count = 5
-        mock_result = MagicMock()
-        mock_result.scalar_one_or_none.return_value = mock_user
-        mock_session.execute.return_value = mock_result
+        user = User(
+            id=1,
+            username="testuser",
+            email="test@example.com",
+            status=UserStatus.ACTIVE,
+            role=UserRole.ENGINEER,
+            auth_type=AuthType.LOCAL,
+            locked_until=datetime.now(UTC) + timedelta(minutes=30),
+            failed_login_count=5,
+        )
+        mock_user_repository.get_by_id.return_value = user
+        mock_user_repository.update.return_value = user
 
         await account_service.unlock_account(1)
 
-        assert mock_user.locked_until is None
-        assert mock_user.failed_login_count == 0
-        assert mock_session.commit.called
+        assert user.locked_until is None
+        assert user.failed_login_count == 0
+        mock_user_repository.update.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_enable_nonexistent_account(
-        self, account_service: AccountService, mock_session: AsyncMock
+        self,
+        account_service: AccountService,
+        mock_user_repository: AsyncMock,
     ) -> None:
         """Test enabling nonexistent account raises error."""
-        mock_result = MagicMock()
-        mock_result.scalar_one_or_none.return_value = None
-        mock_session.execute.return_value = mock_result
+        mock_user_repository.get_by_id.return_value = None
 
         with pytest.raises(AuthenticationError) as exc_info:
             await account_service.enable_account(999)

@@ -1,5 +1,8 @@
-"""Service mixins for shared functionality."""
+"""Service mixins for shared functionality.
 
-from src.application.services.mixins.user_query_mixin import UserQueryMixin
+Note: UserQueryMixin has been replaced by IUserRepository for proper
+Clean Architecture compliance. User queries should now go through
+the repository interface.
+"""
 
-__all__ = ["UserQueryMixin"]
+__all__: list[str] = []
