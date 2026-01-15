@@ -9,7 +9,7 @@ from typing import Any
 
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
-from starlette.responses import Response
+from starlette.responses import JSONResponse, Response
 
 from src.core.security.paths import AUDIT_EXEMPT_PATHS, AUDIT_EXEMPT_PREFIXES
 from src.domain.entities.audit_log import (
@@ -73,18 +73,39 @@ class AuditMiddleware(BaseHTTPMiddleware):
         """Process request and create audit log entry."""
         # Skip exempt paths
         if self._should_skip(request):
-            return await call_next(request)
+            try:
+                return await call_next(request)
+            except Exception as e:
+                logger.error(f"Unhandled exception in request: {e}")
+                return JSONResponse(
+                    status_code=500,
+                    content={"detail": "Internal server error"},
+                )
 
         # Get operation type from HTTP method
         operation_type = self.METHOD_OPERATION_MAP.get(request.method)
         if operation_type is None:
-            return await call_next(request)
+            try:
+                return await call_next(request)
+            except Exception as e:
+                logger.error(f"Unhandled exception in request: {e}")
+                return JSONResponse(
+                    status_code=500,
+                    content={"detail": "Internal server error"},
+                )
 
         # Capture request data before processing
         request_data = await self._capture_request_data(request)
 
-        # Execute the actual request
-        response = await call_next(request)
+        # Execute the actual request with error handling
+        try:
+            response = await call_next(request)
+        except Exception as e:
+            logger.error(f"Unhandled exception in request: {e}")
+            response = JSONResponse(
+                status_code=500,
+                content={"detail": "Internal server error"},
+            )
 
         # Create audit log asynchronously (non-blocking)
         asyncio.create_task(

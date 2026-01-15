@@ -1,6 +1,5 @@
 """Authentication Middleware Integration Tests."""
 
-from typing import Dict
 
 import pytest
 from httpx import AsyncClient
@@ -110,7 +109,7 @@ class TestProtectedPaths:
 
     @pytest.mark.asyncio
     async def test_protected_path_expired_token(
-        self, client: AsyncClient, expired_auth_headers: Dict[str, str]
+        self, client: AsyncClient, expired_auth_headers: dict[str, str]
     ) -> None:
         """Test protected path returns 401 with expired token."""
         response = await client.get("/api/v1/auth/me", headers=expired_auth_headers)
@@ -119,7 +118,7 @@ class TestProtectedPaths:
 
     @pytest.mark.asyncio
     async def test_protected_path_valid_token(
-        self, client: AsyncClient, engineer_auth_headers: Dict[str, str]
+        self, client: AsyncClient, engineer_auth_headers: dict[str, str]
     ) -> None:
         """Test protected path accepts valid token."""
         response = await client.get("/api/v1/auth/me", headers=engineer_auth_headers)
@@ -217,7 +216,7 @@ class TestRequestStatePopulation:
 
     @pytest.mark.asyncio
     async def test_request_state_user_id(
-        self, client: AsyncClient, engineer_auth_headers: Dict[str, str]
+        self, client: AsyncClient, engineer_auth_headers: dict[str, str]
     ) -> None:
         """Test that request.state contains user_id."""
         response = await client.get("/api/v1/auth/me", headers=engineer_auth_headers)
@@ -229,7 +228,7 @@ class TestRequestStatePopulation:
 
     @pytest.mark.asyncio
     async def test_request_state_role(
-        self, client: AsyncClient, admin_auth_headers: Dict[str, str]
+        self, client: AsyncClient, admin_auth_headers: dict[str, str]
     ) -> None:
         """Test that request.state contains role."""
         try:

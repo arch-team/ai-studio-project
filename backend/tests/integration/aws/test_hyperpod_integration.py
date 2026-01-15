@@ -14,7 +14,6 @@ import pytest_asyncio
 
 from src.infrastructure.external.hyperpod.client import HyperPodClient
 
-
 pytestmark = [
     pytest.mark.aws_integration,
     pytest.mark.hyperpod,

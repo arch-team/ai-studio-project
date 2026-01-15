@@ -1,6 +1,6 @@
 """Security Exceptions Unit Tests."""
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import pytest
 
@@ -124,7 +124,7 @@ class TestAccountLockedError:
 
     def test_account_locked_error_locked_until(self) -> None:
         """Test AccountLockedError captures locked_until datetime."""
-        locked_until = datetime.now(timezone.utc) + timedelta(minutes=30)
+        locked_until = datetime.now(UTC) + timedelta(minutes=30)
         error = AccountLockedError("Account locked", locked_until=locked_until)
 
         assert error.locked_until == locked_until

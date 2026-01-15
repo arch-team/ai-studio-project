@@ -1,6 +1,6 @@
 """Password Service Unit Tests."""
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -9,7 +9,6 @@ from src.application.services.password_service import PasswordService
 from src.core.security.exceptions import (
     AuthenticationError,
     InvalidTokenError,
-    PasswordHistoryViolationError,
     PasswordTooWeakError,
     TokenExpiredError,
 )
@@ -25,7 +24,7 @@ def mock_user():
     user.email = "test@example.com"
     user.status = UserStatus.ACTIVE
     user.password_hash = "$2b$04$test_hash"
-    user.password_expires_at = datetime.now(timezone.utc) + timedelta(days=30)
+    user.password_expires_at = datetime.now(UTC) + timedelta(days=30)
     user.locked_until = None
     user.failed_login_count = 0
     user.auth_type = AuthType.LOCAL
@@ -43,7 +42,9 @@ def mock_sso_user(mock_user):
 
 
 @pytest.fixture
-def password_service(mock_session, mock_jwt_manager, fast_password_hasher, password_validator):
+def password_service(
+    mock_session, mock_jwt_manager, fast_password_hasher, password_validator
+):
     """Create PasswordService with mocked dependencies."""
     return PasswordService(
         session=mock_session,
@@ -77,7 +78,9 @@ class TestChangePassword:
 
         mock_session.execute = AsyncMock(side_effect=execute_side_effect)
 
-        with patch.object(password_service._hasher, "verify_password", return_value=True):
+        with patch.object(
+            password_service._hasher, "verify_password", return_value=True
+        ):
             await password_service.change_password(
                 user_id=1,
                 current_password="OldP@ssw0rd123!",
@@ -95,7 +98,9 @@ class TestChangePassword:
         mock_result.scalar_one_or_none.return_value = mock_user
         mock_session.execute.return_value = mock_result
 
-        with patch.object(password_service._hasher, "verify_password", return_value=False):
+        with patch.object(
+            password_service._hasher, "verify_password", return_value=False
+        ):
             with pytest.raises(AuthenticationError) as exc_info:
                 await password_service.change_password(
                     user_id=1,
@@ -114,7 +119,9 @@ class TestChangePassword:
         mock_result.scalar_one_or_none.return_value = mock_user
         mock_session.execute.return_value = mock_result
 
-        with patch.object(password_service._hasher, "verify_password", return_value=True):
+        with patch.object(
+            password_service._hasher, "verify_password", return_value=True
+        ):
             with pytest.raises(PasswordTooWeakError):
                 await password_service.change_password(
                     user_id=1,

@@ -8,14 +8,15 @@ Tests cover:
 - Entity creation
 """
 
-import pytest
 from datetime import datetime
 
+import pytest
+
 from src.domain.entities.model import (
+    MODEL_STATE_TRANSITIONS,
+    Model,
     ModelFramework,
     ModelStatus,
-    Model,
-    MODEL_STATE_TRANSITIONS,
 )
 
 

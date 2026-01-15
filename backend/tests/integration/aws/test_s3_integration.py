@@ -6,14 +6,13 @@ Run with: pytest -m aws_integration tests/integration/aws/test_s3_integration.py
 
 import os
 import uuid
+from collections.abc import AsyncGenerator
 from pathlib import Path
-from typing import AsyncGenerator
 
 import pytest
 import pytest_asyncio
 
 from src.infrastructure.external.s3.client import S3StorageClient
-
 
 pytestmark = [
     pytest.mark.aws_integration,
@@ -448,7 +447,9 @@ class TestS3Stream:
         )
 
         chunks = []
-        async for chunk in s3_client.stream_file(remote_path=remote_path, chunk_size=1024):
+        async for chunk in s3_client.stream_file(
+            remote_path=remote_path, chunk_size=1024
+        ):
             chunks.append(chunk)
 
         streamed_content = b"".join(chunks)

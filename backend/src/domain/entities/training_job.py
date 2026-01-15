@@ -47,7 +47,12 @@ class SpotInterruptionBehavior(Enum):
 # Valid state transitions based on spec.md Training Job State Model
 TRAINING_JOB_STATE_TRANSITIONS = {
     JobStatus.SUBMITTED: {JobStatus.RUNNING, JobStatus.FAILED},
-    JobStatus.RUNNING: {JobStatus.PAUSED, JobStatus.PREEMPTED, JobStatus.COMPLETED, JobStatus.FAILED},
+    JobStatus.RUNNING: {
+        JobStatus.PAUSED,
+        JobStatus.PREEMPTED,
+        JobStatus.COMPLETED,
+        JobStatus.FAILED,
+    },
     JobStatus.PAUSED: {JobStatus.RUNNING, JobStatus.FAILED},
     JobStatus.PREEMPTED: {JobStatus.RUNNING, JobStatus.FAILED},
     JobStatus.COMPLETED: set(),  # Terminal state
@@ -196,7 +201,9 @@ class TrainingJob:
         """Mark job as completed."""
         self.transition_to(JobStatus.COMPLETED)
 
-    def fail(self, error_message: str | None = None, failure_reason: str | None = None) -> None:
+    def fail(
+        self, error_message: str | None = None, failure_reason: str | None = None
+    ) -> None:
         """Mark job as failed with optional error details."""
         self.error_message = error_message
         self.failure_reason = failure_reason

@@ -18,6 +18,7 @@ from src.infrastructure.persistence.models.audit_log_model import (
     ResourceType,
 )
 from src.infrastructure.persistence.models.base import SoftDeleteMixin, TimestampMixin
+from src.infrastructure.persistence.models.checkpoint_model import CheckpointModel
 from src.infrastructure.persistence.models.development_space_model import (
     DevelopmentSpaceModel,
     SpaceInstanceType,
@@ -25,6 +26,7 @@ from src.infrastructure.persistence.models.development_space_model import (
     SpaceType,
 )
 from src.infrastructure.persistence.models.login_attempt_model import LoginAttemptModel
+from src.infrastructure.persistence.models.ml_model import ModelModel
 from src.infrastructure.persistence.models.password_history_model import (
     PasswordHistoryModel,
 )
@@ -38,8 +40,6 @@ from src.infrastructure.persistence.models.resource_quota_model import (
     QuotaType,
     ResourceQuotaModel,
 )
-from src.infrastructure.persistence.models.checkpoint_model import CheckpointModel
-from src.infrastructure.persistence.models.ml_model import ModelModel
 from src.infrastructure.persistence.models.training_job_model import TrainingJobModel
 from src.infrastructure.persistence.models.user_model import (
     AuthType,

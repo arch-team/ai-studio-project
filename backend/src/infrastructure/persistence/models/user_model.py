@@ -20,13 +20,13 @@ if TYPE_CHECKING:
     from src.infrastructure.persistence.models.login_attempt_model import (
         LoginAttemptModel,
     )
+    from src.infrastructure.persistence.models.ml_model import ModelModel
     from src.infrastructure.persistence.models.password_history_model import (
         PasswordHistoryModel,
     )
     from src.infrastructure.persistence.models.resource_quota_model import (
         ResourceQuotaModel,
     )
-    from src.infrastructure.persistence.models.ml_model import ModelModel
     from src.infrastructure.persistence.models.training_job_model import (
         TrainingJobModel,
     )
@@ -202,7 +202,10 @@ class UserModel(Base, TimestampMixin):
 
     def is_password_expired(self) -> bool:
         """Check if password has expired."""
-        return self.password_expires_at is not None and utc_now() > self.password_expires_at
+        return (
+            self.password_expires_at is not None
+            and utc_now() > self.password_expires_at
+        )
 
     def is_local_account(self) -> bool:
         """Check if this is a local authentication account."""

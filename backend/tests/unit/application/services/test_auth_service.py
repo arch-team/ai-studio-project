@@ -1,6 +1,6 @@
 """Auth Service Unit Tests."""
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -35,7 +35,7 @@ def mock_user():
     user.role = UserRole.ENGINEER
     user.status = UserStatus.ACTIVE
     user.password_hash = "$2b$04$test_hash"
-    user.password_expires_at = datetime.now(timezone.utc) + timedelta(days=30)
+    user.password_expires_at = datetime.now(UTC) + timedelta(days=30)
     user.locked_until = None
     user.failed_login_count = 0
     user.auth_type = AuthType.LOCAL
@@ -50,7 +50,7 @@ def mock_user():
 def mock_locked_user(mock_user):
     """Create a mock locked user."""
     user = mock_user
-    user.locked_until = datetime.now(timezone.utc) + timedelta(minutes=30)
+    user.locked_until = datetime.now(UTC) + timedelta(minutes=30)
     user.failed_login_count = 5
     user.is_locked.return_value = True
     return user
@@ -60,7 +60,7 @@ def mock_locked_user(mock_user):
 def mock_expired_password_user(mock_user):
     """Create a mock user with expired password."""
     user = mock_user
-    user.password_expires_at = datetime.now(timezone.utc) - timedelta(days=1)
+    user.password_expires_at = datetime.now(UTC) - timedelta(days=1)
     user.is_password_expired.return_value = True
     return user
 

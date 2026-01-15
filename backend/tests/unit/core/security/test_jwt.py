@@ -1,6 +1,6 @@
 """JWT Manager Unit Tests."""
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from authlib.jose import jwt as authlib_jwt
@@ -58,7 +58,7 @@ class TestJWTManagerTokenCreation:
         )
 
         payload = jwt_manager.verify_token(token)
-        expected_exp = datetime.now(timezone.utc) + custom_delta
+        expected_exp = datetime.now(UTC) + custom_delta
         # Allow 5 second tolerance
         assert abs((payload.exp - expected_exp).total_seconds()) < 5
 
@@ -78,7 +78,7 @@ class TestJWTManagerTokenCreation:
         token = jwt_manager.create_refresh_token(user_id=1)
 
         payload = jwt_manager.verify_token(token, expected_type=TokenType.REFRESH)
-        expected_exp = datetime.now(timezone.utc) + timedelta(days=7)
+        expected_exp = datetime.now(UTC) + timedelta(days=7)
         # Allow 10 second tolerance
         assert abs((payload.exp - expected_exp).total_seconds()) < 10
 
@@ -111,7 +111,7 @@ class TestJWTManagerTokenCreation:
         payload = jwt_manager.verify_token(
             token, expected_type=TokenType.PASSWORD_RESET
         )
-        expected_exp = datetime.now(timezone.utc) + timedelta(minutes=15)
+        expected_exp = datetime.now(UTC) + timedelta(minutes=15)
         # Allow 5 second tolerance
         assert abs((payload.exp - expected_exp).total_seconds()) < 5
 
@@ -173,8 +173,8 @@ class TestJWTManagerTokenVerification:
             "username": "testuser",
             "email": "test@example.com",
             "role": "engineer",
-            "exp": int((datetime.now(timezone.utc) + timedelta(hours=1)).timestamp()),
-            "iat": int(datetime.now(timezone.utc).timestamp()),
+            "exp": int((datetime.now(UTC) + timedelta(hours=1)).timestamp()),
+            "iat": int(datetime.now(UTC).timestamp()),
             "type": "access",
             "jti": "test-jti",
         }
@@ -202,8 +202,8 @@ class TestJWTManagerTokenVerification:
         # Create a token without required claims
         header = {"alg": "HS256"}
         payload = {
-            "exp": int((datetime.now(timezone.utc) + timedelta(hours=1)).timestamp()),
-            "iat": int(datetime.now(timezone.utc).timestamp()),
+            "exp": int((datetime.now(UTC) + timedelta(hours=1)).timestamp()),
+            "iat": int(datetime.now(UTC).timestamp()),
             # Missing: sub, token_type
         }
         token = authlib_jwt.encode(header, payload, jwt_secret_key).decode("utf-8")
@@ -274,7 +274,7 @@ class TestTokenPayload:
 
     def test_token_payload_creation(self) -> None:
         """Test TokenPayload dataclass creation."""
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         payload = TokenPayload(
             sub="1",
             username="testuser",
@@ -292,7 +292,7 @@ class TestTokenPayload:
 
     def test_token_payload_from_dict_with_defaults(self) -> None:
         """Test TokenPayload.from_dict provides defaults for missing optional fields."""
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         data = {
             "sub": "1",
             "exp": int((now + timedelta(hours=1)).timestamp()),

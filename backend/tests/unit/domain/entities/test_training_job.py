@@ -7,16 +7,16 @@ Tests cover:
 - Entity creation
 """
 
+
 import pytest
-from datetime import datetime
 
 from src.domain.entities.training_job import (
-    JobStatus,
+    TRAINING_JOB_STATE_TRANSITIONS,
     DistributionStrategy,
     JobPriority,
+    JobStatus,
     SpotInterruptionBehavior,
     TrainingJob,
-    TRAINING_JOB_STATE_TRANSITIONS,
 )
 
 
@@ -25,7 +25,14 @@ class TestJobStatusEnum:
 
     def test_all_statuses_defined(self) -> None:
         """Verify all required statuses are defined."""
-        expected_statuses = {"SUBMITTED", "RUNNING", "PAUSED", "PREEMPTED", "COMPLETED", "FAILED"}
+        expected_statuses = {
+            "SUBMITTED",
+            "RUNNING",
+            "PAUSED",
+            "PREEMPTED",
+            "COMPLETED",
+            "FAILED",
+        }
         actual_statuses = {s.name for s in JobStatus}
         assert actual_statuses == expected_statuses
 
@@ -377,7 +384,12 @@ class TestStateTransitionMatrix:
 
     def test_running_transitions(self) -> None:
         """Verify RUNNING state transitions."""
-        expected = {JobStatus.PAUSED, JobStatus.PREEMPTED, JobStatus.COMPLETED, JobStatus.FAILED}
+        expected = {
+            JobStatus.PAUSED,
+            JobStatus.PREEMPTED,
+            JobStatus.COMPLETED,
+            JobStatus.FAILED,
+        }
         assert TRAINING_JOB_STATE_TRANSITIONS[JobStatus.RUNNING] == expected
 
     def test_paused_transitions(self) -> None:

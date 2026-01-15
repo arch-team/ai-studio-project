@@ -1,7 +1,7 @@
 """Unit Test Configuration - Shared fixtures for unit tests."""
 
-from datetime import datetime, timedelta, timezone
-from typing import Any, Dict, List
+from datetime import UTC, datetime, timedelta
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock, Mock, patch
 
 import pytest
@@ -50,8 +50,8 @@ def mock_jwt_manager() -> Mock:
         username="testuser",
         email="test@example.com",
         role="engineer",
-        exp=datetime.now(timezone.utc) + timedelta(hours=1),
-        iat=datetime.now(timezone.utc),
+        exp=datetime.now(UTC) + timedelta(hours=1),
+        iat=datetime.now(UTC),
         token_type=TokenType.ACCESS,
         jti="test-jti",
     )
@@ -83,7 +83,7 @@ def password_validator() -> PasswordValidator:
 
 
 @pytest.fixture
-def valid_passwords() -> List[str]:
+def valid_passwords() -> list[str]:
     """List of valid passwords meeting all requirements."""
     return [
         "P@ssw0rd123!",
@@ -95,7 +95,7 @@ def valid_passwords() -> List[str]:
 
 
 @pytest.fixture
-def invalid_passwords() -> Dict[str, str]:
+def invalid_passwords() -> dict[str, str]:
     """Dictionary of invalid passwords with their violation type."""
     return {
         "too_short": "Short1!",
@@ -114,7 +114,7 @@ def invalid_passwords() -> Dict[str, str]:
 
 
 @pytest.fixture
-def sample_user_data() -> Dict[str, Any]:
+def sample_user_data() -> dict[str, Any]:
     """Sample user data for testing."""
     return {
         "id": 1,
@@ -127,13 +127,13 @@ def sample_user_data() -> Dict[str, Any]:
         "iam_groups": None,
         "resource_quota_id": None,
         "last_login_at": None,
-        "created_at": datetime.now(timezone.utc),
-        "updated_at": datetime.now(timezone.utc),
+        "created_at": datetime.now(UTC),
+        "updated_at": datetime.now(UTC),
     }
 
 
 @pytest.fixture
-def admin_user_data(sample_user_data: Dict[str, Any]) -> Dict[str, Any]:
+def admin_user_data(sample_user_data: dict[str, Any]) -> dict[str, Any]:
     """Admin user data for testing."""
     return {
         **sample_user_data,
@@ -146,7 +146,7 @@ def admin_user_data(sample_user_data: Dict[str, Any]) -> Dict[str, Any]:
 
 
 @pytest.fixture
-def project_manager_user_data(sample_user_data: Dict[str, Any]) -> Dict[str, Any]:
+def project_manager_user_data(sample_user_data: dict[str, Any]) -> dict[str, Any]:
     """Project manager user data for testing."""
     return {
         **sample_user_data,
@@ -159,7 +159,7 @@ def project_manager_user_data(sample_user_data: Dict[str, Any]) -> Dict[str, Any
 
 
 @pytest.fixture
-def engineer_user_data(sample_user_data: Dict[str, Any]) -> Dict[str, Any]:
+def engineer_user_data(sample_user_data: dict[str, Any]) -> dict[str, Any]:
     """Engineer user data for testing."""
     return {
         **sample_user_data,
@@ -172,7 +172,7 @@ def engineer_user_data(sample_user_data: Dict[str, Any]) -> Dict[str, Any]:
 
 
 @pytest.fixture
-def viewer_user_data(sample_user_data: Dict[str, Any]) -> Dict[str, Any]:
+def viewer_user_data(sample_user_data: dict[str, Any]) -> dict[str, Any]:
     """Viewer user data for testing."""
     return {
         **sample_user_data,
@@ -185,7 +185,7 @@ def viewer_user_data(sample_user_data: Dict[str, Any]) -> Dict[str, Any]:
 
 
 @pytest.fixture
-def locked_user_data(sample_user_data: Dict[str, Any]) -> Dict[str, Any]:
+def locked_user_data(sample_user_data: dict[str, Any]) -> dict[str, Any]:
     """Locked user data for testing."""
     return {
         **sample_user_data,
@@ -193,13 +193,13 @@ def locked_user_data(sample_user_data: Dict[str, Any]) -> Dict[str, Any]:
         "username": "locked_user",
         "email": "locked@example.com",
         "display_name": "Locked User",
-        "locked_until": datetime.now(timezone.utc) + timedelta(minutes=30),
+        "locked_until": datetime.now(UTC) + timedelta(minutes=30),
         "failed_login_count": 5,
     }
 
 
 @pytest.fixture
-def expired_password_user_data(sample_user_data: Dict[str, Any]) -> Dict[str, Any]:
+def expired_password_user_data(sample_user_data: dict[str, Any]) -> dict[str, Any]:
     """User with expired password for testing."""
     return {
         **sample_user_data,
@@ -207,12 +207,12 @@ def expired_password_user_data(sample_user_data: Dict[str, Any]) -> Dict[str, An
         "username": "expired_user",
         "email": "expired@example.com",
         "display_name": "Expired Password User",
-        "password_expires_at": datetime.now(timezone.utc) - timedelta(days=1),
+        "password_expires_at": datetime.now(UTC) - timedelta(days=1),
     }
 
 
 @pytest.fixture
-def inactive_user_data(sample_user_data: Dict[str, Any]) -> Dict[str, Any]:
+def inactive_user_data(sample_user_data: dict[str, Any]) -> dict[str, Any]:
     """Inactive user data for testing."""
     return {
         **sample_user_data,
@@ -248,9 +248,9 @@ def mock_session() -> AsyncMock:
 
 
 @pytest.fixture
-def sample_token_payload() -> Dict[str, Any]:
+def sample_token_payload() -> dict[str, Any]:
     """Sample token payload data."""
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     return {
         "sub": "1",
         "username": "testuser",
@@ -264,9 +264,9 @@ def sample_token_payload() -> Dict[str, Any]:
 
 
 @pytest.fixture
-def expired_token_payload(sample_token_payload: Dict[str, Any]) -> Dict[str, Any]:
+def expired_token_payload(sample_token_payload: dict[str, Any]) -> dict[str, Any]:
     """Expired token payload data."""
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     return {
         **sample_token_payload,
         "exp": now - timedelta(minutes=30),

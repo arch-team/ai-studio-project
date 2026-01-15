@@ -3,9 +3,9 @@
 Tests follow TDD Red-Green-Refactor cycle.
 """
 
+from unittest.mock import MagicMock, patch
+
 import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
-from typing import Any, Dict, List
 
 from src.application.interfaces.hyperpod_client import IHyperPodClient
 

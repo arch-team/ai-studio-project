@@ -2,7 +2,7 @@
 
 from datetime import datetime
 from decimal import Decimal
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 
 from sqlalchemy import BigInteger, DateTime, Enum, ForeignKey, Integer, String
 from sqlalchemy.dialects.mysql import DECIMAL, JSON
@@ -18,7 +18,9 @@ from src.infrastructure.persistence.models.base import TimestampMixin
 
 if TYPE_CHECKING:
     from src.infrastructure.persistence.models.ml_model import ModelModel
-    from src.infrastructure.persistence.models.training_job_model import TrainingJobModel
+    from src.infrastructure.persistence.models.training_job_model import (
+        TrainingJobModel,
+    )
 
 
 class CheckpointModel(Base, TimestampMixin):

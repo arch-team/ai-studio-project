@@ -1,6 +1,5 @@
 """Password Manager Unit Tests."""
 
-from typing import List
 
 from src.core.security.constants import PASSWORD_BCRYPT_COST, PASSWORD_MIN_LENGTH
 from src.core.security.password import PasswordHasher, PasswordValidator
@@ -105,7 +104,7 @@ class TestPasswordValidatorStrength:
     """Tests for password strength validation."""
 
     def test_validate_strength_valid(
-        self, password_validator: PasswordValidator, valid_passwords: List[str]
+        self, password_validator: PasswordValidator, valid_passwords: list[str]
     ) -> None:
         """Test that valid passwords pass validation."""
         for password in valid_passwords:
@@ -274,7 +273,7 @@ class TestPasswordValidatorHistory:
     ) -> None:
         """Test that any password passes with empty history."""
         password = "AnyP@ssw0rd123!"
-        history: List[str] = []
+        history: list[str] = []
 
         is_ok = password_validator.check_password_history(
             new_password=password,

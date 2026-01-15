@@ -194,16 +194,11 @@ class TestGetTrainingJobEndpoint:
         engineer_auth_headers: dict[str, str],
     ) -> None:
         """Test getting non-existent job returns 404."""
-        try:
-            response = await client.get(
-                "/api/v1/training-jobs/99999",
-                headers=engineer_auth_headers,
-            )
-            assert response.status_code in [404, 500]
-        except RuntimeError as e:
-            if "different loop" in str(e):
-                pytest.skip("Event loop mismatch in test environment")
-            raise
+        response = await client.get(
+            "/api/v1/training-jobs/99999",
+            headers=engineer_auth_headers,
+        )
+        assert response.status_code in [404, 500]
 
     @pytest.mark.asyncio
     async def test_get_job_invalid_id_format(
@@ -266,20 +261,15 @@ class TestUpdateTrainingJobEndpoint:
         engineer_auth_headers: dict[str, str],
     ) -> None:
         """Test valid action values are accepted."""
-        try:
-            valid_actions = ["pause", "resume", "cancel"]
-            for action in valid_actions:
-                response = await client.patch(
-                    "/api/v1/training-jobs/99999",
-                    json={"action": action},
-                    headers=engineer_auth_headers,
-                )
-                # Should be 404 (job not found) or 500 (DB error), not 422
-                assert response.status_code in [404, 409, 500]
-        except RuntimeError as e:
-            if "different loop" in str(e):
-                pytest.skip("Event loop mismatch in test environment")
-            raise
+        valid_actions = ["pause", "resume", "cancel"]
+        for action in valid_actions:
+            response = await client.patch(
+                "/api/v1/training-jobs/99999",
+                json={"action": action},
+                headers=engineer_auth_headers,
+            )
+            # Should be 404 (job not found) or 500 (DB error), not 422
+            assert response.status_code in [404, 409, 500]
 
 
 class TestDeleteTrainingJobEndpoint:
@@ -372,17 +362,12 @@ class TestTrainingJobsRBAC:
         viewer_auth_headers: dict[str, str],
     ) -> None:
         """Test viewer role can list training jobs."""
-        try:
-            response = await client.get(
-                "/api/v1/training-jobs",
-                headers=viewer_auth_headers,
-            )
-            # Viewer should be able to list (200) or DB error (500)
-            assert response.status_code in [200, 500]
-        except RuntimeError as e:
-            if "different loop" in str(e):
-                pytest.skip("Event loop mismatch in test environment")
-            raise
+        response = await client.get(
+            "/api/v1/training-jobs",
+            headers=viewer_auth_headers,
+        )
+        # Viewer should be able to list (200) or DB error (500)
+        assert response.status_code in [200, 500]
 
     @pytest.mark.asyncio
     async def test_viewer_cannot_delete_job(
@@ -406,15 +391,10 @@ class TestTrainingJobsRBAC:
         create_job_request_data: dict[str, Any],
     ) -> None:
         """Test engineer role can create training jobs."""
-        try:
-            response = await client.post(
-                "/api/v1/training-jobs",
-                json=create_job_request_data,
-                headers=engineer_auth_headers,
-            )
-            # Engineer should be allowed (201) or service error (500/503)
-            assert response.status_code in [201, 409, 500, 503]
-        except RuntimeError as e:
-            if "different loop" in str(e) or "HyperPod" in str(e):
-                pytest.skip("Event loop mismatch or HyperPod unavailable")
-            raise
+        response = await client.post(
+            "/api/v1/training-jobs",
+            json=create_job_request_data,
+            headers=engineer_auth_headers,
+        )
+        # Engineer should be allowed (201) or service error (500/503)
+        assert response.status_code in [201, 409, 500, 503]

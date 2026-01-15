@@ -4,7 +4,7 @@ Provides fixtures and utilities for AWS integration testing.
 """
 
 import os
-from typing import Any, Dict
+from typing import Any
 
 import pytest
 
@@ -53,7 +53,7 @@ def aws_account_id() -> str | None:
 
 
 @pytest.fixture(scope="session")
-def s3_test_config() -> Dict[str, Any]:
+def s3_test_config() -> dict[str, Any]:
     """S3 test configuration from environment."""
     return {
         "bucket_name": os.environ.get(
@@ -65,7 +65,7 @@ def s3_test_config() -> Dict[str, Any]:
 
 
 @pytest.fixture(scope="session")
-def hyperpod_test_config() -> Dict[str, Any]:
+def hyperpod_test_config() -> dict[str, Any]:
     """HyperPod test configuration from environment."""
     return {
         "cluster_name": os.environ.get("HYPERPOD_TEST_CLUSTER_NAME"),

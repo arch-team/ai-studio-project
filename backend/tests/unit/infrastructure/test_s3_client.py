@@ -3,9 +3,9 @@
 Tests follow TDD Red-Green-Refactor cycle.
 """
 
+from unittest.mock import MagicMock, patch
+
 import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
-from typing import Any, Dict, List
 
 from src.application.interfaces.storage_service import IStorageService
 
@@ -118,8 +118,16 @@ class TestS3StorageClient:
         """Test successful file listing."""
         mock_boto3_client.list_objects_v2.return_value = {
             "Contents": [
-                {"Key": "data/file1.txt", "Size": 1024, "LastModified": "2026-01-15T10:00:00Z"},
-                {"Key": "data/file2.txt", "Size": 2048, "LastModified": "2026-01-15T11:00:00Z"},
+                {
+                    "Key": "data/file1.txt",
+                    "Size": 1024,
+                    "LastModified": "2026-01-15T10:00:00Z",
+                },
+                {
+                    "Key": "data/file2.txt",
+                    "Size": 2048,
+                    "LastModified": "2026-01-15T11:00:00Z",
+                },
             ],
             "IsTruncated": False,
         }

@@ -7,16 +7,17 @@ Tests cover:
 - Entity creation
 """
 
-import pytest
 from datetime import datetime
 from decimal import Decimal
 
+import pytest
+
 from src.domain.entities.checkpoint import (
+    STORAGE_TIER_HIERARCHY,
+    Checkpoint,
+    CheckpointStatus,
     CheckpointType,
     StorageTier,
-    CheckpointStatus,
-    Checkpoint,
-    STORAGE_TIER_HIERARCHY,
 )
 
 
@@ -105,7 +106,9 @@ class TestStorageTierMigration:
         checkpoint.migrate_to(StorageTier.S3)
         assert checkpoint.storage_tier == StorageTier.S3
 
-    def test_reverse_migration_fsx_to_nvme_invalid(self, checkpoint: Checkpoint) -> None:
+    def test_reverse_migration_fsx_to_nvme_invalid(
+        self, checkpoint: Checkpoint
+    ) -> None:
         """Test invalid reverse migration: FSX -> NVME."""
         checkpoint.storage_tier = StorageTier.FSX
         assert not checkpoint.can_migrate_to(StorageTier.NVME)
@@ -218,13 +221,17 @@ class TestCheckpointBusinessRules:
         assert checkpoint.status == CheckpointStatus.ARCHIVED
         assert checkpoint.archived_at is not None
 
-    def test_archive_when_not_available_raises_error(self, checkpoint: Checkpoint) -> None:
+    def test_archive_when_not_available_raises_error(
+        self, checkpoint: Checkpoint
+    ) -> None:
         """Test archive() raises error when not AVAILABLE."""
         checkpoint.status = CheckpointStatus.DELETED
         with pytest.raises(ValueError, match="Cannot archive checkpoint"):
             checkpoint.archive()
 
-    def test_soft_delete_sets_status_and_timestamp(self, checkpoint: Checkpoint) -> None:
+    def test_soft_delete_sets_status_and_timestamp(
+        self, checkpoint: Checkpoint
+    ) -> None:
         """Test soft_delete() sets status to DELETED and sets deleted_at."""
         assert checkpoint.deleted_at is None
         checkpoint.soft_delete()
@@ -276,7 +283,9 @@ class TestCheckpointCreation:
         assert checkpoint.id == 1
         assert checkpoint.training_job_id == 1
         assert checkpoint.checkpoint_name == "checkpoint-epoch100.pth"
-        assert checkpoint.storage_path == "/fsx/checkpoints/job-1/checkpoint-epoch100.pth"
+        assert (
+            checkpoint.storage_path == "/fsx/checkpoints/job-1/checkpoint-epoch100.pth"
+        )
         assert checkpoint.size_bytes == 1073741824
 
     def test_default_checkpoint_type_is_epoch(self) -> None:

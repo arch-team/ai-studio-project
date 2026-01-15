@@ -1,7 +1,7 @@
 """Integration Test Configuration - Shared fixtures for integration tests."""
 
 from datetime import timedelta
-from typing import Any, Dict
+from typing import Any
 
 import pytest
 
@@ -113,25 +113,25 @@ def expired_refresh_token(jwt_manager: JWTManager) -> str:
 
 
 @pytest.fixture
-def admin_auth_headers(admin_access_token: str) -> Dict[str, str]:
+def admin_auth_headers(admin_access_token: str) -> dict[str, str]:
     """Authorization headers for admin user."""
     return {"Authorization": f"Bearer {admin_access_token}"}
 
 
 @pytest.fixture
-def engineer_auth_headers(engineer_access_token: str) -> Dict[str, str]:
+def engineer_auth_headers(engineer_access_token: str) -> dict[str, str]:
     """Authorization headers for engineer user."""
     return {"Authorization": f"Bearer {engineer_access_token}"}
 
 
 @pytest.fixture
-def viewer_auth_headers(viewer_access_token: str) -> Dict[str, str]:
+def viewer_auth_headers(viewer_access_token: str) -> dict[str, str]:
     """Authorization headers for viewer user."""
     return {"Authorization": f"Bearer {viewer_access_token}"}
 
 
 @pytest.fixture
-def expired_auth_headers(expired_access_token: str) -> Dict[str, str]:
+def expired_auth_headers(expired_access_token: str) -> dict[str, str]:
     """Authorization headers with expired token."""
     return {"Authorization": f"Bearer {expired_access_token}"}
 
@@ -142,7 +142,7 @@ def expired_auth_headers(expired_access_token: str) -> Dict[str, str]:
 
 
 @pytest.fixture
-def local_account_create_data() -> Dict[str, Any]:
+def local_account_create_data() -> dict[str, Any]:
     """Data for creating a local account."""
     return {
         "username": "newuser",
@@ -154,7 +154,7 @@ def local_account_create_data() -> Dict[str, Any]:
 
 
 @pytest.fixture
-def login_request_data() -> Dict[str, Any]:
+def login_request_data() -> dict[str, Any]:
     """Data for local login request."""
     return {
         "username": "testuser",
@@ -163,7 +163,7 @@ def login_request_data() -> Dict[str, Any]:
 
 
 @pytest.fixture
-def password_change_data() -> Dict[str, Any]:
+def password_change_data() -> dict[str, Any]:
     """Data for password change request."""
     return {
         "current_password": "TestP@ssw0rd123!",
@@ -172,7 +172,7 @@ def password_change_data() -> Dict[str, Any]:
 
 
 @pytest.fixture
-def weak_password_data() -> Dict[str, Any]:
+def weak_password_data() -> dict[str, Any]:
     """Data with weak password for testing validation."""
     return {
         "username": "weakuser",
@@ -189,7 +189,7 @@ def weak_password_data() -> Dict[str, Any]:
 
 
 @pytest.fixture
-def sso_user_groups() -> Dict[str, list]:
+def sso_user_groups() -> dict[str, list]:
     """Sample SSO user groups for role mapping tests."""
     return {
         "admin_groups": ["AI-Platform-Admins", "General-Users"],
@@ -205,7 +205,7 @@ def sso_user_groups() -> Dict[str, list]:
 
 
 @pytest.fixture
-def mock_sso_user_info() -> Dict[str, Any]:
+def mock_sso_user_info() -> dict[str, Any]:
     """Mock SSO user info from IAM Identity Center."""
     return {
         "identity_id": "sso-user-123",

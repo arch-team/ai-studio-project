@@ -1,12 +1,13 @@
 """Account Service Unit Tests."""
 
-from unittest.mock import AsyncMock, MagicMock, patch
+from datetime import UTC
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
 from src.application.services.account_service import AccountService
 from src.core.security.exceptions import AuthenticationError, PasswordTooWeakError
-from src.domain.value_objects import AuthType, UserRole, UserStatus
+from src.domain.value_objects import UserRole, UserStatus
 
 
 @pytest.fixture
@@ -127,9 +128,9 @@ class TestAccountManagement:
         self, account_service: AccountService, mock_session: AsyncMock, mock_user
     ) -> None:
         """Test unlocking a locked account."""
-        from datetime import datetime, timedelta, timezone
+        from datetime import datetime, timedelta
 
-        mock_user.locked_until = datetime.now(timezone.utc) + timedelta(minutes=30)
+        mock_user.locked_until = datetime.now(UTC) + timedelta(minutes=30)
         mock_user.failed_login_count = 5
         mock_result = MagicMock()
         mock_result.scalar_one_or_none.return_value = mock_user

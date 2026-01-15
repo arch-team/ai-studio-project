@@ -3,8 +3,9 @@
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 from src.api.middleware.audit import AuditMiddleware
 from src.api.middleware.auth import AuthenticationMiddleware
@@ -55,6 +56,20 @@ def create_app() -> FastAPI:
 
     # Register API routers
     app.include_router(v1_router, prefix="/api")
+
+    # Global exception handler for unhandled exceptions
+    @app.exception_handler(Exception)
+    async def global_exception_handler(
+        request: Request, exc: Exception
+    ) -> JSONResponse:
+        """Handle unhandled exceptions and return 500 response."""
+        return JSONResponse(
+            status_code=500,
+            content={
+                "detail": "Internal server error",
+                "error_type": type(exc).__name__,
+            },
+        )
 
     @app.get("/health", tags=["Health"])
     async def _health_check() -> dict:

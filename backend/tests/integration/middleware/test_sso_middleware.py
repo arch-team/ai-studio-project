@@ -1,7 +1,6 @@
 """SSO Middleware Integration Tests."""
 
-from datetime import datetime, timedelta, timezone
-from typing import Dict, List
+from datetime import UTC, datetime, timedelta
 from unittest.mock import patch
 
 import pytest
@@ -169,7 +168,7 @@ class TestMapGroupsToRole:
     """Tests for group to role mapping."""
 
     def test_map_groups_to_role_admin(
-        self, sso_user_groups: Dict[str, List[str]]
+        self, sso_user_groups: dict[str, list[str]]
     ) -> None:
         """Test admin group maps to admin role."""
         role = map_groups_to_role(sso_user_groups["admin_groups"])
@@ -177,7 +176,7 @@ class TestMapGroupsToRole:
         assert role == "admin"
 
     def test_map_groups_to_role_manager(
-        self, sso_user_groups: Dict[str, List[str]]
+        self, sso_user_groups: dict[str, list[str]]
     ) -> None:
         """Test project manager group maps correctly."""
         role = map_groups_to_role(sso_user_groups["manager_groups"])
@@ -185,7 +184,7 @@ class TestMapGroupsToRole:
         assert role == "project_manager"
 
     def test_map_groups_to_role_engineer(
-        self, sso_user_groups: Dict[str, List[str]]
+        self, sso_user_groups: dict[str, list[str]]
     ) -> None:
         """Test engineer group maps correctly."""
         role = map_groups_to_role(sso_user_groups["engineer_groups"])
@@ -193,7 +192,7 @@ class TestMapGroupsToRole:
         assert role == "engineer"
 
     def test_map_groups_to_role_viewer(
-        self, sso_user_groups: Dict[str, List[str]]
+        self, sso_user_groups: dict[str, list[str]]
     ) -> None:
         """Test viewer group maps correctly."""
         role = map_groups_to_role(sso_user_groups["viewer_groups"])
@@ -201,7 +200,7 @@ class TestMapGroupsToRole:
         assert role == "viewer"
 
     def test_map_groups_to_role_default(
-        self, sso_user_groups: Dict[str, List[str]]
+        self, sso_user_groups: dict[str, list[str]]
     ) -> None:
         """Test unmapped groups default to viewer."""
         role = map_groups_to_role(sso_user_groups["no_mapping_groups"])
@@ -209,7 +208,7 @@ class TestMapGroupsToRole:
         assert role == "viewer"
 
     def test_map_groups_to_role_multiple_highest(
-        self, sso_user_groups: Dict[str, List[str]]
+        self, sso_user_groups: dict[str, list[str]]
     ) -> None:
         """Test multiple groups returns highest privilege role."""
         role = map_groups_to_role(sso_user_groups["multiple_groups"])
@@ -324,7 +323,7 @@ class TestSSOHealthState:
 
     def test_health_state_with_values(self) -> None:
         """Test SSOHealthState with explicit values."""
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         state = SSOHealthState(
             consecutive_failures=3,
             is_degraded=True,

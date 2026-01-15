@@ -1,6 +1,6 @@
 """Authentication API Endpoints Integration Tests."""
 
-from typing import Any, Dict
+from typing import Any
 
 import pytest
 from httpx import AsyncClient
@@ -107,7 +107,7 @@ class TestLogoutEndpoint:
 
     @pytest.mark.asyncio
     async def test_logout_success(
-        self, client: AsyncClient, engineer_auth_headers: Dict[str, str]
+        self, client: AsyncClient, engineer_auth_headers: dict[str, str]
     ) -> None:
         """Test successful logout."""
         response = await client.post(
@@ -127,8 +127,8 @@ class TestLocalAccountManagement:
     async def test_create_local_account_requires_admin(
         self,
         client: AsyncClient,
-        engineer_auth_headers: Dict[str, str],
-        local_account_create_data: Dict[str, Any],
+        engineer_auth_headers: dict[str, str],
+        local_account_create_data: dict[str, Any],
     ) -> None:
         """Test create account requires admin role."""
         response = await client.post(
@@ -143,8 +143,8 @@ class TestLocalAccountManagement:
     async def test_create_local_account_viewer_forbidden(
         self,
         client: AsyncClient,
-        viewer_auth_headers: Dict[str, str],
-        local_account_create_data: Dict[str, Any],
+        viewer_auth_headers: dict[str, str],
+        local_account_create_data: dict[str, Any],
     ) -> None:
         """Test viewer cannot create accounts."""
         response = await client.post(
@@ -159,8 +159,8 @@ class TestLocalAccountManagement:
     async def test_create_local_account_weak_password(
         self,
         client: AsyncClient,
-        admin_auth_headers: Dict[str, str],
-        weak_password_data: Dict[str, Any],
+        admin_auth_headers: dict[str, str],
+        weak_password_data: dict[str, Any],
     ) -> None:
         """Test create account with weak password."""
         try:
@@ -184,7 +184,7 @@ class TestLocalAccountManagement:
     async def test_enable_account_requires_admin(
         self,
         client: AsyncClient,
-        engineer_auth_headers: Dict[str, str],
+        engineer_auth_headers: dict[str, str],
     ) -> None:
         """Test enable account requires admin role."""
         response = await client.post(
@@ -198,7 +198,7 @@ class TestLocalAccountManagement:
     async def test_disable_account_requires_admin(
         self,
         client: AsyncClient,
-        engineer_auth_headers: Dict[str, str],
+        engineer_auth_headers: dict[str, str],
     ) -> None:
         """Test disable account requires admin role."""
         response = await client.post(
@@ -212,7 +212,7 @@ class TestLocalAccountManagement:
     async def test_unlock_account_requires_admin(
         self,
         client: AsyncClient,
-        engineer_auth_headers: Dict[str, str],
+        engineer_auth_headers: dict[str, str],
     ) -> None:
         """Test unlock account requires admin role."""
         response = await client.post(
@@ -243,7 +243,7 @@ class TestPasswordChangeEndpoint:
     async def test_change_password_weak_new_password(
         self,
         client: AsyncClient,
-        engineer_auth_headers: Dict[str, str],
+        engineer_auth_headers: dict[str, str],
     ) -> None:
         """Test password change with weak new password."""
         try:
@@ -266,7 +266,7 @@ class TestPasswordChangeEndpoint:
     async def test_change_password_missing_params(
         self,
         client: AsyncClient,
-        engineer_auth_headers: Dict[str, str],
+        engineer_auth_headers: dict[str, str],
     ) -> None:
         """Test password change with missing parameters."""
         response = await client.post(
@@ -373,7 +373,7 @@ class TestCurrentUserEndpoint:
     async def test_get_me_authenticated(
         self,
         client: AsyncClient,
-        engineer_auth_headers: Dict[str, str],
+        engineer_auth_headers: dict[str, str],
     ) -> None:
         """Test get current user with authentication."""
         response = await client.get("/api/v1/auth/me", headers=engineer_auth_headers)
@@ -385,7 +385,7 @@ class TestCurrentUserEndpoint:
     async def test_get_me_with_admin_token(
         self,
         client: AsyncClient,
-        admin_auth_headers: Dict[str, str],
+        admin_auth_headers: dict[str, str],
     ) -> None:
         """Test get current user with admin token."""
         try:
@@ -413,7 +413,7 @@ class TestAuthResponseFormats:
     async def test_403_response_has_error_info(
         self,
         client: AsyncClient,
-        viewer_auth_headers: Dict[str, str],
+        viewer_auth_headers: dict[str, str],
     ) -> None:
         """Test 403 responses include error information."""
         response = await client.post(

@@ -1,8 +1,7 @@
 """Training Job Service Unit Tests - TDD Red-Green-Refactor."""
 
 from datetime import datetime
-from decimal import Decimal
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock
 
 import pytest
 
@@ -16,9 +15,7 @@ from src.domain.exceptions import (
     DuplicateEntityError,
     EntityNotFoundError,
     InvalidStateTransitionError,
-    ResourceQuotaExceededError,
 )
-
 
 # === Fixtures ===
 
@@ -160,7 +157,9 @@ class TestCreateTrainingJob:
         # Assert
         assert result is not None
         assert result.job_name == sample_job.job_name
-        mock_repository.exists_by_name.assert_called_once_with(create_job_data["job_name"])
+        mock_repository.exists_by_name.assert_called_once_with(
+            create_job_data["job_name"]
+        )
         mock_repository.create.assert_called_once()
         mock_hyperpod_client.submit_training_job.assert_called_once()
 

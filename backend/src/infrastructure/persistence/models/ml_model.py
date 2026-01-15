@@ -13,7 +13,9 @@ from src.infrastructure.persistence.models.base import TimestampMixin
 
 if TYPE_CHECKING:
     from src.infrastructure.persistence.models.checkpoint_model import CheckpointModel
-    from src.infrastructure.persistence.models.training_job_model import TrainingJobModel
+    from src.infrastructure.persistence.models.training_job_model import (
+        TrainingJobModel,
+    )
     from src.infrastructure.persistence.models.user_model import UserModel
 
 
