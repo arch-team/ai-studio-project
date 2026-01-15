@@ -7,6 +7,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.api.middleware.auth import CurrentUser
 from src.api.v1.dependencies.auth import get_current_active_user, require_engineer
+from src.api.v1.dependencies.permissions import (
+    check_resource_owner_or_privileged,
+    get_owner_filter,
+)
 from src.api.v1.dependencies.services import get_checkpoint_service
 from src.api.v1.schemas.training_job import (
     CheckpointResponse,
@@ -26,6 +30,7 @@ from src.application.services.checkpoint_service import CheckpointService
 from src.application.services.training_job_service import TrainingJobService
 from src.core.database import get_db
 from src.core.mapping import EnumMapper
+from src.core.utils import calculate_total_pages
 from src.domain.entities.training_job import JobPriority, JobStatus
 from src.infrastructure.external.hyperpod.client import HyperPodClient
 from src.infrastructure.persistence.repositories.training_job_repository_impl import (
@@ -127,13 +132,8 @@ async def list_training_jobs(
     service: TrainingJobService = Depends(get_training_job_service),
 ):
     """List training jobs with pagination and filters."""
-    # Non-admin users only see their own jobs
-    owner_id = None
-    if current_user.role not in ["admin", "manager"]:
-        owner_id = current_user.user_id
-
     jobs, total = await service.list_jobs(
-        owner_id=owner_id,
+        owner_id=get_owner_filter(current_user),
         status=_to_domain_status(status),
         priority=_to_domain_priority(priority),
         submitted_after=submitted_after,
@@ -144,14 +144,12 @@ async def list_training_jobs(
         sort_order=sort_order,
     )
 
-    total_pages = (total + page_size - 1) // page_size if total > 0 else 0
-
     return TrainingJobListResponse(
         items=[TrainingJobSummary.from_entity(job) for job in jobs],
         total=total,
         page=page,
         page_size=page_size,
-        total_pages=total_pages,
+        total_pages=calculate_total_pages(total, page_size),
     )
 
 
@@ -169,33 +167,10 @@ async def get_training_job(
 ):
     """Get training job details by ID."""
     job = await service.get_job(job_id)
-
-    # Check ownership for non-admin users
-    if current_user.role not in ["admin", "manager"]:
-        if job.owner_id != current_user.user_id:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="You don't have permission to view this job",
-            )
-
+    check_resource_owner_or_privileged(
+        job.owner_id, current_user, "training job", "view"
+    )
     return TrainingJobDetail.from_entity(job)
-
-
-async def _check_job_permission(
-    job_id: int,
-    current_user: CurrentUser,
-    service: TrainingJobService,
-    action: str,
-):
-    """Check job exists and user has permission."""
-    job = await service.get_job(job_id)
-    if current_user.role not in ["admin", "manager"]:
-        if job.owner_id != current_user.user_id:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"You don't have permission to {action} this job",
-            )
-    return job
 
 
 @router.post(
@@ -212,7 +187,8 @@ async def pause_training_job(
     service: TrainingJobService = Depends(get_training_job_service),
 ):
     """Pause a running training job."""
-    await _check_job_permission(job_id, current_user, service, "pause")
+    job = await service.get_job(job_id)
+    check_resource_owner_or_privileged(job.owner_id, current_user, "training job", "pause")
     job = await service.pause_job(job_id)
     return TrainingJobDetail.from_entity(job)
 
@@ -231,7 +207,8 @@ async def resume_training_job(
     service: TrainingJobService = Depends(get_training_job_service),
 ):
     """Resume a paused training job."""
-    await _check_job_permission(job_id, current_user, service, "resume")
+    job = await service.get_job(job_id)
+    check_resource_owner_or_privileged(job.owner_id, current_user, "training job", "resume")
     job = await service.resume_job(job_id)
     return TrainingJobDetail.from_entity(job)
 
@@ -250,7 +227,8 @@ async def cancel_training_job(
     service: TrainingJobService = Depends(get_training_job_service),
 ):
     """Cancel a training job."""
-    await _check_job_permission(job_id, current_user, service, "cancel")
+    job = await service.get_job(job_id)
+    check_resource_owner_or_privileged(job.owner_id, current_user, "training job", "cancel")
     job = await service.cancel_job(job_id)
     return TrainingJobDetail.from_entity(job)
 
@@ -268,15 +246,8 @@ async def delete_training_job(
     service: TrainingJobService = Depends(get_training_job_service),
 ):
     """Delete a training job."""
-    # First check if job exists and user has permission
     job = await service.get_job(job_id)
-    if current_user.role not in ["admin", "manager"]:
-        if job.owner_id != current_user.user_id:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="You don't have permission to delete this job",
-            )
-
+    check_resource_owner_or_privileged(job.owner_id, current_user, "training job", "delete")
     await service.delete_job(job_id)
     return None
 
@@ -301,16 +272,10 @@ async def create_manual_checkpoint(
     checkpoint_service: CheckpointService = Depends(get_checkpoint_service),
 ):
     """Create a manual checkpoint for a running training job (T031d)."""
-    # Check job exists and is running
     job = await service.get_job(job_id)
-
-    # Check ownership
-    if current_user.role not in ["admin", "manager"]:
-        if job.owner_id != current_user.user_id:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="You don't have permission to create checkpoints for this job",
-            )
+    check_resource_owner_or_privileged(
+        job.owner_id, current_user, "training job", "create checkpoints for"
+    )
 
     # Job must be running to create a manual checkpoint
     if job.status != JobStatus.RUNNING:

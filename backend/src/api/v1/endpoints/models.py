@@ -5,6 +5,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.api.middleware.auth import CurrentUser
 from src.api.v1.dependencies.auth import get_current_active_user, require_engineer
+from src.api.v1.dependencies.permissions import (
+    check_resource_owner_or_privileged,
+    get_owner_filter,
+)
 from src.api.v1.schemas.model import (
     CreateModelRequest,
     ModelDetail,
@@ -19,6 +23,7 @@ from src.api.v1.schemas.model import (
 )
 from src.application.services.model_service import ModelService
 from src.core.database import get_db
+from src.core.utils import calculate_total_pages
 from src.infrastructure.persistence.repositories.model_repository_impl import (
     ModelRepository,
 )
@@ -103,13 +108,8 @@ async def list_models(
             detail=f"Invalid sort field: {sort_by}. Valid fields: {', '.join(VALID_SORT_FIELDS)}",
         )
 
-    # Non-admin users only see their own models
-    owner_id = None
-    if current_user.role not in ["admin", "manager"]:
-        owner_id = current_user.user_id
-
     models, total = await service.list_models(
-        owner_id=owner_id,
+        owner_id=get_owner_filter(current_user),
         training_job_id=training_job_id,
         status=status_filter.value if status_filter else None,
         framework=framework.value if framework else None,
@@ -145,15 +145,7 @@ async def get_model(
 ):
     """Get model details by ID."""
     model = await service.get_model(model_id)
-
-    # Check ownership for non-admin users
-    if current_user.role not in ["admin", "manager"]:
-        if model.owner_id != current_user.user_id:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="You don't have permission to view this model",
-            )
-
+    check_resource_owner_or_privileged(model.owner_id, current_user, "model", "view")
     return ModelDetail.from_entity(model)
 
 
@@ -171,17 +163,10 @@ async def get_model_versions(
     service: ModelService = Depends(get_model_service),
 ):
     """Get all versions of a model with optional comparison (T031c)."""
-    # First check if base model exists
     model = await service.get_model(model_id)
-
-    # Check ownership for non-admin users
-    if current_user.role not in ["admin", "manager"]:
-        if model.owner_id != current_user.user_id:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="You don't have permission to view this model's versions",
-            )
-
+    check_resource_owner_or_privileged(
+        model.owner_id, current_user, "model", "view versions of"
+    )
     result = await service.get_model_versions(model_id, compare_with)
 
     # Convert to response format
@@ -229,15 +214,8 @@ async def delete_model(
     service: ModelService = Depends(get_model_service),
 ):
     """Delete/archive a model."""
-    # First check if model exists and user has permission
     model = await service.get_model(model_id)
-    if current_user.role not in ["admin", "manager"]:
-        if model.owner_id != current_user.user_id:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="You don't have permission to delete this model",
-            )
-
+    check_resource_owner_or_privileged(model.owner_id, current_user, "model", "delete")
     await service.delete_model(model_id)
     return None
 
@@ -256,14 +234,7 @@ async def archive_model(
     service: ModelService = Depends(get_model_service),
 ):
     """Archive a model."""
-    # First check if model exists and user has permission
     model = await service.get_model(model_id)
-    if current_user.role not in ["admin", "manager"]:
-        if model.owner_id != current_user.user_id:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="You don't have permission to archive this model",
-            )
-
+    check_resource_owner_or_privileged(model.owner_id, current_user, "model", "archive")
     model = await service.archive_model(model_id)
     return ModelDetail.from_entity(model)
