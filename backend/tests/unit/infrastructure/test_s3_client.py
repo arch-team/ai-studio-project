@@ -1,19 +1,13 @@
 """S3 Client Tests - Unit tests for S3 storage client implementation.
 
 Tests follow TDD Red-Green-Refactor cycle.
-
-NOTE: Tests are skipped because S3StorageClient and IStorageService have not been
-migrated to the new modular architecture yet.
 """
 
 from unittest.mock import MagicMock, patch
 
 import pytest
 
-# Skip all tests in this module - implementation not yet migrated
-pytestmark = pytest.mark.skip(
-    reason="S3StorageClient not migrated to modules/ structure yet"
-)
+from src.shared.infrastructure.storage import IStorageService, S3StorageClient
 
 
 class TestS3StorageClient:
@@ -27,10 +21,8 @@ class TestS3StorageClient:
             yield mock_client
 
     @pytest.fixture
-    def s3_client(self, mock_boto3_client: MagicMock) -> "S3StorageClient":
+    def s3_client(self, mock_boto3_client: MagicMock) -> S3StorageClient:
         """Create S3StorageClient instance with mocked dependencies."""
-        from src.infrastructure.external.s3.client import S3StorageClient
-
         client = S3StorageClient(bucket_name="test-bucket", region="us-west-2")
         client._s3_client = mock_boto3_client
         return client
@@ -40,7 +32,7 @@ class TestS3StorageClient:
     @pytest.mark.asyncio
     async def test_upload_file_success(
         self,
-        s3_client: "S3StorageClient",
+        s3_client: S3StorageClient,
         mock_boto3_client: MagicMock,
     ) -> None:
         """Test successful file upload."""
@@ -58,7 +50,7 @@ class TestS3StorageClient:
     @pytest.mark.asyncio
     async def test_upload_file_with_encryption(
         self,
-        s3_client: "S3StorageClient",
+        s3_client: S3StorageClient,
         mock_boto3_client: MagicMock,
     ) -> None:
         """Test file upload with SSE-KMS encryption."""
@@ -79,7 +71,7 @@ class TestS3StorageClient:
     @pytest.mark.asyncio
     async def test_download_file_success(
         self,
-        s3_client: "S3StorageClient",
+        s3_client: S3StorageClient,
         mock_boto3_client: MagicMock,
     ) -> None:
         """Test successful file download."""
@@ -100,7 +92,7 @@ class TestS3StorageClient:
     @pytest.mark.asyncio
     async def test_delete_file_success(
         self,
-        s3_client: "S3StorageClient",
+        s3_client: S3StorageClient,
         mock_boto3_client: MagicMock,
     ) -> None:
         """Test successful file deletion."""
@@ -118,7 +110,7 @@ class TestS3StorageClient:
     @pytest.mark.asyncio
     async def test_list_files_success(
         self,
-        s3_client: "S3StorageClient",
+        s3_client: S3StorageClient,
         mock_boto3_client: MagicMock,
     ) -> None:
         """Test successful file listing."""
@@ -149,7 +141,7 @@ class TestS3StorageClient:
     @pytest.mark.asyncio
     async def test_list_files_empty(
         self,
-        s3_client: "S3StorageClient",
+        s3_client: S3StorageClient,
         mock_boto3_client: MagicMock,
     ) -> None:
         """Test listing with no results."""
@@ -164,7 +156,7 @@ class TestS3StorageClient:
     @pytest.mark.asyncio
     async def test_get_file_metadata_success(
         self,
-        s3_client: "S3StorageClient",
+        s3_client: S3StorageClient,
         mock_boto3_client: MagicMock,
     ) -> None:
         """Test successful metadata retrieval."""
@@ -189,7 +181,7 @@ class TestS3StorageClient:
     @pytest.mark.asyncio
     async def test_file_exists_returns_true(
         self,
-        s3_client: "S3StorageClient",
+        s3_client: S3StorageClient,
         mock_boto3_client: MagicMock,
     ) -> None:
         """Test file existence check returns true."""
@@ -205,7 +197,7 @@ class TestS3StorageClient:
     @pytest.mark.asyncio
     async def test_file_exists_returns_false(
         self,
-        s3_client: "S3StorageClient",
+        s3_client: S3StorageClient,
         mock_boto3_client: MagicMock,
     ) -> None:
         """Test file existence check returns false for non-existent file."""
@@ -225,7 +217,7 @@ class TestS3StorageClient:
     @pytest.mark.asyncio
     async def test_generate_presigned_url_for_get(
         self,
-        s3_client: "S3StorageClient",
+        s3_client: S3StorageClient,
         mock_boto3_client: MagicMock,
     ) -> None:
         """Test presigned URL generation for download."""
@@ -246,7 +238,7 @@ class TestS3StorageClient:
     @pytest.mark.asyncio
     async def test_generate_presigned_url_for_put(
         self,
-        s3_client: "S3StorageClient",
+        s3_client: S3StorageClient,
         mock_boto3_client: MagicMock,
     ) -> None:
         """Test presigned URL generation for upload."""
@@ -272,7 +264,7 @@ class TestS3StorageClient:
     @pytest.mark.asyncio
     async def test_copy_file_success(
         self,
-        s3_client: "S3StorageClient",
+        s3_client: S3StorageClient,
         mock_boto3_client: MagicMock,
     ) -> None:
         """Test successful file copy."""
@@ -297,7 +289,7 @@ class TestS3StorageClient:
     @pytest.mark.asyncio
     async def test_stream_file_yields_chunks(
         self,
-        s3_client: "S3StorageClient",
+        s3_client: S3StorageClient,
         mock_boto3_client: MagicMock,
     ) -> None:
         """Test file streaming yields chunks."""
@@ -323,7 +315,7 @@ class TestS3StorageClient:
     @pytest.mark.asyncio
     async def test_client_handles_access_denied(
         self,
-        s3_client: "S3StorageClient",
+        s3_client: S3StorageClient,
         mock_boto3_client: MagicMock,
     ) -> None:
         """Test error handling for access denied."""
@@ -342,7 +334,7 @@ class TestS3StorageClient:
     @pytest.mark.asyncio
     async def test_client_handles_bucket_not_found(
         self,
-        s3_client: "S3StorageClient",
+        s3_client: S3StorageClient,
         mock_boto3_client: MagicMock,
     ) -> None:
         """Test error handling when bucket doesn't exist."""
@@ -362,14 +354,14 @@ class TestS3StorageClient:
 
     def test_implements_istorage_service_interface(
         self,
-        s3_client: "S3StorageClient",
+        s3_client: S3StorageClient,
     ) -> None:
         """Test that S3StorageClient implements IStorageService interface."""
         assert isinstance(s3_client, IStorageService)
 
     def test_all_interface_methods_implemented(
         self,
-        s3_client: "S3StorageClient",
+        s3_client: S3StorageClient,
     ) -> None:
         """Test that all interface methods are implemented."""
         interface_methods = [

@@ -1,8 +1,9 @@
-"""Shared Infrastructure - Database, config, and security utilities."""
+"""Shared Infrastructure - Database, config, storage, and security utilities."""
 
 from .config import Settings, get_settings
 from .database import AsyncSessionLocal, Base, engine, get_db
 from .models import SoftDeleteMixin, TimestampMixin
+from .storage import IStorageService, S3StorageClient
 
 __all__ = [
     # Config
@@ -16,4 +17,7 @@ __all__ = [
     # Models
     "TimestampMixin",
     "SoftDeleteMixin",
+    # Storage
+    "IStorageService",
+    "S3StorageClient",
 ]
