@@ -9,25 +9,7 @@ from starlette.responses import JSONResponse, Response
 
 from src.core.security.exceptions import InvalidTokenError, TokenExpiredError
 from src.core.security.jwt import TokenPayload, TokenType, get_jwt_manager
-
-# Paths that don't require authentication
-EXEMPT_PATHS: list[str] = [
-    "/health",
-    "/healthz",
-    "/ready",
-    "/docs",
-    "/redoc",
-    "/openapi.json",
-    "/api/v1/auth/login",
-    "/api/v1/auth/token/refresh",
-    "/api/v1/auth/password-reset/request",
-    "/api/v1/auth/password-reset/confirm",
-]
-
-# Regex patterns for exempt paths
-EXEMPT_PATTERNS: list[str] = [
-    r"^/api/v1/auth/password-reset/.*$",
-]
+from src.core.security.paths import AUTH_EXEMPT_PATHS, AUTH_EXEMPT_PATTERNS
 
 
 class AuthenticationMiddleware(BaseHTTPMiddleware):
@@ -76,10 +58,10 @@ class AuthenticationMiddleware(BaseHTTPMiddleware):
 
     def _is_exempt_path(self, path: str) -> bool:
         """Check if path is exempt from authentication."""
-        if path in EXEMPT_PATHS:
+        if path in AUTH_EXEMPT_PATHS:
             return True
 
-        return any(re.match(pattern, path) for pattern in EXEMPT_PATTERNS)
+        return any(re.match(pattern, path) for pattern in AUTH_EXEMPT_PATTERNS)
 
     def _extract_token(self, request: Request) -> str | None:
         """Extract Bearer token from Authorization header."""

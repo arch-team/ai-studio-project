@@ -17,7 +17,7 @@ from src.domain.entities.checkpoint import (
 from src.infrastructure.persistence.models.base import TimestampMixin
 
 if TYPE_CHECKING:
-    from src.infrastructure.persistence.models.model_model import ModelModel
+    from src.infrastructure.persistence.models.ml_model import ModelModel
     from src.infrastructure.persistence.models.training_job_model import TrainingJobModel
 
 

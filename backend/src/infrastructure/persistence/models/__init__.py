@@ -39,7 +39,7 @@ from src.infrastructure.persistence.models.resource_quota_model import (
     ResourceQuotaModel,
 )
 from src.infrastructure.persistence.models.checkpoint_model import CheckpointModel
-from src.infrastructure.persistence.models.model_model import ModelModel
+from src.infrastructure.persistence.models.ml_model import ModelModel
 from src.infrastructure.persistence.models.training_job_model import TrainingJobModel
 from src.infrastructure.persistence.models.user_model import (
     AuthType,

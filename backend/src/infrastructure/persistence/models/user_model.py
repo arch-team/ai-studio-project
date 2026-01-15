@@ -1,6 +1,5 @@
 """User ORM model - Platform user information with IAM integration."""
 
-import enum
 from datetime import datetime
 from typing import TYPE_CHECKING, Optional
 
@@ -10,6 +9,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from src.core.database import Base
 from src.core.utils import utc_now
+from src.domain.value_objects import AuthType, UserRole, UserStatus
 from src.infrastructure.persistence.models.base import TimestampMixin
 
 if TYPE_CHECKING:
@@ -26,34 +26,10 @@ if TYPE_CHECKING:
     from src.infrastructure.persistence.models.resource_quota_model import (
         ResourceQuotaModel,
     )
-    from src.infrastructure.persistence.models.model_model import ModelModel
+    from src.infrastructure.persistence.models.ml_model import ModelModel
     from src.infrastructure.persistence.models.training_job_model import (
         TrainingJobModel,
     )
-
-
-class UserStatus(enum.Enum):
-    """User status enumeration."""
-
-    ACTIVE = "active"
-    INACTIVE = "inactive"
-    SUSPENDED = "suspended"
-
-
-class UserRole(enum.Enum):
-    """User role enumeration."""
-
-    ADMIN = "admin"
-    PROJECT_MANAGER = "project_manager"
-    ENGINEER = "engineer"
-    VIEWER = "viewer"
-
-
-class AuthType(enum.Enum):
-    """Authentication type enumeration."""
-
-    SSO = "sso"
-    LOCAL = "local"
 
 
 class UserModel(Base, TimestampMixin):

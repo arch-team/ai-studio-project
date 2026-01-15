@@ -11,6 +11,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import Response
 
+from src.core.security.paths import AUDIT_EXEMPT_PATHS, AUDIT_EXEMPT_PREFIXES
 from src.domain.entities.audit_log import (
     AuditLog,
     AuditStatus,
@@ -23,22 +24,6 @@ logger = logging.getLogger(__name__)
 
 class AuditMiddleware(BaseHTTPMiddleware):
     """Middleware for automatic audit logging of API operations."""
-
-    # Paths exempt from audit logging
-    EXEMPT_PATHS: set[str] = {
-        "/health",
-        "/healthz",
-        "/ready",
-        "/docs",
-        "/redoc",
-        "/openapi.json",
-    }
-
-    # Path prefixes exempt from audit logging
-    EXEMPT_PREFIXES: tuple[str, ...] = (
-        "/docs/",
-        "/redoc/",
-    )
 
     # HTTP method to operation type mapping
     METHOD_OPERATION_MAP: dict[str, OperationType | None] = {
@@ -116,7 +101,7 @@ class AuditMiddleware(BaseHTTPMiddleware):
     def _should_skip(self, request: Request) -> bool:
         """Check if request should skip audit logging."""
         path = request.url.path
-        return path in self.EXEMPT_PATHS or path.startswith(self.EXEMPT_PREFIXES)
+        return path in AUDIT_EXEMPT_PATHS or path.startswith(AUDIT_EXEMPT_PREFIXES)
 
     async def _capture_request_data(self, request: Request) -> dict[str, Any] | None:
         """Capture and sanitize request body."""

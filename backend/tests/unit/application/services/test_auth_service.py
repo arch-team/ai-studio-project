@@ -84,15 +84,12 @@ def mock_inactive_user(mock_user):
 
 
 @pytest.fixture
-def auth_service(
-    mock_session, mock_jwt_manager, fast_password_hasher, password_validator
-):
+def auth_service(mock_session, mock_jwt_manager, fast_password_hasher):
     """Create AuthService with mocked dependencies."""
     return AuthService(
         session=mock_session,
         jwt_manager=mock_jwt_manager,
         password_hasher=fast_password_hasher,
-        password_validator=password_validator,
     )
 
 
@@ -333,10 +330,11 @@ class TestRefreshAccessToken:
 
 
 # =============================================================================
-# Create Local Account Tests
+# Create Local Account Tests (Migrated to test_account_service.py)
 # =============================================================================
 
 
+@pytest.mark.skip(reason="Migrated to test_account_service.py - use AccountService")
 class TestCreateLocalAccount:
     """Tests for local account creation."""
 
@@ -424,10 +422,11 @@ class TestCreateLocalAccount:
 
 
 # =============================================================================
-# Change Password Tests
+# Change Password Tests (Migrated to test_password_service.py)
 # =============================================================================
 
 
+@pytest.mark.skip(reason="Migrated to test_password_service.py - use PasswordService")
 class TestChangePassword:
     """Tests for password change functionality."""
 
@@ -522,10 +521,11 @@ class TestChangePassword:
 
 
 # =============================================================================
-# Password Reset Tests
+# Password Reset Tests (Migrated to test_password_service.py)
 # =============================================================================
 
 
+@pytest.mark.skip(reason="Migrated to test_password_service.py - use PasswordService")
 class TestPasswordReset:
     """Tests for password reset functionality."""
 
@@ -616,10 +616,11 @@ class TestPasswordReset:
 
 
 # =============================================================================
-# Account Management Tests
+# Account Management Tests (Migrated to test_account_service.py)
 # =============================================================================
 
 
+@pytest.mark.skip(reason="Migrated to test_account_service.py - use AccountService")
 class TestAccountManagement:
     """Tests for account enable/disable/unlock."""
 

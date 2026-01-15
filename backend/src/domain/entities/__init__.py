@@ -42,7 +42,8 @@ from src.domain.entities.training_job import (
     TRAINING_JOB_STATE_TRANSITIONS,
     TrainingJob,
 )
-from src.domain.entities.user import User, UserRole, UserStatus
+from src.domain.entities.user import User
+from src.domain.value_objects import UserRole, UserStatus
 
 __all__ = [
     # User

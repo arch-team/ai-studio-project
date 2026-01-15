@@ -6,6 +6,10 @@ Dependencies for endpoint injection:
 - get_service: Application service dependencies
 """
 
-from src.api.v1.dependencies.services import get_auth_service
+from src.api.v1.dependencies.services import (
+    get_account_service,
+    get_auth_service,
+    get_password_service,
+)
 
-__all__ = ["get_auth_service"]
+__all__ = ["get_account_service", "get_auth_service", "get_password_service"]

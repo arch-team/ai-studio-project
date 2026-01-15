@@ -6,7 +6,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.api.middleware.auth import CurrentUser
 from src.api.middleware.sso import SSOUserInfo, get_sso_service, map_groups_to_role
-from src.api.v1.dependencies import get_auth_service
+from src.api.v1.dependencies import (
+    get_account_service,
+    get_auth_service,
+    get_password_service,
+)
 from src.api.v1.dependencies.auth import get_current_active_user, require_admin
 from src.api.v1.schemas.auth import (
     ErrorResponse,
@@ -21,7 +25,9 @@ from src.api.v1.schemas.auth import (
     TokenResponse,
     UserResponse,
 )
+from src.application.services.account_service import AccountService
 from src.application.services.auth_service import AuthService
+from src.application.services.password_service import PasswordService
 from src.core.database import get_db
 from src.core.security.exceptions import (
     AccountLockedError,
@@ -34,12 +40,8 @@ from src.core.security.exceptions import (
     SSOError,
     TokenExpiredError,
 )
-from src.infrastructure.persistence.models import (
-    AuthType,
-    UserModel,
-    UserStatus,
-)
-from src.infrastructure.persistence.models.user_model import UserRole
+from src.domain.value_objects import AuthType, UserRole, UserStatus
+from src.infrastructure.persistence.models import UserModel
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
@@ -263,11 +265,11 @@ async def logout(
 async def create_local_account(
     account_data: LocalAccountCreateRequest,
     current_user: CurrentUser = Depends(require_admin),
-    auth_service: AuthService = Depends(get_auth_service),
+    account_service: AccountService = Depends(get_account_service),
 ):
     """Create a new local authentication account (Admin only)."""
     try:
-        user = await auth_service.create_local_account(
+        user = await account_service.create_local_account(
             username=account_data.username,
             email=account_data.email,
             password=account_data.password,
@@ -304,11 +306,11 @@ async def create_local_account(
 async def enable_account(
     user_id: int,
     current_user: CurrentUser = Depends(require_admin),
-    auth_service: AuthService = Depends(get_auth_service),
+    account_service: AccountService = Depends(get_account_service),
 ):
     """Enable a user account (Admin only)."""
     try:
-        await auth_service.enable_account(user_id)
+        await account_service.enable_account(user_id)
         return MessageResponse(message="Account enabled successfully")
     except AuthenticationError as e:
         raise HTTPException(
@@ -325,11 +327,11 @@ async def enable_account(
 async def disable_account(
     user_id: int,
     current_user: CurrentUser = Depends(require_admin),
-    auth_service: AuthService = Depends(get_auth_service),
+    account_service: AccountService = Depends(get_account_service),
 ):
     """Disable a user account (Admin only)."""
     try:
-        await auth_service.disable_account(user_id)
+        await account_service.disable_account(user_id)
         return MessageResponse(message="Account disabled successfully")
     except AuthenticationError as e:
         raise HTTPException(
@@ -346,11 +348,11 @@ async def disable_account(
 async def unlock_account(
     user_id: int,
     current_user: CurrentUser = Depends(require_admin),
-    auth_service: AuthService = Depends(get_auth_service),
+    account_service: AccountService = Depends(get_account_service),
 ):
     """Unlock a locked user account (Admin only)."""
     try:
-        await auth_service.unlock_account(user_id)
+        await account_service.unlock_account(user_id)
         return MessageResponse(message="Account unlocked successfully")
     except AuthenticationError as e:
         raise HTTPException(
@@ -370,11 +372,11 @@ async def unlock_account(
 async def change_password(
     password_data: PasswordChangeRequest,
     current_user: CurrentUser = Depends(get_current_active_user),
-    auth_service: AuthService = Depends(get_auth_service),
+    password_service: PasswordService = Depends(get_password_service),
 ):
     """Change password for the current user."""
     try:
-        await auth_service.change_password(
+        await password_service.change_password(
             user_id=current_user.user_id,
             current_password=password_data.current_password,
             new_password=password_data.new_password,
@@ -403,11 +405,11 @@ async def change_password(
 )
 async def request_password_reset(
     reset_data: PasswordResetRequest,
-    auth_service: AuthService = Depends(get_auth_service),
+    password_service: PasswordService = Depends(get_password_service),
 ):
     """Request a password reset email."""
     # Token would be used in production to send email with reset link
-    _ = await auth_service.request_password_reset(reset_data.email)
+    _ = await password_service.request_password_reset(reset_data.email)
 
     # Note: In production, send email with reset link containing the token
     # For now, we just acknowledge the request
@@ -427,11 +429,11 @@ async def request_password_reset(
 )
 async def confirm_password_reset(
     reset_data: PasswordResetConfirmRequest,
-    auth_service: AuthService = Depends(get_auth_service),
+    password_service: PasswordService = Depends(get_password_service),
 ):
     """Confirm password reset with token."""
     try:
-        await auth_service.confirm_password_reset(
+        await password_service.confirm_password_reset(
             reset_token=reset_data.token,
             new_password=reset_data.new_password,
         )
