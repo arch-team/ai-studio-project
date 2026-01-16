@@ -50,8 +50,18 @@
 │   依赖倒置，核心业务与外部依赖隔离                              │
 └─────────────────────────────────────────────────────────────┘
 ```
+### 1.3 核心原则
 
-### 1.3 模块划分
+| 原则 | 说明 | 实践 |
+|------|------|------|
+| **模块自治** | 每个模块拥有独立的领域模型和业务逻辑 | 模块内 CRUD 完全独立 |
+| **显式依赖** | 模块间依赖必须显式声明 | 通过接口定义依赖 |
+| **最小知识** | 模块只暴露必要的接口 | 内部实现对外不可见 |
+| **单向依赖** | 禁止循环依赖 | 使用事件解耦 |
+| **高内聚低耦合** | 相关功能聚合在同一模块 | 按业务领域划分 |
+
+
+### 1.4 模块划分
 
 | 模块 | 职责 | 核心实体 |
 |------|------|---------|
@@ -72,19 +82,38 @@
 每个业务模块遵循 Clean Architecture 四层结构：
 
 ```
+┌─────────────────────────────────────────┐
+│              API Layer                   │  ← 暴露 HTTP 端点
+│         (endpoints, schemas)             │
+├─────────────────────────────────────────┤
+│          Application Layer               │  ← 业务用例编排
+│       (services, dto, interfaces)        │
+├─────────────────────────────────────────┤
+│            Domain Layer                  │  ← 核心业务逻辑
+│  (entities, value_objects, repositories) │
+├─────────────────────────────────────────┤
+│        Infrastructure Layer              │  ← 技术实现
+│     (persistence, external adapters)     │
+└─────────────────────────────────────────┘
+
+```
+
+```
 modules/{name}/
 ├── api/                    # API 层 (入口适配器)
 │   ├── endpoints.py        # REST 端点定义
 │   ├── schemas/            # Pydantic 请求/响应模型
 │   └── dependencies.py     # FastAPI 依赖注入
-├── application/            # 应用层 (用例协调)
+├── application/            # 应用层 (业务用例编排，协调领域对象和基础设施)
+│   └── dto/                # 数据传输对象 (跨层传输)
 │   └── services/           # 业务用例实现
-├── domain/                 # 域层 (核心业务)
-│   ├── entities/           # 业务实体
+│   └── interfaces/         # 端口接口 (外部服务抽象，定义 Application 层需要的外部能力接口)
+├── domain/                 # 领域层 (核心业务逻辑)
+│   ├── entities/           # 领域实体
 │   ├── value_objects/      # 值对象
 │   ├── repositories/       # 仓库接口 (抽象)
-│   ├── events.py           # 域事件定义
-│   └── exceptions.py       # 域异常
+│   ├── events.py           # 领域事件定义
+│   └── exceptions.py       # 领域异常
 └── infrastructure/         # 基础设施层 (外部适配器)
     ├── models/             # ORM 模型
     ├── repositories/       # 仓库实现
@@ -191,7 +220,7 @@ from src.modules.training.application.services import TrainingJobService
 from src.modules.quotas.domain.entities import ResourceQuota
 
 # ❌ 禁止：直接导入其他模块的仓库实现
-from src.modules.models.infrastructure.repositories import ModelRepositoryImpl
+from src.modules.quotas.infrastructure.repositories import ModelRepositoryImpl
 
 # ❌ 禁止：Domain 层导入任何外部模块
 # modules/training/domain/entities/training_job.py
