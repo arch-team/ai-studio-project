@@ -3,6 +3,12 @@
 This test ensures that the application layer does not directly import
 infrastructure layer modules, maintaining proper dependency direction:
     API → Application → Domain ← Infrastructure
+
+Modular Monolith Rules (see docs/module-dependency-spec.md):
+    R1: Module Domain layer MUST NOT import any other module code
+    R2: Module Application layer MUST only depend on interfaces, not implementations
+    R3: Cross-module communication MUST use EventBus or shared interfaces
+    R4: Auth module authentication dependencies are the ONLY exception (API layer only)
 """
 
 import ast
@@ -576,3 +582,352 @@ class TestApiStateTransitionEndpoints:
             "UpdateTrainingJobRequest should not use action: Literal['pause', 'resume', 'cancel'].\n"
             "State transitions should use dedicated endpoints instead of generic action parameter."
         )
+
+
+# =============================================================================
+# Modular Monolith Module Dependency Compliance Tests
+# =============================================================================
+
+
+class TestModuleDomainLayerIsolation:
+    """Test R1: Module Domain layer MUST NOT import any other module code.
+
+    Domain layer should only depend on:
+    - Python standard library
+    - shared/domain/* (base entities, exceptions, events)
+    - Same module's domain code
+
+    Domain layer MUST NOT import:
+    - Other modules' code (modules.xxx where xxx != current_module)
+    - Infrastructure layer
+    - API layer
+    """
+
+    @pytest.fixture
+    def backend_src_path(self) -> Path:
+        """Get the backend src path."""
+        current = Path(__file__).parent
+        return current.parent.parent / "src"
+
+    @pytest.fixture
+    def module_domain_files(self, backend_src_path: Path) -> list[tuple[str, Path]]:
+        """Get all Python files in module domain layers with module name."""
+        modules_path = backend_src_path / "modules"
+        result = []
+        for module_dir in modules_path.iterdir():
+            if module_dir.is_dir() and not module_dir.name.startswith("_"):
+                domain_path = module_dir / "domain"
+                if domain_path.exists():
+                    for py_file in domain_path.rglob("*.py"):
+                        result.append((module_dir.name, py_file))
+        return result
+
+    def test_domain_layer_no_cross_module_imports(
+        self, module_domain_files: list[tuple[str, Path]]
+    ):
+        """Module domain layer should not import from other modules.
+
+        Allowed:
+        - src.shared.domain.*
+        - src.modules.<same_module>.domain.*
+
+        Forbidden:
+        - src.modules.<other_module>.*
+        """
+        violations = []
+
+        for module_name, file_path in module_domain_files:
+            if file_path.name == "__init__.py":
+                continue
+
+            imports = get_imports_from_file(file_path)
+
+            for imp in imports:
+                # Check for cross-module imports
+                if "src.modules." in imp:
+                    # Extract the imported module name
+                    parts = imp.split(".")
+                    if len(parts) >= 3 and parts[1] == "modules":
+                        imported_module = parts[2]
+                        if imported_module != module_name:
+                            violations.append(
+                                f"{module_name}/domain/{file_path.name}: "
+                                f"imports '{imp}' (cross-module dependency)"
+                            )
+
+        assert not violations, (
+            "Module domain layer MUST NOT import from other modules.\n"
+            "See docs/module-dependency-spec.md Rule R1.\n"
+            f"Found {len(violations)} violation(s):\n"
+            + "\n".join(f"  - {v}" for v in violations)
+        )
+
+
+class TestModuleApplicationLayerDependencies:
+    """Test R2: Module Application layer dependency rules.
+
+    Application layer should only depend on:
+    - Domain layer interfaces (IRepository, etc.)
+    - shared/* (infrastructure, domain, utils)
+    - Same module's code
+
+    Application layer MUST NOT import:
+    - Other modules' services directly
+    - Other modules' repository implementations
+    """
+
+    @pytest.fixture
+    def backend_src_path(self) -> Path:
+        """Get the backend src path."""
+        current = Path(__file__).parent
+        return current.parent.parent / "src"
+
+    @pytest.fixture
+    def module_application_files(self, backend_src_path: Path) -> list[tuple[str, Path]]:
+        """Get all Python files in module application layers with module name."""
+        modules_path = backend_src_path / "modules"
+        result = []
+        for module_dir in modules_path.iterdir():
+            if module_dir.is_dir() and not module_dir.name.startswith("_"):
+                app_path = module_dir / "application"
+                if app_path.exists():
+                    for py_file in app_path.rglob("*.py"):
+                        result.append((module_dir.name, py_file))
+        return result
+
+    def test_no_cross_module_service_imports(
+        self, module_application_files: list[tuple[str, Path]]
+    ):
+        """Application layer should not import other modules' services.
+
+        Cross-module communication should use:
+        - EventBus for async decoupling
+        - Shared interfaces for sync calls
+        """
+        violations = []
+
+        for module_name, file_path in module_application_files:
+            if file_path.name == "__init__.py":
+                continue
+
+            imports = get_imports_from_file(file_path)
+
+            for imp in imports:
+                # Check for cross-module service imports
+                if "src.modules." in imp and ".application." in imp:
+                    parts = imp.split(".")
+                    if len(parts) >= 3 and parts[1] == "modules":
+                        imported_module = parts[2]
+                        if imported_module != module_name:
+                            violations.append(
+                                f"{module_name}/application/{file_path.name}: "
+                                f"imports '{imp}' (cross-module service dependency)"
+                            )
+
+        assert not violations, (
+            "Application layer MUST NOT import other modules' services directly.\n"
+            "Use EventBus or shared interfaces for cross-module communication.\n"
+            "See docs/module-dependency-spec.md Rule R3.\n"
+            f"Found {len(violations)} violation(s):\n"
+            + "\n".join(f"  - {v}" for v in violations)
+        )
+
+    def test_no_cross_module_repository_impl_imports(
+        self, module_application_files: list[tuple[str, Path]]
+    ):
+        """Application layer should not import other modules' repository implementations.
+
+        Application services should depend on repository interfaces (IRepository),
+        not concrete implementations.
+        """
+        violations = []
+
+        for module_name, file_path in module_application_files:
+            if file_path.name == "__init__.py":
+                continue
+
+            imports = get_imports_from_file(file_path)
+
+            for imp in imports:
+                # Check for cross-module infrastructure imports
+                if "src.modules." in imp and ".infrastructure." in imp:
+                    parts = imp.split(".")
+                    if len(parts) >= 3 and parts[1] == "modules":
+                        imported_module = parts[2]
+                        if imported_module != module_name:
+                            violations.append(
+                                f"{module_name}/application/{file_path.name}: "
+                                f"imports '{imp}' (cross-module infrastructure dependency)"
+                            )
+
+        assert not violations, (
+            "Application layer MUST NOT import other modules' infrastructure.\n"
+            "Depend on interfaces, not implementations.\n"
+            "See docs/module-dependency-spec.md Rule R2.\n"
+            f"Found {len(violations)} violation(s):\n"
+            + "\n".join(f"  - {v}" for v in violations)
+        )
+
+
+class TestModuleApiLayerAuthDependency:
+    """Test R4: Auth module dependency exception.
+
+    Only API layer can import auth module's authentication dependencies.
+    Other layers (domain, application) MUST NOT import from auth module.
+
+    Exception: ORM models in infrastructure layer may import UserModel
+    for foreign key relationships - this is a SQLAlchemy technical requirement.
+    """
+
+    @pytest.fixture
+    def backend_src_path(self) -> Path:
+        """Get the backend src path."""
+        current = Path(__file__).parent
+        return current.parent.parent / "src"
+
+    @pytest.fixture
+    def non_api_module_files(self, backend_src_path: Path) -> list[tuple[str, str, Path]]:
+        """Get all non-API Python files in modules with module name and layer."""
+        modules_path = backend_src_path / "modules"
+        result = []
+        for module_dir in modules_path.iterdir():
+            if module_dir.is_dir() and not module_dir.name.startswith("_"):
+                # Skip auth module itself
+                if module_dir.name == "auth":
+                    continue
+                for layer in ["domain", "application"]:  # Exclude infrastructure
+                    layer_path = module_dir / layer
+                    if layer_path.exists():
+                        for py_file in layer_path.rglob("*.py"):
+                            result.append((module_dir.name, layer, py_file))
+        return result
+
+    def test_only_api_layer_imports_auth(
+        self, non_api_module_files: list[tuple[str, str, Path]]
+    ):
+        """Only API layer should import auth module dependencies.
+
+        Domain and Application layers should not depend on auth module
+        to maintain proper separation of concerns.
+
+        Note: Infrastructure ORM models are excluded as they may need
+        UserModel for foreign key relationships.
+        """
+        violations = []
+
+        for module_name, layer, file_path in non_api_module_files:
+            if file_path.name == "__init__.py":
+                continue
+
+            imports = get_imports_from_file(file_path)
+
+            for imp in imports:
+                if "src.modules.auth" in imp:
+                    violations.append(
+                        f"{module_name}/{layer}/{file_path.name}: "
+                        f"imports '{imp}' (auth import outside API layer)"
+                    )
+
+        assert not violations, (
+            "Only API layer can import auth module dependencies.\n"
+            "Domain/Application layers should not import auth.\n"
+            "See docs/module-dependency-spec.md Rule R4.\n"
+            f"Found {len(violations)} violation(s):\n"
+            + "\n".join(f"  - {v}" for v in violations)
+        )
+
+
+class TestModuleInfrastructureLayerIsolation:
+    """Test that infrastructure layer does not import from other modules' infrastructure."""
+
+    @pytest.fixture
+    def backend_src_path(self) -> Path:
+        """Get the backend src path."""
+        current = Path(__file__).parent
+        return current.parent.parent / "src"
+
+    @pytest.fixture
+    def module_infrastructure_files(self, backend_src_path: Path) -> list[tuple[str, Path]]:
+        """Get all Python files in module infrastructure layers."""
+        modules_path = backend_src_path / "modules"
+        result = []
+        for module_dir in modules_path.iterdir():
+            if module_dir.is_dir() and not module_dir.name.startswith("_"):
+                infra_path = module_dir / "infrastructure"
+                if infra_path.exists():
+                    for py_file in infra_path.rglob("*.py"):
+                        result.append((module_dir.name, py_file))
+        return result
+
+    def test_no_cross_module_infrastructure_imports(
+        self, module_infrastructure_files: list[tuple[str, Path]]
+    ):
+        """Infrastructure layer should not import from other modules' infrastructure.
+
+        Each module's infrastructure should be self-contained.
+        Shared infrastructure belongs in shared/infrastructure/.
+        """
+        violations = []
+
+        for module_name, file_path in module_infrastructure_files:
+            if file_path.name == "__init__.py":
+                continue
+
+            imports = get_imports_from_file(file_path)
+
+            for imp in imports:
+                if "src.modules." in imp and ".infrastructure." in imp:
+                    parts = imp.split(".")
+                    if len(parts) >= 3 and parts[1] == "modules":
+                        imported_module = parts[2]
+                        if imported_module != module_name:
+                            violations.append(
+                                f"{module_name}/infrastructure/{file_path.name}: "
+                                f"imports '{imp}' (cross-module infrastructure)"
+                            )
+
+        assert not violations, (
+            "Infrastructure layer MUST NOT import from other modules' infrastructure.\n"
+            "Shared infrastructure should be in shared/infrastructure/.\n"
+            f"Found {len(violations)} violation(s):\n"
+            + "\n".join(f"  - {v}" for v in violations)
+        )
+
+
+class TestModulePublicApiExports:
+    """Test that modules properly define their public API in __init__.py."""
+
+    @pytest.fixture
+    def backend_src_path(self) -> Path:
+        """Get the backend src path."""
+        current = Path(__file__).parent
+        return current.parent.parent / "src"
+
+    def test_modules_have_init_with_all(self, backend_src_path: Path):
+        """Each module should have __init__.py with __all__ defined.
+
+        This ensures explicit public API definition.
+        """
+        modules_path = backend_src_path / "modules"
+        violations = []
+
+        for module_dir in modules_path.iterdir():
+            if module_dir.is_dir() and not module_dir.name.startswith("_"):
+                init_file = module_dir / "__init__.py"
+                if not init_file.exists():
+                    violations.append(f"{module_dir.name}: missing __init__.py")
+                    continue
+
+                content = init_file.read_text()
+                if "__all__" not in content:
+                    violations.append(
+                        f"{module_dir.name}: __init__.py missing __all__ definition"
+                    )
+
+        # This is a soft check - warn but don't fail
+        if violations:
+            import warnings
+            warnings.warn(
+                "Some modules are missing proper __init__.py or __all__ exports:\n"
+                + "\n".join(f"  - {v}" for v in violations)
+            )
