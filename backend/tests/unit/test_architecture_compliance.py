@@ -866,11 +866,21 @@ class TestModuleInfrastructureLayerIsolation:
 
         Each module's infrastructure should be self-contained.
         Shared infrastructure belongs in shared/infrastructure/.
+
+        Exception: ORM model files (*_model.py) are allowed to import other modules'
+        ORM models for SQLAlchemy foreign key relationships. This is a technical
+        necessity for defining database relationships.
+        See: docs/ARCHITECTURE.md Section 3.3
         """
         violations = []
 
         for module_name, file_path in module_infrastructure_files:
             if file_path.name == "__init__.py":
+                continue
+
+            # Exception: ORM model files can import other modules' models
+            # for SQLAlchemy foreign key relationships
+            if file_path.name.endswith("_model.py"):
                 continue
 
             imports = get_imports_from_file(file_path)
@@ -889,6 +899,7 @@ class TestModuleInfrastructureLayerIsolation:
         assert not violations, (
             "Infrastructure layer MUST NOT import from other modules' infrastructure.\n"
             "Shared infrastructure should be in shared/infrastructure/.\n"
+            "Exception: ORM model files (*_model.py) for FK relationships.\n"
             f"Found {len(violations)} violation(s):\n"
             + "\n".join(f"  - {v}" for v in violations)
         )

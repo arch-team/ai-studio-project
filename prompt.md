@@ -291,3 +291,7 @@ admin / Admin123!
 
 代办项
 /Users/jinhuasu/.claude/plans/snazzy-wandering-marble.md
+
+
+应当前这个项目中的后端项目（backend）采用了DDD领域驱动设计和 Modular Monolith的项目工程架构，这些会成本这个backend                                                                                                             
+  项目的核心架构规范，目前这些信息分散在各个地方，难以维护、并且容易出现不一致的地方，请分析当前项目提炼统一的核心架构规范，让使用地方来引用
