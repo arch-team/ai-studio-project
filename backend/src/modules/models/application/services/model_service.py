@@ -2,15 +2,18 @@
 
 from typing import Any
 
-from src.shared.utils import EnumMapper, utc_now
-from src.shared.domain.exceptions import EntityNotFoundError, InvalidStateTransitionError
-
 from src.modules.models.domain.entities import Model
 from src.modules.models.domain.repositories import IModelRepository
 from src.modules.models.domain.value_objects import ModelFramework, ModelStatus
+from src.shared.application import BaseService
+from src.shared.domain.exceptions import (
+    EntityNotFoundError,
+    InvalidStateTransitionError,
+)
+from src.shared.utils import EnumMapper, utc_now
 
 
-class ModelService:
+class ModelService(BaseService[Model, int]):
     """Service for managing ML models."""
 
     def __init__(
@@ -19,34 +22,22 @@ class ModelService:
         training_job_repository: Any | None = None,
         checkpoint_repository: Any | None = None,
     ):
+        super().__init__(model_repository, "Model")
         self._model_repository = model_repository
         self._training_job_repository = training_job_repository
         self._checkpoint_repository = checkpoint_repository
 
-    async def _get_or_raise(self, model_id: int) -> Model:
-        """Get model by ID or raise EntityNotFoundError."""
-        model = await self._model_repository.get_by_id(model_id)
-        if model is None:
-            raise EntityNotFoundError("Model", str(model_id))
-        return model
-
     async def create_model(self, owner_id: int, data: dict) -> Model:
-        """Create a new model.
-
-        Args:
-            owner_id: Owner user ID
-            data: Model creation data
-
-        Returns:
-            Created model entity
-        """
+        """Create a new model."""
         training_job_id = data["training_job_id"]
         checkpoint_id = data["checkpoint_id"]
         model_name = data["model_name"]
 
         # Validate training job exists
         if self._training_job_repository:
-            training_job = await self._training_job_repository.get_by_id(training_job_id)
+            training_job = await self._training_job_repository.get_by_id(
+                training_job_id
+            )
             if training_job is None:
                 raise EntityNotFoundError("Training job", str(training_job_id))
 

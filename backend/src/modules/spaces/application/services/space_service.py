@@ -2,9 +2,6 @@
 
 import uuid
 
-from src.shared.utils import utc_now
-from src.shared.domain.exceptions import EntityNotFoundError
-
 from src.modules.spaces.domain.entities import Space
 from src.modules.spaces.domain.exceptions import DuplicateSpaceNameError
 from src.modules.spaces.domain.repositories import ISpaceRepository
@@ -13,38 +10,28 @@ from src.modules.spaces.domain.value_objects import (
     SpaceStatus,
     SpaceType,
 )
+from src.shared.application import BaseService
+from src.shared.utils import utc_now
 
 
-class SpaceService:
+class SpaceService(BaseService[Space, str]):
     """Service for managing development spaces."""
 
     def __init__(
         self,
         space_repository: ISpaceRepository,
     ):
+        super().__init__(space_repository, "Space")
         self._space_repository = space_repository
 
-    async def _get_or_raise(self, space_id: str) -> Space:
-        """Get space by ID or raise EntityNotFoundError."""
-        space = await self._space_repository.get_by_id(space_id)
-        if space is None:
-            raise EntityNotFoundError("Space", space_id)
-        return space
-
     async def create_space(self, owner_id: int, data: dict) -> Space:
-        """Create a new development space.
-
-        Args:
-            owner_id: Owner user ID
-            data: Space creation data
-
-        Returns:
-            Created space entity
-        """
+        """Create a new development space."""
         space_name = data["space_name"]
 
         # Check for duplicate name for same owner
-        existing = await self._space_repository.get_by_name_and_owner(space_name, owner_id)
+        existing = await self._space_repository.get_by_name_and_owner(
+            space_name, owner_id
+        )
         if existing:
             raise DuplicateSpaceNameError(space_name, owner_id)
 

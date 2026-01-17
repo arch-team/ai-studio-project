@@ -181,34 +181,3 @@ class UserModel(Base, TimestampMixin):
     )
 
     __table_args__ = ({"comment": "用户表"},)
-
-    def is_active(self) -> bool:
-        """Check if user is active."""
-        return self.status == UserStatus.ACTIVE
-
-    def has_admin_privileges(self) -> bool:
-        """Check if user has admin privileges."""
-        return self.role == UserRole.ADMIN
-
-    def can_create_training_job(self) -> bool:
-        """Check if user can create training jobs."""
-        return self.is_active() and self.role in (
-            UserRole.ADMIN,
-            UserRole.PROJECT_MANAGER,
-            UserRole.ENGINEER,
-        )
-
-    def is_locked(self) -> bool:
-        """Check if account is currently locked."""
-        return self.locked_until is not None and utc_now() < self.locked_until
-
-    def is_password_expired(self) -> bool:
-        """Check if password has expired."""
-        return (
-            self.password_expires_at is not None
-            and utc_now() > self.password_expires_at
-        )
-
-    def is_local_account(self) -> bool:
-        """Check if this is a local authentication account."""
-        return self.auth_type == AuthType.LOCAL

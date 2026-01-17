@@ -2,7 +2,6 @@
 
 from datetime import datetime
 
-from src.shared.domain.exceptions import DuplicateEntityError, InvalidStateTransitionError
 from src.modules.training.application.interfaces import IHyperPodClient
 from src.modules.training.domain.entities import TrainingJob
 from src.modules.training.domain.exceptions import TrainingJobNotFoundError
@@ -12,9 +11,14 @@ from src.modules.training.domain.value_objects import (
     JobPriority,
     JobStatus,
 )
+from src.shared.application import BaseService
+from src.shared.domain.exceptions import (
+    DuplicateEntityError,
+    InvalidStateTransitionError,
+)
 
 
-class TrainingJobService:
+class TrainingJobService(BaseService[TrainingJob, int]):
     """Service for managing training jobs."""
 
     def __init__(
@@ -23,7 +27,7 @@ class TrainingJobService:
         hyperpod_client: IHyperPodClient,
         cluster_name: str = "default-cluster",
     ):
-        self._repository = repository
+        super().__init__(repository, "TrainingJob")
         self._hyperpod_client = hyperpod_client
         self._cluster_name = cluster_name
 

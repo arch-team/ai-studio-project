@@ -184,19 +184,3 @@ class ModelModel(Base, TimestampMixin):
     )
 
     __table_args__ = ({"comment": "模型表"},)
-
-    def is_training(self) -> bool:
-        """Check if model is currently training."""
-        return self.status == ModelStatus.TRAINING
-
-    def is_registered(self) -> bool:
-        """Check if model is registered."""
-        return self.status == ModelStatus.REGISTERED
-
-    def is_deployed(self) -> bool:
-        """Check if model is deployed."""
-        return self.status == ModelStatus.DEPLOYED
-
-    def is_archived(self) -> bool:
-        """Check if model is archived."""
-        return self.status == ModelStatus.ARCHIVED

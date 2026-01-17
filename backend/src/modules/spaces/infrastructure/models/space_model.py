@@ -99,11 +99,3 @@ class DevelopmentSpaceModel(Base, TimestampMixin, SoftDeleteMixin):
     )
 
     __table_args__ = ({"comment": "开发空间表"},)
-
-    def can_start(self) -> bool:
-        """Check if space can be started."""
-        return self.status in (SpaceStatus.PENDING, SpaceStatus.STOPPED)
-
-    def can_stop(self) -> bool:
-        """Check if space can be stopped."""
-        return self.status == SpaceStatus.RUNNING
