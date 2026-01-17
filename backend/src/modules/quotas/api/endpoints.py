@@ -2,8 +2,8 @@
 
 from fastapi import APIRouter, Depends, Query, status
 
-from src.modules.auth.api.dependencies import require_admin
 from src.modules.auth.api.current_user import CurrentUser
+from src.modules.auth.api.dependencies import require_admin
 from src.modules.quotas.api.dependencies import get_resource_limit_config_service
 from src.modules.quotas.api.schemas import (
     CreateResourceLimitConfigRequest,
@@ -14,15 +14,9 @@ from src.modules.quotas.api.schemas import (
 )
 from src.modules.quotas.application.services import ResourceLimitConfigService
 from src.modules.quotas.domain.value_objects import LimitRole
+from src.shared.utils import EnumMapper, calculate_total_pages
 
 router = APIRouter()
-
-
-def _to_domain_role(role: LimitRoleEnum | None) -> LimitRole | None:
-    """Convert API role enum to domain role."""
-    if role is None:
-        return None
-    return LimitRole(role.value)
 
 
 @router.get(
@@ -45,7 +39,7 @@ async def list_resource_limit_configs(
     Supports filtering by role and project_id, with pagination.
     """
     configs, total = await service.list_configs(
-        role=_to_domain_role(role),
+        role=EnumMapper.to_domain(role, LimitRole),
         project_id=project_id,
         page=page,
         page_size=page_size,
@@ -53,14 +47,12 @@ async def list_resource_limit_configs(
         sort_order=sort_order,
     )
 
-    total_pages = (total + page_size - 1) // page_size if total > 0 else 0
-
     return ResourceLimitConfigListResponse(
         items=[ResourceLimitConfigResponse.from_entity(c) for c in configs],
         total=total,
         page=page,
         page_size=page_size,
-        total_pages=total_pages,
+        total_pages=calculate_total_pages(total, page_size),
     )
 
 

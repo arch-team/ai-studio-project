@@ -1,9 +1,13 @@
 """Spaces Endpoints - CRUD operations for development spaces (skeleton)."""
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, Query, status
 
-from src.modules.auth.api.dependencies import get_current_active_user, require_engineer
 from src.modules.auth.api.current_user import CurrentUser
+from src.modules.auth.api.dependencies import get_current_active_user, require_engineer
+from src.modules.auth.api.permissions import (
+    check_resource_owner_or_privileged,
+    get_owner_filter,
+)
 from src.modules.spaces.api.dependencies import get_space_service
 from src.modules.spaces.api.schemas import (
     CreateSpaceRequest,
@@ -15,33 +19,9 @@ from src.modules.spaces.api.schemas import (
 )
 from src.modules.spaces.application.services import SpaceService
 from src.modules.spaces.domain.value_objects import SpaceStatus
+from src.shared.utils import calculate_total_pages
 
 router = APIRouter()
-
-
-def _get_owner_filter(current_user: CurrentUser) -> int | None:
-    """Get owner filter based on user role."""
-    if current_user.role in ("admin", "project_manager"):
-        return None  # Can see all spaces
-    return current_user.user_id
-
-
-def _check_resource_owner_or_privileged(
-    owner_id: int, current_user: CurrentUser, resource_name: str, action: str
-) -> None:
-    """Check if user owns the resource or is privileged."""
-    if current_user.role in ("admin", "project_manager"):
-        return
-    if owner_id != current_user.user_id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"You don't have permission to {action} this {resource_name}",
-        )
-
-
-def _calculate_total_pages(total: int, page_size: int) -> int:
-    """Calculate total pages."""
-    return (total + page_size - 1) // page_size if total > 0 else 0
 
 
 @router.post(
@@ -82,7 +62,7 @@ async def list_spaces(
     status_domain = SpaceStatus(status_filter.value) if status_filter else None
 
     spaces, total = await service.list_spaces(
-        owner_id=_get_owner_filter(current_user),
+        owner_id=get_owner_filter(current_user),
         status=status_domain,
         page=page,
         page_size=page_size,
@@ -95,7 +75,7 @@ async def list_spaces(
         total=total,
         page=page,
         page_size=page_size,
-        total_pages=_calculate_total_pages(total, page_size),
+        total_pages=calculate_total_pages(total, page_size),
     )
 
 
@@ -113,7 +93,7 @@ async def get_space(
 ):
     """Get development space details by ID."""
     space = await service.get_space(space_id)
-    _check_resource_owner_or_privileged(space.owner_id, current_user, "space", "view")
+    check_resource_owner_or_privileged(space.owner_id, current_user, "space", "view")
     return SpaceDetail.from_entity(space)
 
 
@@ -132,7 +112,7 @@ async def start_space(
 ):
     """Start a development space."""
     space = await service.get_space(space_id)
-    _check_resource_owner_or_privileged(space.owner_id, current_user, "space", "start")
+    check_resource_owner_or_privileged(space.owner_id, current_user, "space", "start")
     space = await service.start_space(space_id)
     return SpaceDetail.from_entity(space)
 
@@ -152,7 +132,7 @@ async def stop_space(
 ):
     """Stop a development space."""
     space = await service.get_space(space_id)
-    _check_resource_owner_or_privileged(space.owner_id, current_user, "space", "stop")
+    check_resource_owner_or_privileged(space.owner_id, current_user, "space", "stop")
     space = await service.stop_space(space_id)
     return SpaceDetail.from_entity(space)
 
@@ -172,6 +152,6 @@ async def delete_space(
 ):
     """Delete a development space."""
     space = await service.get_space(space_id)
-    _check_resource_owner_or_privileged(space.owner_id, current_user, "space", "delete")
+    check_resource_owner_or_privileged(space.owner_id, current_user, "space", "delete")
     await service.delete_space(space_id)
     return None

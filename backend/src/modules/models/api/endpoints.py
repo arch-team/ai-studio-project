@@ -2,8 +2,12 @@
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 
-from src.modules.auth.api.dependencies import get_current_active_user, require_engineer
 from src.modules.auth.api.current_user import CurrentUser
+from src.modules.auth.api.dependencies import get_current_active_user, require_engineer
+from src.modules.auth.api.permissions import (
+    check_resource_owner_or_privileged,
+    get_owner_filter,
+)
 from src.modules.models.api.dependencies import get_model_service
 from src.modules.models.api.schemas import (
     CreateModelRequest,
@@ -18,37 +22,13 @@ from src.modules.models.api.schemas import (
     VersionComparison,
 )
 from src.modules.models.application.services import ModelService
+from src.shared.utils import calculate_total_pages
 
 router = APIRouter()
 
 
 # Valid sort fields for validation
 VALID_SORT_FIELDS = {"created_at", "version", "model_name", "status", "updated_at"}
-
-
-def _get_owner_filter(current_user: CurrentUser) -> int | None:
-    """Get owner filter based on user role."""
-    if current_user.role in ("admin", "project_manager"):
-        return None  # Can see all models
-    return current_user.user_id
-
-
-def _check_resource_owner_or_privileged(
-    owner_id: int, current_user: CurrentUser, resource_name: str, action: str
-) -> None:
-    """Check if user owns the resource or is privileged."""
-    if current_user.role in ("admin", "project_manager"):
-        return
-    if owner_id != current_user.user_id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"You don't have permission to {action} this {resource_name}",
-        )
-
-
-def _calculate_total_pages(total: int, page_size: int) -> int:
-    """Calculate total pages."""
-    return (total + page_size - 1) // page_size if total > 0 else 0
 
 
 @router.post(
@@ -96,7 +76,7 @@ async def list_models(
         )
 
     models, total = await service.list_models(
-        owner_id=_get_owner_filter(current_user),
+        owner_id=get_owner_filter(current_user),
         training_job_id=training_job_id,
         status=status_filter.value if status_filter else None,
         framework=framework.value if framework else None,
@@ -111,7 +91,7 @@ async def list_models(
         total=total,
         page=page,
         page_size=page_size,
-        total_pages=_calculate_total_pages(total, page_size),
+        total_pages=calculate_total_pages(total, page_size),
     )
 
 
@@ -130,7 +110,7 @@ async def get_model(
 ):
     """Get model details by ID."""
     model = await service.get_model(model_id)
-    _check_resource_owner_or_privileged(model.owner_id, current_user, "model", "view")
+    check_resource_owner_or_privileged(model.owner_id, current_user, "model", "view")
     return ModelDetail.from_entity(model)
 
 
@@ -149,7 +129,7 @@ async def get_model_versions(
 ):
     """Get all versions of a model with optional comparison."""
     model = await service.get_model(model_id)
-    _check_resource_owner_or_privileged(
+    check_resource_owner_or_privileged(
         model.owner_id, current_user, "model", "view versions of"
     )
     result = await service.get_model_versions(model_id, compare_with)
@@ -200,7 +180,7 @@ async def delete_model(
 ):
     """Delete/archive a model."""
     model = await service.get_model(model_id)
-    _check_resource_owner_or_privileged(model.owner_id, current_user, "model", "delete")
+    check_resource_owner_or_privileged(model.owner_id, current_user, "model", "delete")
     await service.delete_model(model_id)
     return None
 
@@ -220,6 +200,6 @@ async def archive_model(
 ):
     """Archive a model."""
     model = await service.get_model(model_id)
-    _check_resource_owner_or_privileged(model.owner_id, current_user, "model", "archive")
+    check_resource_owner_or_privileged(model.owner_id, current_user, "model", "archive")
     model = await service.archive_model(model_id)
     return ModelDetail.from_entity(model)

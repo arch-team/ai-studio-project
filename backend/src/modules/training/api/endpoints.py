@@ -4,10 +4,12 @@ from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 
-from src.shared.utils import utc_now
-
-from src.modules.auth.api.dependencies import get_current_active_user, require_engineer
 from src.modules.auth.api.current_user import CurrentUser
+from src.modules.auth.api.dependencies import get_current_active_user, require_engineer
+from src.modules.auth.api.permissions import (
+    check_resource_owner_or_privileged,
+    get_owner_filter,
+)
 from src.modules.training.api.dependencies import (
     get_checkpoint_service,
     get_training_job_service,
@@ -27,47 +29,9 @@ from src.modules.training.api.schemas import (
 )
 from src.modules.training.application.services import CheckpointService, TrainingJobService
 from src.modules.training.domain.value_objects import JobPriority, JobStatus
+from src.shared.utils import EnumMapper, calculate_total_pages, utc_now
 
 router = APIRouter()
-
-
-def _to_domain_status(status: JobStatusEnum | None) -> JobStatus | None:
-    """Convert API status enum to domain status."""
-    if status is None:
-        return None
-    return JobStatus(status.value)
-
-
-def _to_domain_priority(priority: JobPriorityEnum | None) -> JobPriority | None:
-    """Convert API priority enum to domain priority."""
-    if priority is None:
-        return None
-    return JobPriority(priority.value)
-
-
-def _get_owner_filter(current_user: CurrentUser) -> int | None:
-    """Get owner filter based on user role."""
-    if current_user.role in ("admin", "project_manager"):
-        return None  # Can see all jobs
-    return current_user.user_id
-
-
-def _check_resource_owner_or_privileged(
-    owner_id: int, current_user: CurrentUser, resource_name: str, action: str
-) -> None:
-    """Check if user owns the resource or is privileged."""
-    if current_user.role in ("admin", "project_manager"):
-        return
-    if owner_id != current_user.user_id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"You don't have permission to {action} this {resource_name}",
-        )
-
-
-def _calculate_total_pages(total: int, page_size: int) -> int:
-    """Calculate total pages."""
-    return (total + page_size - 1) // page_size if total > 0 else 0
 
 
 @router.post(
@@ -104,9 +68,9 @@ async def list_training_jobs(
 ):
     """List training jobs with pagination and filters."""
     jobs, total = await service.list_jobs(
-        owner_id=_get_owner_filter(current_user),
-        status=_to_domain_status(status),
-        priority=_to_domain_priority(priority),
+        owner_id=get_owner_filter(current_user),
+        status=EnumMapper.to_domain(status, JobStatus),
+        priority=EnumMapper.to_domain(priority, JobPriority),
         submitted_after=submitted_after,
         submitted_before=submitted_before,
         page=page,
@@ -120,7 +84,7 @@ async def list_training_jobs(
         total=total,
         page=page,
         page_size=page_size,
-        total_pages=_calculate_total_pages(total, page_size),
+        total_pages=calculate_total_pages(total, page_size),
     )
 
 
@@ -135,7 +99,7 @@ async def get_training_job(
 ):
     """Get training job details by ID."""
     job = await service.get_job(job_id)
-    _check_resource_owner_or_privileged(job.owner_id, current_user, "training job", "view")
+    check_resource_owner_or_privileged(job.owner_id, current_user, "training job", "view")
     return TrainingJobDetail.from_entity(job)
 
 
@@ -150,7 +114,7 @@ async def pause_training_job(
 ):
     """Pause a running training job."""
     job = await service.get_job(job_id)
-    _check_resource_owner_or_privileged(job.owner_id, current_user, "training job", "pause")
+    check_resource_owner_or_privileged(job.owner_id, current_user, "training job", "pause")
     job = await service.pause_job(job_id)
     return TrainingJobDetail.from_entity(job)
 
@@ -166,7 +130,7 @@ async def resume_training_job(
 ):
     """Resume a paused training job."""
     job = await service.get_job(job_id)
-    _check_resource_owner_or_privileged(job.owner_id, current_user, "training job", "resume")
+    check_resource_owner_or_privileged(job.owner_id, current_user, "training job", "resume")
     job = await service.resume_job(job_id)
     return TrainingJobDetail.from_entity(job)
 
@@ -182,7 +146,7 @@ async def cancel_training_job(
 ):
     """Cancel a training job."""
     job = await service.get_job(job_id)
-    _check_resource_owner_or_privileged(job.owner_id, current_user, "training job", "cancel")
+    check_resource_owner_or_privileged(job.owner_id, current_user, "training job", "cancel")
     job = await service.cancel_job(job_id)
     return TrainingJobDetail.from_entity(job)
 
@@ -198,7 +162,7 @@ async def delete_training_job(
 ):
     """Delete a training job."""
     job = await service.get_job(job_id)
-    _check_resource_owner_or_privileged(job.owner_id, current_user, "training job", "delete")
+    check_resource_owner_or_privileged(job.owner_id, current_user, "training job", "delete")
     await service.delete_job(job_id)
     return None
 
@@ -220,7 +184,7 @@ async def create_manual_checkpoint(
 ):
     """Create a manual checkpoint for a running training job."""
     job = await service.get_job(job_id)
-    _check_resource_owner_or_privileged(job.owner_id, current_user, "training job", "create checkpoints for")
+    check_resource_owner_or_privileged(job.owner_id, current_user, "training job", "create checkpoints for")
 
     if job.status != JobStatus.RUNNING:
         raise HTTPException(
