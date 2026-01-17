@@ -71,6 +71,9 @@
 | `models` | 模型管理 | Model |
 | `spaces` | 开发空间管理 | Space |
 | `audit` | 审计日志 | AuditLog |
+| `datasets` | 数据集版本管理与存储 | Dataset, DatasetVersion |
+| `billing` | 成本统计与计费分析 | CostRecord, UsageReport |
+| `monitoring` | 训练监控与告警 | Metric, Alert |
 | `shared` | 共享内核 | BaseEntity, DomainEvent |
 
 ---
