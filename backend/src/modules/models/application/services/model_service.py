@@ -112,15 +112,7 @@ class ModelService(BaseService[Model, int]):
     async def get_model_versions(
         self, model_id: int, compare_with: int | None = None
     ) -> dict[str, Any]:
-        """Get all versions of a model with optional comparison.
-
-        Args:
-            model_id: ID of the model to get versions for
-            compare_with: Optional ID of another model version to compare with
-
-        Returns:
-            Dictionary with versions list and optional comparison
-        """
+        """Get all versions of a model with optional comparison."""
         # Get the base model
         model = await self._get_or_raise(model_id)
 
@@ -154,15 +146,7 @@ class ModelService(BaseService[Model, int]):
     async def compare_versions(
         self, model_id_1: int, model_id_2: int
     ) -> dict[str, Any]:
-        """Compare two model versions.
-
-        Args:
-            model_id_1: First model ID (v1)
-            model_id_2: Second model ID (v2)
-
-        Returns:
-            Comparison result with metrics diff and hyperparameter changes
-        """
+        """Compare two model versions and return metrics/hyperparameter diff."""
         model_1 = await self._get_or_raise(model_id_1)
         model_2 = await self._get_or_raise(model_id_2)
 

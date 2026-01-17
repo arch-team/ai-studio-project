@@ -3,7 +3,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import func, select
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -11,6 +11,7 @@ from src.modules.spaces.domain.entities import Space
 from src.modules.spaces.domain.repositories import ISpaceRepository
 from src.modules.spaces.domain.value_objects import SpaceStatus
 from src.modules.spaces.infrastructure.models import DevelopmentSpaceModel
+from src.shared.infrastructure import QueryBuilder
 
 
 class SpaceRepository(ISpaceRepository):
@@ -93,41 +94,23 @@ class SpaceRepository(ISpaceRepository):
         sort_order: str = "desc",
     ) -> tuple[list[Space], int]:
         """List spaces with pagination and filters."""
-        # Build base query (exclude soft-deleted)
-        query = select(DevelopmentSpaceModel).options(
+        base_query = select(DevelopmentSpaceModel).options(
             selectinload(DevelopmentSpaceModel.owner)
-        ).where(DevelopmentSpaceModel.deleted_at.is_(None))
-        count_query = select(func.count(DevelopmentSpaceModel.id)).where(
-            DevelopmentSpaceModel.deleted_at.is_(None)
         )
 
-        # Apply filters
-        if owner_id is not None:
-            query = query.where(DevelopmentSpaceModel.owner_id == owner_id)
-            count_query = count_query.where(DevelopmentSpaceModel.owner_id == owner_id)
+        builder = (
+            QueryBuilder(base_query, DevelopmentSpaceModel)
+            .with_soft_delete_filter()
+            .with_filter("owner_id", owner_id)
+            .with_filter("status", status)
+            .with_order_by(sort_by, sort_order)
+        )
 
-        if status is not None:
-            query = query.where(DevelopmentSpaceModel.status == status)
-            count_query = count_query.where(DevelopmentSpaceModel.status == status)
+        total = await builder.count(self._session)
 
-        # Get total count
-        total_result = await self._session.execute(count_query)
-        total = total_result.scalar() or 0
-
-        # Apply sorting
-        sort_column = getattr(DevelopmentSpaceModel, sort_by, DevelopmentSpaceModel.created_at)
-        if sort_order.lower() == "desc":
-            query = query.order_by(sort_column.desc())
-        else:
-            query = query.order_by(sort_column.asc())
-
-        # Apply pagination
-        offset = (page - 1) * page_size
-        query = query.offset(offset).limit(page_size)
-
-        # Execute query
-        result = await self._session.execute(query)
-        models = result.scalars().all()
+        models, _ = await builder.with_pagination(page, page_size).execute_with_count(
+            self._session
+        )
 
         return [self._model_to_entity(m) for m in models], total
 

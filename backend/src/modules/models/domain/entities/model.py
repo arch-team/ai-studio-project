@@ -3,8 +3,8 @@
 from dataclasses import dataclass, field
 from datetime import datetime
 
-from src.shared.utils import utc_now
 from src.shared.domain.exceptions import InvalidStateTransitionError
+from src.shared.utils import utc_now
 
 from ..value_objects import MODEL_STATE_TRANSITIONS, ModelFramework, ModelStatus
 
@@ -149,26 +149,12 @@ class Model:
 
     @staticmethod
     def parse_version(version: str) -> int:
-        """Parse version string to integer.
-
-        Args:
-            version: Version string like "v1", "v10"
-
-        Returns:
-            Integer version number
-        """
+        """Parse version string (e.g., 'v1') to integer."""
         return int(version[1:])
 
     @staticmethod
     def increment_version(version: str) -> str:
-        """Increment version string.
-
-        Args:
-            version: Current version string like "v1"
-
-        Returns:
-            Next version string like "v2"
-        """
+        """Increment version string (e.g., 'v1' -> 'v2')."""
         num = Model.parse_version(version)
         return f"v{num + 1}"
 
