@@ -46,7 +46,7 @@ docker build --target development -t backend:dev .
 docker build --target production -t backend:prod .
 
 # 架构合规检查
-pytest tests/unit/test_architecture_compliance.py -v
+pytest tests/architecture -v
 ```
 
 ## Architecture
@@ -97,36 +97,17 @@ src/
 
 ## Testing
 
-```
-tests/
-├── conftest.py            # 共享 fixtures (AsyncClient)
-├── unit/                  # 单元测试 (domain, application)
-├── integration/           # 集成测试 (api, persistence)
-└── e2e/                   # 端到端测试
-```
+> **详细测试规范请参见**: [`tests/CLAUDE.md`](tests/CLAUDE.md)
 
 测试使用 `pytest-asyncio` 进行异步测试，`httpx.AsyncClient` + `ASGITransport` 测试 API 端点。
 
-### 测试规范
-
-> TDD 核心原则和测试诚信原则请参见根目录 `CLAUDE.md`
-
-**后端测试分层**:
-
-| 层级 | 位置 | 测试对象 | Mock 策略 |
-|------|------|---------|----------|
-| **Unit** | `tests/unit/domain/` | 实体、值对象、域逻辑 | 无依赖，纯函数 |
-| **Unit** | `tests/unit/application/` | 应用服务 | Mock 仓库接口 |
-| **Integration** | `tests/integration/api/` | API 端点 | Mock 外部服务 |
-| **Integration** | `tests/integration/persistence/` | 仓库实现 | 真实数据库 |
-
-**命令速查**:
+**快速命令**:
 
 ```bash
-pytest tests/unit/ --watch    # 监视模式
-pytest --lf                   # 只运行上次失败
-pytest -x                     # 失败时立即停止
-pytest -v --tb=short          # 详细输出
+pytest tests/unit -v          # 单元测试
+pytest tests/integration -v   # 集成测试
+pytest tests/architecture -v  # 架构合规检查
+pytest --cov=src              # 带覆盖率
 ```
 
 ## Code Style
@@ -281,4 +262,4 @@ class PasswordService:      # 密码处理
 | **核心架构规范** | [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | 模块依赖、通信方式、异常处理等 |
 | **功能规范** | `specs/001-ai-training-platform/spec.md` | 术语标准、功能需求 |
 | **数据模型** | `specs/001-ai-training-platform/data-model.md` | 数据库设计 |
-| **架构合规测试** | `tests/unit/test_architecture_compliance.py` | 自动化验证 |
+| **架构合规测试** | `tests/architecture/` | 自动化验证 |
