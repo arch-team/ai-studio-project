@@ -107,29 +107,11 @@ tests/
 
 测试使用 `pytest-asyncio` 进行异步测试，`httpx.AsyncClient` + `ASGITransport` 测试 API 端点。
 
-### 测试诚信原则
+### 测试规范
 
-**切勿为了让测试用例通过而制造虚假的测试用例通过**
+> TDD 核心原则和测试诚信原则请参见根目录 `CLAUDE.md`
 
-禁止行为：
-- 硬编码预期值以匹配错误的实现
-- 删除或跳过失败的测试而不修复代码
-- 修改测试断言使其匹配错误行为
-
-### TDD 工作流
-
-```
-1. 🔴 Red: 先写失败的测试
-   pytest tests/unit/domain/test_training_job.py -v
-
-2. 🟢 Green: 编写最少代码使测试通过
-   pytest tests/unit/domain/test_training_job.py -v
-
-3. 🔄 Refactor: 重构代码，保持测试通过
-   pytest tests/unit/ -v && black src/ && ruff check src/
-```
-
-### 测试分层策略
+**后端测试分层**:
 
 | 层级 | 位置 | 测试对象 | Mock 策略 |
 |------|------|---------|----------|
@@ -138,20 +120,13 @@ tests/
 | **Integration** | `tests/integration/api/` | API 端点 | Mock 外部服务 |
 | **Integration** | `tests/integration/persistence/` | 仓库实现 | 真实数据库 |
 
-### TDD 命令速查
+**命令速查**:
 
 ```bash
-# 监视模式 - 文件变更自动运行测试
-pytest tests/unit/ --watch              # 需安装 pytest-watch
-
-# 只运行上次失败的测试
-pytest --lf
-
-# 失败时立即停止
-pytest -x
-
-# 显示详细输出
-pytest -v --tb=short
+pytest tests/unit/ --watch    # 监视模式
+pytest --lf                   # 只运行上次失败
+pytest -x                     # 失败时立即停止
+pytest -v --tb=short          # 详细输出
 ```
 
 ## Code Style
