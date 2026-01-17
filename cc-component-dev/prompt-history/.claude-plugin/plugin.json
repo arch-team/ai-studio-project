@@ -1,0 +1,9 @@
+{
+  "name": "prompt-history",
+  "version": "1.0.0",
+  "description": "Display and search Claude Code CLI prompt history, similar to Linux history command",
+  "author": {
+    "name": "jinhuasu"
+  },
+  "keywords": ["history", "prompt", "search", "cli"]
+}

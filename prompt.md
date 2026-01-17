@@ -360,3 +360,25 @@ specs
   ├─────────────┼──────────────────────────────────────────────────────────┤
   │ 精简示例    │ 保留关键示例，删除冗余的完整代码块                       │
   └─────────────┴──────────────────────────────────────────────────────────┘
+
+
+  出我在当前的这个terminal中在Claude code Cli中输入哪些prompt 
+
+  我想开发一个程序来分析我使用Claude code的情况
+
+
+  # 开发一个斜杆命令用来显示历史的prompt，类似history命令
+
+  开发一个插件用来显示在Claude code cli输入的prompt，类似Linux 中的history命令
+
+
+  作为后端测试的**规范单一真实源 (Single Source of Truth)** 使用了Claude Code
+  的记忆管理的Claude.md（tests/Claude.md）文件，你对这个文件/Users/jinhuasu/Project_Workspace/Anker-Projects/ml-platform-research/llm-platform-solution/ai-studio-project/backend/tests/CLAUDE.md你有什么好的优化方案吗？
+    这个问题必须遵循这样的流程：你给出可选的解决方案（并给出推荐方案）、由我最终选择对应的解决方案、你根据我选择的解决方案执行修改、给出这个问题处理的
+    修改总结。提供对人类阅读友好的交互方式 
+
+
+
+
+
+    请在充分理解Claude code memory管理机制，包括Claude.md 和 Rules的原理与机制的基础上，结合社区关于Claude code memory管理的最佳实践这些信息的基础上，充分理解当前ai-studio-project项目的基本清楚下，为这个项目输出一份关于CLaude Code memory管理的规范
