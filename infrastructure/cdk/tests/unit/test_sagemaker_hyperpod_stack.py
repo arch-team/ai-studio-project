@@ -713,3 +713,109 @@ class TestHyperPodStackTags:
                 )
             },
         )
+
+
+class TestGpuInstanceGroup:
+    """Tests for GPU instance group configuration."""
+
+    @pytest.fixture
+    def template(
+        self, cdk_app: cdk.App, dev_config: EnvironmentConfig, cdk_env: cdk.Environment
+    ) -> Template:
+        """Create template for GPU instance group testing."""
+        network_stack = NetworkStack(
+            cdk_app, "TestNetworkStack", env_config=dev_config, env=cdk_env
+        )
+        iam_stack = IamStack(
+            cdk_app, "TestIamStack", env_config=dev_config, env=cdk_env
+        )
+        eks_stack = EksStack(
+            cdk_app,
+            "TestEksStack",
+            env_config=dev_config,
+            vpc=network_stack.vpc,
+            eks_node_role=iam_stack.eks_node_role,
+            env=cdk_env,
+        )
+        stack = SagemakerHyperPodStack(
+            cdk_app,
+            "GpuInstanceGroupTestStack",
+            env_config=dev_config,
+            vpc=network_stack.vpc,
+            eks_cluster=eks_stack.eks_cluster,
+            env=cdk_env,
+        )
+        return Template.from_stack(stack)
+
+    def test_gpu_instance_group_created(self, template: Template) -> None:
+        """Verify GPU training instance group is created."""
+        template.has_resource_properties(
+            "AWS::SageMaker::Cluster",
+            {
+                "InstanceGroups": Match.array_with(
+                    [
+                        Match.object_like(
+                            {
+                                "InstanceGroupName": "gpu-training-group",
+                                "InstanceType": "ml.g5.2xlarge",
+                            }
+                        )
+                    ]
+                )
+            },
+        )
+
+    def test_gpu_instance_count_matches_config(self, template: Template) -> None:
+        """Verify GPU instance count matches environment config (dev=1)."""
+        template.has_resource_properties(
+            "AWS::SageMaker::Cluster",
+            {
+                "InstanceGroups": Match.array_with(
+                    [
+                        Match.object_like(
+                            {
+                                "InstanceGroupName": "gpu-training-group",
+                                "InstanceCount": 1,
+                            }
+                        )
+                    ]
+                )
+            },
+        )
+
+    def test_gpu_instance_has_lifecycle_config(self, template: Template) -> None:
+        """Verify GPU instance group has lifecycle configuration."""
+        template.has_resource_properties(
+            "AWS::SageMaker::Cluster",
+            {
+                "InstanceGroups": Match.array_with(
+                    [
+                        Match.object_like(
+                            {
+                                "InstanceGroupName": "gpu-training-group",
+                                "LifeCycleConfig": {
+                                    "SourceS3Uri": Match.any_value(),
+                                    "OnCreate": "on_create.sh",
+                                },
+                            }
+                        )
+                    ]
+                )
+            },
+        )
+
+    def test_three_instance_groups_total(self, template: Template) -> None:
+        """Verify total of 3 instance groups (controller, system, gpu-training)."""
+        # Check that we have at least 3 instance groups
+        template.has_resource_properties(
+            "AWS::SageMaker::Cluster",
+            {
+                "InstanceGroups": Match.array_with(
+                    [
+                        Match.object_like({"InstanceGroupName": "controller-group"}),
+                        Match.object_like({"InstanceGroupName": "system-group"}),
+                        Match.object_like({"InstanceGroupName": "gpu-training-group"}),
+                    ]
+                )
+            },
+        )

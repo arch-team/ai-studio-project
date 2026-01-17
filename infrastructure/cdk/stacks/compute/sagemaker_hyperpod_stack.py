@@ -280,6 +280,17 @@ class SagemakerHyperPodStack(cdk.Stack):
             ),
         ]
 
+        # Add GPU training instance group if enabled
+        gpu_config = self.env_config.eks.gpu_instance_group
+        if gpu_config.enabled:
+            instance_groups.append(
+                self._create_instance_group(
+                    name=INSTANCE_GROUPS.GPU_TRAINING,
+                    instance_type=SAGEMAKER_INSTANCES.GPU_G5_2XLARGE,
+                    instance_count=gpu_config.instance_count,
+                )
+            )
+
         # Create HyperPod cluster with standard tags + SageMaker=true
         cluster = sagemaker.CfnCluster(
             self,

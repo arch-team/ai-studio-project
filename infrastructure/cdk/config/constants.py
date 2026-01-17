@@ -65,6 +65,7 @@ class SageMakerInstanceTypes:
     GPU_P4D: str = "ml.p4d.24xlarge"
     GPU_P5: str = "ml.p5.48xlarge"
     GPU_G5: str = "ml.g5.xlarge"
+    GPU_G5_2XLARGE: str = "ml.g5.2xlarge"
 
 
 @dataclass(frozen=True)

@@ -135,6 +135,21 @@ class EksAddonVersions:
 
 
 @dataclass(frozen=True)
+class GpuInstanceGroupConfig:
+    """GPU 实例组配置.
+
+    Attributes:
+        instance_type: GPU 实例类型 (e.g., ml.g5.2xlarge)
+        instance_count: 实例数量
+        enabled: 是否启用 GPU 实例组
+    """
+
+    instance_type: str = "ml.g5.2xlarge"
+    instance_count: int = 1
+    enabled: bool = True
+
+
+@dataclass(frozen=True)
 class EksConfig:
     """EKS cluster configuration.
 
@@ -144,6 +159,7 @@ class EksConfig:
         node_instance_types: List of GPU instance types for HyperPod
         min_nodes: Minimum nodes in auto-scaling group
         max_nodes: Maximum nodes in auto-scaling group
+        gpu_instance_group: GPU 实例组配置 (ml.g5.2xlarge)
     """
 
     kubernetes_version: str = "1.33"
@@ -157,6 +173,9 @@ class EksConfig:
     )
     min_nodes: int = 2
     max_nodes: int = 100
+    gpu_instance_group: GpuInstanceGroupConfig = field(
+        default_factory=GpuInstanceGroupConfig
+    )
 
 
 @dataclass(frozen=True)
@@ -243,6 +262,8 @@ class EnvironmentConfig:
         fsx_throughput: int,
         eks_min_nodes: int,
         eks_max_nodes: int,
+        gpu_instance_count: int = 1,
+        gpu_enabled: bool = True,
     ) -> "EnvironmentConfig":
         """通用的环境配置创建方法。
 
@@ -259,6 +280,8 @@ class EnvironmentConfig:
             fsx_throughput: FSx 吞吐量 (MB/s/TiB)
             eks_min_nodes: EKS 最小节点数
             eks_max_nodes: EKS 最大节点数
+            gpu_instance_count: GPU 实例数量
+            gpu_enabled: 是否启用 GPU 实例组
 
         Returns:
             配置好的 EnvironmentConfig 实例
@@ -283,6 +306,10 @@ class EnvironmentConfig:
             eks=EksConfig(
                 min_nodes=eks_min_nodes,
                 max_nodes=eks_max_nodes,
+                gpu_instance_group=GpuInstanceGroupConfig(
+                    instance_count=gpu_instance_count,
+                    enabled=gpu_enabled,
+                ),
             ),
             protection=getattr(ProtectionConfig, f"for_{name.value}")(),
         )
@@ -303,6 +330,7 @@ class EnvironmentConfig:
             fsx_throughput=500,
             eks_min_nodes=1,
             eks_max_nodes=10,
+            gpu_instance_count=1,  # 开发环境: 1 个 GPU 实例
         )
 
     @classmethod
@@ -323,6 +351,7 @@ class EnvironmentConfig:
             fsx_throughput=500,
             eks_min_nodes=2,
             eks_max_nodes=50,
+            gpu_instance_count=2,  # 预发布环境: 2 个 GPU 实例
         )
 
     @classmethod
@@ -341,6 +370,7 @@ class EnvironmentConfig:
             fsx_throughput=500,  # 可根据需要升级到 1000
             eks_min_nodes=2,
             eks_max_nodes=100,
+            gpu_instance_count=4,  # 生产环境: 4 个 GPU 实例
         )
 
 
