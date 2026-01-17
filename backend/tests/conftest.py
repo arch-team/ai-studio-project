@@ -1,4 +1,22 @@
-"""Pytest Configuration - Shared fixtures and configuration."""
+"""Pytest Configuration - Global fixtures and configuration.
+
+This is the root conftest.py that provides global fixtures available
+to all test levels (unit, integration, e2e).
+
+Test Structure:
+    tests/
+    ├── conftest.py              # This file - global config
+    ├── shared/                  # Shared test infrastructure
+    │   ├── fixtures/            # Reusable fixtures
+    │   └── helpers/             # Test utilities
+    ├── unit/                    # Unit tests (no external deps)
+    │   └── modules/             # Organized by business module
+    ├── integration/             # Integration tests
+    │   └── modules/             # Organized by business module
+    ├── e2e/                     # End-to-end tests
+    ├── architecture/            # Architecture compliance tests
+    └── performance/             # Performance tests
+"""
 
 from collections.abc import AsyncGenerator
 
@@ -8,11 +26,47 @@ from httpx import ASGITransport, AsyncClient
 from src.main import app
 
 
+# =============================================================================
+# Global Fixtures
+# =============================================================================
+
+
 @pytest.fixture
 async def client() -> AsyncGenerator[AsyncClient, None]:
-    """Async HTTP client for testing API endpoints."""
+    """Async HTTP client for testing API endpoints.
+
+    This is the default client fixture available to all tests.
+    For more specialized clients, use fixtures from tests/shared/fixtures/.
+    """
     async with AsyncClient(
         transport=ASGITransport(app=app),
         base_url="http://test",
     ) as ac:
         yield ac
+
+
+# =============================================================================
+# Pytest Hooks
+# =============================================================================
+
+
+def pytest_collection_modifyitems(config, items):
+    """Automatically add markers based on test location."""
+    for item in items:
+        # Add markers based on test path
+        test_path = str(item.fspath)
+
+        if "/unit/" in test_path:
+            item.add_marker(pytest.mark.unit)
+        elif "/integration/" in test_path:
+            item.add_marker(pytest.mark.integration)
+        elif "/e2e/" in test_path:
+            item.add_marker(pytest.mark.e2e)
+        elif "/architecture/" in test_path:
+            item.add_marker(pytest.mark.architecture)
+        elif "/performance/" in test_path:
+            item.add_marker(pytest.mark.performance)
+
+        # Add AWS marker for AWS-related tests
+        if "/aws/" in test_path or "hyperpod" in test_path.lower():
+            item.add_marker(pytest.mark.aws_integration)

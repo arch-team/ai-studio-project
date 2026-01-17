@@ -1,4 +1,8 @@
-"""Unit Test Configuration - Shared fixtures for unit tests."""
+"""Unit Test Configuration - Shared fixtures for unit tests.
+
+Unit tests should have no external dependencies (database, AWS, etc.).
+All external dependencies should be mocked.
+"""
 
 from datetime import UTC, datetime, timedelta
 from typing import Any
@@ -10,6 +14,7 @@ from src.shared.infrastructure.security.constants import PASSWORD_BCRYPT_COST
 from src.shared.infrastructure.security.jwt import JWTManager, TokenPayload, TokenType
 from src.shared.infrastructure.security.password import PasswordHasher, PasswordValidator
 from src.modules.auth.domain.entities.user import UserRole, UserStatus
+
 
 # =============================================================================
 # JWT Manager Fixtures

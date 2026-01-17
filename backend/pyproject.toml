@@ -7,12 +7,15 @@ asyncio_default_fixture_loop_scope = "function"
 markers = [
     "unit: Unit tests (no external dependencies)",
     "integration: Integration tests (may require external services)",
+    "e2e: End-to-end tests (full application)",
     "aws_integration: Tests requiring real AWS credentials",
     "hyperpod: HyperPod-specific tests",
     "slow: Slow running tests",
+    "performance: Performance and load tests",
+    "architecture: Architecture compliance tests",
 ]
-# Default: exclude AWS integration tests (require explicit -m aws_integration)
-addopts = "-m 'not aws_integration'"
+# Default: exclude AWS integration, slow, and performance tests
+addopts = "-m 'not aws_integration and not slow and not performance'"
 filterwarnings = [
     "ignore::DeprecationWarning",
     "ignore::pytest.PytestDeprecationWarning",
