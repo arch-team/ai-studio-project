@@ -18,8 +18,10 @@ Example:
             self._quota_checker = quota_checker
 """
 
+from .entity_existence_checker import IEntityExistenceChecker
 from .quota_checker import IQuotaChecker
 
 __all__ = [
+    "IEntityExistenceChecker",
     "IQuotaChecker",
 ]

@@ -3,6 +3,8 @@
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.shared.domain.exceptions import EntityNotFoundError
+
 from ...domain.entities import User
 from ...domain.repositories import IUserRepository
 from ...domain.value_objects import AuthType, UserRole, UserStatus
@@ -102,7 +104,7 @@ class UserRepositoryImpl(IUserRepository):
         )
         model = result.scalar_one_or_none()
         if model is None:
-            raise ValueError(f"User with id {user.id} not found")
+            raise EntityNotFoundError("User", str(user.id))
 
         # Update fields
         model.username = user.username

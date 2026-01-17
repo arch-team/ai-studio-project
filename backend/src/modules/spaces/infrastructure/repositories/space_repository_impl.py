@@ -10,6 +10,7 @@ from src.modules.spaces.domain.entities import Space
 from src.modules.spaces.domain.repositories import ISpaceRepository
 from src.modules.spaces.domain.value_objects import SpaceStatus
 from src.modules.spaces.infrastructure.models import DevelopmentSpaceModel
+from src.shared.domain.exceptions import EntityNotFoundError
 from src.shared.infrastructure import BaseRepositoryImpl, QueryBuilder
 from src.shared.utils import utc_now
 
@@ -124,7 +125,7 @@ class SpaceRepository(
         )
         db_model = result.scalar_one_or_none()
         if db_model is None:
-            raise ValueError(f"Space with id {space.id} not found")
+            raise EntityNotFoundError("Space", str(space.id))
 
         # Update fields
         db_model.space_name = space.space_name

@@ -7,6 +7,7 @@ from src.modules.quotas.domain.entities import ResourceLimitConfig
 from src.modules.quotas.domain.repositories import IResourceLimitConfigRepository
 from src.modules.quotas.domain.value_objects import LimitRole, PriorityDefault
 from src.modules.quotas.infrastructure.models import ResourceLimitConfigModel
+from src.shared.domain.exceptions import EntityNotFoundError
 
 
 class ResourceLimitConfigRepository(IResourceLimitConfigRepository):
@@ -157,7 +158,7 @@ class ResourceLimitConfigRepository(IResourceLimitConfigRepository):
         )
         model = result.scalar_one_or_none()
         if model is None:
-            raise ValueError(f"ResourceLimitConfig with id {config.id} not found")
+            raise EntityNotFoundError("ResourceLimitConfig", str(config.id))
 
         # Update fields
         model.config_name = config.config_name

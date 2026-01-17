@@ -11,7 +11,7 @@ from .exceptions import (
     ResourceQuotaExceededError,
     ValidationError,
 )
-from .interfaces import IQuotaChecker
+from .interfaces import IEntityExistenceChecker, IQuotaChecker
 
 __all__ = [
     # Base classes
@@ -33,5 +33,6 @@ __all__ = [
     "InvalidStateTransitionError",
     "ResourceQuotaExceededError",
     # Cross-module interfaces
+    "IEntityExistenceChecker",
     "IQuotaChecker",
 ]

@@ -2,6 +2,7 @@
 
 from .models import CheckpointModel, TrainingJobModel
 from .repositories import CheckpointRepository, TrainingJobRepository
+from .training_job_existence_checker import TrainingJobExistenceChecker
 
 __all__ = [
     # Models
@@ -10,4 +11,6 @@ __all__ = [
     # Repositories
     "TrainingJobRepository",
     "CheckpointRepository",
+    # Cross-module interfaces
+    "TrainingJobExistenceChecker",
 ]

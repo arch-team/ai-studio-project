@@ -39,19 +39,21 @@ def mock_model_repository() -> AsyncMock:
 
 
 @pytest.fixture
-def mock_training_job_repository() -> AsyncMock:
-    """Mock training job repository."""
-    repo = AsyncMock()
-    repo.get_by_id = AsyncMock(return_value=None)
-    return repo
+def mock_training_job_checker() -> AsyncMock:
+    """Mock training job existence checker."""
+    checker = AsyncMock()
+    checker.exists = AsyncMock(return_value=False)
+    checker.get_entity_type = AsyncMock(return_value="TrainingJob")
+    return checker
 
 
 @pytest.fixture
-def mock_checkpoint_repository() -> AsyncMock:
-    """Mock checkpoint repository."""
-    repo = AsyncMock()
-    repo.get_by_id = AsyncMock(return_value=None)
-    return repo
+def mock_checkpoint_checker() -> AsyncMock:
+    """Mock checkpoint existence checker."""
+    checker = AsyncMock()
+    checker.exists = AsyncMock(return_value=False)
+    checker.get_entity_type = AsyncMock(return_value="Checkpoint")
+    return checker
 
 
 @pytest.fixture
@@ -147,16 +149,16 @@ def create_model_data() -> dict[str, Any]:
 
 def get_service(
     mock_model_repository: AsyncMock,
-    mock_training_job_repository: AsyncMock | None = None,
-    mock_checkpoint_repository: AsyncMock | None = None,
+    mock_training_job_checker: AsyncMock | None = None,
+    mock_checkpoint_checker: AsyncMock | None = None,
 ):
     """Create ModelService with mocked dependencies."""
     from src.modules.models.application.services.model_service import ModelService
 
     return ModelService(
         model_repository=mock_model_repository,
-        training_job_repository=mock_training_job_repository,
-        checkpoint_repository=mock_checkpoint_repository,
+        training_job_checker=mock_training_job_checker,
+        checkpoint_checker=mock_checkpoint_checker,
     )
 
 
@@ -170,21 +172,21 @@ class TestCreateModel:
     async def test_create_model_success(
         self,
         mock_model_repository: AsyncMock,
-        mock_training_job_repository: AsyncMock,
-        mock_checkpoint_repository: AsyncMock,
+        mock_training_job_checker: AsyncMock,
+        mock_checkpoint_checker: AsyncMock,
         create_model_data: dict[str, Any],
         sample_model: Model,
     ):
         """Test successful model creation."""
         # Arrange
-        mock_training_job_repository.get_by_id.return_value = AsyncMock(id=1)
-        mock_checkpoint_repository.get_by_id.return_value = AsyncMock(id=1)
+        mock_training_job_checker.exists.return_value = True
+        mock_checkpoint_checker.exists.return_value = True
         mock_model_repository.get_latest_version.return_value = None
         mock_model_repository.create.return_value = sample_model
         service = get_service(
             mock_model_repository,
-            mock_training_job_repository,
-            mock_checkpoint_repository,
+            mock_training_job_checker,
+            mock_checkpoint_checker,
         )
 
         # Act
@@ -193,31 +195,31 @@ class TestCreateModel:
         # Assert
         assert result is not None
         assert result.model_name == sample_model.model_name
-        mock_training_job_repository.get_by_id.assert_called_once_with(1)
-        mock_checkpoint_repository.get_by_id.assert_called_once_with(1)
+        mock_training_job_checker.exists.assert_called_once_with(1)
+        mock_checkpoint_checker.exists.assert_called_once_with(1)
         mock_model_repository.create.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_create_model_increments_version(
         self,
         mock_model_repository: AsyncMock,
-        mock_training_job_repository: AsyncMock,
-        mock_checkpoint_repository: AsyncMock,
+        mock_training_job_checker: AsyncMock,
+        mock_checkpoint_checker: AsyncMock,
         create_model_data: dict[str, Any],
         sample_model: Model,
         model_v2: Model,
     ):
         """Test model creation auto-increments version when model name exists."""
         # Arrange
-        mock_training_job_repository.get_by_id.return_value = AsyncMock(id=1)
-        mock_checkpoint_repository.get_by_id.return_value = AsyncMock(id=1)
+        mock_training_job_checker.exists.return_value = True
+        mock_checkpoint_checker.exists.return_value = True
         create_model_data["model_name"] = "bert-base-classifier"
         mock_model_repository.get_latest_version.return_value = sample_model  # v1 exists
         mock_model_repository.create.return_value = model_v2
         service = get_service(
             mock_model_repository,
-            mock_training_job_repository,
-            mock_checkpoint_repository,
+            mock_training_job_checker,
+            mock_checkpoint_checker,
         )
 
         # Act
@@ -231,42 +233,42 @@ class TestCreateModel:
     async def test_create_model_training_job_not_found(
         self,
         mock_model_repository: AsyncMock,
-        mock_training_job_repository: AsyncMock,
-        mock_checkpoint_repository: AsyncMock,
+        mock_training_job_checker: AsyncMock,
+        mock_checkpoint_checker: AsyncMock,
         create_model_data: dict[str, Any],
     ):
         """Test create fails when training job does not exist."""
         # Arrange
-        mock_training_job_repository.get_by_id.return_value = None
+        mock_training_job_checker.exists.return_value = False
         service = get_service(
             mock_model_repository,
-            mock_training_job_repository,
-            mock_checkpoint_repository,
+            mock_training_job_checker,
+            mock_checkpoint_checker,
         )
 
         # Act & Assert
         with pytest.raises(EntityNotFoundError) as exc_info:
             await service.create_model(owner_id=100, data=create_model_data)
 
-        assert "training job" in str(exc_info.value).lower()
+        assert "trainingjob" in str(exc_info.value).lower()
         mock_model_repository.create.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_create_model_checkpoint_not_found(
         self,
         mock_model_repository: AsyncMock,
-        mock_training_job_repository: AsyncMock,
-        mock_checkpoint_repository: AsyncMock,
+        mock_training_job_checker: AsyncMock,
+        mock_checkpoint_checker: AsyncMock,
         create_model_data: dict[str, Any],
     ):
         """Test create fails when checkpoint does not exist."""
         # Arrange
-        mock_training_job_repository.get_by_id.return_value = AsyncMock(id=1)
-        mock_checkpoint_repository.get_by_id.return_value = None
+        mock_training_job_checker.exists.return_value = True
+        mock_checkpoint_checker.exists.return_value = False
         service = get_service(
             mock_model_repository,
-            mock_training_job_repository,
-            mock_checkpoint_repository,
+            mock_training_job_checker,
+            mock_checkpoint_checker,
         )
 
         # Act & Assert

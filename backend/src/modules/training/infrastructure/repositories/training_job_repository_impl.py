@@ -14,6 +14,7 @@ from src.modules.training.domain.value_objects import (
     SpotInterruptionBehavior,
 )
 from src.modules.training.infrastructure.models import TrainingJobModel
+from src.shared.domain.exceptions import EntityNotFoundError
 
 
 class TrainingJobRepository(ITrainingJobRepository):
@@ -192,7 +193,7 @@ class TrainingJobRepository(ITrainingJobRepository):
         )
         model = result.scalar_one_or_none()
         if model is None:
-            raise ValueError(f"TrainingJob with id {job.id} not found")
+            raise EntityNotFoundError("TrainingJob", str(job.id))
 
         # Update fields
         model.status = job.status

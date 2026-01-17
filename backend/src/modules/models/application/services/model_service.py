@@ -10,6 +10,7 @@ from src.shared.domain.exceptions import (
     EntityNotFoundError,
     InvalidStateTransitionError,
 )
+from src.shared.domain.interfaces import IEntityExistenceChecker
 from src.shared.utils import EnumMapper, utc_now
 
 
@@ -19,13 +20,13 @@ class ModelService(BaseService[Model, int]):
     def __init__(
         self,
         model_repository: IModelRepository,
-        training_job_repository: Any | None = None,
-        checkpoint_repository: Any | None = None,
+        training_job_checker: IEntityExistenceChecker | None = None,
+        checkpoint_checker: IEntityExistenceChecker | None = None,
     ):
         super().__init__(model_repository, "Model")
         self._model_repository = model_repository
-        self._training_job_repository = training_job_repository
-        self._checkpoint_repository = checkpoint_repository
+        self._training_job_checker = training_job_checker
+        self._checkpoint_checker = checkpoint_checker
 
     async def create_model(self, owner_id: int, data: dict) -> Model:
         """Create a new model."""
@@ -33,18 +34,14 @@ class ModelService(BaseService[Model, int]):
         checkpoint_id = data["checkpoint_id"]
         model_name = data["model_name"]
 
-        # Validate training job exists
-        if self._training_job_repository:
-            training_job = await self._training_job_repository.get_by_id(
-                training_job_id
-            )
-            if training_job is None:
-                raise EntityNotFoundError("Training job", str(training_job_id))
+        # Validate training job exists using cross-module interface
+        if self._training_job_checker:
+            if not await self._training_job_checker.exists(training_job_id):
+                raise EntityNotFoundError("TrainingJob", str(training_job_id))
 
-        # Validate checkpoint exists
-        if self._checkpoint_repository:
-            checkpoint = await self._checkpoint_repository.get_by_id(checkpoint_id)
-            if checkpoint is None:
+        # Validate checkpoint exists using cross-module interface
+        if self._checkpoint_checker:
+            if not await self._checkpoint_checker.exists(checkpoint_id):
                 raise EntityNotFoundError("Checkpoint", str(checkpoint_id))
 
         # Determine version

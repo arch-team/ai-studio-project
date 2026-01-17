@@ -11,6 +11,7 @@ from src.modules.training.domain.value_objects import (
     StorageTier,
 )
 from src.modules.training.infrastructure.models import CheckpointModel
+from src.shared.domain.exceptions import EntityNotFoundError
 
 
 class CheckpointRepository(ICheckpointRepository):
@@ -91,7 +92,7 @@ class CheckpointRepository(ICheckpointRepository):
         )
         model = result.scalar_one_or_none()
         if model is None:
-            raise ValueError(f"Checkpoint with id {checkpoint.id} not found")
+            raise EntityNotFoundError("Checkpoint", str(checkpoint.id))
 
         # Update fields
         model.storage_tier = checkpoint.storage_tier

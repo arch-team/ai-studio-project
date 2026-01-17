@@ -8,6 +8,7 @@ from src.modules.models.domain.entities import Model
 from src.modules.models.domain.repositories import IModelRepository
 from src.modules.models.domain.value_objects import ModelFramework, ModelStatus
 from src.modules.models.infrastructure.models import ModelModel
+from src.shared.domain.exceptions import EntityNotFoundError
 from src.shared.utils import utc_now
 
 
@@ -203,7 +204,7 @@ class ModelRepository(IModelRepository):
         )
         db_model = result.scalar_one_or_none()
         if db_model is None:
-            raise ValueError(f"Model with id {model.id} not found")
+            raise EntityNotFoundError("Model", str(model.id))
 
         # Update fields
         db_model.display_name = model.display_name
