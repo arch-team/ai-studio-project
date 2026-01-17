@@ -6,7 +6,7 @@ from unittest.mock import AsyncMock
 import pytest
 
 from src.modules.auth.application.services.account_service import AccountService
-from src.modules.auth.domain.exceptions import (
+from src.shared.infrastructure.security import (
     InvalidCredentialsError,
     PasswordTooWeakError,
     UserNotFoundError,

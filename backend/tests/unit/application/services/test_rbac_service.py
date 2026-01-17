@@ -9,7 +9,7 @@ from src.modules.auth.application.services.rbac_service import (
     RBACService,
     get_rbac_service,
 )
-from src.modules.auth.domain.exceptions import InsufficientPermissionsError
+from src.shared.infrastructure.security import InsufficientPermissionsError
 
 
 class TestRBACServicePermissions:

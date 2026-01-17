@@ -1,5 +1,7 @@
 """Training Jobs Endpoints - CRUD operations for training jobs."""
 
+from datetime import datetime
+
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 
 from src.shared.utils import utc_now
