@@ -10,13 +10,15 @@ from datetime import datetime
 from typing import Any, Callable, TypeVar
 from uuid import UUID, uuid4
 
+from src.shared.utils import utc_now
+
 
 @dataclass
 class DomainEvent(ABC):
     """Base class for all domain events."""
 
     event_id: UUID = field(default_factory=uuid4)
-    occurred_at: datetime = field(default_factory=datetime.utcnow)
+    occurred_at: datetime = field(default_factory=utc_now)
 
 
 # Type variable for event types

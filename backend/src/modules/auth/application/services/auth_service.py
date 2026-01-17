@@ -56,8 +56,8 @@ class AuthService:
         jwt_manager: JWTManager | None = None,
         password_hasher: PasswordHasher | None = None,
     ):
-        self._user_repo = user_repository
-        self._attempt_repo = login_attempt_repository
+        self._user_repository = user_repository
+        self._login_attempt_repository = login_attempt_repository
         self._jwt = jwt_manager or get_jwt_manager()
         self._hasher = password_hasher or get_password_hasher()
 
@@ -69,7 +69,7 @@ class AuthService:
         user_agent: str | None = None,
     ) -> AuthResult:
         """Authenticate with username and password."""
-        user = await self._user_repo.get_by_username(username)
+        user = await self._user_repository.get_by_username(username)
 
         # Create login attempt record (initially failed)
         attempt = LoginAttempt(
@@ -130,14 +130,14 @@ class AuthService:
 
         finally:
             # Always record the login attempt
-            await self._attempt_repo.create(attempt)
+            await self._login_attempt_repository.create(attempt)
 
     async def refresh_access_token(self, refresh_token: str) -> TokenPair:
         """Refresh access token using refresh token."""
         payload = self._jwt.verify_token(refresh_token, TokenType.REFRESH)
         user_id = int(payload.sub)
 
-        user = await self._user_repo.get_by_id(user_id)
+        user = await self._user_repository.get_by_id(user_id)
         if not user or user.status != UserStatus.ACTIVE:
             raise InvalidCredentialsError("User not found or inactive")
 
@@ -145,7 +145,11 @@ class AuthService:
 
     async def get_user_by_id(self, user_id: int) -> User | None:
         """Get user by ID."""
-        return await self._user_repo.get_by_id(user_id)
+        return await self._user_repository.get_by_id(user_id)
+
+    def create_token_pair_for_user(self, user: User) -> TokenPair:
+        """Create token pair for a user (used for SSO login)."""
+        return self._create_token_pair(user)
 
     def _create_token_pair(self, user: User) -> TokenPair:
         """Create access and refresh token pair."""
@@ -170,10 +174,10 @@ class AuthService:
         if user.failed_login_count >= MAX_FAILED_LOGIN_ATTEMPTS:
             user.lock_account(utc_now() + timedelta(minutes=LOCKOUT_DURATION_MINUTES))
 
-        await self._user_repo.update(user)
+        await self._user_repository.update(user)
 
     async def _handle_successful_login(self, user: User) -> None:
         """Handle successful login."""
         user.reset_login_failures()
         user.record_login()
-        await self._user_repo.update(user)
+        await self._user_repository.update(user)

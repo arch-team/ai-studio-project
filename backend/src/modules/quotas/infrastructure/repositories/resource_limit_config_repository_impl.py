@@ -15,7 +15,7 @@ class ResourceLimitConfigRepository(IResourceLimitConfigRepository):
     def __init__(self, session: AsyncSession):
         self._session = session
 
-    def _model_to_entity(self, model: ResourceLimitConfigModel) -> ResourceLimitConfig:
+    def _to_entity(self, model: ResourceLimitConfigModel) -> ResourceLimitConfig:
         """Convert ORM model to domain entity."""
         return ResourceLimitConfig(
             id=model.id,
@@ -32,7 +32,7 @@ class ResourceLimitConfigRepository(IResourceLimitConfigRepository):
             updated_at=model.updated_at,
         )
 
-    def _entity_to_model(self, entity: ResourceLimitConfig) -> ResourceLimitConfigModel:
+    def _to_model(self, entity: ResourceLimitConfig) -> ResourceLimitConfigModel:
         """Convert domain entity to ORM model."""
         return ResourceLimitConfigModel(
             id=entity.id if entity.id else None,
@@ -57,7 +57,7 @@ class ResourceLimitConfigRepository(IResourceLimitConfigRepository):
         model = result.scalar_one_or_none()
         if model is None:
             return None
-        return self._model_to_entity(model)
+        return self._to_entity(model)
 
     async def get_by_role_and_project(
         self, role: LimitRole, project_id: int | None
@@ -82,7 +82,7 @@ class ResourceLimitConfigRepository(IResourceLimitConfigRepository):
         model = result.scalar_one_or_none()
         if model is None:
             return None
-        return self._model_to_entity(model)
+        return self._to_entity(model)
 
     async def list_configs(
         self,
@@ -138,15 +138,15 @@ class ResourceLimitConfigRepository(IResourceLimitConfigRepository):
         result = await self._session.execute(query)
         models = result.scalars().all()
 
-        return [self._model_to_entity(m) for m in models], total
+        return [self._to_entity(m) for m in models], total
 
     async def create(self, config: ResourceLimitConfig) -> ResourceLimitConfig:
         """Create a new config."""
-        model = self._entity_to_model(config)
+        model = self._to_model(config)
         self._session.add(model)
         await self._session.flush()
         await self._session.refresh(model)
-        return self._model_to_entity(model)
+        return self._to_entity(model)
 
     async def update(self, config: ResourceLimitConfig) -> ResourceLimitConfig:
         """Update an existing config."""
@@ -172,7 +172,7 @@ class ResourceLimitConfigRepository(IResourceLimitConfigRepository):
 
         await self._session.flush()
         await self._session.refresh(model)
-        return self._model_to_entity(model)
+        return self._to_entity(model)
 
     async def soft_delete(self, config_id: int) -> bool:
         """Soft delete a config (hard delete for now, no soft delete column)."""

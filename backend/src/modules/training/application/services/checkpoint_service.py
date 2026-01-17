@@ -6,20 +6,20 @@ from src.modules.training.domain.entities import Checkpoint
 from src.modules.training.domain.exceptions import CheckpointNotFoundError
 from src.modules.training.domain.repositories import ICheckpointRepository
 from src.modules.training.domain.value_objects import CheckpointType
+from src.shared.application import BaseService
 
 
-class CheckpointService:
+class CheckpointService(BaseService[Checkpoint, int]):
     """Service for managing training checkpoints."""
 
+    _not_found_error_factory = CheckpointNotFoundError
+
     def __init__(self, repository: ICheckpointRepository):
-        self._repository = repository
+        super().__init__(repository, "Checkpoint")
 
     async def get_checkpoint(self, checkpoint_id: int) -> Checkpoint:
         """Get checkpoint by ID."""
-        checkpoint = await self._repository.get_by_id(checkpoint_id)
-        if checkpoint is None:
-            raise CheckpointNotFoundError(str(checkpoint_id))
-        return checkpoint
+        return await self._get_or_raise(checkpoint_id)
 
     async def get_checkpoints_for_job(self, training_job_id: int) -> list[Checkpoint]:
         """Get all checkpoints for a training job."""

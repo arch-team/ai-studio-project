@@ -3,17 +3,8 @@
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 
 from ..application.services import AccountService, AuthService, PasswordService
-from ..domain.exceptions import (
-    AccountLockedError,
-    InvalidCredentialsError,
-    InvalidTokenError,
-    PasswordExpiredError,
-    PasswordHistoryViolationError,
-    PasswordTooWeakError,
-    SSODegradedModeError,
-    SSOError,
-    TokenExpiredError,
-)
+from ..application.services.auth_service import TokenPair
+from ..domain.entities import User
 from .current_user import CurrentUser
 from .dependencies import (
     get_account_service,
@@ -46,6 +37,32 @@ def _get_client_ip(request: Request) -> str:
     return request.client.host if request.client else "unknown"
 
 
+def _create_user_response(user: User) -> UserResponse:
+    """Create UserResponse from User entity."""
+    return UserResponse(
+        id=user.id,
+        username=user.username,
+        email=user.email,
+        display_name=user.display_name,
+        role=user.role.value,
+        status=user.status.value,
+        auth_type=user.auth_type.value,
+    )
+
+
+def _create_login_response(user: User, tokens: TokenPair) -> LoginResponse:
+    """Create LoginResponse from User entity and TokenPair."""
+    return LoginResponse(
+        tokens=TokenResponse(
+            access_token=tokens.access_token,
+            refresh_token=tokens.refresh_token,
+            token_type=tokens.token_type,
+            expires_in=tokens.expires_in,
+        ),
+        user=_create_user_response(user),
+    )
+
+
 @router.post(
     "/login",
     response_model=LoginResponse,
@@ -60,133 +77,110 @@ async def login(
     auth_service: AuthService = Depends(get_auth_service),
     account_service: AccountService = Depends(get_account_service),
 ):
-    """Authenticate user via local credentials or SSO token."""
+    """Authenticate user via local credentials or SSO token.
+
+    Exceptions are handled by global exception handlers:
+    - AccountLockedError → 423
+    - PasswordExpiredError → 401
+    - InvalidCredentialsError → 401
+    - SSOError → 401
+    - SSODegradedModeError → 503
+    """
+    # SSO login
+    if login_data.id_token:
+        return await _handle_sso_login(
+            login_data.id_token, auth_service, account_service
+        )
+
+    # Local login
+    if not login_data.username or not login_data.password:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Username and password required for local login",
+        )
+
     ip_address = _get_client_ip(request)
     user_agent = request.headers.get("User-Agent")
 
+    result = await auth_service.local_login(
+        username=login_data.username,
+        password=login_data.password,
+        ip_address=ip_address,
+        user_agent=user_agent,
+    )
+
+    # Get full user for response (local_login returns AuthResult with limited info)
+    user = await auth_service.get_user_by_id(result.user_id)
+    if user:
+        return _create_login_response(user, result.tokens)
+
+    # Fallback for backward compatibility
+    return LoginResponse(
+        tokens=TokenResponse(
+            access_token=result.tokens.access_token,
+            refresh_token=result.tokens.refresh_token,
+            token_type=result.tokens.token_type,
+            expires_in=result.tokens.expires_in,
+        ),
+        user=UserResponse(
+            id=result.user_id,
+            username=result.username,
+            email=result.email,
+            display_name=None,
+            role=result.role,
+            status="active",
+            auth_type="local",
+        ),
+    )
+
+
+async def _handle_sso_login(
+    id_token: str,
+    auth_service: AuthService,
+    account_service: AccountService,
+) -> LoginResponse:
+    """Handle SSO login flow.
+
+    Raises:
+        HTTPException: If SSO is not configured
+        SSOError: If token validation fails (handled by global handler)
+        SSODegradedModeError: If SSO service unavailable (handled by global handler)
+    """
     try:
-        # SSO login - check if SSO service is available
-        if login_data.id_token:
-            # Import SSO service here to avoid circular imports
-            try:
-                from src.api.middleware.sso import (
-                    SSOUserInfo,
-                    get_sso_service,
-                    map_groups_to_role,
-                )
-
-                sso_service = get_sso_service()
-                if not sso_service:
-                    raise HTTPException(
-                        status_code=status.HTTP_501_NOT_IMPLEMENTED,
-                        detail="SSO is not configured",
-                    )
-
-                user_info: SSOUserInfo = await sso_service.validate_id_token(
-                    login_data.id_token
-                )
-
-                # Map groups to role and create/get user via AccountService
-                role = map_groups_to_role(user_info.groups)
-
-                # Get or create SSO user using AccountService
-                user = await account_service.get_or_create_sso_user(
-                    iam_identity_id=user_info.identity_id,
-                    username=user_info.username,
-                    email=user_info.email,
-                    display_name=user_info.display_name,
-                    groups=user_info.groups,
-                    role=role,
-                )
-
-                # Generate tokens using auth_service helper
-                tokens = auth_service._create_token_pair(user)
-
-                return LoginResponse(
-                    tokens=TokenResponse(
-                        access_token=tokens.access_token,
-                        refresh_token=tokens.refresh_token,
-                        token_type=tokens.token_type,
-                        expires_in=tokens.expires_in,
-                    ),
-                    user=UserResponse(
-                        id=user.id,
-                        username=user.username,
-                        email=user.email,
-                        display_name=user.display_name,
-                        role=user.role.value,
-                        status=user.status.value,
-                        auth_type=user.auth_type.value,
-                    ),
-                )
-
-            except SSODegradedModeError:
-                raise HTTPException(
-                    status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                    detail="SSO service is temporarily unavailable. Please try local login.",
-                )
-            except SSOError as e:
-                raise HTTPException(
-                    status_code=status.HTTP_401_UNAUTHORIZED,
-                    detail=str(e),
-                )
-            except ImportError:
-                raise HTTPException(
-                    status_code=status.HTTP_501_NOT_IMPLEMENTED,
-                    detail="SSO is not configured",
-                )
-
-        # Local login
-        if not login_data.username or not login_data.password:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Username and password required for local login",
-            )
-
-        result = await auth_service.local_login(
-            username=login_data.username,
-            password=login_data.password,
-            ip_address=ip_address,
-            user_agent=user_agent,
+        from src.api.middleware.sso import (
+            get_sso_service,
+            map_groups_to_role,
         )
-
-        return LoginResponse(
-            tokens=TokenResponse(
-                access_token=result.tokens.access_token,
-                refresh_token=result.tokens.refresh_token,
-                token_type=result.tokens.token_type,
-                expires_in=result.tokens.expires_in,
-            ),
-            user=UserResponse(
-                id=result.user_id,
-                username=result.username,
-                email=result.email,
-                display_name=None,
-                role=result.role,
-                status="active",
-                auth_type="local",
-            ),
-        )
-
-    except AccountLockedError as e:
+    except ImportError:
         raise HTTPException(
-            status_code=status.HTTP_423_LOCKED,
-            detail=(
-                f"Account is locked until {e.locked_until}"
-                if e.locked_until
-                else "Account is locked"
-            ),
+            status_code=status.HTTP_501_NOT_IMPLEMENTED,
+            detail="SSO is not configured",
         )
-    except PasswordExpiredError:
+
+    sso_service = get_sso_service()
+    if not sso_service:
         raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Password has expired. Please reset your password.",
+            status_code=status.HTTP_501_NOT_IMPLEMENTED,
+            detail="SSO is not configured",
         )
-    except InvalidCredentialsError as e:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail=str(e),
-        )
+
+    # Validate token and get user info (may raise SSOError or SSODegradedModeError)
+    user_info = await sso_service.validate_id_token(id_token)
+
+    # Map groups to role and get/create user
+    role = map_groups_to_role(user_info.groups)
+    user = await account_service.get_or_create_sso_user(
+        iam_identity_id=user_info.identity_id,
+        username=user_info.username,
+        email=user_info.email,
+        display_name=user_info.display_name,
+        groups=user_info.groups,
+        role=role,
+    )
+
+    # Generate tokens
+    tokens = auth_service.create_token_pair_for_user(user)
+    return _create_login_response(user, tokens)
 
 
 @router.post(
@@ -233,98 +227,83 @@ async def create_local_account(
     current_user: CurrentUser = Depends(require_admin),
     account_service: AccountService = Depends(get_account_service),
 ):
-    """Create a new local authentication account (Admin only)."""
-    try:
-        user = await account_service.create_local_account(
-            username=account_data.username,
-            email=account_data.email,
-            password=account_data.password,
-            role=account_data.role,
-            display_name=account_data.display_name,
-        )
+    """Create a new local authentication account (Admin only).
 
-        return UserResponse(
-            id=user.id,
-            username=user.username,
-            email=user.email,
-            display_name=user.display_name,
-            role=user.role.value,
-            status=user.status.value,
-            auth_type=user.auth_type.value,
-        )
-    except PasswordTooWeakError as e:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail={"error": "PASSWORD_TOO_WEAK", "violations": e.violations},
-        )
-    except InvalidCredentialsError as e:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(e),
-        )
+    Exceptions handled by global handler:
+    - PasswordTooWeakError → 400
+    - InvalidCredentialsError → 401 (for duplicate username/email)
+    """
+    user = await account_service.create_local_account(
+        username=account_data.username,
+        email=account_data.email,
+        password=account_data.password,
+        role=account_data.role,
+        display_name=account_data.display_name,
+    )
+    return _create_user_response(user)
 
 
 @router.post(
     "/local-accounts/{user_id}/enable",
     response_model=MessageResponse,
-    responses={403: {"model": ErrorResponse, "description": "Permission denied"}},
+    responses={
+        403: {"model": ErrorResponse, "description": "Permission denied"},
+        404: {"model": ErrorResponse, "description": "User not found"},
+    },
 )
 async def enable_account(
     user_id: int,
     current_user: CurrentUser = Depends(require_admin),
     account_service: AccountService = Depends(get_account_service),
 ):
-    """Enable a user account (Admin only)."""
-    try:
-        await account_service.enable_account(user_id)
-        return MessageResponse(message="Account enabled successfully")
-    except InvalidCredentialsError as e:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=str(e),
-        )
+    """Enable a user account (Admin only).
+
+    Exceptions handled by global handler: UserNotFoundError → 404
+    """
+    await account_service.enable_account(user_id)
+    return MessageResponse(message="Account enabled successfully")
 
 
 @router.post(
     "/local-accounts/{user_id}/disable",
     response_model=MessageResponse,
-    responses={403: {"model": ErrorResponse, "description": "Permission denied"}},
+    responses={
+        403: {"model": ErrorResponse, "description": "Permission denied"},
+        404: {"model": ErrorResponse, "description": "User not found"},
+    },
 )
 async def disable_account(
     user_id: int,
     current_user: CurrentUser = Depends(require_admin),
     account_service: AccountService = Depends(get_account_service),
 ):
-    """Disable a user account (Admin only)."""
-    try:
-        await account_service.disable_account(user_id)
-        return MessageResponse(message="Account disabled successfully")
-    except InvalidCredentialsError as e:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=str(e),
-        )
+    """Disable a user account (Admin only).
+
+    Exceptions handled by global handler: UserNotFoundError → 404
+    """
+    await account_service.disable_account(user_id)
+    return MessageResponse(message="Account disabled successfully")
 
 
 @router.post(
     "/local-accounts/{user_id}/unlock",
     response_model=MessageResponse,
-    responses={403: {"model": ErrorResponse, "description": "Permission denied"}},
+    responses={
+        403: {"model": ErrorResponse, "description": "Permission denied"},
+        404: {"model": ErrorResponse, "description": "User not found"},
+    },
 )
 async def unlock_account(
     user_id: int,
     current_user: CurrentUser = Depends(require_admin),
     account_service: AccountService = Depends(get_account_service),
 ):
-    """Unlock a locked user account (Admin only)."""
-    try:
-        await account_service.unlock_account(user_id)
-        return MessageResponse(message="Account unlocked successfully")
-    except InvalidCredentialsError as e:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=str(e),
-        )
+    """Unlock a locked user account (Admin only).
+
+    Exceptions handled by global handler: UserNotFoundError → 404
+    """
+    await account_service.unlock_account(user_id)
+    return MessageResponse(message="Account unlocked successfully")
 
 
 @router.post(
@@ -340,29 +319,19 @@ async def change_password(
     current_user: CurrentUser = Depends(get_current_active_user),
     password_service: PasswordService = Depends(get_password_service),
 ):
-    """Change password for the current user."""
-    try:
-        await password_service.change_password(
-            user_id=current_user.user_id,
-            current_password=password_data.current_password,
-            new_password=password_data.new_password,
-        )
-        return MessageResponse(message="Password changed successfully")
-    except PasswordTooWeakError as e:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail={"error": "PASSWORD_TOO_WEAK", "violations": e.violations},
-        )
-    except PasswordHistoryViolationError:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Cannot reuse recent passwords",
-        )
-    except InvalidCredentialsError as e:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail=str(e),
-        )
+    """Change password for the current user.
+
+    Exceptions handled by global handler:
+    - PasswordTooWeakError → 400
+    - PasswordHistoryViolationError → 400
+    - InvalidCredentialsError → 401
+    """
+    await password_service.change_password(
+        user_id=current_user.user_id,
+        current_password=password_data.current_password,
+        new_password=password_data.new_password,
+    )
+    return MessageResponse(message="Password changed successfully")
 
 
 @router.post(
@@ -397,33 +366,20 @@ async def confirm_password_reset(
     reset_data: PasswordResetConfirmRequest,
     password_service: PasswordService = Depends(get_password_service),
 ):
-    """Confirm password reset with token."""
-    try:
-        await password_service.confirm_password_reset(
-            reset_token=reset_data.token,
-            new_password=reset_data.new_password,
-        )
-        return MessageResponse(message="Password reset successfully")
-    except (InvalidTokenError, TokenExpiredError):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid or expired reset token",
-        )
-    except PasswordTooWeakError as e:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail={"error": "PASSWORD_TOO_WEAK", "violations": e.violations},
-        )
-    except PasswordHistoryViolationError:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Cannot reuse recent passwords",
-        )
-    except InvalidCredentialsError as e:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail=str(e),
-        )
+    """Confirm password reset with token.
+
+    Exceptions handled by global handler:
+    - InvalidTokenError → 401
+    - TokenExpiredError → 401
+    - PasswordTooWeakError → 400
+    - PasswordHistoryViolationError → 400
+    - InvalidCredentialsError → 401
+    """
+    await password_service.confirm_password_reset(
+        reset_token=reset_data.token,
+        new_password=reset_data.new_password,
+    )
+    return MessageResponse(message="Password reset successfully")
 
 
 @router.get("/me", response_model=UserResponse)
@@ -440,12 +396,4 @@ async def get_current_user_info(
             detail="User not found",
         )
 
-    return UserResponse(
-        id=user.id,
-        username=user.username,
-        email=user.email,
-        display_name=user.display_name,
-        role=user.role.value,
-        status=user.status.value,
-        auth_type=user.auth_type.value,
-    )
+    return _create_user_response(user)

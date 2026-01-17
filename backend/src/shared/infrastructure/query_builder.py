@@ -1,8 +1,9 @@
 """Query builder utility for common repository operations."""
 
+from enum import Enum
 from typing import Any, Generic, TypeVar
 
-from sqlalchemy import Select, asc, desc, func, select
+from sqlalchemy import Select, asc, desc, func, inspect, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 ModelT = TypeVar("ModelT")
@@ -16,6 +17,39 @@ class QueryBuilder(Generic[ModelT]):
         self._model_class = model_class
         self._filters: list[Any] = []
 
+    def _convert_enum_value(self, column_name: str, value: Any) -> Any:
+        """Convert value to enum if column is an enum type.
+
+        Handles string-to-enum conversion automatically by detecting the column's
+        enum class from SQLAlchemy mapper metadata.
+        """
+        if isinstance(value, Enum):
+            return value
+
+        try:
+            mapper = inspect(self._model_class)
+            column = mapper.columns.get(column_name)
+            if column is None:
+                return value
+
+            # Check if column type has enum_class (SQLAlchemy Enum type)
+            column_type = column.type
+            if hasattr(column_type, "enum_class") and column_type.enum_class is not None:
+                enum_class = column_type.enum_class
+                if isinstance(value, str):
+                    # Try by name first (case-insensitive), then by value
+                    upper_value = value.upper()
+                    try:
+                        return enum_class[upper_value]
+                    except KeyError:
+                        for member in enum_class:
+                            if member.value.upper() == upper_value:
+                                return member
+        except Exception:
+            pass
+
+        return value
+
     def with_soft_delete_filter(self) -> "QueryBuilder[ModelT]":
         """Filter out soft-deleted records (deleted_at IS NULL)."""
         if hasattr(self._model_class, "deleted_at"):
@@ -25,9 +59,13 @@ class QueryBuilder(Generic[ModelT]):
         return self
 
     def with_filter(self, column_name: str, value: Any) -> "QueryBuilder[ModelT]":
-        """Add equality filter if value is not None."""
+        """Add equality filter if value is not None.
+
+        Automatically converts string values to enum if the column is an enum type.
+        """
         if value is not None and hasattr(self._model_class, column_name):
-            filter_clause = getattr(self._model_class, column_name) == value
+            converted_value = self._convert_enum_value(column_name, value)
+            filter_clause = getattr(self._model_class, column_name) == converted_value
             self._query = self._query.where(filter_clause)
             self._filters.append(filter_clause)
         return self

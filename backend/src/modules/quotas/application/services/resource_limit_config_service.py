@@ -4,13 +4,16 @@ from src.modules.quotas.domain.entities import ResourceLimitConfig
 from src.modules.quotas.domain.exceptions import DuplicateConfigError, QuotaNotFoundError
 from src.modules.quotas.domain.repositories import IResourceLimitConfigRepository
 from src.modules.quotas.domain.value_objects import LimitRole, PriorityDefault
+from src.shared.application import BaseService
 
 
-class ResourceLimitConfigService:
+class ResourceLimitConfigService(BaseService[ResourceLimitConfig, int]):
     """Service for managing resource limit configurations."""
 
+    _not_found_error_factory = QuotaNotFoundError
+
     def __init__(self, repository: IResourceLimitConfigRepository):
-        self._repository = repository
+        super().__init__(repository, "ResourceLimitConfig")
 
     async def create_config(self, data: dict) -> ResourceLimitConfig:
         """Create a new resource limit config.
@@ -49,10 +52,7 @@ class ResourceLimitConfigService:
 
     async def get_config(self, config_id: int) -> ResourceLimitConfig:
         """Get config by ID."""
-        config = await self._repository.get_by_id(config_id)
-        if config is None:
-            raise QuotaNotFoundError(str(config_id))
-        return config
+        return await self._get_or_raise(config_id)
 
     async def get_config_for_role(
         self, role: LimitRole, project_id: int | None = None
@@ -100,9 +100,7 @@ class ResourceLimitConfigService:
             QuotaNotFoundError: If config not found
             DuplicateConfigError: If new role+project combination already exists
         """
-        config = await self._repository.get_by_id(config_id)
-        if config is None:
-            raise QuotaNotFoundError(str(config_id))
+        config = await self._get_or_raise(config_id)
 
         # Check if changing role or project_id would create duplicate
         new_role = LimitRole(data["role"]) if "role" in data else config.role
@@ -144,10 +142,7 @@ class ResourceLimitConfigService:
         Raises:
             QuotaNotFoundError: If config not found
         """
-        config = await self._repository.get_by_id(config_id)
-        if config is None:
-            raise QuotaNotFoundError(str(config_id))
-
+        await self._get_or_raise(config_id)
         await self._repository.soft_delete(config_id)
 
     async def validate_job_limits(

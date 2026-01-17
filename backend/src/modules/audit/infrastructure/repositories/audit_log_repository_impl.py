@@ -26,7 +26,7 @@ class AuditLogRepositoryImpl(IAuditLogRepository):
     def __init__(self, session: AsyncSession):
         self._session = session
 
-    def _to_domain(self, model: AuditLogModel) -> AuditLog:
+    def _to_entity(self, model: AuditLogModel) -> AuditLog:
         """Convert ORM model to domain entity."""
         return AuditLog(
             id=model.id,
@@ -67,7 +67,7 @@ class AuditLogRepositoryImpl(IAuditLogRepository):
             select(AuditLogModel).where(AuditLogModel.id == int(str(id)))
         )
         model = result.scalar_one_or_none()
-        return self._to_domain(model) if model else None
+        return self._to_entity(model) if model else None
 
     async def get_all(self, limit: int = 100, offset: int = 0) -> list[AuditLog]:
         """Get all audit logs with pagination."""
@@ -77,14 +77,14 @@ class AuditLogRepositoryImpl(IAuditLogRepository):
             .limit(limit)
             .offset(offset)
         )
-        return [self._to_domain(model) for model in result.scalars()]
+        return [self._to_entity(model) for model in result.scalars()]
 
     async def add(self, entity: AuditLog) -> AuditLog:
         """Add new audit log."""
         model = self._to_model(entity)
         self._session.add(model)
         await self._session.flush()
-        return self._to_domain(model)
+        return self._to_entity(model)
 
     async def update(self, entity: AuditLog) -> AuditLog:
         """Update audit log (typically not used for audit logs)."""
@@ -96,7 +96,7 @@ class AuditLogRepositoryImpl(IAuditLogRepository):
             model.status = ModelAuditStatus(entity.status.value)
             model.response_data = entity.response_data
             await self._session.flush()
-            return self._to_domain(model)
+            return self._to_entity(model)
         return entity
 
     async def delete(self, id: UUID) -> bool:
@@ -127,7 +127,7 @@ class AuditLogRepositoryImpl(IAuditLogRepository):
             .limit(limit)
             .offset(offset)
         )
-        return [self._to_domain(model) for model in result.scalars()]
+        return [self._to_entity(model) for model in result.scalars()]
 
     async def get_by_resource(
         self,
@@ -147,7 +147,7 @@ class AuditLogRepositoryImpl(IAuditLogRepository):
             .limit(limit)
             .offset(offset)
         )
-        return [self._to_domain(model) for model in result.scalars()]
+        return [self._to_entity(model) for model in result.scalars()]
 
     async def get_by_operation_type(
         self,
@@ -166,7 +166,7 @@ class AuditLogRepositoryImpl(IAuditLogRepository):
             .limit(limit)
             .offset(offset)
         )
-        return [self._to_domain(model) for model in result.scalars()]
+        return [self._to_entity(model) for model in result.scalars()]
 
     async def get_by_date_range(
         self,
@@ -186,7 +186,7 @@ class AuditLogRepositoryImpl(IAuditLogRepository):
             .limit(limit)
             .offset(offset)
         )
-        return [self._to_domain(model) for model in result.scalars()]
+        return [self._to_entity(model) for model in result.scalars()]
 
     async def delete_expired(self) -> int:
         """Delete expired audit logs."""

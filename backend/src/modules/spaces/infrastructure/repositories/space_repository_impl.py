@@ -1,7 +1,6 @@
 """Space Repository Implementation - SQLAlchemy data access."""
 
 import uuid
-from datetime import datetime
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -11,16 +10,20 @@ from src.modules.spaces.domain.entities import Space
 from src.modules.spaces.domain.repositories import ISpaceRepository
 from src.modules.spaces.domain.value_objects import SpaceStatus
 from src.modules.spaces.infrastructure.models import DevelopmentSpaceModel
-from src.shared.infrastructure import QueryBuilder
+from src.shared.infrastructure import BaseRepositoryImpl, QueryBuilder
+from src.shared.utils import utc_now
 
 
-class SpaceRepository(ISpaceRepository):
+class SpaceRepository(
+    BaseRepositoryImpl[Space, DevelopmentSpaceModel, str],
+    ISpaceRepository,
+):
     """SQLAlchemy implementation of space repository."""
 
     def __init__(self, session: AsyncSession):
-        self._session = session
+        super().__init__(session, DevelopmentSpaceModel)
 
-    def _model_to_entity(self, model: DevelopmentSpaceModel) -> Space:
+    def _to_entity(self, model: DevelopmentSpaceModel) -> Space:
         """Convert ORM model to domain entity."""
         return Space(
             id=model.id,
@@ -37,7 +40,7 @@ class SpaceRepository(ISpaceRepository):
             deleted_at=model.deleted_at,
         )
 
-    def _entity_to_model(self, entity: Space) -> DevelopmentSpaceModel:
+    def _to_model(self, entity: Space) -> DevelopmentSpaceModel:
         """Convert domain entity to ORM model."""
         return DevelopmentSpaceModel(
             id=entity.id if entity.id else str(uuid.uuid4()),
@@ -64,7 +67,7 @@ class SpaceRepository(ISpaceRepository):
         model = result.scalar_one_or_none()
         if model is None:
             return None
-        return self._model_to_entity(model)
+        return self._to_entity(model)
 
     async def get_by_name_and_owner(
         self, space_name: str, owner_id: int
@@ -82,7 +85,7 @@ class SpaceRepository(ISpaceRepository):
         model = result.scalar_one_or_none()
         if model is None:
             return None
-        return self._model_to_entity(model)
+        return self._to_entity(model)
 
     async def list_spaces(
         self,
@@ -112,15 +115,7 @@ class SpaceRepository(ISpaceRepository):
             self._session
         )
 
-        return [self._model_to_entity(m) for m in models], total
-
-    async def create(self, space: Space) -> Space:
-        """Create a new space."""
-        db_model = self._entity_to_model(space)
-        self._session.add(db_model)
-        await self._session.flush()
-        await self._session.refresh(db_model)
-        return self._model_to_entity(db_model)
+        return [self._to_entity(m) for m in models], total
 
     async def update(self, space: Space) -> Space:
         """Update an existing space."""
@@ -139,11 +134,11 @@ class SpaceRepository(ISpaceRepository):
         db_model.status = space.status
         db_model.lifecycle_config_arn = space.lifecycle_config_arn
         db_model.sagemaker_space_arn = space.sagemaker_space_arn
-        db_model.updated_at = datetime.utcnow()
+        db_model.updated_at = utc_now()
 
         await self._session.flush()
         await self._session.refresh(db_model)
-        return self._model_to_entity(db_model)
+        return self._to_entity(db_model)
 
     async def soft_delete(self, space_id: str) -> bool:
         """Soft delete a space."""
@@ -155,7 +150,7 @@ class SpaceRepository(ISpaceRepository):
             return False
 
         model.status = SpaceStatus.DELETED
-        model.deleted_at = datetime.utcnow()
-        model.updated_at = datetime.utcnow()
+        model.deleted_at = utc_now()
+        model.updated_at = utc_now()
         await self._session.flush()
         return True

@@ -15,7 +15,7 @@ class UserRepositoryImpl(IUserRepository):
     def __init__(self, session: AsyncSession):
         self._session = session
 
-    def _model_to_entity(self, model: UserModel) -> User:
+    def _to_entity(self, model: UserModel) -> User:
         """Convert ORM model to domain entity."""
         return User(
             id=model.id,
@@ -37,7 +37,7 @@ class UserRepositoryImpl(IUserRepository):
             failed_login_count=model.failed_login_count,
         )
 
-    def _entity_to_model(self, entity: User) -> UserModel:
+    def _to_model(self, entity: User) -> UserModel:
         """Convert domain entity to ORM model."""
         return UserModel(
             id=entity.id if entity.id else None,
@@ -65,7 +65,7 @@ class UserRepositoryImpl(IUserRepository):
         model = result.scalar_one_or_none()
         if model is None:
             return None
-        return self._model_to_entity(model)
+        return self._to_entity(model)
 
     async def get_by_username(self, username: str) -> User | None:
         """Get user by username."""
@@ -75,7 +75,7 @@ class UserRepositoryImpl(IUserRepository):
         model = result.scalar_one_or_none()
         if model is None:
             return None
-        return self._model_to_entity(model)
+        return self._to_entity(model)
 
     async def get_by_email(self, email: str) -> User | None:
         """Get user by email."""
@@ -85,15 +85,15 @@ class UserRepositoryImpl(IUserRepository):
         model = result.scalar_one_or_none()
         if model is None:
             return None
-        return self._model_to_entity(model)
+        return self._to_entity(model)
 
     async def create(self, user: User) -> User:
         """Create a new user."""
-        model = self._entity_to_model(user)
+        model = self._to_model(user)
         self._session.add(model)
         await self._session.flush()
         await self._session.refresh(model)
-        return self._model_to_entity(model)
+        return self._to_entity(model)
 
     async def update(self, user: User) -> User:
         """Update an existing user."""
@@ -122,7 +122,7 @@ class UserRepositoryImpl(IUserRepository):
 
         await self._session.flush()
         await self._session.refresh(model)
-        return self._model_to_entity(model)
+        return self._to_entity(model)
 
     async def exists_by_username(self, username: str) -> bool:
         """Check if a user with the given username exists."""
@@ -148,4 +148,4 @@ class UserRepositoryImpl(IUserRepository):
         model = result.scalar_one_or_none()
         if model is None:
             return None
-        return self._model_to_entity(model)
+        return self._to_entity(model)

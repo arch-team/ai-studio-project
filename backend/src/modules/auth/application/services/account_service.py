@@ -31,8 +31,8 @@ class AccountService:
         password_hasher: PasswordHasher | None = None,
         password_validator: PasswordValidator | None = None,
     ):
-        self._user_repo = user_repository
-        self._password_history_repo = password_history_repository
+        self._user_repository = user_repository
+        self._password_history_repository = password_history_repository
         self._hasher = password_hasher or get_password_hasher()
         self._validator = password_validator or get_password_validator()
 
@@ -49,10 +49,10 @@ class AccountService:
         if violations:
             raise PasswordTooWeakError(violations)
 
-        if await self._user_repo.exists_by_username(username):
+        if await self._user_repository.exists_by_username(username):
             raise InvalidCredentialsError("Username already exists")
 
-        if await self._user_repo.exists_by_email(email):
+        if await self._user_repository.exists_by_email(email):
             raise InvalidCredentialsError("Email already exists")
 
         password_hash = self._hasher.hash_password(password)
@@ -68,14 +68,14 @@ class AccountService:
             password_hash=password_hash,
             password_expires_at=utc_now() + timedelta(days=PASSWORD_EXPIRY_DAYS),
         )
-        created_user = await self._user_repo.create(user)
+        created_user = await self._user_repository.create(user)
 
         # Add to password history
         history = PasswordHistory.create(
             user_id=created_user.id,
             password_hash=password_hash,
         )
-        await self._password_history_repo.create(history)
+        await self._password_history_repository.create(history)
 
         return created_user
 
@@ -84,19 +84,19 @@ class AccountService:
         user = await self._ensure_user_exists(user_id)
         user.activate()
         user.reset_login_failures()
-        await self._user_repo.update(user)
+        await self._user_repository.update(user)
 
     async def disable_account(self, user_id: int) -> None:
         """Disable a user account."""
         user = await self._ensure_user_exists(user_id)
         user.status = UserStatus.INACTIVE
-        await self._user_repo.update(user)
+        await self._user_repository.update(user)
 
     async def unlock_account(self, user_id: int) -> None:
         """Unlock a locked user account."""
         user = await self._ensure_user_exists(user_id)
         user.reset_login_failures()
-        await self._user_repo.update(user)
+        await self._user_repository.update(user)
 
     async def get_or_create_sso_user(
         self,
@@ -112,13 +112,13 @@ class AccountService:
         If user exists, updates their groups and role.
         If user doesn't exist, creates a new SSO user.
         """
-        existing_user = await self._user_repo.get_by_iam_identity_id(iam_identity_id)
+        existing_user = await self._user_repository.get_by_iam_identity_id(iam_identity_id)
 
         if existing_user:
             # Update existing user's groups and role
             existing_user.iam_groups = groups or []
             existing_user.role = UserRole(role)
-            return await self._user_repo.update(existing_user)
+            return await self._user_repository.update(existing_user)
 
         # Create new SSO user
         user = User(
@@ -132,11 +132,11 @@ class AccountService:
             status=UserStatus.ACTIVE,
             role=UserRole(role),
         )
-        return await self._user_repo.create(user)
+        return await self._user_repository.create(user)
 
     async def _ensure_user_exists(self, user_id: int) -> User:
         """Get user by ID, raising error if not found."""
-        user = await self._user_repo.get_by_id(user_id)
+        user = await self._user_repository.get_by_id(user_id)
         if not user:
             raise UserNotFoundError(user_id)
         return user

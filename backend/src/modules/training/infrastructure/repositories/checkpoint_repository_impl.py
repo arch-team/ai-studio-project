@@ -19,7 +19,7 @@ class CheckpointRepository(ICheckpointRepository):
     def __init__(self, session: AsyncSession):
         self._session = session
 
-    def _model_to_entity(self, model: CheckpointModel) -> Checkpoint:
+    def _to_entity(self, model: CheckpointModel) -> Checkpoint:
         """Convert ORM model to domain entity."""
         return Checkpoint(
             id=model.id,
@@ -50,7 +50,7 @@ class CheckpointRepository(ICheckpointRepository):
         model = result.scalar_one_or_none()
         if model is None:
             return None
-        return self._model_to_entity(model)
+        return self._to_entity(model)
 
     async def get_by_training_job_id(self, training_job_id: int) -> list[Checkpoint]:
         """Get all checkpoints for a training job."""
@@ -60,7 +60,7 @@ class CheckpointRepository(ICheckpointRepository):
             .order_by(CheckpointModel.created_at.desc())
         )
         models = result.scalars().all()
-        return [self._model_to_entity(m) for m in models]
+        return [self._to_entity(m) for m in models]
 
     async def create(self, checkpoint: Checkpoint) -> Checkpoint:
         """Create a new checkpoint."""
@@ -82,7 +82,7 @@ class CheckpointRepository(ICheckpointRepository):
         self._session.add(model)
         await self._session.flush()
         await self._session.refresh(model)
-        return self._model_to_entity(model)
+        return self._to_entity(model)
 
     async def update(self, checkpoint: Checkpoint) -> Checkpoint:
         """Update an existing checkpoint."""
@@ -101,7 +101,7 @@ class CheckpointRepository(ICheckpointRepository):
 
         await self._session.flush()
         await self._session.refresh(model)
-        return self._model_to_entity(model)
+        return self._to_entity(model)
 
     async def delete(self, checkpoint_id: int) -> None:
         """Delete a checkpoint by ID."""
@@ -126,4 +126,4 @@ class CheckpointRepository(ICheckpointRepository):
         model = result.scalar_one_or_none()
         if model is None:
             return None
-        return self._model_to_entity(model)
+        return self._to_entity(model)

@@ -1,8 +1,8 @@
 """Training Jobs Endpoints - CRUD operations for training jobs."""
 
-from datetime import datetime
-
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+
+from src.shared.utils import utc_now
 
 from src.modules.auth.api.dependencies import get_current_active_user, require_engineer
 from src.modules.auth.api.current_user import CurrentUser
@@ -229,7 +229,7 @@ async def create_manual_checkpoint(
     checkpoint_name = (
         data.checkpoint_name
         if data and data.checkpoint_name
-        else f"manual-checkpoint-{datetime.utcnow().strftime('%Y%m%d-%H%M%S')}"
+        else f"manual-checkpoint-{utc_now().strftime('%Y%m%d-%H%M%S')}"
     )
     storage_path = f"{job.checkpoint_mount_path or '/checkpoints'}/{job.job_name}/{checkpoint_name}.pt"
 

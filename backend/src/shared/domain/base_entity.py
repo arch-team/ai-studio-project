@@ -6,6 +6,8 @@ from datetime import datetime
 from typing import TypeVar
 from uuid import UUID, uuid4
 
+from src.shared.utils import utc_now
+
 
 @dataclass
 class BaseEntity(ABC):
@@ -15,8 +17,8 @@ class BaseEntity(ABC):
     """
 
     id: UUID = field(default_factory=uuid4)
-    created_at: datetime = field(default_factory=datetime.utcnow)
-    updated_at: datetime = field(default_factory=datetime.utcnow)
+    created_at: datetime = field(default_factory=utc_now)
+    updated_at: datetime = field(default_factory=utc_now)
 
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, BaseEntity):

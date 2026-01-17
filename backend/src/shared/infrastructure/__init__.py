@@ -1,5 +1,6 @@
 """Shared Infrastructure - Database, config, storage, and security utilities."""
 
+from .base_repository_impl import BaseRepositoryImpl
 from .config import Settings, get_settings
 from .database import AsyncSessionLocal, Base, engine, get_db
 from .models import SoftDeleteMixin, TimestampMixin
@@ -20,6 +21,8 @@ __all__ = [
     "SoftDeleteMixin",
     # Query
     "QueryBuilder",
+    # Repository
+    "BaseRepositoryImpl",
     # Storage
     "IStorageService",
     "S3StorageClient",

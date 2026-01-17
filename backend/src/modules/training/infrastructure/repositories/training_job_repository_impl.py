@@ -22,7 +22,7 @@ class TrainingJobRepository(ITrainingJobRepository):
     def __init__(self, session: AsyncSession):
         self._session = session
 
-    def _model_to_entity(self, model: TrainingJobModel) -> TrainingJob:
+    def _to_entity(self, model: TrainingJobModel) -> TrainingJob:
         """Convert ORM model to domain entity."""
         return TrainingJob(
             id=model.id,
@@ -82,7 +82,7 @@ class TrainingJobRepository(ITrainingJobRepository):
         model = result.scalar_one_or_none()
         if model is None:
             return None
-        return self._model_to_entity(model)
+        return self._to_entity(model)
 
     async def get_by_name(self, job_name: str) -> TrainingJob | None:
         """Get training job by unique name."""
@@ -92,7 +92,7 @@ class TrainingJobRepository(ITrainingJobRepository):
         model = result.scalar_one_or_none()
         if model is None:
             return None
-        return self._model_to_entity(model)
+        return self._to_entity(model)
 
     async def list_jobs(
         self,
@@ -150,7 +150,7 @@ class TrainingJobRepository(ITrainingJobRepository):
         result = await self._session.execute(query)
         models = result.scalars().all()
 
-        return [self._model_to_entity(m) for m in models], total
+        return [self._to_entity(m) for m in models], total
 
     async def create(self, job: TrainingJob) -> TrainingJob:
         """Create a new training job."""
@@ -183,7 +183,7 @@ class TrainingJobRepository(ITrainingJobRepository):
         self._session.add(model)
         await self._session.flush()
         await self._session.refresh(model)
-        return self._model_to_entity(model)
+        return self._to_entity(model)
 
     async def update(self, job: TrainingJob) -> TrainingJob:
         """Update an existing training job."""
@@ -213,7 +213,7 @@ class TrainingJobRepository(ITrainingJobRepository):
 
         await self._session.flush()
         await self._session.refresh(model)
-        return self._model_to_entity(model)
+        return self._to_entity(model)
 
     async def soft_delete(self, job_id: int) -> bool:
         """Soft delete a training job."""

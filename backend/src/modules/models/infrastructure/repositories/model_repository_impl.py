@@ -1,7 +1,5 @@
 """Model Repository Implementation - SQLAlchemy data access."""
 
-from datetime import datetime
-
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -10,6 +8,7 @@ from src.modules.models.domain.entities import Model
 from src.modules.models.domain.repositories import IModelRepository
 from src.modules.models.domain.value_objects import ModelFramework, ModelStatus
 from src.modules.models.infrastructure.models import ModelModel
+from src.shared.utils import utc_now
 
 
 class ModelRepository(IModelRepository):
@@ -18,7 +17,7 @@ class ModelRepository(IModelRepository):
     def __init__(self, session: AsyncSession):
         self._session = session
 
-    def _model_to_entity(self, model: ModelModel) -> Model:
+    def _to_entity(self, model: ModelModel) -> Model:
         """Convert ORM model to domain entity."""
         return Model(
             id=model.id,
@@ -46,7 +45,7 @@ class ModelRepository(IModelRepository):
             archived_at=model.archived_at,
         )
 
-    def _entity_to_model(self, entity: Model) -> ModelModel:
+    def _to_model(self, entity: Model) -> ModelModel:
         """Convert domain entity to ORM model."""
         return ModelModel(
             id=entity.id if entity.id else None,
@@ -82,7 +81,7 @@ class ModelRepository(IModelRepository):
         model = result.scalar_one_or_none()
         if model is None:
             return None
-        return self._model_to_entity(model)
+        return self._to_entity(model)
 
     async def get_by_name_and_version(
         self, model_name: str, version: str
@@ -96,7 +95,7 @@ class ModelRepository(IModelRepository):
         model = result.scalar_one_or_none()
         if model is None:
             return None
-        return self._model_to_entity(model)
+        return self._to_entity(model)
 
     async def get_latest_version(self, model_name: str) -> Model | None:
         """Get the latest version of a model by name."""
@@ -110,7 +109,7 @@ class ModelRepository(IModelRepository):
         model = result.scalar_one_or_none()
         if model is None:
             return None
-        return self._model_to_entity(model)
+        return self._to_entity(model)
 
     async def list_models(
         self,
@@ -176,7 +175,7 @@ class ModelRepository(IModelRepository):
         result = await self._session.execute(query)
         models = result.scalars().all()
 
-        return [self._model_to_entity(m) for m in models], total
+        return [self._to_entity(m) for m in models], total
 
     async def list_versions(self, model_name: str) -> list[Model]:
         """List all versions of a model by name."""
@@ -187,15 +186,15 @@ class ModelRepository(IModelRepository):
             .order_by(ModelModel.created_at.asc())
         )
         models = result.scalars().all()
-        return [self._model_to_entity(m) for m in models]
+        return [self._to_entity(m) for m in models]
 
     async def create(self, model: Model) -> Model:
         """Create a new model."""
-        db_model = self._entity_to_model(model)
+        db_model = self._to_model(model)
         self._session.add(db_model)
         await self._session.flush()
         await self._session.refresh(db_model)
-        return self._model_to_entity(db_model)
+        return self._to_entity(db_model)
 
     async def update(self, model: Model) -> Model:
         """Update an existing model."""
@@ -220,11 +219,11 @@ class ModelRepository(IModelRepository):
         db_model.tags = model.tags
         db_model.registered_at = model.registered_at
         db_model.archived_at = model.archived_at
-        db_model.updated_at = datetime.utcnow()
+        db_model.updated_at = utc_now()
 
         await self._session.flush()
         await self._session.refresh(db_model)
-        return self._model_to_entity(db_model)
+        return self._to_entity(db_model)
 
     async def soft_delete(self, model_id: int) -> bool:
         """Soft delete a model (archive it)."""
@@ -236,7 +235,7 @@ class ModelRepository(IModelRepository):
             return False
 
         model.status = ModelStatus.ARCHIVED
-        model.archived_at = datetime.utcnow()
-        model.updated_at = datetime.utcnow()
+        model.archived_at = utc_now()
+        model.updated_at = utc_now()
         await self._session.flush()
         return True

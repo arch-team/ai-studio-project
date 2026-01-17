@@ -14,7 +14,7 @@ class LoginAttemptRepositoryImpl(ILoginAttemptRepository):
     def __init__(self, session: AsyncSession):
         self._session = session
 
-    def _model_to_entity(self, model: LoginAttemptModel) -> LoginAttempt:
+    def _to_entity(self, model: LoginAttemptModel) -> LoginAttempt:
         """Convert ORM model to domain entity."""
         return LoginAttempt(
             id=model.id,
@@ -27,7 +27,7 @@ class LoginAttemptRepositoryImpl(ILoginAttemptRepository):
             created_at=model.created_at,
         )
 
-    def _entity_to_model(self, entity: LoginAttempt) -> LoginAttemptModel:
+    def _to_model(self, entity: LoginAttempt) -> LoginAttemptModel:
         """Convert domain entity to ORM model."""
         return LoginAttemptModel(
             id=entity.id if entity.id else None,
@@ -41,11 +41,11 @@ class LoginAttemptRepositoryImpl(ILoginAttemptRepository):
 
     async def create(self, attempt: LoginAttempt) -> LoginAttempt:
         """Create a new login attempt record."""
-        model = self._entity_to_model(attempt)
+        model = self._to_model(attempt)
         self._session.add(model)
         await self._session.flush()
         await self._session.refresh(model)
-        return self._model_to_entity(model)
+        return self._to_entity(model)
 
     async def get_recent_failures(
         self, username: str, limit: int = 5
@@ -61,4 +61,4 @@ class LoginAttemptRepositoryImpl(ILoginAttemptRepository):
             .limit(limit)
         )
         models = result.scalars().all()
-        return [self._model_to_entity(m) for m in models]
+        return [self._to_entity(m) for m in models]

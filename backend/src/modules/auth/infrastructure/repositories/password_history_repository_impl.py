@@ -14,7 +14,7 @@ class PasswordHistoryRepositoryImpl(IPasswordHistoryRepository):
     def __init__(self, session: AsyncSession):
         self._session = session
 
-    def _model_to_entity(self, model: PasswordHistoryModel) -> PasswordHistory:
+    def _to_entity(self, model: PasswordHistoryModel) -> PasswordHistory:
         """Convert ORM model to domain entity."""
         return PasswordHistory(
             id=model.id,
@@ -23,7 +23,7 @@ class PasswordHistoryRepositoryImpl(IPasswordHistoryRepository):
             created_at=model.created_at,
         )
 
-    def _entity_to_model(self, entity: PasswordHistory) -> PasswordHistoryModel:
+    def _to_model(self, entity: PasswordHistory) -> PasswordHistoryModel:
         """Convert domain entity to ORM model."""
         return PasswordHistoryModel(
             id=entity.id if entity.id else None,
@@ -33,11 +33,11 @@ class PasswordHistoryRepositoryImpl(IPasswordHistoryRepository):
 
     async def create(self, history: PasswordHistory) -> PasswordHistory:
         """Create a new password history entry."""
-        model = self._entity_to_model(history)
+        model = self._to_model(history)
         self._session.add(model)
         await self._session.flush()
         await self._session.refresh(model)
-        return self._model_to_entity(model)
+        return self._to_entity(model)
 
     async def get_recent(self, user_id: int, limit: int = 5) -> list[PasswordHistory]:
         """Get recent password history entries for a user."""
@@ -48,7 +48,7 @@ class PasswordHistoryRepositoryImpl(IPasswordHistoryRepository):
             .limit(limit)
         )
         models = result.scalars().all()
-        return [self._model_to_entity(m) for m in models]
+        return [self._to_entity(m) for m in models]
 
     async def cleanup_old_entries(self, user_id: int, keep_count: int = 5) -> int:
         """Remove old password history entries, keeping only the most recent ones."""

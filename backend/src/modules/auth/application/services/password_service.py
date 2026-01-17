@@ -37,8 +37,8 @@ class PasswordService:
         password_hasher: PasswordHasher | None = None,
         password_validator: PasswordValidator | None = None,
     ):
-        self._user_repo = user_repository
-        self._password_history_repo = password_history_repository
+        self._user_repository = user_repository
+        self._password_history_repository = password_history_repository
         self._jwt = jwt_manager or get_jwt_manager()
         self._hasher = password_hasher or get_password_hasher()
         self._validator = password_validator or get_password_validator()
@@ -65,7 +65,7 @@ class PasswordService:
 
     async def request_password_reset(self, email: str) -> str | None:
         """Request password reset and return reset token."""
-        user = await self._user_repo.get_by_email(email)
+        user = await self._user_repository.get_by_email(email)
         if not user or not user.is_local_account():
             return None
 
@@ -97,7 +97,7 @@ class PasswordService:
         if violations:
             raise PasswordTooWeakError(violations)
 
-        password_history = await self._password_history_repo.get_recent(
+        password_history = await self._password_history_repository.get_recent(
             user_id, PASSWORD_HISTORY_COUNT
         )
         history_hashes = [h.password_hash for h in password_history]
@@ -114,23 +114,23 @@ class PasswordService:
             password_hash=new_hash,
             expires_at=utc_now() + timedelta(days=PASSWORD_EXPIRY_DAYS),
         )
-        await self._user_repo.update(user)
+        await self._user_repository.update(user)
 
         # Add to password history
         history = PasswordHistory.create(
             user_id=user.id,
             password_hash=new_hash,
         )
-        await self._password_history_repo.create(history)
+        await self._password_history_repository.create(history)
 
         # Cleanup old password history entries
-        await self._password_history_repo.cleanup_old_entries(
+        await self._password_history_repository.cleanup_old_entries(
             user.id, PASSWORD_HISTORY_COUNT
         )
 
     async def _ensure_user_exists(self, user_id: int) -> User:
         """Get user by ID, raising error if not found."""
-        user = await self._user_repo.get_by_id(user_id)
+        user = await self._user_repository.get_by_id(user_id)
         if not user:
             raise UserNotFoundError(user_id)
         return user
