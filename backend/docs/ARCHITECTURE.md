@@ -30,7 +30,7 @@
 |------|---------|
 | **Web 框架** | FastAPI 0.100+ |
 | **ORM** | SQLAlchemy 2.0 (async) |
-| **数据库** | PostgreSQL 15+ |
+| **数据库** | MySQL 8.0+ (Aurora MySQL 3.x 兼容) |
 | **Python** | 3.11+ |
 | **外部服务** | AWS SageMaker HyperPod |
 
