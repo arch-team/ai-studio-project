@@ -500,131 +500,99 @@ specs/001-ai-training-platform/
 backend/
 ├── src/
 │   ├── main.py                     # FastAPI 应用入口
+│   ├── router.py                   # 路由聚合 (注册所有模块路由)
 │   │
-│   ├── domain/                     # 领域层 (核心) - 不依赖任何外层
-│   │   ├── __init__.py
-│   │   ├── entities/               # 领域实体 (纯业务对象, 无框架依赖)
-│   │   │   ├── __init__.py
-│   │   │   ├── training_job.py     # 训练任务实体
-│   │   │   ├── checkpoint.py       # 检查点实体
-│   │   │   ├── dataset.py          # 数据集实体
-│   │   │   ├── resource_quota.py   # 资源配额实体
-│   │   │   └── user.py             # 用户实体
-│   │   ├── value_objects/          # 值对象
-│   │   │   ├── __init__.py
-│   │   │   ├── job_status.py       # 任务状态枚举
-│   │   │   ├── resource_spec.py    # 资源规格值对象
-│   │   │   └── storage_path.py     # 存储路径值对象
-│   │   ├── repositories/           # 仓储接口 (抽象, 定义数据访问契约)
-│   │   │   ├── __init__.py
-│   │   │   ├── base.py             # IRepository 基础接口
-│   │   │   ├── training_job_repository.py  # ITrainingJobRepository
-│   │   │   ├── checkpoint_repository.py    # ICheckpointRepository
-│   │   │   ├── dataset_repository.py       # IDatasetRepository
-│   │   │   └── user_repository.py          # IUserRepository
-│   │   ├── exceptions/             # 领域异常
-│   │   │   ├── __init__.py
-│   │   │   ├── training_exceptions.py      # 训练相关异常
-│   │   │   └── resource_exceptions.py      # 资源相关异常
-│   │   └── events/                 # 领域事件 (可选, 用于事件驱动)
-│   │       ├── __init__.py
-│   │       └── training_events.py  # 训练任务事件
+│   ├── modules/                    # 功能模块 (Modular Monolith 架构)
+│   │   │
+│   │   ├── auth/                   # 认证与授权模块
+│   │   │   ├── api/
+│   │   │   │   ├── endpoints.py    # REST 端点
+│   │   │   │   ├── schemas/        # Pydantic 请求/响应
+│   │   │   │   └── dependencies.py # 依赖注入 (get_current_user)
+│   │   │   ├── application/
+│   │   │   │   └── services/       # AuthService
+│   │   │   ├── domain/
+│   │   │   │   ├── entities/       # User 实体
+│   │   │   │   ├── repositories/   # IUserRepository 接口
+│   │   │   │   └── exceptions.py   # 认证异常
+│   │   │   └── infrastructure/
+│   │   │       ├── models/         # UserModel (ORM)
+│   │   │       └── repositories/   # UserRepository 实现
+│   │   │
+│   │   ├── training/               # 训练任务管理模块
+│   │   │   ├── api/
+│   │   │   │   ├── endpoints.py
+│   │   │   │   └── schemas/
+│   │   │   ├── application/
+│   │   │   │   └── services/       # TrainingJobService
+│   │   │   ├── domain/
+│   │   │   │   ├── entities/       # TrainingJob, Checkpoint
+│   │   │   │   ├── value_objects/  # JobStatus, ResourceSpec
+│   │   │   │   └── repositories/   # ITrainingJobRepository
+│   │   │   └── infrastructure/
+│   │   │       ├── models/
+│   │   │       └── repositories/
+│   │   │
+│   │   ├── datasets/               # 数据集管理模块
+│   │   │   ├── api/
+│   │   │   ├── application/
+│   │   │   ├── domain/             # Dataset, DatasetVersion
+│   │   │   └── infrastructure/
+│   │   │
+│   │   ├── quotas/                 # 资源配额管理模块
+│   │   │   ├── api/
+│   │   │   ├── application/
+│   │   │   ├── domain/             # ResourceQuota, ResourceLimitConfig
+│   │   │   └── infrastructure/
+│   │   │
+│   │   ├── models/                 # 模型管理模块
+│   │   │   ├── api/
+│   │   │   ├── application/
+│   │   │   ├── domain/             # Model, ModelVersion
+│   │   │   └── infrastructure/
+│   │   │
+│   │   ├── spaces/                 # 开发空间管理模块
+│   │   │   ├── api/
+│   │   │   ├── application/
+│   │   │   ├── domain/             # Space
+│   │   │   └── infrastructure/
+│   │   │
+│   │   ├── audit/                  # 审计日志模块
+│   │   │   ├── api/
+│   │   │   │   └── middleware.py   # 审计中间件
+│   │   │   ├── application/
+│   │   │   ├── domain/             # AuditLog
+│   │   │   └── infrastructure/
+│   │   │
+│   │   ├── billing/                # 成本分析模块
+│   │   │   ├── api/
+│   │   │   ├── application/
+│   │   │   ├── domain/             # CostRecord, UsageReport
+│   │   │   └── infrastructure/
+│   │   │
+│   │   └── monitoring/             # 监控告警模块
+│   │       ├── api/
+│   │       ├── application/
+│   │       ├── domain/             # Metric, Alert
+│   │       └── infrastructure/
 │   │
-│   ├── application/                # 应用层 - 仅依赖 domain
-│   │   ├── __init__.py
-│   │   ├── services/               # 应用服务 (编排业务用例)
-│   │   │   ├── __init__.py
-│   │   │   ├── training_job_service.py     # 训练任务服务
-│   │   │   ├── checkpoint_service.py       # 检查点服务
-│   │   │   ├── dataset_service.py          # 数据集服务
-│   │   │   ├── resource_quota_service.py   # 资源配额服务
-│   │   │   └── monitoring_service.py       # 监控服务
-│   │   ├── dto/                    # 数据传输对象
-│   │   │   ├── __init__.py
-│   │   │   ├── training_job_dto.py         # 训练任务 DTO
-│   │   │   ├── dataset_dto.py              # 数据集 DTO
-│   │   │   └── resource_quota_dto.py       # 资源配额 DTO
-│   │   └── interfaces/             # 端口接口 (外部服务抽象)
-│   │       ├── __init__.py
-│   │       ├── hyperpod_client.py          # IHyperPodClient 接口
-│   │       ├── storage_service.py          # IStorageService 接口
-│   │       └── queue_service.py            # IQueueService 接口
-│   │
-│   ├── infrastructure/             # 基础设施层 - 实现 domain/application 接口
-│   │   ├── __init__.py
-│   │   ├── persistence/            # 持久化实现
-│   │   │   ├── __init__.py
-│   │   │   ├── models/             # SQLAlchemy ORM 模型 (技术实现)
-│   │   │   │   ├── __init__.py
-│   │   │   │   ├── base.py                 # SQLAlchemy Base
-│   │   │   │   ├── training_job_model.py   # TrainingJobModel
-│   │   │   │   ├── checkpoint_model.py     # CheckpointModel
-│   │   │   │   ├── dataset_model.py        # DatasetModel
-│   │   │   │   ├── resource_quota_model.py # ResourceQuotaModel
-│   │   │   │   └── user_model.py           # UserModel
-│   │   │   ├── repositories/       # 仓储实现 (实现 domain 接口)
-│   │   │   │   ├── __init__.py
-│   │   │   │   ├── base.py                 # SQLAlchemyRepository 基类
-│   │   │   │   ├── training_job_repository.py  # SQLAlchemyTrainingJobRepository
-│   │   │   │   ├── checkpoint_repository.py    # SQLAlchemyCheckpointRepository
-│   │   │   │   ├── dataset_repository.py       # SQLAlchemyDatasetRepository
-│   │   │   │   └── user_repository.py          # SQLAlchemyUserRepository
-│   │   │   └── migrations/         # 数据库迁移 (Alembic)
-│   │   │       └── versions/
-│   │   └── external/               # 外部服务适配器
-│   │       ├── __init__.py
-│   │       ├── hyperpod/           # HyperPod SDK 集成
-│   │       │   ├── __init__.py
-│   │       │   └── client.py       # HyperPodClient 实现
-│   │       ├── s3/                 # S3 存储适配器
-│   │       │   ├── __init__.py
-│   │       │   └── client.py       # S3StorageClient 实现
-│   │       └── kueue/              # Kueue 队列适配器
-│   │           ├── __init__.py
-│   │           └── client.py       # KueueClient 实现
-│   │   └── config/                 # 配置管理
-│   │       ├── __init__.py
-│   │       └── settings.py         # 环境变量和配置文件解析
-│   │
-│   ├── api/                        # API 层 - 依赖 application
-│   │   ├── __init__.py
-│   │   └── v1/
-│   │       ├── __init__.py
-│   │       ├── endpoints/          # REST 端点
-│   │       │   ├── __init__.py
-│   │       │   ├── training_jobs.py        # 训练任务 API
-│   │       │   ├── checkpoints.py          # 检查点 API
-│   │       │   ├── datasets.py             # 数据集 API
-│   │       │   ├── resource_quotas.py      # 资源配额 API
-│   │       │   ├── users.py                # 用户 API
-│   │       │   └── monitoring.py           # 监控 API
-│   │       ├── schemas/            # Pydantic 请求/响应模式
-│   │       │   ├── __init__.py
-│   │       │   ├── training_job.py         # 训练任务 Schema
-│   │       │   ├── dataset.py              # 数据集 Schema
-│   │       │   └── resource_quota.py       # 资源配额 Schema
-│   │       └── dependencies/       # FastAPI 依赖注入
-│   │           ├── __init__.py
-│   │           ├── auth.py                 # 认证依赖
-│   │           └── database.py             # 数据库会话依赖
-│   │   └── middleware/             # API 中间件
-│   │       ├── __init__.py
-│   │       ├── auth.py                     # 认证中间件
-│   │       ├── sso.py                      # SSO 集成中间件
-│   │       ├── audit.py                    # 审计日志中间件
-│   │       └── error_handler.py            # 统一错误处理中间件
-│   │
-│   └── core/                       # 共享核心 - 跨层工具
-│       ├── __init__.py
-│       ├── security/               # 安全相关
-│       │   ├── __init__.py
-│       │   └── utils.py            # 安全工具函数
-│       ├── logging/                # 日志配置
-│       │   ├── __init__.py
-│       │   └── config.py           # 日志配置
-│       └── utils/                  # 通用工具
-│           ├── __init__.py
-│           └── helpers.py          # 辅助函数
+│   └── shared/                     # 共享内核 (跨模块)
+│       ├── domain/
+│       │   ├── base_entity.py      # BaseEntity 基类
+│       │   ├── base_repository.py  # IRepository 接口
+│       │   ├── events.py           # DomainEvent, EventBus
+│       │   ├── exceptions.py       # 通用领域异常
+│       │   └── interfaces/         # 跨模块接口 (IQuotaChecker)
+│       ├── infrastructure/
+│       │   ├── config.py           # 配置管理
+│       │   ├── database.py         # 数据库连接
+│       │   ├── security/           # JWT, 密码哈希
+│       │   └── storage/            # S3 客户端
+│       ├── api/
+│       │   ├── exception_handlers.py  # 全局异常处理
+│       │   ├── middleware/         # 通用中间件
+│       │   └── schemas/            # 通用响应 Schema
+│       └── utils/                  # 工具函数
 │
 ├── tests/
 │   ├── unit/                       # 单元测试
