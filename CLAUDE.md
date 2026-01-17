@@ -111,3 +111,41 @@ Layer 5: AlbStack
 | **前端开发指南** | `frontend/CLAUDE.md` | React 架构、状态管理、设计规范 |
 | **CDK 部署指南** | `infrastructure/cdk/CLAUDE.md` | Stack 分层、HyperPod 部署流程 |
 
+## Spec-Kit 文件体系
+
+本项目使用 Spec-Kit 进行规范驱动开发。文件结构和职责如下：
+
+### 目录结构
+```
+.specify/memory/constitution.md    # 项目宪法 (全局约束)
+specs/{feature}/
+├── spec.md          # 功能规范 (WHAT/WHY)
+├── plan.md          # 实施计划 (HOW)
+├── tasks.md         # 任务清单 (DO)
+├── data-model.md    # 数据模型设计
+├── research.md      # 技术研究报告
+├── quickstart.md    # 快速开始指南
+├── checklists/      # 质量检查清单
+└── contracts/       # OpenAPI 契约
+```
+
+### 文件职责速查
+
+| 文件 | 生成命令 | 职责 |
+|------|---------|------|
+| `constitution.md` | `/speckit.constitution` | 不可违反的核心原则和技术约束 |
+| `spec.md` | `/speckit.specify` | 用户故事、验收标准、术语定义 |
+| `plan.md` | `/speckit.plan` | 技术选型、架构设计、里程碑 |
+| `tasks.md` | `/speckit.tasks` | 可执行的原子任务清单 (0.5-2人日/任务) |
+| `data-model.md` | (plan 附带) | 数据库表结构、持久化策略 |
+| `research.md` | (plan 附带) | SDK 可行性验证、技术决策依据 |
+| `contracts/*.yaml` | (plan 附带) | OpenAPI 3.0 API 接口规范 |
+| `checklists/*.md` | `/speckit.checklist` | 架构/安全/UX 质量验证清单 |
+
+### 工作流程
+```
+constitution → specify → [clarify] → plan → [checklist] → tasks → implement
+```
+
+### 一致性检查
+运行 `/speckit.analyze` 检查 spec.md、plan.md、tasks.md 之间的一致性。

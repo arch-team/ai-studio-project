@@ -308,11 +308,6 @@ specs
 001-ai-training-platform
   checklists
   contracts
-    datasets-api.yaml
-    monitoring-api.yaml
-    resource-quotas-api.yaml
-    training-jobs-api.yaml
-    users-api.yaml
   data-model.md
   plan.md
   quickstart.md
@@ -322,3 +317,9 @@ specs
 
 
   针对以上发现所有的问题，逐个逐个的进行处理，一个问题处理完成后进行下一个，针对每个问题必须遵循这样的流程：你给出可选的解决方案（并给出推荐方案）、由我最终选择对应的解决方案、你根据我选择的解决方案执行修改、给出这个问题处理的修改总结。提供对人类阅读友好的交互方式
+
+根据Claude Code 记忆管理的机制与原则，分析当前项目中的CLAUDE.md文件是否存在冗余和冲突不一致的的问题
+  ai-studio-project/CLAUDE.md
+  ai-studio-project/backend/CLAUDE.md
+  ai-studio-project/frontend/CLAUDE.md
+  ai-studio-project/infrastructure/cdk/CLAUDE.md
