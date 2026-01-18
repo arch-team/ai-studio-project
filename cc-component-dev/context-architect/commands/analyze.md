@@ -1,11 +1,29 @@
 ---
 description: Analyze existing context configuration and provide suggestions
-allowed-tools: Read, Glob, Grep
+allowed-tools: Read, Glob, Grep, Task
 ---
 
 # Context Analyze 命令
 
 分析当前项目的上下文配置状态，并提供优化建议。
+
+## 获取最新规范
+
+当需要验证配置是否符合 Claude Code 最新规范时，使用 Task 工具调用 claude-code-guide agent：
+
+```
+Task(
+  subagent_type="claude-code-guide",
+  prompt="查询 [具体问题]",
+  description="验证配置规范"
+)
+```
+
+**适用场景**：
+- 验证 CLAUDE.md 结构是否符合最新推荐
+- 检查 Rules glob 模式是否正确
+- 确认 settings.json 字段是否有效
+- 了解最新的最佳实践
 
 ## 执行流程
 
@@ -59,7 +77,23 @@ build.gradle
    - 技术栈配置文件
    - README.md (了解项目背景)
 
-### Step 4: 分析与评估
+### Step 4: 验证规范合规性
+
+对发现的配置进行规范验证。如果存在以下情况，调用 claude-code-guide 获取最新规范：
+
+- 发现未知的配置字段
+- Rules 使用了复杂的 glob 模式
+- 存在 Hooks 或 MCP 配置
+
+```
+Task(
+  subagent_type="claude-code-guide",
+  prompt="验证以下 Claude Code 配置是否符合最新规范: [配置内容]",
+  description="验证配置合规性"
+)
+```
+
+### Step 5: 分析与评估
 
 对每个发现的配置进行评估：
 
@@ -102,7 +136,7 @@ build.gradle
 - [ ] Token 效率良好
 ```
 
-### Step 5: 生成建议报告
+### Step 6: 生成建议报告
 
 输出完整的分析报告：
 
@@ -135,6 +169,10 @@ project/CLAUDE.md ({lines}行, ~{tokens} tokens)
 ### Memory 使用
 
 {检测到的 memory 使用情况或"未检测到"}
+
+## 规范合规性检查
+
+{基于 claude-code-guide 查询结果的合规性评估}
 
 ## 问题与建议
 
@@ -172,40 +210,10 @@ project/CLAUDE.md ({lines}行, ~{tokens} tokens)
 
 1. **概览表格**: 快速了解配置状态
 2. **详细分析**: 每个文件的具体评估
-3. **问题列表**: 按优先级排列
-4. **建议操作**: 具体可执行的改进步骤
-5. **Token 分析**: 预算使用情况
-
-## 执行示例
-
-```
-用户: /context-architect:analyze
-
-输出:
-# 上下文配置分析报告
-
-## 项目概况
-| 项目属性 | 值 |
-|---------|-----|
-| 技术栈 | Python (FastAPI) |
-| 目录深度 | 3 级 |
-| CLAUDE.md 数量 | 2 |
-| Rules 数量 | 5 |
-
-## 问题与建议
-
-### 🔴 需要修复
-1. backend/CLAUDE.md 重复了根目录的术语表 (50行)
-2. 缺少 tests/ 目录的 CLAUDE.md
-
-### 🟡 建议优化
-1. 根 CLAUDE.md 的架构说明过长，建议移到 docs/
-2. Rules 中的 Python 规则可以更精简
-
-### 🟢 良好实践
-- 清晰的层级继承结构
-- 术语表格式规范
-```
+3. **规范合规性**: 基于最新规范的验证结果
+4. **问题列表**: 按优先级排列
+5. **建议操作**: 具体可执行的改进步骤
+6. **Token 分析**: 预算使用情况
 
 ## 开始执行
 

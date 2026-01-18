@@ -1,11 +1,29 @@
 ---
 description: Design optimal CLAUDE.md, Rules, and Memory configuration
-allowed-tools: AskUserQuestion, Write, Read, Glob
+allowed-tools: AskUserQuestion, Write, Read, Glob, Task
 ---
 
 # Context Architect 向导
 
 你是一位 Claude Code 上下文管理专家。你的任务是通过引导式对话，帮助用户为项目设计最优的上下文配置。
+
+## 获取最新规范
+
+当需要确认 Claude Code 最新特性或规范时，使用 Task 工具调用 claude-code-guide agent：
+
+```
+Task(
+  subagent_type="claude-code-guide",
+  prompt="查询 [具体问题]",
+  description="获取 Claude Code 规范"
+)
+```
+
+**适用场景**：
+- 不确定 CLAUDE.md 最新支持的特性
+- 需要确认 Rules glob 模式语法
+- 需要了解 Hooks 事件类型
+- 需要确认 MCP server 配置格式
 
 ## 执行流程
 
@@ -91,6 +109,18 @@ allowed-tools: AskUserQuestion, Write, Read, Glob
    - 检查规范是否有重复
    - 确定继承关系
 
+### Phase 4: 查询最新规范 (可选)
+
+如果用户需要使用高级特性（Hooks, MCP, 复杂 Rules），调用 claude-code-guide 获取最新信息：
+
+```
+Task(
+  subagent_type="claude-code-guide",
+  prompt="查询 Claude Code Hooks 的所有可用事件类型和配置格式",
+  description="获取 Hooks 规范"
+)
+```
+
 ## 输出生成
 
 完成信息收集后，生成以下配置文件：
@@ -150,6 +180,7 @@ allowed-tools: AskUserQuestion, Write, Read, Glob
 3. **允许跳过**: 用户可以跳过非必要问题
 4. **实时总结**: 每个 Phase 结束后总结收集的信息
 5. **增量生成**: 可以先生成部分配置，再逐步完善
+6. **动态查询**: 遇到不确定的规范时，调用 claude-code-guide 获取最新信息
 
 ## 示例对话
 
@@ -162,6 +193,10 @@ allowed-tools: AskUserQuestion, Write, Read, Glob
 "了解了，这是一个 Web 应用。请问使用什么技术栈？"
 
 [提供选项: React+Node, Vue+Python, Angular+Java, 其他]
+
+**需要查询规范时**:
+"你提到想使用 Hooks 来自动验证代码。让我查询最新的 Hooks 配置规范..."
+[调用 Task agent 获取信息]
 
 **完成 Phase 1**:
 "项目画像收集完成。总结：

@@ -1,11 +1,28 @@
 ---
 description: Analyze CLAUDE.md token usage and provide optimization suggestions
-allowed-tools: Read, Glob
+allowed-tools: Read, Glob, Task
 ---
 
 # Context Optimize 命令
 
 专项分析 CLAUDE.md 文件的 Token 效率，识别冗余内容并提供精简建议。
+
+## 获取最新最佳实践
+
+当需要了解最新的 Token 优化技巧时，使用 Task 工具调用 claude-code-guide agent：
+
+```
+Task(
+  subagent_type="claude-code-guide",
+  prompt="查询 CLAUDE.md Token 优化的最新最佳实践",
+  description="获取优化建议"
+)
+```
+
+**适用场景**：
+- 了解最新的 CLAUDE.md 推荐结构
+- 查询 Rules 与 CLAUDE.md 的最佳分工
+- 获取 Memory 使用的最新建议
 
 ## 执行流程
 
@@ -73,7 +90,19 @@ allowed-tools: Read, Glob
 3. **冗长描述**
    - 检测可以精简的段落
 
-### Step 5: 生成优化报告
+### Step 5: 查询最新优化技巧 (可选)
+
+如果发现复杂的优化场景，调用 claude-code-guide 获取建议：
+
+```
+Task(
+  subagent_type="claude-code-guide",
+  prompt="对于包含大量术语表的 CLAUDE.md，有什么最新的 Token 优化建议？",
+  description="获取术语表优化建议"
+)
+```
+
+### Step 6: 生成优化报告
 
 ```markdown
 # Token 优化分析报告
@@ -207,34 +236,6 @@ allowed-tools: Read, Glob
 
 # 优化后
 开发: TDD (🔴→🟢→🔄)
-```
-
-## 执行示例
-
-```
-用户: /context-architect:optimize
-
-输出:
-# Token 优化分析报告
-
-## 总体概况
-| 文件 | Token | 状态 |
-|------|-------|------|
-| /CLAUDE.md | 2,500 | 🟡 |
-| /backend/CLAUDE.md | 1,800 | 🟡 |
-| **总计** | 4,300 | 🟡 86% |
-
-## 优化建议
-
-🔴 backend/CLAUDE.md 重复了根目录术语表
-   - 删除: 第 45-65 行
-   - 节省: ~400 tokens
-
-🟡 架构说明过长 (30行)
-   - 移到 docs/ARCHITECTURE.md
-   - 节省: ~600 tokens
-
-应用所有建议后: 3,300 tokens (节省 23%)
 ```
 
 ## 开始执行

@@ -94,6 +94,20 @@ cc-component-dev/
 └── prompt-history/        # 其他插件
 ```
 
+## claude-code-guide 集成
+
+context-architect 插件通过 Task 工具调用 `claude-code-guide` agent 获取最新规范：
+
+```
+Task(
+  subagent_type="claude-code-guide",
+  prompt="查询 [具体问题]",
+  description="获取 Claude Code 规范"
+)
+```
+
+**注意**：`claude-code-guide` 是 Task Agent，不是 MCP Server。
+
 ## 调试技巧
 
 当命令显示 "Unknown skill" 错误时：

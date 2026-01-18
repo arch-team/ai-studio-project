@@ -94,6 +94,31 @@ cp -r context-architect .claude/plugins/
 
 ## 知识体系
 
+### 混合知识策略
+
+插件采用 **静态知识 + 动态查询** 的混合策略：
+
+1. **静态知识 (Skill references)** - 核心稳定知识，离线可用
+2. **动态查询 (claude-code-guide agent)** - 最新规范，实时获取
+
+### claude-code-guide 集成
+
+命令执行时可调用 `claude-code-guide` agent 获取最新的 Claude Code 规范：
+
+```
+Task(
+  subagent_type="claude-code-guide",
+  prompt="查询 CLAUDE.md 的最新层级规范",
+  description="获取 Claude Code 规范"
+)
+```
+
+**适用场景**：
+- 确认 CLAUDE.md 最新支持的特性
+- 验证 Rules glob 模式语法
+- 了解 Hooks 事件类型
+- 确认 MCP server 配置格式
+
 ### Skill 知识结构
 
 ```
