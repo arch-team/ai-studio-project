@@ -1,6 +1,5 @@
 ---
-name: optimize
-description: 分析 CLAUDE.md 文件的 Token 占用，提供精简优化建议
+description: Analyze CLAUDE.md token usage and provide optimization suggestions
 allowed-tools: Read, Glob
 ---
 

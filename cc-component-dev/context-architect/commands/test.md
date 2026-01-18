@@ -1,6 +1,5 @@
 ---
-name: test
-description: 测试命令是否正常工作
+description: Test if plugin is working
 ---
 
 # Test Command

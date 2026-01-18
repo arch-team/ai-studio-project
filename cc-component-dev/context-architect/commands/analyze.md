@@ -1,6 +1,5 @@
 ---
-name: analyze
-description: 分析现有项目的上下文配置，提供优化建议
+description: Analyze existing context configuration and provide suggestions
 allowed-tools: Read, Glob, Grep
 ---
 

@@ -1,6 +1,5 @@
 ---
-name: architect
-description: 引导式多轮对话，帮助设计最优的 CLAUDE.md、Rules、Memory 配置
+description: Design optimal CLAUDE.md, Rules, and Memory configuration
 allowed-tools: AskUserQuestion, Write, Read, Glob
 ---
 
