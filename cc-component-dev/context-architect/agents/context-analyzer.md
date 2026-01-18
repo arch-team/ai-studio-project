@@ -230,9 +230,17 @@ Agent 分析:
 第 45-75 行与根目录术语表重复，建议删除并使用引用。
 
 🔴 **缺少 Rules 配置**
-建议为 Python 文件添加规则:
-```json
-{"glob": "**/*.py", "rule": "类型提示必需，使用 dataclass"}
+建议创建 `.claude/rules/python.md`:
+```markdown
+---
+paths:
+  - "**/*.py"
+---
+
+# Python Rules
+
+- 类型提示必需
+- 使用 dataclass
 ```
 
 运行 `/context-architect:optimize` 获取详细优化建议。

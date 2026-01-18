@@ -36,19 +36,31 @@ Claude Code 使用三层上下文管理机制：
 
 ### Rules 触发模式
 
-```json
-{
-  "rules": [
-    {
-      "glob": "**/*.test.ts",
-      "rule": "使用 Jest 和 React Testing Library"
-    },
-    {
-      "glob": "backend/**/*.py",
-      "rule": "遵循 DDD 模式，使用 SDK-First 原则"
-    }
-  ]
-}
+Rules 配置使用 `.claude/rules/` 目录下的 Markdown 文件：
+
+**`.claude/rules/testing.md`**:
+```markdown
+---
+paths:
+  - "**/*.test.ts"
+---
+
+# Testing Rules
+
+- 使用 Jest 和 React Testing Library
+```
+
+**`.claude/rules/backend.md`**:
+```markdown
+---
+paths:
+  - "backend/**/*.py"
+---
+
+# Backend Rules
+
+- 遵循 DDD 模式
+- 使用 SDK-First 原则
 ```
 
 ### Memory 持久化
@@ -123,23 +135,43 @@ list_memories()
 
 ### Rules 配置示例
 
-```json
-{
-  "rules": [
-    {
-      "glob": "**/*.py",
-      "rule": "使用 Python 3.11+ 特性，类型提示必需"
-    },
-    {
-      "glob": "infrastructure/**/*.ts",
-      "rule": "CDK 代码遵循 infrastructure/cdk/CLAUDE.md"
-    },
-    {
-      "glob": "**/tests/**",
-      "rule": "测试使用 TDD 红绿重构循环"
-    }
-  ]
-}
+在 `.claude/rules/` 目录下创建规则文件：
+
+**`.claude/rules/python.md`**:
+```markdown
+---
+paths:
+  - "**/*.py"
+---
+
+# Python Rules
+
+- 使用 Python 3.11+ 特性
+- 类型提示必需
+```
+
+**`.claude/rules/infrastructure.md`**:
+```markdown
+---
+paths:
+  - "infrastructure/**/*.ts"
+---
+
+# Infrastructure Rules
+
+- CDK 代码遵循 infrastructure/cdk/CLAUDE.md
+```
+
+**`.claude/rules/testing.md`**:
+```markdown
+---
+paths:
+  - "**/tests/**"
+---
+
+# Testing Rules
+
+- 测试使用 TDD 红绿重构循环
 ```
 
 ### Memory 使用策略

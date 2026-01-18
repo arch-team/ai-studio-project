@@ -159,12 +159,25 @@ Task(
 
 ### 3. Rules 配置
 
-```json
-{
-  "rules": [
-    {规则列表}
-  ]
-}
+在 `.claude/rules/` 目录下创建规则文件：
+
+```
+.claude/rules/
+├── {language}.md      # 语言规范 (如 python.md, typescript.md)
+├── {layer}.md         # 架构层规范 (如 domain.md, api.md)
+└── testing.md         # 测试规范
+```
+
+**规则文件模板**:
+```markdown
+---
+paths:
+  - "{glob pattern}"
+---
+
+# {Rule Name}
+
+- {具体规则}
 ```
 
 ### 4. Memory 使用建议

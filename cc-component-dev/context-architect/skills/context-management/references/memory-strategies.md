@@ -231,9 +231,19 @@ write_memory("adr_db_choice", "选择 DynamoDB...")
 # Memory 中记录模式
 write_memory("pattern_api_error", "所有 API 使用统一错误格式...")
 
-# 成为规范后添加到 Rules
-# .claude/settings.json:
-{"glob": "src/api/**", "rule": "使用统一错误响应格式 ErrorResponse"}
+# 成为规范后，创建 Rules 文件
+# .claude/rules/api.md:
+```
+
+```markdown
+---
+paths:
+  - "src/api/**"
+---
+
+# API Rules
+
+- 使用统一错误响应格式 ErrorResponse
 ```
 
 ## 清理策略
