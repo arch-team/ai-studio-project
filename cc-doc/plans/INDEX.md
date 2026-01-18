@@ -32,3 +32,4 @@ Claude Code 生成的计划文件索引。
 | 2026-01-17 | `2026-01-17-backend-tests-目录结构设计方案.md` | Backend Tests 目录结构设计方案 | ⏳ 进行中 |
 | 2026-01-17 | `2026-01-17-claude-code-记忆管理与-rule-机制研究.md` | Claude Code 记忆管理与 Rule 机制研究 | ⏳ 进行中 |
 | 2026-01-18 | `2026-01-18-backend-tests-重构计划.md` | Backend Tests 重构计划 | ⏳ 进行中 |
+| 2026-01-18 | `2026-01-18-claude-code-memory-管理规范-实施计划.md` | Claude Code Memory 管理规范 - 实施计划 | ⏳ 进行中 |
