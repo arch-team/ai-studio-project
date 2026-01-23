@@ -306,6 +306,7 @@ npm run test:coverage                       # 覆盖率报告
 
 | 文档 | 位置 | 用途 |
 |------|------|------|
+| **架构规范** | `docs/ARCHITECTURE.md` | 模块结构、依赖规则、状态管理 |
 | **设计规范** | `DESIGN.md` | Cloudscape 组件使用、页面模板 |
 | **详细设计指南** | `../specs/frontend-design-guide.md` | 完整视觉规范、无障碍设计 |
 

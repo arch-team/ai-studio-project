@@ -8,9 +8,6 @@ import { AppError, ErrorCode, isApiErrorResponse } from '../types/errors';
 
 // === 配置 ===
 
-// Vite 环境变量类型
-declare const __VITE_API_BASE_URL__: string | undefined;
-
 const API_BASE_URL =
   (typeof import.meta !== 'undefined' && (import.meta as unknown as { env?: { VITE_API_BASE_URL?: string } }).env?.VITE_API_BASE_URL) ||
   '/api/v1';

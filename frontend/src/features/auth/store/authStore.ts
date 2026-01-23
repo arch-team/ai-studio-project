@@ -30,7 +30,7 @@ const DEV_USER: User = {
 };
 
 // 是否为开发模式
-const isDev = import.meta.env.DEV;
+const isDev = (typeof import.meta !== 'undefined' && (import.meta as unknown as { env?: { DEV?: boolean } }).env?.DEV) ?? false;
 
 // 开发模式下设置 mock token
 if (isDev && !localStorage.getItem('access_token')) {

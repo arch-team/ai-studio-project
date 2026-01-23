@@ -90,7 +90,7 @@ export function TrainingStatusMonitor({
     job.status === 'running' ? pollInterval : undefined
   );
 
-  const metrics = metricsData?.metrics || [];
+  const metrics = useMemo(() => metricsData?.metrics || [], [metricsData?.metrics]);
 
   // 计算进度百分比
   const progress = useMemo(() => {
