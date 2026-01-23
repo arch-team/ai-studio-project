@@ -149,6 +149,11 @@ modules/{name}/
 - 依赖只能从外层指向内层
 - Domain 层是最内层，不依赖任何外部
 - Infrastructure 层实现 Domain 层定义的接口
+- **API 层约束**:
+  - API 层只能通过 Application Services 执行业务操作（创建、修改、删除）
+  - API 层可以导入 Domain 层的类型定义（实体类、值对象、枚举）用于类型标注和响应映射
+  - API 层禁止直接访问 Infrastructure 实现
+- **Infrastructure 双重实现**: Infrastructure 层同时实现 Domain 层的 Repository 接口和 Application 层的外部服务接口 (interfaces/)
 
 ---
 
@@ -197,6 +202,11 @@ from src.shared.api.schemas import EntitySchema, PaginatedResponse
 # ✅ 工具共享
 from src.shared.utils import utc_now, paginate
 ```
+
+**Shared Kernel 约束**:
+- `shared/` 只包含技术基础设施和跨模块抽象，**禁止包含任何业务逻辑**
+- Domain 类型 (BaseEntity, DomainEvent) 是纯技术抽象，不包含业务规则
+- 跨模块接口 (IQuotaChecker) 只定义契约，实现放在具体模块的 Infrastructure 层
 
 #### 3.2.2 Auth 模块特殊依赖（唯一例外）
 
@@ -247,6 +257,24 @@ class TrainingJobModel(Base):
 **原因**: SQLAlchemy 要求在定义外键关系时引用目标模型类，这是数据库关系映射的技术必要性。
 
 **约束**: 此例外仅限于 ORM 模型文件（`*_model.py`），其他基础设施代码（如仓库实现）仍需遵循模块隔离原则。
+
+### 3.4 DDD 战术模式规范
+
+#### Entity 实体
+- 继承 `BaseEntity`，使用 UUID 标识，`__eq__`/`__hash__` 基于 ID
+- 状态转换逻辑在 Entity 内部，**禁止**依赖外部服务或数据库
+- 只抛出 Domain 异常，**禁止** `ValueError` 等通用异常
+
+#### Value Object 值对象
+- 使用 `@dataclass(frozen=True)` 确保不可变，相等性基于值比较
+- 在 `__post_init__` 验证，无效值抛出 `ValidationError`
+
+#### Repository 仓库
+- 继承 `IRepository[T]`，含 `get_by_id`, `add`, `update`, `delete`, `exists`
+- **只负责持久化**，禁止业务逻辑；复杂查询命名 `find_by_*`, `list_by_*`
+
+#### Domain Event 域事件
+- 继承 `DomainEvent`，自动含 `event_id: UUID` 和 `occurred_at: datetime`
 
 ---
 
