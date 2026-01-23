@@ -361,25 +361,25 @@
   - **参考**: spec.md Training Job State Model 状态转换规则
 
 ### SQLAlchemy 模型
-- [X] [T011] 创建 User 模型 - 领域实体 `backend/src/domain/entities/user.py` (纯业务对象) + ORM 模型 `backend/src/infrastructure/persistence/models/user_model.py` (SQLAlchemy),使用 Pydantic v2 schema 验证,关联 resource_quotas
-- [X] [T011c] 创建 Space 模型 - 领域实体 `backend/src/domain/entities/space.py` + ORM 模型 `backend/src/infrastructure/persistence/models/space_model.py`,包含状态转换验证逻辑 (pending → running → stopped),关联 User (owner_id),支持 SageMaker Spaces ARN 存储,实现资源配额检查方法,提供空间生命周期管理接口 (start/stop/delete)
-- [X] [T012] 创建 ResourceQuota 模型 - 领域实体 `backend/src/domain/entities/resource_quota.py` + ORM 模型 `backend/src/infrastructure/persistence/models/resource_quota_model.py`,包含配额验证逻辑
-- [X] [T012b] 创建 ResourceLimitConfig 模型 - 领域实体 `backend/src/domain/entities/resource_limit_config.py` + ORM 模型 `backend/src/infrastructure/persistence/models/resource_limit_config_model.py`,包含限制验证逻辑,关联 User (通过 role),支持项目级和全局级配置 (project_id nullable),实现默认限制查询方法 (根据 user role + project 查找适用配置),提供配额检查和应用默认限制的服务接口
-- [X] [T012a] 创建 AuditLog 模型 - 领域实体 `backend/src/domain/entities/audit_log.py` + ORM 模型 `backend/src/infrastructure/persistence/models/audit_log_model.py`,包含自动过期逻辑 (expires_at = created_at + 90天),关联 User,支持操作类型和资源类型枚举,实现审计日志查询优化
+- [X] [T011] 创建 User 模型 - 领域实体 `backend/src/modules/auth/domain/entities/user.py` (纯业务对象) + ORM 模型 `backend/src/modules/auth/infrastructure/models/user_model.py` (SQLAlchemy),使用 Pydantic v2 schema 验证,关联 resource_quotas
+- [X] [T011c] 创建 Space 模型 - 领域实体 `backend/src/modules/spaces/domain/entities/space.py` + ORM 模型 `backend/src/modules/spaces/infrastructure/models/space_model.py`,包含状态转换验证逻辑 (pending → running → stopped),关联 User (owner_id),支持 SageMaker Spaces ARN 存储,实现资源配额检查方法,提供空间生命周期管理接口 (start/stop/delete)
+- [X] [T012] 创建 ResourceQuota 模型 - 领域实体 `backend/src/modules/quotas/domain/entities/resource_quota.py` + ORM 模型 `backend/src/modules/quotas/infrastructure/models/resource_quota_model.py`,包含配额验证逻辑
+- [X] [T012b] 创建 ResourceLimitConfig 模型 - 领域实体 `backend/src/modules/quotas/domain/entities/resource_limit_config.py` + ORM 模型 `backend/src/modules/quotas/infrastructure/models/resource_limit_config_model.py`,包含限制验证逻辑,关联 User (通过 role),支持项目级和全局级配置 (project_id nullable),实现默认限制查询方法 (根据 user role + project 查找适用配置),提供配额检查和应用默认限制的服务接口
+- [X] [T012a] 创建 AuditLog 模型 - 领域实体 `backend/src/modules/audit/domain/entities/audit_log.py` + ORM 模型 `backend/src/modules/audit/infrastructure/models/audit_log_model.py`,包含自动过期逻辑 (expires_at = created_at + 90天),关联 User,支持操作类型和资源类型枚举,实现审计日志查询优化
 
 ### ResourceLimitConfig 管理 API (Admin)
-- [X] [T012c] [Admin] GET /resource-limit-configs 端点实现 - `backend/src/api/v1/endpoints/resource_limit_configs.py`,支持分页、过滤 (role, project_id)、排序 (created_at),返回资源限制配置列表,仅 admin 角色可访问
+- [X] [T012c] [Admin] GET /resource-limit-configs 端点实现 - `backend/src/modules/quotas/api/endpoints.py`,支持分页、过滤 (role, project_id)、排序 (created_at),返回资源限制配置列表,仅 admin 角色可访问
 - [X] [T012d] [Admin] POST /resource-limit-configs 端点实现 - 创建资源限制配置,验证角色和项目有效性,防止重复配置 (同一 role + project_id 组合唯一)
 - [X] [T012e] [Admin] PUT /resource-limit-configs/{id} 端点实现 - 更新资源限制配置,支持部分更新,记录变更到审计日志
 - [X] [T012f] [Admin] DELETE /resource-limit-configs/{id} 端点实现 - 删除资源限制配置,软删除策略,记录到审计日志
 
 ### 认证中间件
-- [X] [T013] 实现基础认证中间件 - `backend/src/api/middleware/auth.py`,验证 IAM Identity Center token,提取用户信息
+- [X] [T013] 实现基础认证中间件 - `backend/src/shared/api/middleware/auth.py`,验证 IAM Identity Center token,提取用户信息
 
 ### 企业级认证扩展
-- [X] [T013a] SSO集成实现 - `backend/src/api/middleware/sso.py`,集成AWS IAM Identity Center (SAML 2.0/OIDC),配置IdP元数据,实现用户自动映射和角色同步
-- [X] [T013b] RBAC策略管理 - `backend/src/application/services/rbac_service.py`,定义角色层次 (admin/project_manager/engineer/viewer),实现基于资源的权限检查,集成Kubernetes RBAC
-- [X] [T013c] 本地账号管理API - `backend/src/api/v1/endpoints/auth.py`,实现POST/PUT /auth/local-accounts,支持密码重置和账号启用/禁用,作为SSO不可用时的备用认证,包含以下密码安全要求:
+- [X] [T013a] SSO集成实现 - `backend/src/shared/api/middleware/sso.py`,集成AWS IAM Identity Center (SAML 2.0/OIDC),配置IdP元数据,实现用户自动映射和角色同步
+- [X] [T013b] RBAC策略管理 - `backend/src/modules/auth/application/services/rbac_service.py`,定义角色层次 (admin/project_manager/engineer/viewer),实现基于资源的权限检查,集成Kubernetes RBAC
+- [X] [T013c] 本地账号管理API - `backend/src/modules/auth/api/endpoints.py`,实现POST/PUT /auth/local-accounts,支持密码重置和账号启用/禁用,作为SSO不可用时的备用认证,包含以下密码安全要求:
   - **密码强度策略**: 最小长度 12 字符,必须包含大小写字母、数字和特殊字符
   - **密码哈希算法**: 使用 bcrypt (cost factor ≥12) 或 argon2id 存储密码哈希
   - **密码重置安全**: 生成临时令牌 (有效期 15 分钟),通过邮件发送重置链接,令牌使用后立即失效
@@ -397,12 +397,12 @@
   - **依赖**: T013a (SSO 集成), T013c (本地账号 API)
 
 ### AWS 客户端封装
-- [X] [T014] [P] HyperPod SDK 客户端封装 - 接口 `backend/src/application/interfaces/hyperpod_client.py` (IHyperPodClient) + 实现 `backend/src/infrastructure/external/hyperpod/client.py`,封装 HyperPod Training 模块 API,使用 T000 验证的方法名实现训练任务生命周期管理 (提交、状态查询、暂停/恢复/终止),参考 `docs/hyperpod-sdk-reference.md` 获取准确的方法签名 (依赖 T000)
-- [X] [T015] [P] S3 客户端封装 - 接口 `backend/src/application/interfaces/storage_service.py` (IStorageService) + 实现 `backend/src/infrastructure/external/s3/client.py`,封装 boto3 S3 操作 (upload_file, download_file, list_objects),支持 presigned URLs,继承 T008b 配置的 SSE-KMS 默认加密
+- [X] [T014] [P] HyperPod SDK 客户端封装 - 接口 `backend/src/modules/training/application/interfaces/hyperpod_client.py` (IHyperPodClient) + 实现 `backend/src/modules/training/infrastructure/external/hyperpod_client.py`,封装 HyperPod Training 模块 API,使用 T000 验证的方法名实现训练任务生命周期管理 (提交、状态查询、暂停/恢复/终止),参考 `docs/hyperpod-sdk-reference.md` 获取准确的方法签名 (依赖 T000)
+- [X] [T015] [P] S3 客户端封装 - 接口 `backend/src/shared/application/interfaces/storage_service.py` (IStorageService) + 实现 `backend/src/shared/infrastructure/storage/s3_client.py`,封装 boto3 S3 操作 (upload_file, download_file, list_objects),支持 presigned URLs,继承 T008b 配置的 SSE-KMS 默认加密
 
 ### FastAPI 应用配置
 - [X] [T016] 配置 FastAPI 应用入口 - `backend/src/main.py`,注册路由,配置 CORS,集成认证中间件,配置 OpenAPI docs (TLS 终止由 T008i ALB 处理,应用无需配置 HTTPS)
-- [X] [T016b] 审计日志中间件 - `backend/src/api/middleware/audit.py`,拦截所有 API 请求,自动记录操作日志 (user_id, operation_type, resource_type, request/response data),异步写入数据库,确保审计完整性
+- [X] [T016b] 审计日志中间件 - `backend/src/modules/audit/api/middleware.py`,拦截所有 API 请求,自动记录操作日志 (user_id, operation_type, resource_type, request/response data),异步写入数据库,确保审计完整性
 
 ### 前端基础配置
 - [X] [T017] [P] 配置 React Router - `frontend/src/app/App.tsx` 和 `frontend/src/app/router/index.tsx`,路由配置 (/training-jobs, /datasets, /admin, /reports, /ide),配置路由守卫 (AuthGuard, RoleGuard)
@@ -429,22 +429,22 @@
 - [X] [T022a] 创建 models 表迁移 - `backend/alembic/versions/20260115_100200_create_models.py`,字段: id, model_name, version, training_job_id (FK), checkpoint_id (FK), model_uri (S3), registry_arn (SageMaker Model Registry), metrics (JSON: accuracy/loss), hyperparameters (JSON), framework (enum: pytorch/tensorflow), status (enum: training/registered/deployed/archived), created_at
 
 ### SQLAlchemy 模型
-- [X] [T023] 创建 TrainingJob 模型 - 领域实体 `backend/src/domain/entities/training_job.py` + ORM 模型 `backend/src/infrastructure/persistence/models/training_job_model.py`,包含状态转换验证 (submitted → running → paused/completed/failed),关联 User 和 Checkpoint
-- [X] [T024] 创建 Checkpoint 模型 - 领域实体 `backend/src/domain/entities/checkpoint.py` + ORM 模型 `backend/src/infrastructure/persistence/models/checkpoint_model.py`,包含存储层级自动迁移逻辑 (NVMe → FSx → S3)
-- [X] [T024a] 创建 Model 模型 - 领域实体 `backend/src/domain/entities/model.py` + ORM 模型 `backend/src/infrastructure/persistence/models/model_model.py`,包含版本比较逻辑,关联 TrainingJob 和 Checkpoint,支持 SageMaker Model Registry ARN 存储,实现模型生命周期管理
+- [X] [T023] 创建 TrainingJob 模型 - 领域实体 `backend/src/modules/training/domain/entities/training_job.py` + ORM 模型 `backend/src/modules/training/infrastructure/models/training_job_model.py`,包含状态转换验证 (submitted → running → paused/completed/failed),关联 User 和 Checkpoint
+- [X] [T024] 创建 Checkpoint 模型 - 领域实体 `backend/src/modules/training/domain/entities/checkpoint.py` + ORM 模型 `backend/src/modules/training/infrastructure/models/checkpoint_model.py`,包含存储层级自动迁移逻辑 (NVMe → FSx → S3)
+- [X] [T024a] 创建 Model 模型 - 领域实体 `backend/src/modules/models/domain/entities/model.py` + ORM 模型 `backend/src/modules/models/infrastructure/models/model_model.py`,包含版本比较逻辑,关联 TrainingJob 和 Checkpoint,支持 SageMaker Model Registry ARN 存储,实现模型生命周期管理
 
 ### 后端 API 端点 (基于 contracts/training-jobs-api.yaml)
-- [X] [T025] [US1] POST /training-jobs 端点实现 - `backend/src/api/v1/endpoints/training_jobs.py`,验证训练配置,检查资源配额,调用 HyperPod SDK 创建训练任务
+- [X] [T025] [US1] POST /training-jobs 端点实现 - `backend/src/modules/training/api/endpoints.py`,验证训练配置,检查资源配额,调用 HyperPod SDK 创建训练任务
 - [X] [T026] [US1] GET /training-jobs 端点实现 - 支持分页、过滤 (status, owner_id)、排序 (created_at, priority)
 - [X] [T027] [US1] GET /training-jobs/{id} 端点实现 - 返回训练任务详情,包含实时指标 (GPU 利用率,训练进度)
 - [X] [T028] [US1] PUT /training-jobs/{id} 端点实现 - 更新训练配置 (仅允许 priority, training_config 字段)
 - [X] [T029] [US1] DELETE /training-jobs/{id} 端点实现 - 软删除训练任务,终止 HyperPod 训练任务
 - [X] [T030] [US1] POST /training-jobs/{id}/pause 端点实现 - 暂停训练任务,保存检查点,更新状态为 paused
 - [X] [T031] [US1] POST /training-jobs/{id}/resume 端点实现 - 恢复训练任务,从最新检查点恢复,更新状态为 running
-- [X] [T031a] [US1] POST /models 端点实现 - `backend/src/api/v1/endpoints/models.py`,注册训练完成的模型,自动从 checkpoint 提升,集成 SageMaker Model Registry,记录模型元数据(metrics, hyperparameters)
+- [X] [T031a] [US1] POST /models 端点实现 - `backend/src/modules/models/api/endpoints.py`,注册训练完成的模型,自动从 checkpoint 提升,集成 SageMaker Model Registry,记录模型元数据(metrics, hyperparameters)
 - [X] [T031b] [US1] GET /models 端点实现 - 支持分页、过滤 (training_job_id, status)、排序 (version, created_at),返回模型版本列表
 - [X] [T031c] [US1] GET /models/{id}/versions 端点实现 - 返回模型版本历史,支持版本对比 (metrics diff, hyperparameter changes)
-- [X] [T031d] [US1] POST /training-jobs/{id}/checkpoints 端点实现 - `backend/src/api/v1/endpoints/training_jobs.py`,支持用户手动触发检查点创建,验证任务状态 (仅 Running 状态可创建),调用 checkpoint_service 创建检查点,返回检查点 ID 和存储路径 (依赖 T038)
+- [X] [T031d] [US1] POST /training-jobs/{id}/checkpoints 端点实现 - `backend/src/modules/training/api/endpoints.py`,支持用户手动触发检查点创建,验证任务状态 (仅 Running 状态可创建),调用 checkpoint_service 创建检查点,返回检查点 ID 和存储路径 (依赖 T038)
 
 ### 前端页面组件
 - [X] [T032] [US1] [P] 训练任务列表页面 - `frontend/src/features/training/pages/TrainingJobListPage.tsx`,使用 Cloudscape Table 组件,支持分页/过滤/排序,实时状态更新,创建模块 API 层 `frontend/src/features/training/api/queries.ts`
@@ -458,7 +458,7 @@
 - [X] [T035e] [US1] [P] 模型版本对比组件 - `frontend/src/features/models/components/ModelVersionTable.tsx` 展示版本历史表格,`frontend/src/features/models/components/ModelMetricsCompare.tsx` 实现版本指标对比(metrics diff)可视化,创建 hooks `frontend/src/features/models/hooks/useModel.ts` 和 `frontend/src/features/models/hooks/useModelVersions.ts`
 
 ### HyperPod 集成服务
-- [x] [T036] [US1] HyperPodPytorchJob 集成逻辑 - `backend/src/application/services/hyperpod_service.py`,封装 HyperPod SDK 训练任务生命周期管理,使用 T000 验证的 Training 模块方法实现训练任务提交、暂停、恢复、终止功能,实现错误处理和重试机制,参考 `docs/hyperpod-sdk-reference.md`。如该模块不支持特定训练模式,MAY 使用 boto3 (SageMaker API) 或 kubernetes-client (直接操作 PyTorchJob CRD) 作为备选方案,但 MUST 提交例外申请并获得平台治理委员会批准,在代码中注释说明理由 (遵循宪章 Principle I.B) (依赖 T000, T014)
+- [x] [T036] [US1] HyperPodPytorchJob 集成逻辑 - `backend/src/modules/training/application/services/hyperpod_service.py`,封装 HyperPod SDK 训练任务生命周期管理,使用 T000 验证的 Training 模块方法实现训练任务提交、暂停、恢复、终止功能,实现错误处理和重试机制,参考 `docs/hyperpod-sdk-reference.md`。如该模块不支持特定训练模式,MAY 使用 boto3 (SageMaker API) 或 kubernetes-client (直接操作 PyTorchJob CRD) 作为备选方案,但 MUST 提交例外申请并获得平台治理委员会批准,在代码中注释说明理由 (遵循宪章 Principle I.B) (依赖 T000, T014)
 - [x] [T036a] [US1] Gang Scheduling 行为验证 - `backend/tests/integration/test_gang_scheduling.py`,验证 FR-003 Gang Scheduling 机制正确工作:
   - **验证场景 1**: 提交多节点分布式训练任务 (≥2 节点),验证所有 Pods 在 60 秒内同时就绪
   - **验证场景 2**: 模拟部分 Pod 调度失败,验证任务状态正确转为 Failed 且已创建的 Pods 自动清理
@@ -466,7 +466,7 @@
   - **监控指标**: 记录 Pod 就绪时间差,验证时间窗口 ≤60 秒
   - **测试工具**: 使用 pytest + kubernetes-client 查询 Pod 状态和事件
   - **参考**: spec.md FR-003 Gang Scheduling 机制 (依赖 T036, T008c-1/T008c-2/T008c-3 HyperPod 集群)
-- [ ] [T037] [US1] 训练任务状态同步服务 - `backend/src/application/services/training_sync_service.py`,定时任务 (30秒) 同步 HyperPod 训练状态到数据库,使用 T000 验证的状态查询方法获取任务状态,处理状态转换事件,参考 `docs/hyperpod-sdk-reference.md`。如需细粒度状态监控,MAY 使用 kubernetes-client 查询 Kueue Workload 状态,但 MUST 提交例外申请并获得平台治理委员会批准,在代码中注释说明理由 (遵循宪章 Principle I.B) (依赖 T000, T036)
+- [ ] [T037] [US1] 训练任务状态同步服务 - `backend/src/modules/training/application/services/training_sync_service.py`,定时任务 (30秒) 同步 HyperPod 训练状态到数据库,使用 T000 验证的状态查询方法获取任务状态,处理状态转换事件,参考 `docs/hyperpod-sdk-reference.md`。如需细粒度状态监控,MAY 使用 kubernetes-client 查询 Kueue Workload 状态,但 MUST 提交例外申请并获得平台治理委员会批准,在代码中注释说明理由 (遵循宪章 Principle I.B) (依赖 T000, T036)
 - [ ] [T037d] [US1] 抢占连续失败转 Failed 状态测试 - `backend/tests/integration/test_preemption_exhausted.py`,验证 FR-004 连续抢占失败机制:
   - **验证场景 1**: 模拟训练任务被连续抢占 3 次,验证第 3 次抢占后任务状态转为 Failed
   - **验证场景 2**: 验证 preemption_count 计数器正确累加 (每次抢占 +1)
@@ -475,7 +475,7 @@
   - **验证场景 5**: 验证告警通知发送给任务提交者和平台管理员
   - **测试工具**: 使用 pytest + kubernetes-client 模拟 Kueue Evicted condition
   - **参考**: spec.md L427-462 连续抢占失败逻辑 (依赖 T037)
-- [ ] [T037c] [US1] 训练任务停滞检测服务 - `backend/src/application/services/stall_detection_service.py`,实现 FR-022 停滞检测机制:
+- [ ] [T037c] [US1] 训练任务停滞检测服务 - `backend/src/modules/training/application/services/stall_detection_service.py`,实现 FR-022 停滞检测机制:
   - **主指标监控**: 默认监控 Loss 指标,支持用户指定单一主检测指标 (Accuracy/Perplexity 等)
   - **停滞判定逻辑**: 主指标在可配置时间窗口 (默认 30 分钟) 内变化率 <0.1% 触发停滞告警
   - **辅助指标处理**: 其他指标异常仅记录日志供参考,不触发告警 (避免误报)
@@ -493,9 +493,9 @@
   - **验证场景 5**: 验证主指标选择逻辑 (Loss → Accuracy → Perplexity 自动选择)
   - **测试工具**: 使用 pytest + MLflow API 模拟指标记录和查询
   - **参考**: spec.md FR-022 停滞检测策略 (依赖 T037c 停滞检测服务)
-- [ ] [T037a] [US1] SageMaker Managed MLflow 集成 - `backend/src/application/services/mlflow_service.py`,部署 MLflow Tracking Server (使用 SageMaker Managed MLflow),配置 MLflow Tracking URI 环境变量注入,提供 Python SDK 示例代码 (`backend/examples/mlflow_training_example.py`),文档化指标记录最佳实践 (指标命名规范、记录频率、超参数追踪模式),实现 MLflow 实验查询 API 集成到前端监控页面
+- [ ] [T037a] [US1] SageMaker Managed MLflow 集成 - `backend/src/modules/training/application/services/mlflow_service.py`,部署 MLflow Tracking Server (使用 SageMaker Managed MLflow),配置 MLflow Tracking URI 环境变量注入,提供 Python SDK 示例代码 (`backend/examples/mlflow_training_example.py`),文档化指标记录最佳实践 (指标命名规范、记录频率、超参数追踪模式),实现 MLflow 实验查询 API 集成到前端监控页面
 - [ ] [T037b] [US1] Prometheus Pushgateway 部署 (可选) - `infrastructure/monitoring/pushgateway.yaml`,部署 Pushgateway 服务到 EKS 集群 (仅用于实时告警场景),配置 Service 和环境变量 `PROMETHEUS_PUSHGATEWAY_URL` 注入,提供 Python SDK 示例代码 (`backend/examples/prometheus_metrics_example.py`),文档化与 MLflow 的职责分离和使用场景
-- [ ] [T038] [US1] Checkpoint 自动保存逻辑 - `backend/src/application/services/checkpoint_service.py`,实现 FR-010 定义的 5 种检查点创建触发场景:
+- [ ] [T038] [US1] Checkpoint 自动保存逻辑 - `backend/src/modules/training/application/services/checkpoint_service.py`,实现 FR-010 定义的 5 种检查点创建触发场景:
   - **(1) 定期自动创建**: 定时任务 (10-15 分钟间隔) 为 Running 状态的训练任务自动创建检查点
   - **(2) 训练中断**: 检测到训练任务 Pods 异常终止时立即触发检查点创建
   - **(3) 节点故障**: 检测到 PodsReady=False 且持续 >30 秒时触发检查点创建
@@ -505,7 +505,7 @@
   - **接口设计**: 提供 `create_checkpoint(job_id, trigger_type)` 接口创建检查点,提供 `list_checkpoints(job_id, filters)` 接口供 T038b 查询检查点列表
   - **职责边界**: T038 负责检查点创建和初始保存,不负责后续迁移 (迁移由 T038b 负责)
   - **参考**: spec.md FR-010 检查点触发场景映射
-- [ ] [T038b-1] [US1] Checkpoint 分层迁移服务 - `backend/src/application/services/checkpoint_migration_service.py`,实现 FR-011 分层存储迁移策略:
+- [ ] [T038b-1] [US1] Checkpoint 分层迁移服务 - `backend/src/modules/training/application/services/checkpoint_migration_service.py`,实现 FR-011 分层存储迁移策略:
   - **依赖接口**: 调用 T038 的 `list_checkpoints(job_id)` 接口获取检查点列表和元数据 (创建时间、序号、存储路径、校验和)
   - **热检查点管理**: 保留最近 3 个检查点在 NVMe 本地存储
   - **温检查点迁移**: 第 4-10 个检查点自动迁移到 FSx for Lustre
@@ -529,7 +529,7 @@
   - **职责边界**: T038b-2 仅负责 S3 基础设施配置,不负责检查点迁移逻辑 (迁移由 T038b-1 负责)
   - **依赖**: T008b (S3 Buckets Stack,提供 checkpoint bucket 名称和 ARN)
   - **参考**: spec.md FR-011 S3 生命周期策略要求
-- [ ] [T038a] [US1] SageMaker Model Registry 集成 - `backend/src/application/services/model_registry_service.py`,封装 SageMaker Model Registry API,自动注册训练完成的模型,管理模型版本生命周期(注册→批准→部署→归档)
+- [ ] [T038a] [US1] SageMaker Model Registry 集成 - `backend/src/modules/models/application/services/model_registry_service.py`,封装 SageMaker Model Registry API,自动注册训练完成的模型,管理模型版本生命周期(注册→批准→部署→归档)
 
 ### 集成测试
 - [ ] [T038c] [US1] 抢占时序SLA集成测试 - `backend/tests/integration/test_preemption_timing.py`,验证 FR-004 抢占时序保证:
@@ -561,11 +561,11 @@
 - [ ] [T200] 创建 job_templates 表迁移 - `backend/alembic/versions/xxx_create_job_templates.py`,字段: id, name, description, owner_id (FK users), visibility (enum: private/team/public), training_config (JSON), usage_count, last_used_at, created_at, updated_at, deleted_at
   - **依赖**: T021 (users 表)
   - **参考**: data-model.md job_templates 表结构, spec.md FR-023
-- [ ] [T201] 创建 JobTemplate SQLAlchemy 模型 - `backend/src/infrastructure/persistence/models/job_template_model.py`,包含 ORM 映射、关系定义 (owner → users)、软删除支持
+- [ ] [T201] 创建 JobTemplate SQLAlchemy 模型 - `backend/src/modules/training/infrastructure/models/job_template_model.py`,包含 ORM 映射、关系定义 (owner → users)、软删除支持
   - **依赖**: T200 (job_templates 表迁移)
-  - **领域实体**: `backend/src/domain/entities/job_template.py`
-  - **仓储接口**: `backend/src/domain/repositories/job_template_repository.py`
-- [ ] [T202] 任务模板 CRUD API 端点 - `backend/src/api/v1/endpoints/job_templates.py`,实现:
+  - **领域实体**: `backend/src/modules/training/domain/entities/job_template.py`
+  - **仓储接口**: `backend/src/modules/training/domain/repositories/job_template_repository.py`
+- [ ] [T202] 任务模板 CRUD API 端点 - `backend/src/modules/training/api/job_templates.py`,实现:
   - POST /job-templates: 创建模板 (复制训练任务配置)
   - GET /job-templates: 列表查询 (支持按可见性、热度排序)
   - GET /job-templates/{id}: 获取模板详情
@@ -573,7 +573,7 @@
   - DELETE /job-templates/{id}: 软删除模板
   - POST /training-jobs/from-template/{template_id}: 基于模板创建训练任务
   - **依赖**: T201 (JobTemplate 模型), T036 (HyperPod 客户端)
-  - **服务层**: `backend/src/application/services/job_template_service.py`
+  - **服务层**: `backend/src/modules/training/application/services/job_template_service.py`
 - [ ] [T203] 任务模板前端页面 - `frontend/src/pages/job-templates/`,实现:
   - 模板列表页面 (支持筛选、搜索)
   - 模板详情/编辑页面
@@ -592,10 +592,10 @@
 - [ ] [T039] 创建 datasets 表迁移 - `backend/alembic/versions/006_create_datasets.py`,字段: id, name, version, storage_type (enum: s3/fsx), storage_uri, dataset_type (enum: image/text/audio/video), size_bytes, owner_id (FK users), created_at, updated_at
 
 ### SQLAlchemy 模型
-- [ ] [T040] 创建 Dataset 模型 - 领域实体 `backend/src/domain/entities/dataset.py` + ORM 模型 `backend/src/infrastructure/persistence/models/dataset_model.py`,包含版本控制逻辑,关联 User,支持元数据存储
+- [ ] [T040] 创建 Dataset 模型 - 领域实体 `backend/src/modules/datasets/domain/entities/dataset.py` + ORM 模型 `backend/src/modules/datasets/infrastructure/models/dataset_model.py`,包含版本控制逻辑,关联 User,支持元数据存储
 
 ### 后端 API 端点 (基于 contracts/datasets-api.yaml)
-- [ ] [T041] [US2] POST /datasets 端点实现 - `backend/src/api/v1/endpoints/datasets.py`,验证数据集元数据,生成 S3 presigned upload URL,创建数据集记录
+- [ ] [T041] [US2] POST /datasets 端点实现 - `backend/src/modules/datasets/api/endpoints.py`,验证数据集元数据,生成 S3 presigned upload URL,创建数据集记录
 - [ ] [T042] [US2] GET /datasets 端点实现 - 支持分页、过滤 (dataset_type, owner_id)、排序 (created_at, size_bytes)
 - [ ] [T043] [US2] GET /datasets/{id} 端点实现 - 返回数据集详情,包含版本历史、存储信息、使用统计
 - [ ] [T044] [US2] PUT /datasets/{id} 端点实现 - 更新数据集元数据 (name, dataset_type, description)
@@ -603,8 +603,8 @@
 - [ ] [T046] [US2] POST /datasets/{id}/versions 端点实现 - 创建数据集新版本,复制或链接存储路径,更新版本号
 
 ### 存储集成服务
-- [ ] [T047] [US2] S3 上传集成 - `backend/src/application/services/dataset_upload.py`,实现分片上传,计算 MD5 校验和,支持断点续传
-- [ ] [T048] [US2] FSx for Lustre 路径管理 - `backend/src/application/services/fsx_service.py`,管理 FSx 挂载路径,自动同步 S3 到 FSx (≥5GB/s 吞吐量),数据预热逻辑
+- [ ] [T047] [US2] S3 上传集成 - `backend/src/modules/datasets/application/services/dataset_upload.py`,实现分片上传,计算 MD5 校验和,支持断点续传
+- [ ] [T048] [US2] FSx for Lustre 路径管理 - `backend/src/modules/datasets/application/services/fsx_service.py`,管理 FSx 挂载路径,自动同步 S3 到 FSx (≥5GB/s 吞吐量),数据预热逻辑
 
 ### 前端页面组件
 - [ ] [T049] [US2] [P] 数据集列表页面 - `frontend/src/features/datasets/pages/DatasetListPage.tsx`,使用 Cloudscape Table,支持搜索/过滤/排序,显示存储类型和大小,创建模块 API 层 `frontend/src/features/datasets/api/queries.ts`
@@ -635,23 +635,23 @@
 - [ ] [T053] 创建 hyperpod_clusters 表迁移 - `backend/alembic/versions/006_create_hyperpod_clusters.py`,字段: id, cluster_name, cluster_arn, region, status (enum: active/inactive/error), instance_types (JSON), capacity (JSON), created_at, updated_at
 
 ### SQLAlchemy 模型
-- [ ] [T054] 创建 HyperPodCluster 模型 - 领域实体 `backend/src/domain/entities/hyperpod_cluster.py` + ORM 模型 `backend/src/infrastructure/persistence/models/hyperpod_cluster_model.py`,包含集群容量计算逻辑,关联 TrainingJob
+- [ ] [T054] 创建 HyperPodCluster 模型 - 领域实体 `backend/src/modules/monitoring/domain/entities/hyperpod_cluster.py` + ORM 模型 `backend/src/modules/monitoring/infrastructure/models/hyperpod_cluster_model.py`,包含集群容量计算逻辑,关联 TrainingJob
 
 ### 后端 API 端点 (基于 contracts/users-api.yaml, resource-quotas-api.yaml, monitoring-api.yaml)
-- [ ] [T055] [US3] GET /users 端点实现 - `backend/src/api/v1/endpoints/users.py`,支持分页、过滤 (role, status)、排序 (created_at)
+- [ ] [T055] [US3] GET /users 端点实现 - `backend/src/modules/auth/api/endpoints.py`,支持分页、过滤 (role, status)、排序 (created_at)
 - [ ] [T056] [US3] POST /users 端点实现 - 验证用户信息,创建 IAM Identity Center 用户,分配默认配额
 - [ ] [T057] [US3] PUT /users/{id} 端点实现 - 更新用户角色、状态、配额关联
-- [ ] [T058] [US3] GET /resource-quotas 端点实现 - `backend/src/api/v1/endpoints/resource_quotas.py`,返回所有配额模板
+- [ ] [T058] [US3] GET /resource-quotas 端点实现 - `backend/src/modules/quotas/api/endpoints.py`,返回所有配额模板
 - [ ] [T059] [US3] POST /resource-quotas 端点实现 - 创建配额模板,验证配额限制 (CPU, GPU, Memory, Storage)
 - [ ] [T060] [US3] PUT /resource-quotas/{id} 端点实现 - 更新配额限制,触发用户通知
-- [ ] [T061] [US3] GET /monitoring/metrics 端点实现 - `backend/src/api/v1/endpoints/monitoring.py`,查询 Prometheus 指标 (GPU 利用率,集群容量,任务队列长度),支持时间范围过滤
-- [ ] [T061a] [US3] GET /audit-logs 端点实现 - `backend/src/api/v1/endpoints/audit_logs.py`,支持分页、过滤 (user_id, operation_type, resource_type, time_range)、排序 (created_at),返回审计日志列表,管理员权限
+- [ ] [T061] [US3] GET /monitoring/metrics 端点实现 - `backend/src/modules/monitoring/api/endpoints.py`,查询 Prometheus 指标 (GPU 利用率,集群容量,任务队列长度),支持时间范围过滤
+- [ ] [T061a] [US3] GET /audit-logs 端点实现 - `backend/src/modules/audit/api/endpoints.py`,支持分页、过滤 (user_id, operation_type, resource_type, time_range)、排序 (created_at),返回审计日志列表,管理员权限
 - [ ] [T061b] [US3] DELETE /audit-logs/cleanup 端点实现 - 清理过期审计日志 (expires_at < now),管理员权限,定时任务调用,记录清理统计
   - **职责**: 提供 API 接口供自动清理服务 (T102a) 或管理员手动调用
   - **输出**: 返回清理统计 (清理条数、执行耗时、失败记录数)
 
 ### 监控集成服务
-- [ ] [T062] [US3] Prometheus 指标采集集成 - `backend/src/application/services/prometheus_service.py`,封装 Prometheus HTTP API,查询 HyperPod Observability Add-on 指标,实现 ≤30秒刷新频率:
+- [ ] [T062] [US3] Prometheus 指标采集集成 - `backend/src/modules/monitoring/application/services/prometheus_service.py`,封装 Prometheus HTTP API,查询 HyperPod Observability Add-on 指标,实现 ≤30秒刷新频率:
   - **存储容量监控 (FR-020)**: 采集 NVMe 和 FSx for Lustre 二层存储使用率指标,配置三级阈值告警:
     - **警告级别 (80%)**: 发送邮件通知管理员,触发加速检查点迁移到下一层
     - **严重级别 (90%)**: 触发紧急迁移 (参见 FR-011),暂停新检查点创建 (保留最近 1 个)
@@ -661,10 +661,10 @@
   - **告警规则配置**: 创建 Prometheus AlertManager 规则 (`infrastructure/prometheus/alerts/storage-alerts.yaml`, `infrastructure/prometheus/alerts/network-alerts.yaml`),定义存储三级告警和网络告警条件
   - **参考**: spec.md FR-020 存储容量监控 (三级阈值), FR-021 网络带宽管理和 QoS 策略
 - [ ] [T063] [US3] Grafana 仪表盘配置 - 创建 Grafana dashboard JSON 配置 (`infrastructure/grafana/dashboards/hyperpod-overview.json`),展示集群健康、资源利用率、训练任务分布
-- [ ] [T068] [US3] 集群健康检查服务 - `backend/src/application/services/cluster_health_service.py`,定时任务 (1分钟) 检查 HyperPod 集群状态,更新 hyperpod_clusters 表,触发告警
+- [ ] [T068] [US3] 集群健康检查服务 - `backend/src/modules/monitoring/application/services/cluster_health_service.py`,定时任务 (1分钟) 检查 HyperPod 集群状态,更新 hyperpod_clusters 表,触发告警
 
 ### 训练指标服务 (FR-026)
-- [ ] [T220] [US1] 训练指标查询服务 - `backend/src/application/services/training_metrics_service.py`,扩展 Prometheus API 封装,专门查询训练相关指标 (Loss, Accuracy, Learning Rate, Throughput),支持时间范围过滤和多任务对比:
+- [ ] [T220] [US1] 训练指标查询服务 - `backend/src/modules/training/application/services/training_metrics_service.py`,扩展 Prometheus API 封装,专门查询训练相关指标 (Loss, Accuracy, Learning Rate, Throughput),支持时间范围过滤和多任务对比:
   - **训练曲线数据**: 查询 Prometheus `/api/v1/query_range` 获取时序数据,支持 step 参数调整精度
   - **指标聚合**: 支持 avg/max/min/last 聚合函数
   - **缓存策略**: 已完成任务的指标数据缓存 1 小时,减少 Prometheus 查询压力
@@ -709,20 +709,20 @@
 **依赖**: US1, US2, US3 完成 (需要训练任务、数据集、配额数据)
 
 ### 成本计算服务
-- [ ] [T069] [US4] 成本计算引擎核心逻辑 - `backend/src/application/services/cost_calculator.py`,基于 instance_type, node_count, training_duration 计算训练成本,实现成本累加和分摊逻辑,支持多维度成本分析 (compute/storage/network)
-- [ ] [T069a] [US4] AWS Cost Explorer 集成 - `backend/src/infrastructure/external/aws/cost_explorer_client.py`,封装 AWS Cost Explorer API,获取实际账单数据 (EC2, S3, FSx, EBS),支持按资源标签过滤成本数据,缓存策略 (1小时刷新)
-- [ ] [T069b] [US4] 训练成本定价模型 - `backend/src/application/services/pricing_model.py`,维护 HyperPod 实例定价表 (p4d.24xlarge, p5.48xlarge, trn1.32xlarge),FSx for Lustre 存储定价 (按吞吐量和容量),S3 存储和数据传输定价,网络传输成本计算
+- [ ] [T069] [US4] 成本计算引擎核心逻辑 - `backend/src/modules/billing/application/services/cost_calculator.py`,基于 instance_type, node_count, training_duration 计算训练成本,实现成本累加和分摊逻辑,支持多维度成本分析 (compute/storage/network)
+- [ ] [T069a] [US4] AWS Cost Explorer 集成 - `backend/src/modules/billing/infrastructure/external/cost_explorer_client.py`,封装 AWS Cost Explorer API,获取实际账单数据 (EC2, S3, FSx, EBS),支持按资源标签过滤成本数据,缓存策略 (1小时刷新)
+- [ ] [T069b] [US4] 训练成本定价模型 - `backend/src/modules/billing/application/services/pricing_model.py`,维护 HyperPod 实例定价表 (p4d.24xlarge, p5.48xlarge, trn1.32xlarge),FSx for Lustre 存储定价 (按吞吐量和容量),S3 存储和数据传输定价,网络传输成本计算
 - [ ] [T069c] [US4] 成本准确率验证测试 - `backend/tests/test_cost_accuracy.py`,对比计算成本 vs AWS Cost Explorer 实际账单,误差率计算 (目标 <2%),回归测试 (使用历史训练任务数据),准确率监控告警 (误差 >2% 触发)
   - **依赖**: T069 (成本计算引擎), T069a (Cost Explorer 集成), T069b (定价模型), T070 (资源使用聚合查询)
   - **测试数据**: 使用 T070 聚合的历史训练任务数据 (至少 30 天)
-- [ ] [T070] [US4] 资源使用聚合查询 - `backend/src/application/services/usage_aggregator.py`,使用 SQLAlchemy aggregation functions 聚合用户/项目资源使用,支持按时间维度分组 (day/week/month)
+- [ ] [T070] [US4] 资源使用聚合查询 - `backend/src/modules/billing/application/services/usage_aggregator.py`,使用 SQLAlchemy aggregation functions 聚合用户/项目资源使用,支持按时间维度分组 (day/week/month)
 
 ### 后端 API 端点
-- [ ] [T071] [US4] GET /reports/resource-usage 端点 - `backend/src/api/v1/endpoints/reports.py`,查询资源使用报表,支持时间范围、用户/项目过滤,返回 CPU/GPU/Storage 使用统计
+- [ ] [T071] [US4] GET /reports/resource-usage 端点 - `backend/src/modules/billing/api/endpoints.py`,查询资源使用报表,支持时间范围、用户/项目过滤,返回 CPU/GPU/Storage 使用统计
 - [ ] [T072] [US4] GET /reports/cost-analysis 端点 - 查询成本分析报表,支持时间范围、成本类型 (compute/storage/network) 过滤,返回成本趋势和预测
 
 ### CloudWatch Logs 集成
-- [ ] [T073] [US4] CloudWatch Logs 集成 - `backend/src/infrastructure/external/aws/cloudwatch_client.py`,封装 CloudWatch Logs Insights API,查询训练任务日志,支持 30天留存策略
+- [ ] [T073] [US4] CloudWatch Logs 集成 - `backend/src/shared/infrastructure/external/cloudwatch_client.py`,封装 CloudWatch Logs Insights API,查询训练任务日志,支持 30天留存策略
 
 ### 前端页面组件
 - [ ] [T074] [US4] [P] 资源使用报表页面 - `frontend/src/features/reports/pages/ResourceUsageReportPage.tsx`,使用 Cloudscape Container,展示资源使用图表和表格,支持导出 CSV,创建模块 API 层 `frontend/src/features/reports/api/queries.ts`,创建模块类型定义 `frontend/src/features/reports/types/index.ts`
@@ -731,7 +731,7 @@
 - [ ] [T077] [US4] [P] 成本趋势图表组件 - `frontend/src/features/reports/components/CostTrendChart.tsx`,使用 Recharts 渲染成本趋势折线图,支持对比上一周期
 
 ### 报表导出功能
-- [ ] [T078] [US4] 报表导出功能 - `backend/src/application/services/report_export_service.py`,实现 CSV/PDF 导出,使用 pandas 和 reportlab,支持自定义报表模板
+- [ ] [T078] [US4] 报表导出功能 - `backend/src/modules/billing/application/services/report_export_service.py`,实现 CSV/PDF 导出,使用 pandas 和 reportlab,支持自定义报表模板
 
 **并行执行机会**:
 - 成本计算服务: T069, T069a, T069b, T070 可并行 → T069c (依赖 T069, T069a, T069b, T070)
@@ -765,18 +765,18 @@
 - [X] [T080] [US5] ~~DevEnvironment 模型~~ → **与 T011c 重复** (`Space` 模型已在 Phase 2 创建,参见 T011c)
 
 ### 后端 API 端点
-- [ ] [T081] [US5] POST /ide/sessions 端点实现 - `backend/src/api/v1/endpoints/ide.py`,验证 IDE 配置,调用 SageMaker Spaces API 创建 Space,配置实例类型 (ml.g5.xlarge 默认/ml.g5.2xlarge,遵循 spec.md User Story 5 资源配额定义),验证用户配额 (GPU/CPU/内存,计入 FR-008 整体配额),返回 SageMaker Studio URL
+- [ ] [T081] [US5] POST /ide/sessions 端点实现 - `backend/src/modules/spaces/api/endpoints.py`,验证 IDE 配置,调用 SageMaker Spaces API 创建 Space,配置实例类型 (ml.g5.xlarge 默认/ml.g5.2xlarge,遵循 spec.md User Story 5 资源配额定义),验证用户配额 (GPU/CPU/内存,计入 FR-008 整体配额),返回 SageMaker Studio URL
 - [ ] [T082] [US5] GET /ide/sessions 端点实现 - 支持分页、过滤 (status, owner_id)、排序 (created_at)
 - [ ] [T083] [US5] GET /ide/sessions/{id} 端点实现 - 返回在线开发环境详情,包含 SageMaker Studio URL、Space 状态、实例类型、资源使用
 - [ ] [T084] [US5] DELETE /ide/sessions/{id} 端点实现 - 调用 SageMaker DeleteSpace API 停止在线开发环境,清理 Space 资源
 
 ### SageMaker Spaces 集成服务
-- [ ] [T085] [US5] SageMaker Spaces 集成 - `backend/src/application/services/sagemaker_spaces_service.py`,封装 `sagemaker-hyperpod.space` 模块 API,使用 T000 验证的 Space 模块方法实现 Space 创建、删除、查询功能,配置生命周期脚本 (Lifecycle Configuration) 预装常用库,管理 Space 状态转换,参考 `docs/hyperpod-sdk-reference.md`。如 SDK 不支持特定配置,MAY 使用 boto3 调用 SageMaker Spaces API 作为备选,但 MUST 提交例外申请并获得平台治理委员会批准,在代码中注释说明理由 (遵循宪章 Principle I.B) (依赖 T000)
-- [ ] [T085a] [US5] SageMaker Spaces 启动性能配置 - `backend/src/application/services/sagemaker_lifecycle_service.py`,配置 SageMaker Studio 生命周期脚本,预装常用 Python 库 (pip install pytorch transformers),选择合适的实例类型 (ml.g5.xlarge 默认/ml.g5.2xlarge 高性能场景,遵循 spec.md User Story 5 资源配额定义),配置 EFS 持久化存储避免重装,目标启动时间 <3分钟
-- [ ] [T085b] [US5] SageMaker Spaces 启动性能监控 - `backend/src/application/services/sagemaker_metrics_service.py`,集成 CloudWatch Metrics 监控 Space 启动时间,记录 CreateSpace API 调用到 InService 状态的耗时,P95/P99 启动时间统计,启动超时告警 (>3分钟触发)
+- [ ] [T085] [US5] SageMaker Spaces 集成 - `backend/src/modules/spaces/application/services/sagemaker_spaces_service.py`,封装 `sagemaker-hyperpod.space` 模块 API,使用 T000 验证的 Space 模块方法实现 Space 创建、删除、查询功能,配置生命周期脚本 (Lifecycle Configuration) 预装常用库,管理 Space 状态转换,参考 `docs/hyperpod-sdk-reference.md`。如 SDK 不支持特定配置,MAY 使用 boto3 调用 SageMaker Spaces API 作为备选,但 MUST 提交例外申请并获得平台治理委员会批准,在代码中注释说明理由 (遵循宪章 Principle I.B) (依赖 T000)
+- [ ] [T085a] [US5] SageMaker Spaces 启动性能配置 - `backend/src/modules/spaces/application/services/sagemaker_lifecycle_service.py`,配置 SageMaker Studio 生命周期脚本,预装常用 Python 库 (pip install pytorch transformers),选择合适的实例类型 (ml.g5.xlarge 默认/ml.g5.2xlarge 高性能场景,遵循 spec.md User Story 5 资源配额定义),配置 EFS 持久化存储避免重装,目标启动时间 <3分钟
+- [ ] [T085b] [US5] SageMaker Spaces 启动性能监控 - `backend/src/modules/spaces/application/services/sagemaker_metrics_service.py`,集成 CloudWatch Metrics 监控 Space 启动时间,记录 CreateSpace API 调用到 InService 状态的耗时,P95/P99 启动时间统计,启动超时告警 (>3分钟触发)
 - [ ] [T085c] [US5] SageMaker Spaces 启动性能测试 - `backend/tests/test_sagemaker_spaces_performance.py`,端到端启动时间测试 (目标 <3分钟),并发启动压力测试 (≥50 并发 Space),不同实例类型启动时间对比,性能回归测试 (CI/CD 集成)
-- [ ] [T086] [US5] SageMaker Studio 镜像配置 - `backend/src/application/services/sagemaker_image_service.py`,使用 SageMaker Studio 官方镜像 (Data Science, PyTorch, TensorFlow),支持自定义镜像注册到 SageMaker Image Registry,配置镜像版本管理
-- [ ] [T090] [US5] SageMaker Space 状态同步 - `backend/src/application/services/sagemaker_sync_service.py`,定时任务 (30秒) 调用 DescribeSpace API 同步状态到数据库,处理 InService/Pending/Failed 状态转换
+- [ ] [T086] [US5] SageMaker Studio 镜像配置 - `backend/src/modules/spaces/application/services/sagemaker_image_service.py`,使用 SageMaker Studio 官方镜像 (Data Science, PyTorch, TensorFlow),支持自定义镜像注册到 SageMaker Image Registry,配置镜像版本管理
+- [ ] [T090] [US5] SageMaker Space 状态同步 - `backend/src/modules/spaces/application/services/sagemaker_sync_service.py`,定时任务 (30秒) 调用 DescribeSpace API 同步状态到数据库,处理 InService/Pending/Failed 状态转换
 
 ### 前端页面组件
 - [ ] [T087] [US5] [P] 开发空间创建页面 - `frontend/src/features/spaces/pages/CreateSpacePage.tsx`,使用 Cloudscape Form,选择 IDE 类型 (JupyterLab/VS Code)、实例类型 (ml.g5.xlarge 默认/ml.g5.2xlarge,显示资源规格: CPU/内存/GPU,遵循 spec.md User Story 5 资源配额定义)、SageMaker Studio 镜像,显示启动进度和预估启动时间,创建模块 API 层 `frontend/src/features/spaces/api/queries.ts`
@@ -821,7 +821,7 @@
 - [ ] [T096] [P] OpenAPI 文档生成 - 配置 FastAPI 自动生成 OpenAPI 3.0 规范,集成 Swagger UI (`/docs`) 和 ReDoc (`/redoc`)
 
 ### 错误处理和重试逻辑
-- [ ] [T097] [P] 统一错误处理中间件 - `backend/src/api/middleware/error_handler.py`,捕获所有异常,返回标准化错误响应 (RFC 7807 Problem Details),记录错误日志
+- [ ] [T097] [P] 统一错误处理中间件 - `backend/src/shared/api/middleware/error_handler.py`,捕获所有异常,返回标准化错误响应 (RFC 7807 Problem Details),记录错误日志
 - [ ] [T098] [P] 请求重试逻辑 - `frontend/src/lib/api/client.ts`,使用 TanStack Query retry 机制,配置指数退避策略 (1s, 2s, 4s),最多重试 3 次,创建请求/响应拦截器 `frontend/src/lib/api/interceptors.ts`
 - [ ] [T099] [P] 前端错误边界组件 - `frontend/src/shared/components/feedback/ErrorBoundary.tsx`,捕获 React 组件错误,显示友好错误页面,支持错误上报,作为共享反馈组件供全局使用
 
@@ -830,7 +830,7 @@
 - [ ] [T101] CloudWatch Logs 配置验证 - 验证 30天日志留存策略,配置日志组 (/aws/hyperpod/training-platform),创建 CloudWatch Logs Insights 查询模板
 - [ ] [T101a] 加密合规性验证 - 验证所有 S3 存储桶启用 SSE-KMS 加密,验证 API 端点强制 TLS 1.2+,生成加密审计报告,确保符合 FR-018 要求
 - [ ] [T102] 性能监控埋点 - 使用 FastAPI middleware 记录 API 延迟,上报到 CloudWatch Metrics,配置告警 (P95 延迟 >500ms)
-- [ ] [T102a] 审计日志自动清理服务 - `backend/src/application/services/audit_cleanup_service.py`,配置定时任务 (使用 APScheduler 或 Celery Beat,每日凌晨 2:00 执行),调用 DELETE /audit-logs/cleanup API (T061b),记录清理统计 (清理条数、执行耗时、失败记录数),CloudWatch Logs 记录清理事件 (级别 INFO,包含清理时间和统计),配置清理失败告警 (连续 3 天失败触发),确保符合 FR-017 保留策略 ≥90天
+- [ ] [T102a] 审计日志自动清理服务 - `backend/src/modules/audit/application/services/audit_cleanup_service.py`,配置定时任务 (使用 APScheduler 或 Celery Beat,每日凌晨 2:00 执行),调用 DELETE /audit-logs/cleanup API (T061b),记录清理统计 (清理条数、执行耗时、失败记录数),CloudWatch Logs 记录清理事件 (级别 INFO,包含清理时间和统计),配置清理失败告警 (连续 3 天失败触发),确保符合 FR-017 保留策略 ≥90天
   - **职责**: 定时任务调度和执行监控,不负责实际清理逻辑 (委托给 T061b)
   - **依赖**: T061b (cleanup API)
 

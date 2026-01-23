@@ -510,7 +510,9 @@ backend/
 │   │   │   │   ├── schemas/        # Pydantic 请求/响应
 │   │   │   │   └── dependencies.py # 依赖注入 (get_current_user)
 │   │   │   ├── application/
-│   │   │   │   └── services/       # AuthService
+│   │   │   │   ├── dto/            # 数据传输对象 (跨层传输)
+│   │   │   │   ├── services/       # AuthService
+│   │   │   │   └── interfaces/     # 端口接口 (外部服务抽象)
 │   │   │   ├── domain/
 │   │   │   │   ├── entities/       # User 实体
 │   │   │   │   ├── repositories/   # IUserRepository 接口
@@ -524,7 +526,9 @@ backend/
 │   │   │   │   ├── endpoints.py
 │   │   │   │   └── schemas/
 │   │   │   ├── application/
-│   │   │   │   └── services/       # TrainingJobService
+│   │   │   │   ├── dto/            # 数据传输对象
+│   │   │   │   ├── services/       # TrainingJobService
+│   │   │   │   └── interfaces/     # IHyperPodClient 等外部服务接口
 │   │   │   ├── domain/
 │   │   │   │   ├── entities/       # TrainingJob, Checkpoint
 │   │   │   │   ├── value_objects/  # JobStatus, ResourceSpec
@@ -959,10 +963,17 @@ infrastructure/                     # 基础设施即代码 (IaC)
 **目录结构设计原则**:
 - **后端**: 遵循 Clean Architecture (整洁架构) 四层分层:
   - `domain/`: 领域层 (核心) - 包含实体、值对象、仓储接口、领域异常，**MUST NOT 依赖任何外层或框架**
-  - `application/`: 应用层 - 包含应用服务、DTO、端口接口，**仅依赖 domain 层**
-  - `infrastructure/`: 基础设施层 - 包含 ORM 模型、仓储实现、外部服务适配器，**实现 domain/application 接口**
-  - `api/`: API 层 - 包含 REST 端点、Pydantic Schema、FastAPI 依赖注入，**依赖 application 层**
-  - `core/`: 共享核心 - 跨层工具 (配置、安全、日志)
+  - `application/`: 应用层 - 包含三个子目录:
+    - `dto/`: 数据传输对象 (跨层传输)
+    - `services/`: 业务用例实现
+    - `interfaces/`: 端口接口 (外部服务抽象，如 IHyperPodClient)
+    - **仅依赖 domain 层**
+  - `infrastructure/`: 基础设施层 - 包含 ORM 模型、仓储实现、外部服务适配器，**同时实现 domain 层的 Repository 接口和 application 层的外部服务接口 (interfaces/)**
+  - `api/`: API 层 - 包含 REST 端点、Pydantic Schema、FastAPI 依赖注入
+    - **主要依赖 application 层执行业务操作**
+    - **可以导入 domain 层的类型定义**（实体类、值对象、枚举）用于类型标注和响应映射
+    - **禁止直接访问 infrastructure 实现**
+  - `shared/`: 共享内核 - 跨模块工具 (配置、安全、日志、通用接口)
   - **依赖规则**: 依赖方向 **MUST** 从外层指向内层，内层 **MUST NOT** 依赖外层
 - **前端**: 采用 **功能模块化架构 (Feature-based Architecture)** + **垂直切片架构 (Vertical Slice)**:
   - `app/`: 应用层 - 全局配置、入口、Providers、路由守卫
