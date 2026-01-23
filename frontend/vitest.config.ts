@@ -8,12 +8,13 @@ export default defineConfig({
   test: {
     globals: true,
     environment: 'jsdom',
-    setupFiles: ['./src/tests/setup.ts'],
-    include: ['src/**/*.{test,spec}.{ts,tsx}'],
+    setupFiles: ['./tests/setup.ts'],
+    include: ['tests/**/*.{test,spec}.{ts,tsx}'],
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'html'],
-      exclude: ['node_modules/', 'src/tests/'],
+      include: ['src/**/*.{ts,tsx}'],
+      exclude: ['node_modules/', 'src/**/*.d.ts'],
     },
   },
   resolve: {
@@ -26,6 +27,7 @@ export default defineConfig({
       '@lib': resolve(__dirname, './src/lib'),
       '@store': resolve(__dirname, './src/store'),
       '@types': resolve(__dirname, './src/types'),
+      '@tests': resolve(__dirname, './tests'),
     },
   },
 });
