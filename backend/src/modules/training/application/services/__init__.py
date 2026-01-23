@@ -9,6 +9,7 @@ from .hyperpod_service import (
     build_volume_config,
     build_job_config,
 )
+from .mlflow_service import MLflowService, MLflowServiceError
 
 __all__ = [
     "TrainingJobService",
@@ -18,4 +19,6 @@ __all__ = [
     "map_hyperpod_status",
     "build_volume_config",
     "build_job_config",
+    "MLflowService",
+    "MLflowServiceError",
 ]

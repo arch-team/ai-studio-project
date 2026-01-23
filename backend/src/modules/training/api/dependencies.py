@@ -5,8 +5,10 @@ from functools import lru_cache
 from fastapi import Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.modules.training.application.interfaces import IMetricsService
 from src.modules.training.application.services import (
     CheckpointService,
+    MLflowService,
     TrainingJobService,
 )
 from src.modules.training.infrastructure.hyperpod import HyperPodClient
@@ -43,3 +45,15 @@ async def get_checkpoint_service(
     """Dependency for CheckpointService."""
     repository = CheckpointRepository(session)
     return CheckpointService(repository=repository)
+
+
+@lru_cache(maxsize=1)
+def get_mlflow_service() -> IMetricsService:
+    """Singleton MLflowService instance (T037a)."""
+    settings = get_settings()
+    return MLflowService(
+        tracking_uri=settings.mlflow_tracking_uri,
+        experiment_prefix=settings.mlflow_experiment_prefix,
+        timeout=settings.mlflow_request_timeout,
+        max_retries=settings.mlflow_max_retries,
+    )

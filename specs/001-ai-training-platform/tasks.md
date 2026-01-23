@@ -466,8 +466,8 @@
   - **监控指标**: 记录 Pod 就绪时间差,验证时间窗口 ≤60 秒
   - **测试工具**: 使用 pytest + kubernetes-client 查询 Pod 状态和事件
   - **参考**: spec.md FR-003 Gang Scheduling 机制 (依赖 T036, T008c-1/T008c-2/T008c-3 HyperPod 集群)
-- [ ] [T037] [US1] 训练任务状态同步服务 - `backend/src/modules/training/application/services/training_sync_service.py`,定时任务 (30秒) 同步 HyperPod 训练状态到数据库,使用 T000 验证的状态查询方法获取任务状态,处理状态转换事件,参考 `docs/hyperpod-sdk-reference.md`。如需细粒度状态监控,MAY 使用 kubernetes-client 查询 Kueue Workload 状态,但 MUST 提交例外申请并获得平台治理委员会批准,在代码中注释说明理由 (遵循宪章 Principle I.B) (依赖 T000, T036)
-- [ ] [T037d] [US1] 抢占连续失败转 Failed 状态测试 - `backend/tests/integration/test_preemption_exhausted.py`,验证 FR-004 连续抢占失败机制:
+- [X] [T037] [US1] 训练任务状态同步服务 - `backend/src/modules/training/application/services/training_sync_service.py`,定时任务 (30秒) 同步 HyperPod 训练状态到数据库,使用 T000 验证的状态查询方法获取任务状态,处理状态转换事件,参考 `docs/hyperpod-sdk-reference.md`。如需细粒度状态监控,MAY 使用 kubernetes-client 查询 Kueue Workload 状态,但 MUST 提交例外申请并获得平台治理委员会批准,在代码中注释说明理由 (遵循宪章 Principle I.B) (依赖 T000, T036)
+- [X] [T037d] [US1] 抢占连续失败转 Failed 状态测试 - `backend/tests/integration/test_preemption_exhausted.py`,验证 FR-004 连续抢占失败机制:
   - **验证场景 1**: 模拟训练任务被连续抢占 3 次,验证第 3 次抢占后任务状态转为 Failed
   - **验证场景 2**: 验证 preemption_count 计数器正确累加 (每次抢占 +1)
   - **验证场景 3**: 验证失败分类正确记录 (failureCategory = "PreemptionExhausted")
@@ -475,7 +475,7 @@
   - **验证场景 5**: 验证告警通知发送给任务提交者和平台管理员
   - **测试工具**: 使用 pytest + kubernetes-client 模拟 Kueue Evicted condition
   - **参考**: spec.md L427-462 连续抢占失败逻辑 (依赖 T037)
-- [ ] [T037c] [US1] 训练任务停滞检测服务 - `backend/src/modules/training/application/services/stall_detection_service.py`,实现 FR-022 停滞检测机制:
+- [X] [T037c] [US1] 训练任务停滞检测服务 - `backend/src/modules/training/application/services/stall_detection_service.py`,实现 FR-022 停滞检测机制:
   - **主指标监控**: 默认监控 Loss 指标,支持用户指定单一主检测指标 (Accuracy/Perplexity 等)
   - **停滞判定逻辑**: 主指标在可配置时间窗口 (默认 30 分钟) 内变化率 <0.1% 触发停滞告警
   - **辅助指标处理**: 其他指标异常仅记录日志供参考,不触发告警 (避免误报)
@@ -485,7 +485,7 @@
   - **终止选项**: 提供自动终止 (管理员配置) 或手动终止 (用户确认) 选项
   - **定时任务调度**: 每 5 分钟执行一次检测 (覆盖所有 Running 状态任务)
   - **参考**: spec.md FR-022 训练任务停滞检测机制 (依赖 T037 状态同步服务)
-- [ ] [T037e] [US1] 停滞检测机制测试 - `backend/tests/integration/test_stall_detection.py`,验证 FR-022 停滞检测功能:
+- [X] [T037e] [US1] 停滞检测机制测试 - `backend/tests/integration/test_stall_detection.py`,验证 FR-022 停滞检测功能:
   - **验证场景 1**: 模拟 Loss 指标 30 分钟内变化率 <0.1%,验证停滞告警触发
   - **验证场景 2**: 验证用户指定主指标 (Accuracy) 时的停滞检测逻辑
   - **验证场景 3**: 验证禁用停滞检测配置 (disable_stall_detection: true) 生效
@@ -493,7 +493,7 @@
   - **验证场景 5**: 验证主指标选择逻辑 (Loss → Accuracy → Perplexity 自动选择)
   - **测试工具**: 使用 pytest + MLflow API 模拟指标记录和查询
   - **参考**: spec.md FR-022 停滞检测策略 (依赖 T037c 停滞检测服务)
-- [ ] [T037a] [US1] SageMaker Managed MLflow 集成 - `backend/src/modules/training/application/services/mlflow_service.py`,部署 MLflow Tracking Server (使用 SageMaker Managed MLflow),配置 MLflow Tracking URI 环境变量注入,提供 Python SDK 示例代码 (`backend/examples/mlflow_training_example.py`),文档化指标记录最佳实践 (指标命名规范、记录频率、超参数追踪模式),实现 MLflow 实验查询 API 集成到前端监控页面
+- [X] [T037a] [US1] SageMaker Managed MLflow 集成 - `backend/src/modules/training/application/services/mlflow_service.py`,部署 MLflow Tracking Server (使用 SageMaker Managed MLflow),配置 MLflow Tracking URI 环境变量注入,提供 Python SDK 示例代码 (`backend/examples/mlflow_training_example.py`),文档化指标记录最佳实践 (指标命名规范、记录频率、超参数追踪模式),实现 MLflow 实验查询 API 集成到前端监控页面
 - [ ] [T037b] [US1] Prometheus Pushgateway 部署 (可选) - `infrastructure/monitoring/pushgateway.yaml`,部署 Pushgateway 服务到 EKS 集群 (仅用于实时告警场景),配置 Service 和环境变量 `PROMETHEUS_PUSHGATEWAY_URL` 注入,提供 Python SDK 示例代码 (`backend/examples/prometheus_metrics_example.py`),文档化与 MLflow 的职责分离和使用场景
 - [ ] [T038] [US1] Checkpoint 自动保存逻辑 - `backend/src/modules/training/application/services/checkpoint_service.py`,实现 FR-010 定义的 5 种检查点创建触发场景:
   - **(1) 定期自动创建**: 定时任务 (10-15 分钟间隔) 为 Running 状态的训练任务自动创建检查点

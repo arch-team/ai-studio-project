@@ -40,6 +40,12 @@ class Settings(BaseSettings):
     # HyperPod
     hyperpod_cluster_name: str | None = None
 
+    # MLflow (T037a)
+    mlflow_tracking_uri: str = "http://mlflow.kubeflow.svc.cluster.local:5000"
+    mlflow_experiment_prefix: str = "ai-training-platform"
+    mlflow_request_timeout: int = 30  # 秒
+    mlflow_max_retries: int = 3
+
     # Security
     secret_key: str = "change-me-in-production"
     access_token_expire_minutes: int = 30
