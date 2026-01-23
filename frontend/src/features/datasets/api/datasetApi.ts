@@ -13,6 +13,16 @@ import type {
 const API_BASE = '/api/v1';
 
 /**
+ * 获取认证请求头
+ */
+function getAuthHeaders(): HeadersInit {
+  return {
+    'Content-Type': 'application/json',
+    Authorization: `Bearer ${localStorage.getItem('access_token') || ''}`,
+  };
+}
+
+/**
  * Fetch paginated list of datasets.
  */
 export async function fetchDatasets(
@@ -31,7 +41,9 @@ export async function fetchDatasets(
   if (filters.sort_by) params.append('sort_by', filters.sort_by);
   if (filters.sort_order) params.append('sort_order', filters.sort_order);
 
-  const response = await fetch(`${API_BASE}/datasets?${params.toString()}`);
+  const response = await fetch(`${API_BASE}/datasets?${params.toString()}`, {
+    headers: getAuthHeaders(),
+  });
   if (!response.ok) {
     throw new Error(`Failed to fetch datasets: ${response.statusText}`);
   }
@@ -42,7 +54,9 @@ export async function fetchDatasets(
  * Fetch a single dataset by ID.
  */
 export async function fetchDataset(id: number): Promise<DatasetDetail> {
-  const response = await fetch(`${API_BASE}/datasets/${id}`);
+  const response = await fetch(`${API_BASE}/datasets/${id}`, {
+    headers: getAuthHeaders(),
+  });
   if (!response.ok) {
     throw new Error(`Failed to fetch dataset: ${response.statusText}`);
   }
@@ -57,7 +71,7 @@ export async function createDataset(
 ): Promise<DatasetDetail> {
   const response = await fetch(`${API_BASE}/datasets`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: getAuthHeaders(),
     body: JSON.stringify(data),
   });
   if (!response.ok) {
@@ -75,7 +89,7 @@ export async function updateDataset(
 ): Promise<DatasetDetail> {
   const response = await fetch(`${API_BASE}/datasets/${id}`, {
     method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
+    headers: getAuthHeaders(),
     body: JSON.stringify(data),
   });
   if (!response.ok) {
@@ -90,6 +104,7 @@ export async function updateDataset(
 export async function deleteDataset(id: number): Promise<void> {
   const response = await fetch(`${API_BASE}/datasets/${id}`, {
     method: 'DELETE',
+    headers: getAuthHeaders(),
   });
   if (!response.ok) {
     throw new Error(`Failed to delete dataset: ${response.statusText}`);
@@ -102,6 +117,7 @@ export async function deleteDataset(id: number): Promise<void> {
 export async function archiveDataset(id: number): Promise<DatasetDetail> {
   const response = await fetch(`${API_BASE}/datasets/${id}/archive`, {
     method: 'POST',
+    headers: getAuthHeaders(),
   });
   if (!response.ok) {
     throw new Error(`Failed to archive dataset: ${response.statusText}`);

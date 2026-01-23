@@ -49,7 +49,7 @@ export function useModelVersions(
   }
 ) {
   return useQuery({
-    queryKey: ['models', 'versions', id, options],
+    queryKey: queryKeys.models.versions(id!, options),
     queryFn: () => fetchModelVersions(id!, options),
     enabled: id !== undefined,
   });
@@ -104,7 +104,7 @@ export function useArchiveModel() {
       // Invalidate list queries
       queryClient.invalidateQueries({ queryKey: queryKeys.models.lists() });
       // Invalidate version queries
-      queryClient.invalidateQueries({ queryKey: ['models', 'versions', result.id] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.models.versionsAll() });
     },
   });
 }
@@ -123,7 +123,7 @@ export function useRestoreModel() {
       // Invalidate list queries
       queryClient.invalidateQueries({ queryKey: queryKeys.models.lists() });
       // Invalidate version queries
-      queryClient.invalidateQueries({ queryKey: ['models', 'versions', result.id] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.models.versionsAll() });
     },
   });
 }

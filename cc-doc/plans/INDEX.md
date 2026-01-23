@@ -35,3 +35,4 @@ Claude Code 生成的计划文件索引。
 | 2026-01-18 | `2026-01-18-claude-code-memory-管理规范-实施计划.md` | Claude Code Memory 管理规范 - 实施计划 | ⏳ 进行中 |
 | 2026-01-23 | `2026-01-23-架构合规性检查清单生成计划.md` | 架构合规性检查清单生成计划 | ⏳ 进行中 |
 | 2026-01-23 | `2026-01-23-architecture-md-与-spec-kit-文件一致性分析.md` | ARCHITECTURE.md 与 Spec-Kit 文件一致性分析 | ⏳ 进行中 |
+| 2026-01-24 | `2026-01-24-实施计划-hyperpod-集成服务-t037-t037c-t037d-t037e.md` | 实施计划: HyperPod 集成服务 (T037, T037c, T037d, T037e) | ⏳ 进行中 |

@@ -72,7 +72,7 @@ export function useTrainingJobLogs(
   pollInterval?: number
 ) {
   return useQuery({
-    queryKey: ['trainingJobs', 'logs', jobId, options],
+    queryKey: queryKeys.trainingJobs.logs(jobId!, options),
     queryFn: () => fetchTrainingJobLogs(jobId!, options),
     enabled: jobId !== undefined,
     refetchInterval: pollInterval,
@@ -93,7 +93,7 @@ export function useTrainingJobMetrics(
   pollInterval?: number
 ) {
   return useQuery({
-    queryKey: ['trainingJobs', 'metrics', jobId, options],
+    queryKey: queryKeys.trainingJobs.metrics(jobId!, options),
     queryFn: () => fetchTrainingJobMetrics(jobId!, options),
     enabled: jobId !== undefined,
     refetchInterval: pollInterval,

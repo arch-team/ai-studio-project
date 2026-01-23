@@ -201,7 +201,7 @@ Training Operator 需要在带有 sagemaker.amazonaws.com/compute-type: hyperpod
 
 
 
-使用code-simplifier插件帮我优化当前项目中的代码，这个项目(backend)是使用python开发的企业训练平台后端项目
+使用code-simplifier:code-simplifier插件帮我优化当前项目中的代码，这个项目(backend)是使用python开发的企业训练平台后端项目
 
 
 
@@ -220,7 +220,7 @@ Training Operator 需要在带有 sagemaker.amazonaws.com/compute-type: hyperpod
 
 /speckit.implement ## Phase 3: US1 (P1) - 训练任务管理 (33 tasks) 中的后端 API 端点 (基于 contracts/training-jobs-api.yaml), 每个任务按照TDD（测试驱动开发的流程进行），完成后将相应的任务标记为完成状态
 
-/speckit.implement ## Phase 3: US1 (P1) - 训练任务管理 (33 tasks) 中的后端 API 端点 (基于 contracts/training-jobs-api.yaml), 每个任务按照TDD（测试驱动开发的流程进行），完成后将相应的任务标记为完成状态
+/speckit.implement ## Phase 3: US1 (P1) - 训练任务管理 (33 tasks) 中的HyperPod 集成服务(T037，T037d，T037c，T037e), 每个任务按照TDD（测试驱动开发的流程进行），完成后将相应的任务标记为完成状态
 
 
 
@@ -229,7 +229,6 @@ Training Operator 需要在带有 sagemaker.amazonaws.com/compute-type: hyperpod
 # 标准
 
 推荐模块化设计、简明逻辑、清晰接口、职责单一
-
 
 
 仔细分析，在理解当前项目的需求和数据库表和实体设计的基础上，确认哪些数据库表和实体的设计希望记录的信息是SageMaker HyperPod with EKS提供了持久化，哪些是需要应用层自己应该记录到数据库中的
@@ -241,7 +240,7 @@ Training Operator 需要在带有 sagemaker.amazonaws.com/compute-type: hyperpod
 
 
 /speckit.implement ## Phase 2: Foundational - 基础设施 (23 tasks) 中的### ResourceLimitConfig 管理 API (Admin), 每个任务按照TDD（测试驱动开发的流程进行），完成后将相应的任务标记为完成状态。注意ResourceLimit 依赖于SageMaker HyperPod 原生的Task Governance 这个功能特性，因此你需要分析resource_limit_configs相关的信息哪些应该保存到应用数据库，哪些应该来自SageMaker HyperPod 原生的Task Governance组件提供的信息
-‘
+
 
 
 /Users/jinhuasu/.claude/plans/dapper-tumbling-widget.md。
@@ -365,3 +364,6 @@ specs
 
 
 当前目录是对应/Users/jinhuasu/Project_Workspace/Anker-Projects/ml-platform-research/llm-platform-solution/ai-studio-project/backend这个后端项目前端项目，请参考这个前端项目的实现现状，分析这个前端项目是否能backend这个后端项目在Modular Monolith架构模式保持一致性
+
+
+
