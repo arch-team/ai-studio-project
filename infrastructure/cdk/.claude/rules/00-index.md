@@ -13,23 +13,13 @@
 
 ## 始终加载
 
-- `01-architecture.md` - Stack 分层
+- `01-architecture.md` - 依赖规则
 - `05-code-style.md` - 代码风格
 
-## 快速命令
+## 命令速查
 
 ```bash
-ruff check . && mypy .     # 检查
-pytest -m unit             # 测试
-cdk deploy --context env=dev
-```
-
-## Stack 分层
-
-```
-L1: NetworkStack, IamStack
-L2: DatabaseStack, StorageStack
-L3: EksStack → HyperPodStack → AddonsStack
-L4: FsxLustreStack
-L5: AlbStack
+ruff check . && mypy .          # 检查
+pytest -m unit                  # 测试
+cdk deploy --context env=dev    # 部署
 ```

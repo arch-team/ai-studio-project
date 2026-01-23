@@ -69,70 +69,21 @@ cdk deploy --context env=dev    # 部署
 
 ---
 
-## 目录结构
+## 详细规范
 
-```
-cdk/
-├── app.py                 # CDK 入口
-├── config/
-│   ├── constants.py       # 常量 (EKS_ADDON_NAMES, K8S_NAMESPACES)
-│   └── environments.py    # 环境配置 (EnvironmentConfig.for_dev/staging/prod)
-├── stacks/
-│   ├── foundation/        # Layer 1: NetworkStack, IamStack
-│   ├── data/              # Layer 2: DatabaseStack, StorageStack, FsxLustreStack
-│   ├── compute/           # Layer 3: EksStack, SagemakerHyperPodStack
-│   └── networking/        # Layer 5: AlbStack
-├── cdk_constructs/        # 可复用 L3 Construct
-├── utils/                 # 工具函数
-└── tests/                 # 测试
-```
+`.claude/rules/` 目录中的规范文件**按需自动加载**:
 
----
+| 规范 | 触发条件 |
+|------|----------|
+| 02-stack-design | 编辑 `stacks/**/*.py` |
+| 03-construct-design | 编辑 `cdk_constructs/**/*.py` |
+| 04-configuration | 编辑 `config/**/*.py` |
+| 05-code-style | 编辑 `**/*.py` |
+| 06-testing | 编辑 `tests/**/*.py` |
+| 07-security | 编辑安全相关代码 |
+| 08-hyperpod | 编辑 HyperPod 相关代码 |
 
-## Stack 模板 (简化版)
-
-```python
-class ExampleStack(Stack):
-    def __init__(
-        self,
-        scope: Construct,
-        construct_id: str,
-        *,
-        env_config: EnvironmentConfig,
-        vpc: ec2.IVpc,  # 依赖注入
-        **kwargs,
-    ) -> None:
-        super().__init__(scope, construct_id, **kwargs)
-
-        self._env_config = env_config
-        self._create_resources(vpc)
-        apply_standard_tags(self, env_config)
-
-    def _create_resources(self, vpc: ec2.IVpc) -> None:
-        """私有方法创建资源"""
-        pass
-
-    @property
-    def resource(self) -> SomeType:
-        """公开属性导出资源"""
-        return self._resource
-```
-
----
-
-## 详细规范 (按需加载)
-
-当需要深入了解特定主题时，使用 `@` 引用对应规范文件:
-
-| 任务 | 规范文件 | 引用方式 |
-|------|----------|----------|
-| 新建 Stack | `.claude/rules/02-stack-design.md` | `@02-stack-design.md` |
-| 新建 Construct | `.claude/rules/03-construct-design.md` | `@03-construct-design.md` |
-| 配置管理 | `.claude/rules/04-configuration.md` | `@04-configuration.md` |
-| 代码风格 | `.claude/rules/05-code-style.md` | `@05-code-style.md` |
-| 编写测试 | `.claude/rules/06-testing.md` | `@06-testing.md` |
-| 安全审查 | `.claude/rules/07-security.md` | `@07-security.md` |
-| HyperPod 部署 | `.claude/rules/08-hyperpod.md` | `@08-hyperpod.md` |
+**手动引用**: 在对话中使用 `@.claude/rules/02-stack-design.md` 加载特定规范
 
 ---
 
