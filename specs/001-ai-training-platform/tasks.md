@@ -249,7 +249,8 @@
 | AWS 原生资源 (VPC/RDS/S3/FSx) | CDK Stack | `infrastructure/cdk/stacks/` |
 | EKS 集群 | CDK Stack | `infrastructure/cdk/stacks/` |
 | AWS 托管 EKS Add-ons (含 HyperPod 全系列) | CDK `eks.Addon` | `infrastructure/cdk/stacks/hyperpod_addons_stack.py` |
-| K8s 原生资源 (NetworkPolicy/RBAC/PriorityClass) | K8s 清单 | `infrastructure/k8s/` |
+| K8s 原生资源 (NetworkPolicy/RBAC) | K8s 清单 | `infrastructure/k8s/` |
+| PriorityClass | Task Governance Add-on 自动管理 | 无需手动创建，由 T008d-1 安装的 Add-on 自动提供 |
 | ArgoCD Application | K8s 清单 | `infrastructure/argocd/` |
 
 - [X] [T008d-1] [P] 训练核心组件安装 - `infrastructure/cdk/stacks/hyperpod_addons_stack.py`,使用 CDK `eks.Addon` 安装训练调度核心组件 (已完成: CDK Stack + 验证脚本):
@@ -651,10 +652,14 @@
 
 ### 监控集成服务
 - [ ] [T062] [US3] Prometheus 指标采集集成 - `backend/src/application/services/prometheus_service.py`,封装 Prometheus HTTP API,查询 HyperPod Observability Add-on 指标,实现 ≤30秒刷新频率:
-  - **存储容量监控 (FR-020)**: 采集 FSx for Lustre 和 S3 存储使用率指标,配置双阈值告警 (80% 警告/90% 严重),集成 CloudWatch Alarms 发送通知
+  - **存储容量监控 (FR-020)**: 采集 NVMe 和 FSx for Lustre 二层存储使用率指标,配置三级阈值告警:
+    - **警告级别 (80%)**: 发送邮件通知管理员,触发加速检查点迁移到下一层
+    - **严重级别 (90%)**: 触发紧急迁移 (参见 FR-011),暂停新检查点创建 (保留最近 1 个)
+    - **满载级别 (95%)**: 暂停新训练任务提交,发送紧急告警 (邮件 + Slack/PagerDuty),要求管理员介入
+  - **满载保护机制**: 实现 `StorageCapacityGuard` 服务,在训练任务提交时检查存储使用率,95% 以上拒绝提交并返回明确错误信息
   - **网络性能监控 (FR-021)**: 采集 EFA 网络吞吐量、延迟指标 (node_network_receive/transmit_bytes_total),监控 Pod 间网络延迟 P99,配置告警 (延迟 >10ms 或带宽利用率 <80% 触发)
-  - **告警规则配置**: 创建 Prometheus AlertManager 规则 (`infrastructure/prometheus/alerts/storage-alerts.yaml`, `infrastructure/prometheus/alerts/network-alerts.yaml`),定义存储和网络告警条件
-  - **参考**: spec.md FR-020 存储容量监控, FR-021 网络带宽管理和 QoS 策略
+  - **告警规则配置**: 创建 Prometheus AlertManager 规则 (`infrastructure/prometheus/alerts/storage-alerts.yaml`, `infrastructure/prometheus/alerts/network-alerts.yaml`),定义存储三级告警和网络告警条件
+  - **参考**: spec.md FR-020 存储容量监控 (三级阈值), FR-021 网络带宽管理和 QoS 策略
 - [ ] [T063] [US3] Grafana 仪表盘配置 - 创建 Grafana dashboard JSON 配置 (`infrastructure/grafana/dashboards/hyperpod-overview.json`),展示集群健康、资源利用率、训练任务分布
 - [ ] [T068] [US3] 集群健康检查服务 - `backend/src/application/services/cluster_health_service.py`,定时任务 (1分钟) 检查 HyperPod 集群状态,更新 hyperpod_clusters 表,触发告警
 
@@ -690,7 +695,7 @@
 - FR-012: 配额检查延迟 <100ms
 - FR-013: 集群监控刷新频率 ≤30秒
 - FR-014: 支持 ≥1000 并发用户
-- FR-020: 存储容量告警触发准确率 100% (80%/90% 双阈值)
+- FR-020: 存储容量告警触发准确率 100% (80%/90%/95% 三级阈值)
 - FR-021: 网络延迟 P99 <10ms,带宽利用率 >80%
 - FR-026: 训练指标查询延迟 <2秒,支持 7 天历史数据
 - SC-008: Prometheus 指标保留期 ≥30天

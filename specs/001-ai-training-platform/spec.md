@@ -876,7 +876,7 @@ training_job_failures_total{failure_category="..."}
     - 优先级间隔足够大（400-500），便于未来插入新的优先级层级
     - PriorityClass 名称遵循 `training-priority-{level}` 命名规范
 
-    **配置位置**: Phase 1 IaC 任务 T008d-1 负责创建 Kubernetes PriorityClass 资源
+    **配置位置**: PriorityClass 由 HyperPod Task Governance Add-on 自动管理。Phase 1 IaC 任务 T008d-1 安装 Task Governance Add-on 后，三级优先级 (training-priority-low/medium/high) 自动可用，无需手动创建 Kubernetes PriorityClass 资源。用户通过 HyperPod SDK 提交训练任务时指定优先级参数 (high/medium/low) 即可
   - 🔧 **实施约束**: MUST 使用 HyperPod Task Governance (Kueue) 的原生抢占机制。
     任务优先级配置：通过 `sagemaker-hyperpod.training` 模块提交训练任务时，在任务配置中指定优先级参数（high/medium/low）。
     抢占状态监控：底层 Kueue Workload 状态驱动抢占流程（详见 Training Job State Model 章节），通过 `get_training_job_status()` 方法获取抢占状态。

@@ -9,13 +9,7 @@ from src.main import app
 from tests.shared.constants import TEST_API_BASE_URL
 
 
-@pytest.fixture(scope="session")
-def anyio_backend() -> str:
-    """Configure anyio backend for async tests."""
-    return "asyncio"
-
-
-@pytest.fixture(scope="session")
+@pytest.fixture(scope="function")
 async def app_client() -> AsyncGenerator[AsyncClient, None]:
     """Full application client for E2E testing.
 
@@ -30,7 +24,7 @@ async def app_client() -> AsyncGenerator[AsyncClient, None]:
         yield client
 
 
-@pytest.fixture
+@pytest.fixture(scope="function")
 async def authenticated_client(app_client: AsyncClient) -> AsyncGenerator[AsyncClient, None]:
     """Authenticated client for E2E testing.
 
