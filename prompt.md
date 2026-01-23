@@ -381,7 +381,7 @@ specs
 
 
 
-    请在充分理解Claude code memory管理机制，包括Claude.md 和 Rules的原理与机制的基础上，结合社区关于Claude code memory管理的最佳实践这些信息的基础上，充分理解当前ai-studio-project项目的基本清楚下，为这个项目输出一份关于CLaude Code memory管理的规范
+  请在充分理解Claude code memory管理机制，包括Claude.md 和 Rules的原理与机制的基础上，结合社区关于Claude code memory管理的最佳实践这些信息的基础上，充分理解当前ai-studio-project项目的基本清楚下，为这个项目输出一份关于CLaude Code memory管理的规范
 
 
   在面临一个实际项目时，Claude Code用户并不知道需要考虑这个项目的哪些因素来合理的选择Claude.md 还是rules以便为自己的项目构建有效的、便于维护、高效token使用的Claude Code 上下文管理体系，我想开发一个Claude Code的组件来帮用户自动化、引导式地创建满足某个具体项目的Claude Code 上下文管理体系。为此这个插件应该精通Claude Code Memory管理机制、Claude.md 和 Rules的原理与机制、是一位Claude Code 上下文管理的专家，并且它对软件项目涉及的规范类型（全局术语/命名、编码风格、架构原则、模块入口说明、目录结构说明等等）、改项目的特性包括软件类型、功能特点、架构特点、质量需求、技术栈等等因素有非常熟悉。这个Claude Code的组件应当尽可能充分的跟项目开发的用户就软件项目涉及的规范类型、项目的软件采用引导式收集，多轮交互的方式收集到软件项目的全面信息，在这些基础上帮用户创建时候该项目的Claude Code 上下文管理体系

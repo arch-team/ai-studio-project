@@ -1,0 +1,33 @@
+# CLAUDE.local.md - 个人配置模板
+
+> 复制此文件为 `CLAUDE.local.md` 并填入你的个人配置。
+> `CLAUDE.local.md` 不会被提交到 Git 仓库。
+
+---
+
+## 我的 AWS 环境
+
+```
+AWS_ACCOUNT_ID=123456789012
+AWS_REGION=us-west-2
+AWS_PROFILE=my-dev-profile
+```
+
+## 个人测试配置
+
+```bash
+# 快速部署到个人环境
+alias my-deploy="cdk deploy --all --context env=dev --context account=$AWS_ACCOUNT_ID --context region=$AWS_REGION"
+
+# 跳过某些测试
+alias my-test="pytest -m 'not slow'"
+```
+
+## 调试偏好
+
+- 启用详细日志: `export CDK_DEBUG=true`
+- 跳过 CDK Nag: `--context skip_nag=true`
+
+## 本地开发笔记
+
+<!-- 在这里记录个人开发笔记，不会被团队看到 -->
