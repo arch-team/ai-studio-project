@@ -117,35 +117,44 @@ class TrainingSyncService:
             if hyperpod_response is None:
                 return False
 
-            # 映射并验证状态
-            new_status = HYPERPOD_TO_PLATFORM_STATUS.get(
-                hyperpod_response.get("status")
-            )
-            if new_status is None:
-                logger.warning(
-                    f"未知的 HyperPod 状态: {hyperpod_response.get('status')}"
-                )
-                return False
-
-            # 状态未变化，跳过
-            if new_status == job.status:
-                return None
-
-            # 检查状态转换是否合法
-            if not job.can_transition_to(new_status):
-                logger.warning(
-                    f"任务 {job.job_name} 状态转换非法: "
-                    f"{job.status.value} → {new_status.value}"
-                )
-                return False
-
-            # 执行状态转换
-            await self._apply_status_transition(job, new_status, hyperpod_response)
-            return True
+            # 验证并处理状态变化
+            return await self._process_status_change(job, hyperpod_response)
 
         except Exception as e:
             logger.error(f"同步任务 {job.job_name} 失败: {e}")
             return False
+
+    async def _process_status_change(
+        self, job: TrainingJob, hyperpod_response: dict[str, Any]
+    ) -> bool | None:
+        """处理状态变化
+
+        Returns:
+            True: 状态已更新
+            False: 状态转换非法
+            None: 状态未变化
+        """
+        # 映射并验证状态
+        new_status = HYPERPOD_TO_PLATFORM_STATUS.get(hyperpod_response.get("status"))
+        if new_status is None:
+            logger.warning(f"未知的 HyperPod 状态: {hyperpod_response.get('status')}")
+            return False
+
+        # 状态未变化，跳过
+        if new_status == job.status:
+            return None
+
+        # 检查状态转换是否合法
+        if not job.can_transition_to(new_status):
+            logger.warning(
+                f"任务 {job.job_name} 状态转换非法: "
+                f"{job.status.value} → {new_status.value}"
+            )
+            return False
+
+        # 执行状态转换
+        await self._apply_status_transition(job, new_status, hyperpod_response)
+        return True
 
     async def _fetch_job_status(self, job: TrainingJob) -> dict[str, Any] | None:
         """从 HyperPod 获取任务状态，处理异常情况"""

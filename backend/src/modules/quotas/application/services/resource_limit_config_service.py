@@ -12,42 +12,65 @@ class ResourceLimitConfigService(BaseService[ResourceLimitConfig, int]):
 
     _not_found_error_factory = QuotaNotFoundError
 
+    # 资源限制字段映射
+    _RESOURCE_LIMITS = {
+        "max_gpu_per_job": ("GPU", 8),
+        "max_cpu_per_job": ("CPU", 64),
+        "max_memory_gb_per_job": ("Memory", 512),
+        "max_storage_gb_per_job": ("Storage", 1000),
+        "max_nodes_per_job": ("Nodes", 4),
+    }
+
+    # 可更新字段列表
+    _UPDATABLE_FIELDS = [
+        "config_name",
+        "role",
+        "project_id",
+        "max_gpu_per_job",
+        "max_cpu_per_job",
+        "max_memory_gb_per_job",
+        "max_storage_gb_per_job",
+        "max_nodes_per_job",
+        "priority_default",
+    ]
+
     def __init__(self, repository: IResourceLimitConfigRepository):
         super().__init__(repository, "ResourceLimitConfig")
 
-    async def create_config(self, data: dict) -> ResourceLimitConfig:
-        """Create a new resource limit config.
-
-        Raises:
-            DuplicateConfigError: If config with same role+project exists
-        """
-        role = LimitRole(data["role"])
-        project_id = data.get("project_id")
-
-        # Check for duplicate (role, project_id) combination
-        if await self._repository.exists_by_role_and_project(role, project_id):
+    async def _check_duplicate_config(
+        self, role: LimitRole, project_id: int | None, exclude_id: int | None = None
+    ) -> None:
+        """检查配置是否重复."""
+        existing = await self._repository.get_by_role_and_project(role, project_id)
+        if existing and (exclude_id is None or existing.id != exclude_id):
             scope = f"project {project_id}" if project_id else "global"
             raise DuplicateConfigError(role.value, scope)
 
-        # Map priority_default
-        priority_default = PriorityDefault.MEDIUM
-        if data.get("priority_default"):
-            priority_default = PriorityDefault(data["priority_default"])
-
-        # Create domain entity
-        config = ResourceLimitConfig(
-            id=0,  # Will be set by database
+    def _build_config_entity(self, data: dict, config_id: int = 0) -> ResourceLimitConfig:
+        """构建配置实体."""
+        return ResourceLimitConfig(
+            id=config_id,
             config_name=data["config_name"],
-            role=role,
-            project_id=project_id,
-            max_gpu_per_job=data.get("max_gpu_per_job", 8),
-            max_cpu_per_job=data.get("max_cpu_per_job", 64),
-            max_memory_gb_per_job=data.get("max_memory_gb_per_job", 512),
-            max_storage_gb_per_job=data.get("max_storage_gb_per_job", 1000),
-            max_nodes_per_job=data.get("max_nodes_per_job", 4),
-            priority_default=priority_default,
+            role=LimitRole(data["role"]),
+            project_id=data.get("project_id"),
+            max_gpu_per_job=data.get("max_gpu_per_job", self._RESOURCE_LIMITS["max_gpu_per_job"][1]),
+            max_cpu_per_job=data.get("max_cpu_per_job", self._RESOURCE_LIMITS["max_cpu_per_job"][1]),
+            max_memory_gb_per_job=data.get("max_memory_gb_per_job", self._RESOURCE_LIMITS["max_memory_gb_per_job"][1]),
+            max_storage_gb_per_job=data.get("max_storage_gb_per_job", self._RESOURCE_LIMITS["max_storage_gb_per_job"][1]),
+            max_nodes_per_job=data.get("max_nodes_per_job", self._RESOURCE_LIMITS["max_nodes_per_job"][1]),
+            priority_default=PriorityDefault(data.get("priority_default", PriorityDefault.MEDIUM.value)),
         )
 
+    async def create_config(self, data: dict) -> ResourceLimitConfig:
+        """Create a new resource limit config."""
+        role = LimitRole(data["role"])
+        project_id = data.get("project_id")
+
+        # 检查重复配置
+        await self._check_duplicate_config(role, project_id)
+
+        # 构建并保存配置
+        config = self._build_config_entity(data)
         return await self._repository.create(config)
 
     async def get_config(self, config_id: int) -> ResourceLimitConfig:
@@ -61,13 +84,13 @@ class ResourceLimitConfigService(BaseService[ResourceLimitConfig, int]):
 
         First tries to find project-specific config, then falls back to global.
         """
+        # 优先查找项目特定配置
         if project_id is not None:
-            # Try project-specific first
             config = await self._repository.get_by_role_and_project(role, project_id)
             if config is not None:
                 return config
 
-        # Fall back to global config
+        # 回退到全局配置
         return await self._repository.get_by_role_and_project(role, None)
 
     async def list_configs(
@@ -91,59 +114,52 @@ class ResourceLimitConfigService(BaseService[ResourceLimitConfig, int]):
             sort_order=sort_order,
         )
 
+    def _update_config_fields(self, config: ResourceLimitConfig, data: dict) -> None:
+        """更新配置字段."""
+        for field in self._UPDATABLE_FIELDS:
+            if field not in data:
+                continue
+
+            value = data[field]
+            if field == "role":
+                value = LimitRole(value)
+            elif field == "priority_default":
+                value = PriorityDefault(value)
+
+            setattr(config, field, value)
+
     async def update_config(
         self, config_id: int, data: dict
     ) -> ResourceLimitConfig:
-        """Update an existing config.
-
-        Raises:
-            QuotaNotFoundError: If config not found
-            DuplicateConfigError: If new role+project combination already exists
-        """
+        """Update an existing config."""
         config = await self._get_or_raise(config_id)
 
-        # Check if changing role or project_id would create duplicate
+        # 检查角色和项目组合是否会导致重复
         new_role = LimitRole(data["role"]) if "role" in data else config.role
         new_project_id = data.get("project_id", config.project_id)
 
         if new_role != config.role or new_project_id != config.project_id:
-            existing = await self._repository.get_by_role_and_project(
-                new_role, new_project_id
-            )
-            if existing is not None and existing.id != config_id:
-                scope = f"project {new_project_id}" if new_project_id else "global"
-                raise DuplicateConfigError(new_role.value, scope)
+            await self._check_duplicate_config(new_role, new_project_id, config_id)
 
-        # Update fields
-        if "config_name" in data:
-            config.config_name = data["config_name"]
-        if "role" in data:
-            config.role = LimitRole(data["role"])
-        if "project_id" in data:
-            config.project_id = data["project_id"]
-        if "max_gpu_per_job" in data:
-            config.max_gpu_per_job = data["max_gpu_per_job"]
-        if "max_cpu_per_job" in data:
-            config.max_cpu_per_job = data["max_cpu_per_job"]
-        if "max_memory_gb_per_job" in data:
-            config.max_memory_gb_per_job = data["max_memory_gb_per_job"]
-        if "max_storage_gb_per_job" in data:
-            config.max_storage_gb_per_job = data["max_storage_gb_per_job"]
-        if "max_nodes_per_job" in data:
-            config.max_nodes_per_job = data["max_nodes_per_job"]
-        if "priority_default" in data:
-            config.priority_default = PriorityDefault(data["priority_default"])
+        # 更新字段
+        self._update_config_fields(config, data)
 
         return await self._repository.update(config)
 
     async def delete_config(self, config_id: int) -> None:
-        """Delete a config.
-
-        Raises:
-            QuotaNotFoundError: If config not found
-        """
+        """Delete a config."""
         await self._get_or_raise(config_id)
         await self._repository.soft_delete(config_id)
+
+    def _check_resource_limit(
+        self, requested: int, limit: int, resource_name: str, errors: list[str]
+    ) -> None:
+        """检查单个资源限制."""
+        if requested > limit:
+            unit = "GB" if "memory" in resource_name.lower() or "storage" in resource_name.lower() else ""
+            errors.append(
+                f"{resource_name} ({requested}{unit}) exceeds limit ({limit}{unit})"
+            )
 
     async def validate_job_limits(
         self,
@@ -162,32 +178,21 @@ class ResourceLimitConfigService(BaseService[ResourceLimitConfig, int]):
         """
         config = await self.get_config_for_role(role, project_id)
         if config is None:
-            # No limits configured, allow by default
+            # 无限制配置，默认允许
             return True, None
 
+        # 验证各项资源限制
         errors = []
-        if requested_gpu > config.max_gpu_per_job:
-            errors.append(
-                f"GPU ({requested_gpu}) exceeds limit ({config.max_gpu_per_job})"
-            )
-        if requested_cpu > config.max_cpu_per_job:
-            errors.append(
-                f"CPU ({requested_cpu}) exceeds limit ({config.max_cpu_per_job})"
-            )
-        if requested_memory_gb > config.max_memory_gb_per_job:
-            errors.append(
-                f"Memory ({requested_memory_gb}GB) exceeds limit "
-                f"({config.max_memory_gb_per_job}GB)"
-            )
-        if requested_storage_gb > config.max_storage_gb_per_job:
-            errors.append(
-                f"Storage ({requested_storage_gb}GB) exceeds limit "
-                f"({config.max_storage_gb_per_job}GB)"
-            )
-        if requested_nodes > config.max_nodes_per_job:
-            errors.append(
-                f"Nodes ({requested_nodes}) exceeds limit ({config.max_nodes_per_job})"
-            )
+        validations = [
+            (requested_gpu, config.max_gpu_per_job, "GPU"),
+            (requested_cpu, config.max_cpu_per_job, "CPU"),
+            (requested_memory_gb, config.max_memory_gb_per_job, "Memory"),
+            (requested_storage_gb, config.max_storage_gb_per_job, "Storage"),
+            (requested_nodes, config.max_nodes_per_job, "Nodes"),
+        ]
+
+        for requested, limit, resource_name in validations:
+            self._check_resource_limit(requested, limit, resource_name, errors)
 
         if errors:
             return False, "; ".join(errors)

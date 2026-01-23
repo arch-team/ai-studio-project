@@ -28,36 +28,44 @@ class ModelService(BaseService[Model, int]):
         self._training_job_checker = training_job_checker
         self._checkpoint_checker = checkpoint_checker
 
+    async def _validate_entity_exists(
+        self, checker: IEntityExistenceChecker | None, entity_type: str, entity_id: int
+    ) -> None:
+        """验证关联实体是否存在."""
+        if checker and not await checker.exists(entity_id):
+            raise EntityNotFoundError(entity_type, str(entity_id))
+
+    async def _determine_model_version(self, model_name: str) -> str:
+        """确定模型版本号."""
+        latest_model = await self._model_repository.get_latest_version(model_name)
+        return Model.increment_version(latest_model.version) if latest_model else "v1"
+
     async def create_model(self, owner_id: int, data: dict) -> Model:
         """Create a new model."""
+        # 提取关键字段
         training_job_id = data["training_job_id"]
         checkpoint_id = data["checkpoint_id"]
         model_name = data["model_name"]
 
-        # Validate training job exists using cross-module interface
-        if self._training_job_checker:
-            if not await self._training_job_checker.exists(training_job_id):
-                raise EntityNotFoundError("TrainingJob", str(training_job_id))
+        # 验证关联实体
+        await self._validate_entity_exists(
+            self._training_job_checker, "TrainingJob", training_job_id
+        )
+        await self._validate_entity_exists(
+            self._checkpoint_checker, "Checkpoint", checkpoint_id
+        )
 
-        # Validate checkpoint exists using cross-module interface
-        if self._checkpoint_checker:
-            if not await self._checkpoint_checker.exists(checkpoint_id):
-                raise EntityNotFoundError("Checkpoint", str(checkpoint_id))
+        # 确定版本号
+        version = await self._determine_model_version(model_name)
 
-        # Determine version
-        version = "v1"
-        latest_model = await self._model_repository.get_latest_version(model_name)
-        if latest_model:
-            version = Model.increment_version(latest_model.version)
-
-        # Map framework from string
+        # 映射框架枚举
         framework = EnumMapper.from_string(
             data.get("framework"),
             ModelFramework,
             default=ModelFramework.PYTORCH,
         )
 
-        # Create domain entity
+        # 创建领域实体
         model = Model(
             id=0,  # Will be set by database
             model_name=model_name,
@@ -76,7 +84,6 @@ class ModelService(BaseService[Model, int]):
             registered_at=utc_now(),
         )
 
-        # Save to database
         return await self._model_repository.create(model)
 
     async def get_model(self, model_id: int) -> Model:
@@ -110,10 +117,7 @@ class ModelService(BaseService[Model, int]):
         self, model_id: int, compare_with: int | None = None
     ) -> dict[str, Any]:
         """Get all versions of a model with optional comparison."""
-        # Get the base model
         model = await self._get_or_raise(model_id)
-
-        # Get all versions
         versions = await self._model_repository.list_versions(model.model_name)
 
         result: dict[str, Any] = {
@@ -131,7 +135,7 @@ class ModelService(BaseService[Model, int]):
             ]
         }
 
-        # Add comparison if requested
+        # 添加版本比较（如果请求）
         if compare_with is not None:
             compare_model = await self._model_repository.get_by_id(compare_with)
             if compare_model is not None:
@@ -140,28 +144,25 @@ class ModelService(BaseService[Model, int]):
 
         return result
 
-    async def compare_versions(
-        self, model_id_1: int, model_id_2: int
+    def _calculate_metric_diff(
+        self, metrics_1: dict, metrics_2: dict
     ) -> dict[str, Any]:
-        """Compare two model versions and return metrics/hyperparameter diff."""
-        model_1 = await self._get_or_raise(model_id_1)
-        model_2 = await self._get_or_raise(model_id_2)
-
-        # Calculate metrics diff
-        metrics_diff: dict[str, Any] = {}
-        metrics_1 = model_1.metrics or {}
-        metrics_2 = model_2.metrics or {}
+        """计算指标差异."""
+        metrics_diff = {}
         all_metrics = set(metrics_1.keys()) | set(metrics_2.keys())
 
         for metric in all_metrics:
             v1 = metrics_1.get(metric)
             v2 = metrics_2.get(metric)
+
             diff = None
             diff_percent = None
+
             if v1 is not None and v2 is not None:
                 diff = v2 - v1
                 if v1 != 0:
                     diff_percent = ((v2 - v1) / v1) * 100
+
             metrics_diff[metric] = {
                 "v1": v1,
                 "v2": v2,
@@ -169,29 +170,47 @@ class ModelService(BaseService[Model, int]):
                 "diff_percent": diff_percent,
             }
 
-        # Find changed hyperparameters
-        hyperparams_changed: list[str] = []
-        hp_1 = model_1.hyperparameters or {}
-        hp_2 = model_2.hyperparameters or {}
-        all_hp = set(hp_1.keys()) | set(hp_2.keys())
+        return metrics_diff
 
-        for hp in all_hp:
-            if hp_1.get(hp) != hp_2.get(hp):
-                hyperparams_changed.append(hp)
+    def _find_changed_hyperparams(
+        self, hyperparams_1: dict, hyperparams_2: dict
+    ) -> list[str]:
+        """查找变更的超参数."""
+        all_hp = set(hyperparams_1.keys()) | set(hyperparams_2.keys())
+        return [hp for hp in all_hp if hyperparams_1.get(hp) != hyperparams_2.get(hp)]
 
-        # Check framework change
-        framework_changed = model_1.framework != model_2.framework
+    def _analyze_tag_changes(
+        self, tags_1: list[str] | None, tags_2: list[str] | None
+    ) -> tuple[list[str], list[str]]:
+        """分析标签变化."""
+        tags_set_1 = set(tags_1 or [])
+        tags_set_2 = set(tags_2 or [])
+        return list(tags_set_2 - tags_set_1), list(tags_set_1 - tags_set_2)
 
-        # Check tags changes
-        tags_1 = set(model_1.tags or [])
-        tags_2 = set(model_2.tags or [])
-        tags_added = list(tags_2 - tags_1)
-        tags_removed = list(tags_1 - tags_2)
+    async def compare_versions(
+        self, model_id_1: int, model_id_2: int
+    ) -> dict[str, Any]:
+        """Compare two model versions and return metrics/hyperparameter diff."""
+        model_1 = await self._get_or_raise(model_id_1)
+        model_2 = await self._get_or_raise(model_id_2)
+
+        # 计算各维度差异
+        metrics_diff = self._calculate_metric_diff(
+            model_1.metrics or {}, model_2.metrics or {}
+        )
+
+        hyperparams_changed = self._find_changed_hyperparams(
+            model_1.hyperparameters or {}, model_2.hyperparameters or {}
+        )
+
+        tags_added, tags_removed = self._analyze_tag_changes(
+            model_1.tags, model_2.tags
+        )
 
         return {
             "metrics_diff": metrics_diff,
             "hyperparams_changed": hyperparams_changed,
-            "framework_changed": framework_changed,
+            "framework_changed": model_1.framework != model_2.framework,
             "tags_added": tags_added,
             "tags_removed": tags_removed,
         }
@@ -223,5 +242,4 @@ class ModelService(BaseService[Model, int]):
     async def delete_model(self, model_id: int) -> None:
         """Delete a model (soft delete)."""
         await self._get_or_raise(model_id)  # Verify model exists
-        # Soft delete (archive)
         await self._model_repository.soft_delete(model_id)

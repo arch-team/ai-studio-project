@@ -46,16 +46,34 @@ class TrainingJobService(BaseService[TrainingJob, int]):
         if await self._repository.exists_by_name(job_name):
             raise DuplicateEntityError("TrainingJob", job_name)
 
+        # Create domain entity
+        job = self._build_training_job(owner_id, data)
+
+        # Submit to HyperPod
+        await self._submit_to_hyperpod(job)
+
+        # Save to database
+        return await self._repository.create(job)
+
+    def _build_training_job(self, owner_id: int, data: dict) -> TrainingJob:
+        """构建训练任务实体
+
+        Args:
+            owner_id: 任务所有者 ID
+            data: 任务配置数据
+
+        Returns:
+            TrainingJob: 训练任务实体
+        """
         # Map enums (convert to uppercase for domain layer)
         distribution_strategy = DistributionStrategy(
             data.get("distribution_strategy", "DDP").upper()
         )
         priority = JobPriority(data.get("priority", "MEDIUM").upper())
 
-        # Create domain entity
-        job = TrainingJob(
+        return TrainingJob(
             id=0,
-            job_name=job_name,
+            job_name=data["job_name"],
             owner_id=owner_id,
             image_uri=data["image_uri"],
             instance_type=data["instance_type"],
@@ -80,7 +98,12 @@ class TrainingJobService(BaseService[TrainingJob, int]):
             status=JobStatus.SUBMITTED,
         )
 
-        # Submit to HyperPod
+    async def _submit_to_hyperpod(self, job: TrainingJob) -> None:
+        """提交任务到 HyperPod
+
+        Args:
+            job: 训练任务实体
+        """
         job_config = {
             "image_uri": job.image_uri,
             "instance_type": job.instance_type,
@@ -91,12 +114,9 @@ class TrainingJobService(BaseService[TrainingJob, int]):
         }
         await self._hyperpod_client.submit_training_job(
             cluster_name=self._cluster_name,
-            job_name=job_name,
+            job_name=job.job_name,
             job_config=job_config,
         )
-
-        # Save to database
-        return await self._repository.create(job)
 
     async def get_job(self, job_id: int) -> TrainingJob:
         """Get training job by ID."""

@@ -63,6 +63,27 @@ def _create_login_response(user: User, tokens: TokenPair) -> LoginResponse:
     )
 
 
+def _create_fallback_login_response(result) -> LoginResponse:
+    """创建向后兼容的登录响应（当无法获取完整用户信息时）"""
+    return LoginResponse(
+        tokens=TokenResponse(
+            access_token=result.tokens.access_token,
+            refresh_token=result.tokens.refresh_token,
+            token_type=result.tokens.token_type,
+            expires_in=result.tokens.expires_in,
+        ),
+        user=UserResponse(
+            id=result.user_id,
+            username=result.username,
+            email=result.email,
+            display_name=None,
+            role=result.role,
+            status="active",
+            auth_type="local",
+        ),
+    )
+
+
 @router.post(
     "/login",
     response_model=LoginResponse,
@@ -93,6 +114,27 @@ async def login(
         )
 
     # Local login
+    return await _handle_local_login(request, login_data, auth_service)
+
+
+async def _handle_local_login(
+    request: Request,
+    login_data: LoginRequest,
+    auth_service: AuthService,
+) -> LoginResponse:
+    """处理本地账户登录
+
+    Args:
+        request: FastAPI 请求对象
+        login_data: 登录请求数据
+        auth_service: 认证服务
+
+    Returns:
+        LoginResponse: 登录响应
+
+    Raises:
+        HTTPException: 缺少用户名或密码
+    """
     if not login_data.username or not login_data.password:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -109,29 +151,13 @@ async def login(
         user_agent=user_agent,
     )
 
-    # Get full user for response (local_login returns AuthResult with limited info)
+    # Get full user for response
     user = await auth_service.get_user_by_id(result.user_id)
     if user:
         return _create_login_response(user, result.tokens)
 
     # Fallback for backward compatibility
-    return LoginResponse(
-        tokens=TokenResponse(
-            access_token=result.tokens.access_token,
-            refresh_token=result.tokens.refresh_token,
-            token_type=result.tokens.token_type,
-            expires_in=result.tokens.expires_in,
-        ),
-        user=UserResponse(
-            id=result.user_id,
-            username=result.username,
-            email=result.email,
-            display_name=None,
-            role=result.role,
-            status="active",
-            auth_type="local",
-        ),
-    )
+    return _create_fallback_login_response(result)
 
 
 async def _handle_sso_login(
@@ -146,30 +172,44 @@ async def _handle_sso_login(
         SSOError: If token validation fails (handled by global handler)
         SSODegradedModeError: If SSO service unavailable (handled by global handler)
     """
+    sso_service = _get_sso_service_or_raise()
+
+    # Validate token and get user info
+    user_info = await sso_service.validate_id_token(id_token)
+
+    # Get or create SSO user
+    user = await _get_or_create_sso_user(account_service, user_info)
+
+    # Generate tokens
+    tokens = auth_service.create_token_pair_for_user(user)
+    return _create_login_response(user, tokens)
+
+
+def _get_sso_service_or_raise():
+    """获取 SSO 服务实例，未配置时抛出异常"""
     try:
-        from src.api.middleware.sso import (
-            get_sso_service,
-            map_groups_to_role,
-        )
+        from src.api.middleware.sso import get_sso_service
+
+        sso_service = get_sso_service()
+        if not sso_service:
+            raise HTTPException(
+                status_code=status.HTTP_501_NOT_IMPLEMENTED,
+                detail="SSO is not configured",
+            )
+        return sso_service
     except ImportError:
         raise HTTPException(
             status_code=status.HTTP_501_NOT_IMPLEMENTED,
             detail="SSO is not configured",
         )
 
-    sso_service = get_sso_service()
-    if not sso_service:
-        raise HTTPException(
-            status_code=status.HTTP_501_NOT_IMPLEMENTED,
-            detail="SSO is not configured",
-        )
 
-    # Validate token and get user info (may raise SSOError or SSODegradedModeError)
-    user_info = await sso_service.validate_id_token(id_token)
+async def _get_or_create_sso_user(account_service: AccountService, user_info):
+    """根据 SSO 用户信息获取或创建用户"""
+    from src.api.middleware.sso import map_groups_to_role
 
-    # Map groups to role and get/create user
     role = map_groups_to_role(user_info.groups)
-    user = await account_service.get_or_create_sso_user(
+    return await account_service.get_or_create_sso_user(
         iam_identity_id=user_info.identity_id,
         username=user_info.username,
         email=user_info.email,
@@ -177,10 +217,6 @@ async def _handle_sso_login(
         groups=user_info.groups,
         role=role,
     )
-
-    # Generate tokens
-    tokens = auth_service.create_token_pair_for_user(user)
-    return _create_login_response(user, tokens)
 
 
 @router.post(
