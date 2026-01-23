@@ -41,10 +41,17 @@ class ResourceLimitConfigService(BaseService[ResourceLimitConfig, int]):
         self, role: LimitRole, project_id: int | None, exclude_id: int | None = None
     ) -> None:
         """检查配置是否重复."""
-        existing = await self._repository.get_by_role_and_project(role, project_id)
-        if existing and (exclude_id is None or existing.id != exclude_id):
-            scope = f"project {project_id}" if project_id else "global"
-            raise DuplicateConfigError(role.value, scope)
+        if exclude_id is None:
+            # 创建时使用 exists 方法
+            if await self._repository.exists_by_role_and_project(role, project_id):
+                scope = f"project {project_id}" if project_id else "global"
+                raise DuplicateConfigError(role.value, scope)
+        else:
+            # 更新时需要排除自身
+            existing = await self._repository.get_by_role_and_project(role, project_id)
+            if existing and existing.id != exclude_id:
+                scope = f"project {project_id}" if project_id else "global"
+                raise DuplicateConfigError(role.value, scope)
 
     def _build_config_entity(self, data: dict, config_id: int = 0) -> ResourceLimitConfig:
         """构建配置实体."""

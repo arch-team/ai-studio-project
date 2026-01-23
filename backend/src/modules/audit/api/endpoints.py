@@ -5,7 +5,9 @@ from datetime import datetime
 from fastapi import APIRouter, Depends, Query
 
 from src.modules.audit.application import AuditService
-from src.modules.audit.domain.value_objects import OperationType, ResourceType
+from src.modules.audit.domain.entities import AuditLog
+from src.modules.audit.domain.value_objects import ResourceType
+from src.shared.domain import EntityNotFoundError
 from src.shared.utils import calculate_offset, calculate_total_pages
 
 from .dependencies import get_audit_service
@@ -19,90 +21,8 @@ from .schemas import (
 router = APIRouter()
 
 
-@router.get("", response_model=AuditLogListResponse)
-async def get_audit_logs(
-    page: int = Query(default=1, ge=1, description="页码"),
-    page_size: int = Query(default=20, ge=1, le=100, description="每页数量"),
-    user_id: int | None = Query(default=None, description="用户ID过滤"),
-    resource_type: str | None = Query(default=None, description="资源类型过滤"),
-    resource_id: str | None = Query(default=None, description="资源ID过滤"),
-    start_date: datetime | None = Query(default=None, description="开始日期"),
-    end_date: datetime | None = Query(default=None, description="结束日期"),
-    service: AuditService = Depends(get_audit_service),
-) -> AuditLogListResponse:
-    """Get audit logs with optional filtering."""
-    offset = calculate_offset(page, page_size)
-
-    # Apply filters based on provided parameters
-    if user_id is not None:
-        logs = await service.get_user_audit_logs(
-            user_id=user_id,
-            limit=page_size,
-            offset=offset,
-        )
-        total = await service.count_user_logs(user_id)
-    elif resource_type is not None and resource_id is not None:
-        try:
-            rt = ResourceType(resource_type)
-            logs = await service.get_resource_audit_logs(
-                resource_type=rt,
-                resource_id=resource_id,
-                limit=page_size,
-                offset=offset,
-            )
-            total = len(logs)  # TODO: Add count method for resources
-        except ValueError:
-            logs = []
-            total = 0
-    elif start_date is not None and end_date is not None:
-        logs = await service.get_audit_logs_by_date_range(
-            start_date=start_date,
-            end_date=end_date,
-            limit=page_size,
-            offset=offset,
-        )
-        total = len(logs)  # TODO: Add count method for date range
-    else:
-        logs = await service.get_audit_logs(limit=page_size, offset=offset)
-        total = await service.count_total_logs()
-
-    return AuditLogListResponse(
-        items=[
-            AuditLogResponse(
-                id=log.id,
-                operation_type=log.operation_type.value,
-                resource_type=log.resource_type.value,
-                status=log.status.value,
-                user_id=log.user_id,
-                resource_id=log.resource_id,
-                request_data=log.request_data,
-                response_data=log.response_data,
-                ip_address=log.ip_address,
-                user_agent=log.user_agent,
-                created_at=log.created_at,
-                expires_at=log.expires_at,
-            )
-            for log in logs
-        ],
-        total=total,
-        page=page,
-        page_size=page_size,
-        total_pages=calculate_total_pages(total, page_size),
-    )
-
-
-@router.get("/{audit_log_id}", response_model=AuditLogResponse)
-async def get_audit_log(
-    audit_log_id: int,
-    service: AuditService = Depends(get_audit_service),
-) -> AuditLogResponse:
-    """Get a specific audit log by ID."""
-    from src.shared.domain import EntityNotFoundError
-
-    log = await service.get_audit_log_by_id(audit_log_id)
-    if log is None:
-        raise EntityNotFoundError("AuditLog", str(audit_log_id))
-
+def _to_response(log: AuditLog) -> AuditLogResponse:
+    """将审计日志实体转换为响应模型."""
     return AuditLogResponse(
         id=log.id,
         operation_type=log.operation_type.value,
@@ -119,6 +39,120 @@ async def get_audit_log(
     )
 
 
+async def _get_logs_by_user(
+    service: AuditService, user_id: int, page_size: int, offset: int
+) -> tuple[list[AuditLog], int]:
+    """按用户 ID 获取审计日志."""
+    logs = await service.get_user_audit_logs(
+        user_id=user_id,
+        limit=page_size,
+        offset=offset,
+    )
+    total = await service.count_user_logs(user_id)
+    return logs, total
+
+
+async def _get_logs_by_resource(
+    service: AuditService,
+    resource_type: str,
+    resource_id: str,
+    page_size: int,
+    offset: int,
+) -> tuple[list[AuditLog], int]:
+    """按资源类型和 ID 获取审计日志."""
+    try:
+        rt = ResourceType(resource_type)
+        logs = await service.get_resource_audit_logs(
+            resource_type=rt,
+            resource_id=resource_id,
+            limit=page_size,
+            offset=offset,
+        )
+        # TODO: 添加资源计数方法
+        total = len(logs)
+        return logs, total
+    except ValueError:
+        return [], 0
+
+
+async def _get_logs_by_date_range(
+    service: AuditService,
+    start_date: datetime,
+    end_date: datetime,
+    page_size: int,
+    offset: int,
+) -> tuple[list[AuditLog], int]:
+    """按日期范围获取审计日志."""
+    logs = await service.get_audit_logs_by_date_range(
+        start_date=start_date,
+        end_date=end_date,
+        limit=page_size,
+        offset=offset,
+    )
+    # TODO: 添加日期范围计数方法
+    total = len(logs)
+    return logs, total
+
+
+async def _get_all_logs(
+    service: AuditService, page_size: int, offset: int
+) -> tuple[list[AuditLog], int]:
+    """获取所有审计日志."""
+    logs = await service.get_audit_logs(limit=page_size, offset=offset)
+    total = await service.count_total_logs()
+    return logs, total
+
+
+@router.get("", response_model=AuditLogListResponse)
+async def get_audit_logs(
+    page: int = Query(default=1, ge=1, description="页码"),
+    page_size: int = Query(default=20, ge=1, le=100, description="每页数量"),
+    user_id: int | None = Query(default=None, description="用户ID过滤"),
+    resource_type: str | None = Query(default=None, description="资源类型过滤"),
+    resource_id: str | None = Query(default=None, description="资源ID过滤"),
+    start_date: datetime | None = Query(default=None, description="开始日期"),
+    end_date: datetime | None = Query(default=None, description="结束日期"),
+    service: AuditService = Depends(get_audit_service),
+) -> AuditLogListResponse:
+    """Get audit logs with optional filtering."""
+    offset = calculate_offset(page, page_size)
+
+    # 根据过滤条件选择查询策略
+    if user_id is not None:
+        logs, total = await _get_logs_by_user(service, user_id, page_size, offset)
+    elif resource_type is not None and resource_id is not None:
+        logs, total = await _get_logs_by_resource(
+            service, resource_type, resource_id, page_size, offset
+        )
+    elif start_date is not None and end_date is not None:
+        logs, total = await _get_logs_by_date_range(
+            service, start_date, end_date, page_size, offset
+        )
+    else:
+        logs, total = await _get_all_logs(service, page_size, offset)
+
+    return AuditLogListResponse(
+        items=[_to_response(log) for log in logs],
+        total=total,
+        page=page,
+        page_size=page_size,
+        total_pages=calculate_total_pages(total, page_size),
+    )
+
+
+@router.get("/{audit_log_id}", response_model=AuditLogResponse)
+async def get_audit_log(
+    audit_log_id: int,
+    service: AuditService = Depends(get_audit_service),
+) -> AuditLogResponse:
+    """Get a specific audit log by ID."""
+    log = await service.get_audit_log_by_id(audit_log_id)
+    if log is None:
+        raise EntityNotFoundError("AuditLog", str(audit_log_id))
+
+    return _to_response(log)
+
+
 @router.get("/count/total", response_model=AuditLogCountResponse)
 async def get_audit_log_count(
     service: AuditService = Depends(get_audit_service),
@@ -133,7 +167,7 @@ async def cleanup_expired_logs(
     service: AuditService = Depends(get_audit_service),
 ) -> CleanupResultResponse:
     """Delete expired audit logs (admin only)."""
-    # TODO: Add admin permission check
+    # TODO: 添加管理员权限检查
     deleted_count = await service.cleanup_expired_logs()
     return CleanupResultResponse(
         deleted_count=deleted_count,
