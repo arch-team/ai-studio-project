@@ -1,0 +1,5 @@
+/**
+ * Audit pages exports.
+ */
+
+export {};

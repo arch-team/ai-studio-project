@@ -1,0 +1,5 @@
+/**
+ * Spaces pages exports.
+ */
+
+export {};

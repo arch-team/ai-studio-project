@@ -1,5 +1,5 @@
 /**
- * Resource Quotas Feature Module
+ * Billing module - Public API exports.
  */
 
 // Types
@@ -11,5 +11,8 @@ export * from './api';
 // Hooks
 export * from './hooks';
 
+// Components
+export * from './components';
+
 // Pages
-export { ResourceQuotasPage } from './ResourceQuotasPage';
+export * from './pages';

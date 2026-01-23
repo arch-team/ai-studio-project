@@ -1,0 +1,5 @@
+/**
+ * Monitoring pages exports.
+ */
+
+export {};

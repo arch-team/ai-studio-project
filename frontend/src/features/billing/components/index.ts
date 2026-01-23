@@ -1,0 +1,5 @@
+/**
+ * Billing components exports.
+ */
+
+export {};

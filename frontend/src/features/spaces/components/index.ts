@@ -1,0 +1,5 @@
+/**
+ * Spaces components exports.
+ */
+
+export {};
