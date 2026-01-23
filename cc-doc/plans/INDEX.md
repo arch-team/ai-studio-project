@@ -34,3 +34,4 @@ Claude Code 生成的计划文件索引。
 | 2026-01-18 | `2026-01-18-backend-tests-重构计划.md` | Backend Tests 重构计划 | ⏳ 进行中 |
 | 2026-01-18 | `2026-01-18-claude-code-memory-管理规范-实施计划.md` | Claude Code Memory 管理规范 - 实施计划 | ⏳ 进行中 |
 | 2026-01-23 | `2026-01-23-架构合规性检查清单生成计划.md` | 架构合规性检查清单生成计划 | ⏳ 进行中 |
+| 2026-01-23 | `2026-01-23-architecture-md-与-spec-kit-文件一致性分析.md` | ARCHITECTURE.md 与 Spec-Kit 文件一致性分析 | ⏳ 进行中 |
