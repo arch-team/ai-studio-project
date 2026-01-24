@@ -558,29 +558,36 @@
 - SC-002: 检查点保存成功率 >99%
 
 ### 任务模板管理 (FR-023 扩展)
-- [ ] [T200] 创建 job_templates 表迁移 - `backend/alembic/versions/xxx_create_job_templates.py`,字段: id, name, description, owner_id (FK users), visibility (enum: private/team/public), training_config (JSON), usage_count, last_used_at, created_at, updated_at, deleted_at
+- [x] [T200] 创建 job_templates 表迁移 - `backend/alembic/versions/20260125_100000_create_job_templates.py`,字段: id, name, description, owner_id (FK users), visibility (enum: private/team/public), training_config (JSON), usage_count, last_used_at, created_at, updated_at, deleted_at ✅
   - **依赖**: T021 (users 表)
   - **参考**: data-model.md job_templates 表结构, spec.md FR-023
-- [ ] [T201] 创建 JobTemplate SQLAlchemy 模型 - `backend/src/modules/training/infrastructure/models/job_template_model.py`,包含 ORM 映射、关系定义 (owner → users)、软删除支持
+- [x] [T201] 创建 JobTemplate 领域层 + 基础设施层 ✅
+  - `backend/src/modules/training/domain/value_objects/template_visibility.py` - TemplateVisibility 枚举
+  - `backend/src/modules/training/domain/entities/job_template.py` - 领域实体 (含业务规则)
+  - `backend/src/modules/training/domain/repositories/job_template_repository.py` - 仓储接口
+  - `backend/src/modules/training/infrastructure/models/job_template_model.py` - ORM 模型
+  - `backend/src/modules/training/infrastructure/repositories/job_template_repository_impl.py` - 仓储实现
   - **依赖**: T200 (job_templates 表迁移)
-  - **领域实体**: `backend/src/modules/training/domain/entities/job_template.py`
-  - **仓储接口**: `backend/src/modules/training/domain/repositories/job_template_repository.py`
-- [ ] [T202] 任务模板 CRUD API 端点 - `backend/src/modules/training/api/job_templates.py`,实现:
-  - POST /job-templates: 创建模板 (复制训练任务配置)
+- [x] [T202] 任务模板 CRUD API 端点 - `backend/src/modules/training/api/job_templates.py` ✅
+  - POST /job-templates: 创建模板
   - GET /job-templates: 列表查询 (支持按可见性、热度排序)
+  - GET /job-templates/popular: 获取热门模板
   - GET /job-templates/{id}: 获取模板详情
   - PUT /job-templates/{id}: 更新模板
   - DELETE /job-templates/{id}: 软删除模板
   - POST /training-jobs/from-template/{template_id}: 基于模板创建训练任务
-  - **依赖**: T201 (JobTemplate 模型), T036 (HyperPod 客户端)
   - **服务层**: `backend/src/modules/training/application/services/job_template_service.py`
-- [ ] [T203] 任务模板前端页面 - `frontend/src/pages/job-templates/`,实现:
-  - 模板列表页面 (支持筛选、搜索)
-  - 模板详情/编辑页面
-  - "从模板创建任务"表单组件
-  - 热门模板推荐组件
-  - **依赖**: T202 (模板 API), T032 (训练任务创建页面)
-  - **Cloudscape 组件**: Table, Cards, Modal, FormField
+  - **依赖**: T201 (JobTemplate 模型)
+- [x] [T203] 任务模板前端页面 - `frontend/src/features/templates/` ✅
+  - `types/index.ts` - TypeScript 类型定义
+  - `api/templateApi.ts` - API 调用函数
+  - `api/queries.ts` - TanStack Query hooks
+  - `components/TemplateTable.tsx` - 模板列表表格
+  - `components/PopularTemplates.tsx` - 热门模板卡片
+  - `pages/TemplateListPage.tsx` - 模板列表页面
+  - `pages/TemplateDetailPage.tsx` - 模板详情页面
+  - **依赖**: T202 (模板 API)
+  - **Cloudscape 组件**: Table, Cards, Badge, KeyValuePairs, Pagination
 
 ---
 
