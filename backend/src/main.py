@@ -1,5 +1,6 @@
 """AI Training Platform - FastAPI Application Entry Point."""
 
+import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
@@ -7,28 +8,30 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
+from src.modules.audit.api.middleware import AuditMiddleware
+from src.router import api_router
 from src.shared.api import (
     domain_exception_handler,
     security_exception_handler,
 )
-from src.modules.audit.api.middleware import AuditMiddleware
-from src.shared.infrastructure.security.exceptions import SecurityError
-from src.shared.domain.exceptions import DomainError
 from src.shared.api.middleware import AuthenticationMiddleware
-from src.router import api_router
+from src.shared.domain.exceptions import DomainError
 from src.shared.infrastructure import get_settings
+from src.shared.infrastructure.security.exceptions import SecurityError
+
+logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     """Application lifecycle manager."""
     settings = get_settings()
-    print(f"Starting {settings.app_name} v{settings.app_version}")
-    print(f"Environment: {settings.environment}")
+    logger.info(f"Starting {settings.app_name} v{settings.app_version}")
+    logger.info(f"Environment: {settings.environment}")
 
     yield
 
-    print("Shutting down application...")
+    logger.info("Shutting down application...")
 
 
 def create_app() -> FastAPI:

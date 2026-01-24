@@ -113,6 +113,76 @@ class HyperPodClient(IHyperPodClient):
         loop = asyncio.get_running_loop()
         return await loop.run_in_executor(None, func)
 
+    def _build_env_list(self, env_dict: dict[str, Any] | None) -> list[Any] | None:
+        """构建环境变量列表。"""
+        if not env_dict:
+            return None
+
+        from sagemaker.hyperpod.training.config.hyperpod_pytorch_job_unified_config import (
+            Env,
+        )
+
+        return [Env(name=k, value=str(v)) for k, v in env_dict.items()]
+
+    def _build_container(
+        self,
+        image_uri: str | None,
+        command: str | list[str] | None,
+        env_dict: dict[str, Any] | None,
+        gpu_count: int,
+    ) -> Any:
+        """构建容器配置。"""
+        from sagemaker.hyperpod.training.config.hyperpod_pytorch_job_unified_config import (
+            Containers,
+            Resources,
+        )
+
+        env_list = self._build_env_list(env_dict)
+        resources = Resources(
+            limits={"nvidia.com/gpu": str(gpu_count)},
+            requests={"nvidia.com/gpu": str(gpu_count)},
+        )
+
+        # 处理 command 格式
+        cmd = None
+        if command:
+            cmd = command if isinstance(command, list) else [command]
+
+        return Containers(
+            name="pytorch",
+            image=image_uri,
+            command=cmd,
+            env=env_list,
+            resources=resources,
+        )
+
+    def _build_kueue_labels(
+        self, queue_name: str | None, priority_class: str | None
+    ) -> dict[str, str]:
+        """构建 Kueue 调度标签。"""
+        labels: dict[str, str] = {}
+        if queue_name:
+            labels["kueue.x-k8s.io/queue-name"] = queue_name
+        if priority_class:
+            # 使用 Kueue 的 priority-class label 代替 Pod 的 priorityClassName
+            labels["kueue.x-k8s.io/priority-class"] = priority_class
+        return labels
+
+    def _build_replica_spec(self, container: Any, node_count: int) -> Any:
+        """构建 ReplicaSpec 配置。"""
+        from sagemaker.hyperpod.training.config.hyperpod_pytorch_job_unified_config import (
+            ReplicaSpec,
+            Spec,
+            Template,
+        )
+
+        # 注意: name 必须小写，符合 Kubernetes RFC 1123 命名规范
+        return ReplicaSpec(
+            name="worker",
+            replicas=node_count,
+            template=Template(spec=Spec(containers=[container])),
+        )
+
     async def create_cluster(
         self,
         cluster_name: str,
@@ -192,90 +262,30 @@ class HyperPodClient(IHyperPodClient):
             if HyperPodPytorchJob is None:
                 raise RuntimeError("HyperPod SDK not available")
 
-            # 确保集群上下文已设置
             self._ensure_cluster_context(cluster_name)
 
-            # 导入必要的配置类
             from sagemaker.hyperpod.common.config import Metadata
             from sagemaker.hyperpod.training.config.hyperpod_pytorch_job_unified_config import (
-                Containers,
-                ReplicaSpec,
                 RunPolicy,
-                Spec,
-                Template,
             )
 
-            # 构建容器配置
+            # 提取配置参数
             image_uri = job_config.get("image_uri")
             command = job_config.get("command") or job_config.get("entrypoint_command")
             env_dict = job_config.get("environment") or {}
-
-            # 构建环境变量列表
-            env_list = None
-            if env_dict:
-                from sagemaker.hyperpod.training.config.hyperpod_pytorch_job_unified_config import (
-                    Env,
-                )
-
-                env_list = [Env(name=k, value=str(v)) for k, v in env_dict.items()]
-
-            # 构建资源配置 (GPU 请求确保调度到 GPU 节点)
-            from sagemaker.hyperpod.training.config.hyperpod_pytorch_job_unified_config import (
-                Resources,
-            )
-
             gpu_count = job_config.get("gpu_count", 1)
-            resources = Resources(
-                limits={"nvidia.com/gpu": str(gpu_count)},
-                requests={"nvidia.com/gpu": str(gpu_count)},
-            )
-
-            # 构建容器
-            container = Containers(
-                name="pytorch",
-                image=image_uri,
-                command=command if isinstance(command, list) else [command] if command else None,
-                env=env_list,
-                resources=resources,
-            )
-
-            # Task Governance 配置
+            node_count = job_config.get("node_count", 1)
             namespace = job_config.get("namespace", "default")
             queue_name = job_config.get("queue_name")
             priority_class = job_config.get("priority_class")
 
-            # 构建 Spec (不在 Pod 级别设置 priorityClassName，使用 Kueue label)
-            # 原因: SageMaker Task Governance 创建 WorkloadPriorityClass (Kueue)，
-            # 但不创建 Kubernetes 原生 PriorityClass，导致 HyperPod 控制器报错
-            spec_kwargs: dict[str, Any] = {"containers": [container]}
-            # 注意: 不设置 priority_class_name，改用 Kueue label
+            # 使用辅助方法构建配置
+            container = self._build_container(image_uri, command, env_dict, gpu_count)
+            replica_spec = self._build_replica_spec(container, node_count)
+            labels = self._build_kueue_labels(queue_name, priority_class)
 
-            # 构建 ReplicaSpec
-            # 注意: name 必须小写，符合 Kubernetes RFC 1123 命名规范
-            node_count = job_config.get("node_count", 1)
-            replica_spec = ReplicaSpec(
-                name="worker",
-                replicas=node_count,
-                template=Template(
-                    spec=Spec(**spec_kwargs)
-                ),
-            )
-
-            # 构建运行策略 (SDK 使用默认值)
-            run_policy = RunPolicy()
-
-            # 构建 Metadata (包含 namespace 和 Kueue labels)
-            metadata_kwargs: dict[str, Any] = {
-                "name": job_name,
-                "namespace": namespace,
-            }
-            # Kueue 使用 labels 指定 queue 和 priority
-            labels: dict[str, str] = {}
-            if queue_name:
-                labels["kueue.x-k8s.io/queue-name"] = queue_name
-            if priority_class:
-                # 使用 Kueue 的 priority-class label 代替 Pod 的 priorityClassName
-                labels["kueue.x-k8s.io/priority-class"] = priority_class
+            # 构建 Metadata
+            metadata_kwargs: dict[str, Any] = {"name": job_name, "namespace": namespace}
             if labels:
                 metadata_kwargs["labels"] = labels
 
@@ -285,7 +295,7 @@ class HyperPodClient(IHyperPodClient):
                 metadata=Metadata(**metadata_kwargs),
                 nproc_per_node=nproc_per_node,
                 replica_specs=[replica_spec],
-                run_policy=run_policy,
+                run_policy=RunPolicy(),
             )
 
             # 提交任务
