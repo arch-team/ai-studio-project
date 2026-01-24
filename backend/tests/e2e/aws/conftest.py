@@ -1,12 +1,4 @@
-"""AWS E2E 测试共享配置和 Fixture
-
-提供真实 AWS 环境测试所需的:
-- Skip 条件装饰器
-- SLA 常量定义
-- AWS 客户端 Fixture
-- 测试任务配置 Fixture
-- 资源清理策略
-"""
+"""AWS E2E 测试配置和 Fixture"""
 
 import time
 from collections.abc import AsyncGenerator
@@ -21,135 +13,99 @@ from src.main import app
 from tests.e2e.config import get_e2e_settings
 from tests.shared.constants import TEST_API_BASE_URL
 
-
-# 获取配置实例
+# 配置实例
 settings = get_e2e_settings()
 
 
 # =============================================================================
-# Skip 条件装饰器
+# Skip 条件检查
 # =============================================================================
 
 
-def _check_aws_credentials() -> bool:
-    """检查 AWS 凭证是否可用 (支持 SSO/配置文件/环境变量)"""
+def _has_aws_credentials() -> bool:
+    """检查 AWS 凭证"""
     try:
-        sts = boto3.client("sts")
-        sts.get_caller_identity()
+        boto3.client("sts").get_caller_identity()
         return True
     except Exception:
         return False
 
 
-def _check_hyperpod_cluster() -> bool:
-    """检查 HyperPod 集群是否配置"""
-    return bool(settings.hyperpod_cluster_name)
+def _has_task_governance() -> bool:
+    """检查 Task Governance 配置"""
+    if not settings.hyperpod_cluster_name:
+        return False
 
-
-def _check_sso_configured() -> bool:
-    """检查 SSO IdP 是否配置 (可选，用于 SSO 特定测试)"""
-    # SSO 测试不强制要求外部 IdP，可以测试本地降级逻辑
-    return True  # 默认允许运行
-
-
-def _check_task_governance() -> bool:
-    """检查 Task Governance 是否配置
-
-    使用 SageMaker API 检查:
-    - Cluster Scheduler Config (PriorityClasses)
-    - Compute Quotas (Team allocations)
-
-    参考: https://docs.aws.amazon.com/sagemaker/latest/dg/sagemaker-hyperpod-eks-operate-console-ui-governance.html
-    """
     try:
-        cluster_name = settings.hyperpod_cluster_name
-        if not cluster_name:
-            return False
-
         sagemaker = boto3.client("sagemaker")
+        clusters = sagemaker.list_clusters(NameContains=settings.hyperpod_cluster_name)
 
-        # 获取集群 ARN
-        clusters = sagemaker.list_clusters(NameContains=cluster_name)
         if not clusters.get("ClusterSummaries"):
             return False
 
         cluster_arn = clusters["ClusterSummaries"][0]["ClusterArn"]
 
-        # 检查 Cluster Scheduler Config (PriorityClasses)
-        try:
-            configs = sagemaker.list_cluster_scheduler_configs(ClusterArn=cluster_arn)
-            has_scheduler_config = bool(configs.get("ClusterSchedulerConfigSummaries"))
-        except Exception:
-            has_scheduler_config = False
+        # 检查 Scheduler Config 和 Compute Quotas
+        has_scheduler = bool(
+            sagemaker.list_cluster_scheduler_configs(ClusterArn=cluster_arn)
+            .get("ClusterSchedulerConfigSummaries")
+        )
+        has_quotas = bool(
+            sagemaker.list_compute_quotas(ClusterArn=cluster_arn)
+            .get("ComputeQuotaSummaries")
+        )
 
-        # 检查 Compute Quotas (Team allocations)
-        try:
-            quotas = sagemaker.list_compute_quotas(ClusterArn=cluster_arn)
-            has_compute_quotas = bool(quotas.get("ComputeQuotaSummaries"))
-        except Exception:
-            has_compute_quotas = False
-
-        return has_scheduler_config and has_compute_quotas
+        return has_scheduler and has_quotas
     except Exception:
         return False
 
 
-# AWS 凭证检查 - 支持 SSO/配置文件/环境变量
+# Skip 装饰器
 skip_without_aws = pytest.mark.skipif(
-    not _check_aws_credentials(),
-    reason="AWS credentials not configured (SSO/Profile/EnvVar)",
+    not _has_aws_credentials(),
+    reason="AWS credentials not configured",
 )
 
 skip_without_hyperpod = pytest.mark.skipif(
-    not _check_hyperpod_cluster(),
-    reason="HyperPod cluster not configured (set HYPERPOD_CLUSTER_NAME)",
+    not settings.hyperpod_cluster_name,
+    reason="HyperPod cluster not configured",
 )
 
 skip_without_sso = pytest.mark.skipif(
-    not _check_sso_configured(),
+    False,  # SSO 测试默认允许（测试降级逻辑）
     reason="SSO IdP not configured",
 )
 
 skip_write_tests = pytest.mark.skipif(
     settings.e2e_read_only,
-    reason="Write tests disabled (E2E_READ_ONLY=true)",
+    reason="Write tests disabled",
 )
 
 skip_without_task_governance = pytest.mark.skipif(
-    not _check_task_governance(),
-    reason="Task Governance not configured (requires ClusterQueues and WorkloadPriorityClasses)",
+    not _has_task_governance(),
+    reason="Task Governance not configured",
 )
 
 
 # =============================================================================
-# SLA 常量
+# SLA 常量（直接使用配置）
 # =============================================================================
 
 
 class SLAConstants:
-    """SLA 时间窗口定义 (单位: 秒)
+    """SLA 时间窗口（秒）"""
 
-    从配置中读取，支持环境变量覆盖
-    """
-
-    # 抢占相关 SLA
     CHECKPOINT_SAVE_TIMEOUT = settings.sla_checkpoint_save_timeout
     POD_RELEASE_TIMEOUT = settings.sla_pod_release_timeout
-
-    # SSO 相关 SLA
     SSO_FAILOVER_TIMEOUT = settings.sla_sso_failover_timeout
     SSO_RECOVERY_CHECK_INTERVAL = settings.sla_sso_recovery_check_interval
-
-    # 任务相关超时
     JOB_SUBMISSION_TIMEOUT = settings.sla_job_submission_timeout
     JOB_STATUS_POLL_INTERVAL = settings.sla_job_status_poll_interval
-
-    # 抢占限制
     MAX_PREEMPTION_COUNT = settings.sla_max_preemption_count
 
 
 # =============================================================================
-# AWS 客户端 Fixture
+# AWS 客户端 Fixtures
 # =============================================================================
 
 
@@ -177,35 +133,21 @@ def s3_client(aws_region: str):
     return boto3.client("s3", region_name=aws_region)
 
 
-# =============================================================================
-# HyperPod 客户端 Fixture (延迟导入避免启动时报错)
-# =============================================================================
-
-
 @pytest.fixture(scope="function")
-def hyperpod_client(
-    hyperpod_cluster_name: str,
-    aws_region: str,
-) -> Any:
-    """真实 HyperPod 客户端 (同步初始化)
-
-    延迟导入以避免 AWS 凭证未配置时启动失败
-    """
+def hyperpod_client(hyperpod_cluster_name: str, aws_region: str) -> Any:
+    """HyperPod 客户端（延迟导入）"""
     try:
         from src.modules.training.infrastructure.hyperpod.client import HyperPodClient
 
         client = HyperPodClient(region=aws_region)
-        # 保存集群名称供测试使用
         client._cluster_name = hyperpod_cluster_name
         return client
-    except ImportError:
-        pytest.skip("HyperPodClient not available")
-    except Exception as e:
-        pytest.skip(f"HyperPodClient initialization failed: {e}")
+    except (ImportError, Exception) as e:
+        pytest.skip(f"HyperPodClient unavailable: {e}")
 
 
 # =============================================================================
-# HTTP 客户端 Fixture
+# HTTP 客户端 Fixtures
 # =============================================================================
 
 
@@ -215,46 +157,40 @@ async def async_client() -> AsyncGenerator[AsyncClient, None]:
     async with AsyncClient(
         transport=ASGITransport(app=app),
         base_url=TEST_API_BASE_URL,
-        timeout=60.0,  # E2E 测试使用更长超时
+        timeout=60.0,
     ) as client:
         yield client
 
 
 @pytest.fixture(scope="function")
 async def admin_token(async_client: AsyncClient) -> str:
-    """获取管理员 Token
-
-    使用配置中的管理员凭证
-    """
-    admin_username = settings.e2e_admin_username
-    admin_password = settings.e2e_admin_password
-
-    if not admin_password:
-        pytest.skip("E2E_ADMIN_PASSWORD not configured")
+    """管理员 Token"""
+    if not settings.e2e_admin_password:
+        pytest.skip("Admin password not configured")
 
     response = await async_client.post(
         "/api/v1/auth/login",
-        json={"username": admin_username, "password": admin_password},
+        json={
+            "username": settings.e2e_admin_username,
+            "password": settings.e2e_admin_password,
+        },
     )
 
     if response.status_code != 200:
         pytest.skip(f"Admin login failed: {response.status_code}")
 
     data = response.json()
-    # API 返回嵌套结构: {tokens: {access_token: ...}, user: {...}}
-    if "tokens" in data:
-        return data["tokens"]["access_token"]
-    return data["access_token"]
+    return data.get("tokens", data).get("access_token")
 
 
 # =============================================================================
-# 测试用户 Fixture
+# 测试配置 Fixtures
 # =============================================================================
 
 
 @pytest.fixture
 def test_local_user() -> dict[str, str]:
-    """本地测试用户配置"""
+    """测试用户配置"""
     return {
         "username": settings.e2e_test_username,
         "password": settings.e2e_test_password,
@@ -268,99 +204,72 @@ def sso_health_endpoint() -> str:
     return settings.sso_health_endpoint
 
 
-# =============================================================================
-# 测试任务配置 Fixture
-# =============================================================================
+def _create_job_config(priority: str, job_type: str, command: list[str]) -> dict[str, Any]:
+    """创建任务配置的辅助函数"""
+    is_low_priority = priority == "low"
+
+    return {
+        "job_name": f"e2e-{job_type}-{int(time.time())}",
+        "image_uri": settings.resolved_image_uri,
+        "instance_type": settings.test_instance_type,
+        "node_count": 1,
+        "priority": priority,
+        "namespace": settings.e2e_low_namespace if is_low_priority else settings.e2e_high_namespace,
+        "queue_name": settings.e2e_low_queue_name if is_low_priority else settings.e2e_high_queue_name,
+        "priority_class": settings.e2e_low_priority_class if is_low_priority else settings.e2e_high_priority_class,
+        "entrypoint_command": command,
+        "distribution_strategy": "ddp",
+        "gpu_count": settings.test_gpu_count,
+    }
 
 
 @pytest.fixture
 def low_priority_job_config() -> dict[str, Any]:
-    """低优先级测试任务配置
-
-    使用 Task Governance 配置:
-    - namespace: 从 settings.e2e_low_namespace 读取
-    - queue: 从 settings.e2e_low_queue_name 读取
-    - priority: 从 settings.e2e_low_priority_class 读取
-
-    训练脚本使用简单的 sleep 循环模拟长时间训练。
-    """
-    return {
-        "job_name": f"e2e-low-priority-{int(time.time())}",
-        "image_uri": settings.resolved_image_uri,
-        "instance_type": settings.test_instance_type,
-        "node_count": 1,
-        "priority": "low",
-        # Task Governance 配置
-        "namespace": settings.e2e_low_namespace,
-        "queue_name": settings.e2e_low_queue_name,
-        "priority_class": settings.e2e_low_priority_class,
-        # 简单的训练命令 - sleep 模拟长时间训练
-        "entrypoint_command": ["python", "-c", "import time; print('Low priority job started'); [print(f'Step {i}') or time.sleep(1) for i in range(600)]"],
-        "distribution_strategy": "ddp",
-        "gpu_count": settings.test_gpu_count,
-    }
+    """低优先级任务配置"""
+    command = [
+        "python", "-c",
+        "import time; print('Low priority job started'); "
+        "[print(f'Step {i}') or time.sleep(1) for i in range(600)]"
+    ]
+    return _create_job_config("low", "low-priority", command)
 
 
 @pytest.fixture
 def high_priority_job_config() -> dict[str, Any]:
-    """高优先级测试任务配置 (用于触发抢占)
-
-    使用 Task Governance 配置:
-    - namespace: 从 settings.e2e_high_namespace 读取
-    - queue: 从 settings.e2e_high_queue_name 读取
-    - priority: 从 settings.e2e_high_priority_class 读取
-    """
-    return {
-        "job_name": f"e2e-high-priority-{int(time.time())}",
-        "image_uri": settings.resolved_image_uri,
-        "instance_type": settings.test_instance_type,
-        "node_count": 1,
-        "priority": "critical",
-        # Task Governance 配置
-        "namespace": settings.e2e_high_namespace,
-        "queue_name": settings.e2e_high_queue_name,
-        "priority_class": settings.e2e_high_priority_class,
-        # 简短任务 - 快速完成
-        "entrypoint_command": ["python", "-c", "print('High priority job completed')"],
-        "distribution_strategy": "ddp",
-        "gpu_count": settings.test_gpu_count,
-    }
+    """高优先级任务配置"""
+    command = ["python", "-c", "print('High priority job completed')"]
+    return _create_job_config("critical", "high-priority", command)
 
 
 @pytest.fixture
 def checkpoint_enabled_job_config() -> dict[str, Any]:
-    """启用 Checkpoint 的测试任务配置
-
-    使用 torchrun 启动训练并定期保存检查点。
-    """
-    # 训练脚本带检查点保存
-    training_command = """cat > /tmp/train.py << 'SCRIPT'
+    """带检查点的任务配置"""
+    training_script = """cat > /tmp/train.py << 'SCRIPT'
 import os
 import time
 import torch
 import torch.distributed as dist
 
-# 初始化分布式环境
+# 初始化分布式
 if 'WORLD_SIZE' in os.environ:
     dist.init_process_group(backend='nccl')
     rank = dist.get_rank()
     print(f'Initialized rank {rank}')
 else:
     rank = 0
-    print('Running in non-distributed mode')
+    print('Non-distributed mode')
 
 # 检查点目录
 checkpoint_dir = os.environ.get('CHECKPOINT_DIR', '/tmp/checkpoints')
 os.makedirs(checkpoint_dir, exist_ok=True)
 
-# 模拟训练并定期保存状态
+# 模拟训练
 for epoch in range(100):
     if rank == 0:
         print(f'Training epoch {epoch}')
-        # 创建模拟 checkpoint
         checkpoint_path = os.path.join(checkpoint_dir, f'checkpoint_{epoch}.pt')
         torch.save({'epoch': epoch}, checkpoint_path)
-        print(f'Saved checkpoint: {checkpoint_path}')
+        print(f'Saved: {checkpoint_path}')
     time.sleep(10)
 
 if dist.is_initialized():
@@ -368,25 +277,17 @@ if dist.is_initialized():
 SCRIPT
 torchrun --nproc_per_node=1 --nnodes=1 --rdzv_backend=c10d --rdzv_endpoint=localhost:29400 /tmp/train.py"""
 
-    return {
-        "job_name": f"e2e-checkpoint-{int(time.time())}",
-        "image_uri": settings.resolved_image_uri,
-        "instance_type": settings.test_instance_type,
-        "node_count": 1,
-        "priority": "medium",
-        "entrypoint_command": ["bash", "-c", training_command],
-        "distribution_strategy": "ddp",
-        "gpu_count": settings.test_gpu_count,
-        "checkpoint_config": {
-            "enabled": True,
-            "interval_seconds": 60,
-            "s3_path": settings.checkpoint_s3_path or "s3://ai-training-checkpoints-dev/e2e-tests/",
-        },
+    config = _create_job_config("medium", "checkpoint", ["bash", "-c", training_script])
+    config["checkpoint_config"] = {
+        "enabled": True,
+        "interval_seconds": 60,
+        "s3_path": settings.checkpoint_s3_path or "s3://ai-training-checkpoints-dev/e2e-tests/",
     }
+    return config
 
 
 # =============================================================================
-# 全局资源跟踪和清理
+# 资源跟踪和清理
 # =============================================================================
 
 _created_resources: list[dict[str, Any]] = []
@@ -394,46 +295,44 @@ _created_resources: list[dict[str, Any]] = []
 
 def track_resource(resource_type: str, resource_id: str) -> None:
     """跟踪创建的资源"""
-    _created_resources.append(
-        {
-            "type": resource_type,
-            "id": resource_id,
-            "created_at": datetime.now(UTC),
-        }
-    )
+    _created_resources.append({
+        "type": resource_type,
+        "id": resource_id,
+        "created_at": datetime.now(UTC),
+    })
 
 
 async def cleanup_all_resources(hyperpod_client: Any) -> None:
-    """清理所有创建的资源"""
+    """清理所有资源"""
+    cleanup_actions = {
+        "training_job": hyperpod_client.cancel_training_job,
+        "checkpoint": hyperpod_client.delete_checkpoint,
+    }
+
     for resource in _created_resources:
-        try:
-            if resource["type"] == "training_job":
-                await hyperpod_client.cancel_training_job(resource["id"])
-                print(f"✅ 清理 training_job: {resource['id']}")
-            elif resource["type"] == "checkpoint":
-                await hyperpod_client.delete_checkpoint(resource["id"])
-                print(f"✅ 清理 checkpoint: {resource['id']}")
-        except Exception as e:
-            print(f"⚠️ 清理失败 {resource['type']}: {resource['id']}: {e}")
+        action = cleanup_actions.get(resource["type"])
+        if action:
+            try:
+                await action(resource["id"])
+                print(f"✅ 清理 {resource['type']}: {resource['id']}")
+            except Exception as e:
+                print(f"⚠️ 清理失败 {resource['type']}: {resource['id']}: {e}")
+
     _created_resources.clear()
 
 
-# 注: cleanup_on_exit 已移除 autouse=True
-# 资源清理在各测试的 finally 块中处理，避免 pytest-asyncio scope 问题
-
-
 # =============================================================================
-# 辅助 Fixture
+# 辅助 Fixtures
 # =============================================================================
 
 
 @pytest.fixture
 def e2e_timeout() -> int:
-    """E2E 测试总体超时时间 (秒)"""
+    """E2E 测试超时（秒）"""
     return settings.e2e_timeout
 
 
 @pytest.fixture
 def e2e_settings():
-    """E2E 测试配置对象"""
+    """E2E 配置对象"""
     return settings
