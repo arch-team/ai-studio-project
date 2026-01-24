@@ -28,6 +28,12 @@ export const ROUTES = {
   TRAINING_JOBS: '/training-jobs',
   TRAINING_JOB_DETAIL: '/training-jobs/:id',
   TRAINING_JOB_CREATE: '/training-jobs/create',
+
+  // 任务模板
+  JOB_TEMPLATES: '/job-templates',
+  JOB_TEMPLATE_DETAIL: '/job-templates/:id',
+  JOB_TEMPLATE_CREATE: '/job-templates/create',
+
   MODELS: '/models',
   MODEL_DETAIL: '/models/:id',
   MODEL_VERSIONS: '/models/:id/versions',

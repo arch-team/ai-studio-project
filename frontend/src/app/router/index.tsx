@@ -21,6 +21,12 @@ import {
   TrainingJobDetailPage,
 } from '@features/training';
 
+// Templates 模块页面
+import {
+  TemplateListPage,
+  TemplateDetailPage,
+} from '@features/templates';
+
 // Models 模块页面
 import {
   ModelListPage,
@@ -101,6 +107,16 @@ export const router = createBrowserRouter([
       {
         path: ROUTES.MODEL_VERSIONS,
         element: <ModelVersionsPage />,
+      },
+
+      // 任务模板
+      {
+        path: ROUTES.JOB_TEMPLATES,
+        element: <TemplateListPage />,
+      },
+      {
+        path: ROUTES.JOB_TEMPLATE_DETAIL,
+        element: <TemplateDetailPage />,
       },
 
       // 数据管理
