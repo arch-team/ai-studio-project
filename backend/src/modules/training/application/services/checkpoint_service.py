@@ -30,14 +30,12 @@ from src.modules.training.domain.value_objects import (
     JobStatus,
     StorageTier,
 )
-from src.shared.application import BaseService
+from src.shared.application.enhanced_base_service import EnhancedBaseService
 from src.shared.utils import utc_now
 
 
-class CheckpointService(BaseService[Checkpoint, int]):
+class CheckpointService(EnhancedBaseService[Checkpoint, int]):
     """Service for managing training checkpoints."""
-
-    _not_found_error_factory = CheckpointNotFoundError
 
     def __init__(
         self,
@@ -46,6 +44,7 @@ class CheckpointService(BaseService[Checkpoint, int]):
         storage_service: IStorageService | None = None,
     ):
         super().__init__(repository, "Checkpoint")
+        self._not_found_error_factory = CheckpointNotFoundError
         self._training_job_repo = training_job_repository
         self._storage_service = storage_service
 

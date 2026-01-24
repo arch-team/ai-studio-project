@@ -10,13 +10,12 @@ from src.modules.spaces.domain.entities import Space
 from src.modules.spaces.domain.repositories import ISpaceRepository
 from src.modules.spaces.domain.value_objects import SpaceStatus
 from src.modules.spaces.infrastructure.models import DevelopmentSpaceModel
-from src.shared.domain.exceptions import EntityNotFoundError
-from src.shared.infrastructure import BaseRepositoryImpl, QueryBuilder
+from src.shared.infrastructure.repository_base import EnhancedBaseRepository
 from src.shared.utils import utc_now
 
 
 class SpaceRepository(
-    BaseRepositoryImpl[Space, DevelopmentSpaceModel, str],
+    EnhancedBaseRepository[Space, DevelopmentSpaceModel, str],
     ISpaceRepository,
 ):
     """SQLAlchemy implementation of space repository."""
@@ -54,6 +53,18 @@ class SpaceRepository(
             lifecycle_config_arn=entity.lifecycle_config_arn,
             sagemaker_space_arn=entity.sagemaker_space_arn,
         )
+
+    def _update_model(self, model: DevelopmentSpaceModel, entity: Space) -> None:
+        """Update ORM model fields from entity."""
+        model.space_name = entity.space_name
+        model.instance_type = entity.instance_type
+        model.space_type = entity.space_type
+        model.storage_size_gb = entity.storage_size_gb
+        model.status = entity.status
+        model.lifecycle_config_arn = entity.lifecycle_config_arn
+        model.sagemaker_space_arn = entity.sagemaker_space_arn
+
+    # ========== Domain-specific queries ==========
 
     async def get_by_id(self, space_id: str) -> Space | None:
         """Get space by ID."""
@@ -98,60 +109,17 @@ class SpaceRepository(
         sort_order: str = "desc",
     ) -> tuple[list[Space], int]:
         """List spaces with pagination and filters."""
-        base_query = select(DevelopmentSpaceModel).options(
-            selectinload(DevelopmentSpaceModel.owner)
+        filters = {}
+        if owner_id is not None:
+            filters["owner_id"] = owner_id
+        if status is not None:
+            filters["status"] = status
+
+        return await self._list_with_filters(
+            filters=filters,
+            page=page,
+            page_size=page_size,
+            sort_by=sort_by,
+            sort_order=sort_order,
         )
 
-        builder = (
-            QueryBuilder(base_query, DevelopmentSpaceModel)
-            .with_soft_delete_filter()
-            .with_filter("owner_id", owner_id)
-            .with_filter("status", status)
-            .with_order_by(sort_by, sort_order)
-        )
-
-        total = await builder.count(self._session)
-
-        models, _ = await builder.with_pagination(page, page_size).execute_with_count(
-            self._session
-        )
-
-        return [self._to_entity(m) for m in models], total
-
-    async def update(self, space: Space) -> Space:
-        """Update an existing space."""
-        result = await self._session.execute(
-            select(DevelopmentSpaceModel).where(DevelopmentSpaceModel.id == space.id)
-        )
-        db_model = result.scalar_one_or_none()
-        if db_model is None:
-            raise EntityNotFoundError("Space", str(space.id))
-
-        # Update fields
-        db_model.space_name = space.space_name
-        db_model.instance_type = space.instance_type
-        db_model.space_type = space.space_type
-        db_model.storage_size_gb = space.storage_size_gb
-        db_model.status = space.status
-        db_model.lifecycle_config_arn = space.lifecycle_config_arn
-        db_model.sagemaker_space_arn = space.sagemaker_space_arn
-        db_model.updated_at = utc_now()
-
-        await self._session.flush()
-        await self._session.refresh(db_model)
-        return self._to_entity(db_model)
-
-    async def soft_delete(self, space_id: str) -> bool:
-        """Soft delete a space."""
-        result = await self._session.execute(
-            select(DevelopmentSpaceModel).where(DevelopmentSpaceModel.id == space_id)
-        )
-        model = result.scalar_one_or_none()
-        if model is None:
-            return False
-
-        model.status = SpaceStatus.DELETED
-        model.deleted_at = utc_now()
-        model.updated_at = utc_now()
-        await self._session.flush()
-        return True

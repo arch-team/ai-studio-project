@@ -5,7 +5,7 @@ from typing import Any
 from src.modules.models.domain.entities import Model
 from src.modules.models.domain.repositories import IModelRepository
 from src.modules.models.domain.value_objects import ModelFramework, ModelStatus
-from src.shared.application import BaseService
+from src.shared.application.enhanced_base_service import EnhancedBaseService
 from src.shared.domain.exceptions import (
     EntityNotFoundError,
     InvalidStateTransitionError,
@@ -14,7 +14,7 @@ from src.shared.domain.interfaces import IEntityExistenceChecker
 from src.shared.utils import EnumMapper, utc_now
 
 
-class ModelService(BaseService[Model, int]):
+class ModelService(EnhancedBaseService[Model, int]):
     """Service for managing ML models."""
 
     def __init__(
@@ -27,13 +27,6 @@ class ModelService(BaseService[Model, int]):
         self._model_repository = model_repository
         self._training_job_checker = training_job_checker
         self._checkpoint_checker = checkpoint_checker
-
-    async def _validate_entity_exists(
-        self, checker: IEntityExistenceChecker | None, entity_type: str, entity_id: int
-    ) -> None:
-        """验证关联实体是否存在."""
-        if checker and not await checker.exists(entity_id):
-            raise EntityNotFoundError(entity_type, str(entity_id))
 
     async def _determine_model_version(self, model_name: str) -> str:
         """确定模型版本号."""
@@ -230,10 +223,12 @@ class ModelService(BaseService[Model, int]):
         """Archive a model."""
         model = await self._get_or_raise(model_id)
 
-        if not model.can_transition_to(ModelStatus.ARCHIVED):
-            raise InvalidStateTransitionError(
-                "Model", model.status.value, ModelStatus.ARCHIVED.value
-            )
+        # Use base class method for state transition validation
+        self._validate_state_transition(
+            model,
+            ModelStatus.ARCHIVED,
+            [ModelStatus.REGISTERED, ModelStatus.TRAINING]  # Allowed from states
+        )
 
         model.archive()
         return await self._model_repository.update(model)

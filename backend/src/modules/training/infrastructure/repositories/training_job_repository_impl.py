@@ -14,14 +14,17 @@ from src.modules.training.domain.value_objects import (
     SpotInterruptionBehavior,
 )
 from src.modules.training.infrastructure.models import TrainingJobModel
-from src.shared.domain.exceptions import EntityNotFoundError
+from src.shared.infrastructure.repository_base import EnhancedBaseRepository
 
 
-class TrainingJobRepository(ITrainingJobRepository):
+class TrainingJobRepository(
+    EnhancedBaseRepository[TrainingJob, TrainingJobModel, int],
+    ITrainingJobRepository,
+):
     """SQLAlchemy implementation of TrainingJob repository."""
 
     def __init__(self, session: AsyncSession):
-        self._session = session
+        super().__init__(session, TrainingJobModel)
 
     def _to_entity(self, model: TrainingJobModel) -> TrainingJob:
         """Convert ORM model to domain entity."""
@@ -75,15 +78,54 @@ class TrainingJobRepository(ITrainingJobRepository):
             updated_at=model.updated_at,
         )
 
-    async def get_by_id(self, job_id: int) -> TrainingJob | None:
-        """Get training job by ID."""
-        result = await self._session.execute(
-            select(TrainingJobModel).where(TrainingJobModel.id == job_id)
+    def _to_model(self, entity: TrainingJob) -> TrainingJobModel:
+        """Convert domain entity to ORM model."""
+        return TrainingJobModel(
+            job_name=entity.job_name,
+            owner_id=entity.owner_id,
+            image_uri=entity.image_uri,
+            instance_type=entity.instance_type,
+            entrypoint_command=entity.entrypoint_command,
+            display_name=entity.display_name,
+            description=entity.description,
+            node_count=entity.node_count,
+            tasks_per_node=entity.tasks_per_node,
+            hyperparameters=entity.hyperparameters,
+            max_epochs=entity.max_epochs,
+            batch_size=entity.batch_size,
+            learning_rate=entity.learning_rate,
+            environment_variables=entity.environment_variables,
+            distribution_strategy=entity.distribution_strategy,
+            mixed_precision=entity.mixed_precision,
+            use_spot_instances=entity.use_spot_instances,
+            spot_interruption_behavior=entity.spot_interruption_behavior,
+            priority=entity.priority,
+            status=entity.status,
+            dataset_id=entity.dataset_id,
+            data_mount_path=entity.data_mount_path,
+            checkpoint_mount_path=entity.checkpoint_mount_path,
+            checkpoint_interval=entity.checkpoint_interval,
         )
-        model = result.scalar_one_or_none()
-        if model is None:
-            return None
-        return self._to_entity(model)
+
+    def _update_model(self, model: TrainingJobModel, entity: TrainingJob) -> None:
+        """Update ORM model fields from entity."""
+        model.status = entity.status
+        model.hyperpod_status = entity.hyperpod_status
+        model.kueue_status = entity.kueue_status
+        model.running_pods = entity.running_pods
+        model.failed_pods = entity.failed_pods
+        model.preemption_count = entity.preemption_count
+        model.current_epoch = entity.current_epoch
+        model.current_step = entity.current_step
+        model.latest_loss = entity.latest_loss
+        model.latest_accuracy = entity.latest_accuracy
+        model.started_at = entity.started_at
+        model.completed_at = entity.completed_at
+        model.duration_seconds = entity.duration_seconds
+        model.error_message = entity.error_message
+        model.failure_reason = entity.failure_reason
+
+    # ========== Domain-specific queries ==========
 
     async def get_by_name(self, job_name: str) -> TrainingJob | None:
         """Get training job by unique name."""
@@ -152,82 +194,6 @@ class TrainingJobRepository(ITrainingJobRepository):
         models = result.scalars().all()
 
         return [self._to_entity(m) for m in models], total
-
-    async def create(self, job: TrainingJob) -> TrainingJob:
-        """Create a new training job."""
-        model = TrainingJobModel(
-            job_name=job.job_name,
-            owner_id=job.owner_id,
-            image_uri=job.image_uri,
-            instance_type=job.instance_type,
-            entrypoint_command=job.entrypoint_command,
-            display_name=job.display_name,
-            description=job.description,
-            node_count=job.node_count,
-            tasks_per_node=job.tasks_per_node,
-            hyperparameters=job.hyperparameters,
-            max_epochs=job.max_epochs,
-            batch_size=job.batch_size,
-            learning_rate=job.learning_rate,
-            environment_variables=job.environment_variables,
-            distribution_strategy=job.distribution_strategy,
-            mixed_precision=job.mixed_precision,
-            use_spot_instances=job.use_spot_instances,
-            spot_interruption_behavior=job.spot_interruption_behavior,
-            priority=job.priority,
-            status=job.status,
-            dataset_id=job.dataset_id,
-            data_mount_path=job.data_mount_path,
-            checkpoint_mount_path=job.checkpoint_mount_path,
-            checkpoint_interval=job.checkpoint_interval,
-        )
-        self._session.add(model)
-        await self._session.flush()
-        await self._session.refresh(model)
-        return self._to_entity(model)
-
-    async def update(self, job: TrainingJob) -> TrainingJob:
-        """Update an existing training job."""
-        result = await self._session.execute(
-            select(TrainingJobModel).where(TrainingJobModel.id == job.id)
-        )
-        model = result.scalar_one_or_none()
-        if model is None:
-            raise EntityNotFoundError("TrainingJob", str(job.id))
-
-        # Update fields
-        model.status = job.status
-        model.hyperpod_status = job.hyperpod_status
-        model.kueue_status = job.kueue_status
-        model.running_pods = job.running_pods
-        model.failed_pods = job.failed_pods
-        model.preemption_count = job.preemption_count
-        model.current_epoch = job.current_epoch
-        model.current_step = job.current_step
-        model.latest_loss = job.latest_loss
-        model.latest_accuracy = job.latest_accuracy
-        model.started_at = job.started_at
-        model.completed_at = job.completed_at
-        model.duration_seconds = job.duration_seconds
-        model.error_message = job.error_message
-        model.failure_reason = job.failure_reason
-
-        await self._session.flush()
-        await self._session.refresh(model)
-        return self._to_entity(model)
-
-    async def soft_delete(self, job_id: int) -> bool:
-        """Soft delete a training job."""
-        result = await self._session.execute(
-            select(TrainingJobModel).where(TrainingJobModel.id == job_id)
-        )
-        model = result.scalar_one_or_none()
-        if model is None:
-            return False
-
-        await self._session.delete(model)
-        await self._session.flush()
-        return True
 
     async def exists_by_name(self, job_name: str) -> bool:
         """Check if a job with the given name exists."""

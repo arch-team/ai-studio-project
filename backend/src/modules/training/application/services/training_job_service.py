@@ -11,17 +11,15 @@ from src.modules.training.domain.value_objects import (
     JobPriority,
     JobStatus,
 )
-from src.shared.application import BaseService
+from src.shared.application.enhanced_base_service import EnhancedBaseService
 from src.shared.domain.exceptions import (
     DuplicateEntityError,
     InvalidStateTransitionError,
 )
 
 
-class TrainingJobService(BaseService[TrainingJob, int]):
+class TrainingJobService(EnhancedBaseService[TrainingJob, int]):
     """Service for managing training jobs."""
-
-    _not_found_error_factory = TrainingJobNotFoundError
 
     def __init__(
         self,
@@ -30,6 +28,7 @@ class TrainingJobService(BaseService[TrainingJob, int]):
         cluster_name: str = "default-cluster",
     ):
         super().__init__(repository, "TrainingJob")
+        self._not_found_error_factory = TrainingJobNotFoundError
         self._hyperpod_client = hyperpod_client
         self._cluster_name = cluster_name
 
@@ -37,9 +36,8 @@ class TrainingJobService(BaseService[TrainingJob, int]):
         """Create a new training job."""
         job_name = data["job_name"]
 
-        # Check if job name already exists
-        if await self._repository.exists_by_name(job_name):
-            raise DuplicateEntityError("TrainingJob", job_name)
+        # Use base class method for unique field validation
+        await self._validate_unique_field("name", job_name)
 
         # Create domain entity
         job = self._build_training_job(owner_id, data)
@@ -164,10 +162,10 @@ class TrainingJobService(BaseService[TrainingJob, int]):
         """Pause a running training job."""
         job = await self._get_or_raise(job_id)
 
-        if not job.can_pause():
-            raise InvalidStateTransitionError(
-                "TrainingJob", job.status.value, JobStatus.PAUSED.value
-            )
+        # Use base class method for state transition validation
+        self._validate_state_transition(
+            job, JobStatus.PAUSED, [JobStatus.RUNNING]
+        )
 
         await self._hyperpod_client.stop_training_job(
             cluster_name=self._cluster_name,
@@ -181,10 +179,10 @@ class TrainingJobService(BaseService[TrainingJob, int]):
         """Resume a paused or preempted training job."""
         job = await self._get_or_raise(job_id)
 
-        if not job.can_resume():
-            raise InvalidStateTransitionError(
-                "TrainingJob", job.status.value, JobStatus.RUNNING.value
-            )
+        # Use base class method for state transition validation
+        self._validate_state_transition(
+            job, JobStatus.RUNNING, [JobStatus.PAUSED, JobStatus.PREEMPTED]
+        )
 
         job_config = self._build_job_config(job)
         await self._hyperpod_client.submit_training_job(

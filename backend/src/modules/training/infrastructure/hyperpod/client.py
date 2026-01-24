@@ -222,9 +222,10 @@ class HyperPodClient(IHyperPodClient):
             )
 
             # 构建 ReplicaSpec
+            # 注意: name 必须小写，符合 Kubernetes RFC 1123 命名规范
             node_count = job_config.get("node_count", 1)
             replica_spec = ReplicaSpec(
-                name="Worker",
+                name="worker",
                 replicas=node_count,
                 template=Template(
                     spec=Spec(containers=[container])
