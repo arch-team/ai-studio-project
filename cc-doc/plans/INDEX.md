@@ -41,3 +41,5 @@ Claude Code 生成的计划文件索引。
 | 2026-01-24 | `2026-01-24-t037b-prometheus-pushgateway-部署实施计划.md` | T037b - Prometheus Pushgateway 部署实施计划 | ⏳ 进行中 |
 | 2026-01-24 | `2026-01-24-t038-hyperpod-集成服务实施计划.md` | T038 HyperPod 集成服务实施计划 | ⏳ 进行中 |
 | 2026-01-24 | `2026-01-24-t037b-prometheus-pushgateway-部署实施计划-1.md` | T037b - Prometheus Pushgateway 部署实施计划 | ⏳ 进行中 |
+| 2026-01-24 | `2026-01-24-cdk-项目代码优化计划.md` | CDK 项目代码优化计划 | ⏳ 进行中 |
+| 2026-01-24 | `2026-01-24-phase-3-us1-训练任务管理-集成测试实施计划.md` | Phase 3: US1 训练任务管理 - 集成测试实施计划 | ⏳ 进行中 |

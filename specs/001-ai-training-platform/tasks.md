@@ -389,7 +389,7 @@
   - **审计日志集成**: 记录所有密码操作 (创建、重置、修改) 到 audit_logs 表
   - **安全响应头**: API 返回错误时使用通用消息 (避免泄露账号存在性信息)
   - **参考**: spec.md FR-015 企业级认证和 SC-015 安全标准
-- [ ] [T013d] SSO 故障转移集成测试 - `backend/tests/integration/test_sso_failover.py`,验证 SSO 不可用时自动切换到本地账号认证:
+- [X] [T013d] SSO 故障转移集成测试 - `backend/tests/integration/auth/test_api_sso_middleware.py`,验证 SSO 不可用时自动切换到本地账号认证:
   - **场景 1**: 模拟 IdP 超时 (连接超时 >5s),验证系统降级到本地认证并记录告警
   - **场景 2**: 验证 SSO 恢复后自动切换回 SSO 认证 (健康检查通过后)
   - **场景 3**: 验证降级期间审计日志正确记录 (operation_type: auth_failover)
@@ -532,7 +532,7 @@
 - [X] [T038a] [US1] SageMaker Model Registry 集成 - `backend/src/modules/models/application/services/model_registry_service.py`,封装 SageMaker Model Registry API,自动注册训练完成的模型,管理模型版本生命周期(注册→批准→部署→归档)
 
 ### 集成测试
-- [ ] [T038c] [US1] 抢占时序SLA集成测试 - `backend/tests/integration/test_preemption_timing.py`,验证 FR-004 抢占时序保证:
+- [X] [T038c] [US1] 抢占时序SLA集成测试 - `backend/tests/integration/training/test_preemption_timing.py`,验证 FR-004 抢占时序保证:
   - **测试场景 1**: 触发低优先级任务被高优先级任务抢占 (使用 Kueue Priority 配置)
   - **测试场景 2**: 验证 checkpoint 在抢占触发后 5 分钟内保存完成 (监控 T038 的场景 4 触发时间戳)
   - **测试场景 3**: 验证被抢占任务的 Pod 在 30 秒内被释放 (调用 Kubernetes API 查询 Pod 状态)
