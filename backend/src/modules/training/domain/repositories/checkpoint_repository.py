@@ -1,8 +1,12 @@
 """Checkpoint Repository Interface - Data access contract for checkpoints."""
 
 from abc import ABC, abstractmethod
+from typing import TYPE_CHECKING
 
 from ..entities import Checkpoint
+
+if TYPE_CHECKING:
+    from ..value_objects import StorageTier
 
 
 class ICheckpointRepository(ABC):
@@ -33,3 +37,29 @@ class ICheckpointRepository(ABC):
         self, training_job_id: int
     ) -> Checkpoint | None:
         """Get the latest checkpoint for a training job."""
+
+    @abstractmethod
+    async def count_by_training_job_id(self, training_job_id: int) -> int:
+        """Count checkpoints for a training job."""
+
+    @abstractmethod
+    async def get_by_storage_tier(
+        self, storage_tier: "StorageTier", limit: int = 100
+    ) -> list[Checkpoint]:
+        """Get checkpoints by storage tier for migration."""
+
+    @abstractmethod
+    async def get_checkpoints_for_migration(
+        self,
+        training_job_id: int,
+        exclude_latest_count: int = 3,
+    ) -> list[Checkpoint]:
+        """Get checkpoints eligible for migration (excluding latest N)."""
+
+    @abstractmethod
+    async def get_oldest_checkpoints(
+        self,
+        training_job_id: int,
+        hours_threshold: int = 72,
+    ) -> list[Checkpoint]:
+        """Get checkpoints older than threshold for archival."""

@@ -4,6 +4,7 @@
 - IHyperPodClient: SageMaker HyperPod 操作契约
 - IMetricsService: 训练指标查询契约 (T037c)
 - INotificationService: 告警通知契约 (T037c)
+- IStorageService: 检查点存储操作契约 (T038)
 """
 
 from abc import ABC, abstractmethod
@@ -148,5 +149,166 @@ class INotificationService(ABC):
 
         Args:
             alert: 告警消息
+        """
+        pass
+
+
+# =============================================================================
+# Storage Service Interface (T038)
+# =============================================================================
+
+
+@dataclass
+class StorageInfo:
+    """存储信息"""
+
+    path: str
+    size_bytes: int
+    checksum: str
+
+
+class IStorageService(ABC):
+    """检查点存储服务接口 (T038)
+
+    提供检查点的存储层操作能力，支持 NVMe、FSx、S3 三层存储。
+    负责检查点文件的保存、迁移和完整性验证。
+    """
+
+    @abstractmethod
+    async def check_nvme_available(self, job_id: int) -> bool:
+        """检查 NVMe 存储是否可用
+
+        Args:
+            job_id: 训练任务 ID
+
+        Returns:
+            bool: NVMe 存储是否可用
+        """
+        pass
+
+    @abstractmethod
+    async def check_fsx_available(self, job_id: int) -> bool:
+        """检查 FSx 存储是否可用
+
+        Args:
+            job_id: 训练任务 ID
+
+        Returns:
+            bool: FSx 存储是否可用
+        """
+        pass
+
+    @abstractmethod
+    async def get_storage_path(
+        self,
+        job_id: int,
+        checkpoint_name: str,
+        storage_tier: str,
+    ) -> str:
+        """生成检查点存储路径
+
+        Args:
+            job_id: 训练任务 ID
+            checkpoint_name: 检查点名称
+            storage_tier: 存储层级 (NVME, FSX, S3)
+
+        Returns:
+            str: 完整存储路径
+        """
+        pass
+
+    @abstractmethod
+    async def save_checkpoint(
+        self,
+        job_id: int,
+        checkpoint_name: str,
+        storage_tier: str,
+    ) -> StorageInfo:
+        """保存检查点到指定存储层
+
+        Args:
+            job_id: 训练任务 ID
+            checkpoint_name: 检查点名称
+            storage_tier: 目标存储层级
+
+        Returns:
+            StorageInfo: 包含路径、大小、校验和的存储信息
+        """
+        pass
+
+    @abstractmethod
+    async def calculate_checksum(self, storage_path: str) -> str:
+        """计算检查点文件的 SHA-256 校验和
+
+        Args:
+            storage_path: 文件存储路径
+
+        Returns:
+            str: SHA-256 校验和
+        """
+        pass
+
+    @abstractmethod
+    async def get_checkpoint_size(self, storage_path: str) -> int:
+        """获取检查点文件大小
+
+        Args:
+            storage_path: 文件存储路径
+
+        Returns:
+            int: 文件大小 (字节)
+        """
+        pass
+
+    @abstractmethod
+    async def migrate_checkpoint(
+        self,
+        source_path: str,
+        target_tier: str,
+        job_id: int,
+    ) -> str:
+        """迁移检查点到目标存储层
+
+        Args:
+            source_path: 源文件路径
+            target_tier: 目标存储层级
+            job_id: 训练任务 ID
+
+        Returns:
+            str: 新的存储路径
+        """
+        pass
+
+    @abstractmethod
+    async def verify_integrity(self, storage_path: str, expected_checksum: str) -> bool:
+        """验证检查点文件完整性
+
+        Args:
+            storage_path: 文件存储路径
+            expected_checksum: 预期的 SHA-256 校验和
+
+        Returns:
+            bool: 文件是否完整
+        """
+        pass
+
+    @abstractmethod
+    async def get_storage_usage(self, storage_tier: str) -> float:
+        """获取存储层使用率
+
+        Args:
+            storage_tier: 存储层级
+
+        Returns:
+            float: 使用率 (0.0 - 1.0)
+        """
+        pass
+
+    @abstractmethod
+    async def delete_checkpoint(self, storage_path: str) -> None:
+        """删除检查点文件
+
+        Args:
+            storage_path: 文件存储路径
         """
         pass

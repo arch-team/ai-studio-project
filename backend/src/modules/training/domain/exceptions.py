@@ -41,3 +41,24 @@ class InvalidJobStateError(TrainingError):
         self.job_id = job_id
         self.current_state = current_state
         self.operation = operation
+
+
+class CheckpointStorageError(TrainingError):
+    """Raised when checkpoint storage operation fails."""
+
+    def __init__(self, message: str, job_id: int | None = None):
+        super().__init__(message)
+        self.job_id = job_id
+
+
+class CheckpointMigrationError(TrainingError):
+    """Raised when checkpoint migration fails."""
+
+    def __init__(self, checkpoint_id: int, source_tier: str, target_tier: str, reason: str):
+        super().__init__(
+            f"Failed to migrate checkpoint {checkpoint_id} from {source_tier} to {target_tier}: {reason}"
+        )
+        self.checkpoint_id = checkpoint_id
+        self.source_tier = source_tier
+        self.target_tier = target_tier
+        self.reason = reason

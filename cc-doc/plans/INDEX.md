@@ -38,3 +38,6 @@ Claude Code 生成的计划文件索引。
 | 2026-01-24 | `2026-01-24-实施计划-hyperpod-集成服务-t037-t037c-t037d-t037e.md` | 实施计划: HyperPod 集成服务 (T037, T037c, T037d, T037e) | ⏳ 进行中 |
 | 2026-01-24 | `2026-01-24-后端代码质量分析报告与改进计划.md` | 后端代码质量分析报告与改进计划 | ⏳ 进行中 |
 | 2026-01-24 | `2026-01-24-t037a-sagemaker-managed-mlflow-集成-实施计划.md` | T037a: SageMaker Managed MLflow 集成 - 实施计划 | ⏳ 进行中 |
+| 2026-01-24 | `2026-01-24-t037b-prometheus-pushgateway-部署实施计划.md` | T037b - Prometheus Pushgateway 部署实施计划 | ⏳ 进行中 |
+| 2026-01-24 | `2026-01-24-t038-hyperpod-集成服务实施计划.md` | T038 HyperPod 集成服务实施计划 | ⏳ 进行中 |
+| 2026-01-24 | `2026-01-24-t037b-prometheus-pushgateway-部署实施计划-1.md` | T037b - Prometheus Pushgateway 部署实施计划 | ⏳ 进行中 |

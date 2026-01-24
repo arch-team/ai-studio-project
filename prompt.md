@@ -224,6 +224,10 @@ Training Operator 需要在带有 sagemaker.amazonaws.com/compute-type: hyperpod
 
 
 
+/speckit.implement ## Phase 3: US1 (P1) - 训练任务管理 (33 tasks) 中的HyperPod 集成服务(T037a), 每个任务按照TDD（测试驱动开发的流程进行），完成后将相应的任务标记为完成状态
+
+/speckit.implement ## Phase 3: US1 (P1) - 训练任务管理 (33 tasks) 中的HyperPod 集成服务(T037b), 每个任务按照TDD（测试驱动开发的流程进行），完成后将相应的任务标记为完成状态
+
 
 
 # 标准

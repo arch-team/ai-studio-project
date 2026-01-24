@@ -7,7 +7,12 @@ from decimal import Decimal
 from src.shared.utils import utc_now
 from src.shared.domain.exceptions import InvalidStateTransitionError
 
-from ..value_objects import CheckpointStatus, CheckpointType, StorageTier
+from ..value_objects import (
+    CheckpointStatus,
+    CheckpointTriggerType,
+    CheckpointType,
+    StorageTier,
+)
 from ..value_objects.checkpoint_enums import STORAGE_TIER_HIERARCHY
 
 
@@ -22,8 +27,9 @@ class Checkpoint:
     storage_path: str
     size_bytes: int
 
-    # === Checkpoint type and progress ===
+    # === Checkpoint type and trigger ===
     checkpoint_type: CheckpointType = CheckpointType.EPOCH
+    trigger_type: CheckpointTriggerType = CheckpointTriggerType.SCHEDULED
     epoch: int | None = None
     step: int | None = None
 

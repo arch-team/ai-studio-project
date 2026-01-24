@@ -12,6 +12,7 @@ from src.shared.infrastructure.database import Base
 from src.shared.infrastructure.models import TimestampMixin
 from src.modules.training.domain.value_objects import (
     CheckpointStatus,
+    CheckpointTriggerType,
     CheckpointType,
     StorageTier,
 )
@@ -36,8 +37,9 @@ class CheckpointModel(Base, TimestampMixin):
     checkpoint_name: Mapped[str] = mapped_column(String(256), nullable=False, comment="检查点名称")
     storage_path: Mapped[str] = mapped_column(String(512), nullable=False, comment="存储路径")
 
-    # Checkpoint type
+    # Checkpoint type and trigger
     checkpoint_type: Mapped[CheckpointType] = mapped_column(Enum(CheckpointType), nullable=False, default=CheckpointType.EPOCH, comment="检查点类型")
+    trigger_type: Mapped[CheckpointTriggerType] = mapped_column(Enum(CheckpointTriggerType), nullable=False, default=CheckpointTriggerType.SCHEDULED, comment="触发类型")
 
     # Training progress
     epoch: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True, comment="训练轮次")

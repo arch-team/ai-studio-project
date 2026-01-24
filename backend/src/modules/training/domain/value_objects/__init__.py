@@ -1,7 +1,12 @@
 """Training domain value objects."""
 
 from .job_status import DistributionStrategy, JobPriority, JobStatus, SpotInterruptionBehavior
-from .checkpoint_enums import CheckpointStatus, CheckpointType, StorageTier
+from .checkpoint_enums import (
+    CheckpointStatus,
+    CheckpointTriggerType,
+    CheckpointType,
+    StorageTier,
+)
 from .training_metrics import TrainingMetrics
 from .pod_statistics import PodStatistics
 
@@ -14,6 +19,7 @@ __all__ = [
     # Checkpoint enums
     "CheckpointType",
     "CheckpointStatus",
+    "CheckpointTriggerType",
     "StorageTier",
     # Value objects
     "TrainingMetrics",

@@ -494,7 +494,7 @@
   - **测试工具**: 使用 pytest + MLflow API 模拟指标记录和查询
   - **参考**: spec.md FR-022 停滞检测策略 (依赖 T037c 停滞检测服务)
 - [X] [T037a] [US1] SageMaker Managed MLflow 集成 - `backend/src/modules/training/application/services/mlflow_service.py`,部署 MLflow Tracking Server (使用 SageMaker Managed MLflow),配置 MLflow Tracking URI 环境变量注入,提供 Python SDK 示例代码 (`backend/examples/mlflow_training_example.py`),文档化指标记录最佳实践 (指标命名规范、记录频率、超参数追踪模式),实现 MLflow 实验查询 API 集成到前端监控页面
-- [ ] [T037b] [US1] Prometheus Pushgateway 部署 (可选) - `infrastructure/monitoring/pushgateway.yaml`,部署 Pushgateway 服务到 EKS 集群 (仅用于实时告警场景),配置 Service 和环境变量 `PROMETHEUS_PUSHGATEWAY_URL` 注入,提供 Python SDK 示例代码 (`backend/examples/prometheus_metrics_example.py`),文档化与 MLflow 的职责分离和使用场景
+- [SKIP] [T037b] [US1] ~~Prometheus Pushgateway 部署~~ - **已跳过**: MLflow 已满足训练业务指标监控需求，HyperPod Observability Add-on 覆盖基础设施监控，无即时告警场景需求
 - [ ] [T038] [US1] Checkpoint 自动保存逻辑 - `backend/src/modules/training/application/services/checkpoint_service.py`,实现 FR-010 定义的 5 种检查点创建触发场景:
   - **(1) 定期自动创建**: 定时任务 (10-15 分钟间隔) 为 Running 状态的训练任务自动创建检查点
   - **(2) 训练中断**: 检测到训练任务 Pods 异常终止时立即触发检查点创建
