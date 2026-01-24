@@ -19,7 +19,7 @@ from src.modules.spaces.api.schemas import (
 )
 from src.modules.spaces.application.services import SpaceService
 from src.modules.spaces.domain.value_objects import SpaceStatus
-from src.shared.api.pagination import PageParam, PageSizeParam
+from src.shared.api.pagination import PageParam, PageSizeParam, SortByParam, SortOrder, SortOrderParam
 from src.shared.utils import calculate_total_pages
 
 router = APIRouter()
@@ -54,8 +54,8 @@ async def list_spaces(
     page: PageParam,
     page_size: PageSizeParam,
     status_filter: SpaceStatusEnum | None = Query(default=None, alias="status", description="Filter by status"),
-    sort_by: str = Query(default="created_at", description="Sort field"),
-    sort_order: str = Query(default="desc", description="Sort order (asc/desc)"),
+    sort_by: SortByParam = "created_at",
+    sort_order: SortOrderParam = SortOrder.DESC,
     current_user: CurrentUser = Depends(get_current_active_user),
     service: SpaceService = Depends(get_space_service),
 ):
@@ -68,7 +68,7 @@ async def list_spaces(
         page=page,
         page_size=page_size,
         sort_by=sort_by,
-        sort_order=sort_order,
+        sort_order=sort_order.value,
     )
 
     return SpaceListResponse(

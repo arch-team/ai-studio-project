@@ -22,7 +22,7 @@ from src.modules.models.api.schemas import (
     VersionComparison,
 )
 from src.modules.models.application.services import ModelService
-from src.shared.api.pagination import PageParam, PageSizeParam
+from src.shared.api.pagination import PageParam, PageSizeParam, SortByParam, SortOrder, SortOrderParam
 from src.shared.utils import calculate_total_pages
 
 router = APIRouter()
@@ -63,8 +63,8 @@ async def list_models(
     training_job_id: int | None = Query(default=None, description="Filter by training job"),
     status_filter: ModelStatusEnum | None = Query(default=None, alias="status", description="Filter by status"),
     framework: ModelFrameworkEnum | None = Query(default=None, description="Filter by framework"),
-    sort_by: str = Query(default="created_at", description="Sort field"),
-    sort_order: str = Query(default="desc", description="Sort order (asc/desc)"),
+    sort_by: SortByParam = "created_at",
+    sort_order: SortOrderParam = SortOrder.DESC,
     current_user: CurrentUser = Depends(get_current_active_user),
     service: ModelService = Depends(get_model_service),
 ):
@@ -84,7 +84,7 @@ async def list_models(
         page=page,
         page_size=page_size,
         sort_by=sort_by,
-        sort_order=sort_order,
+        sort_order=sort_order.value,
     )
 
     return ModelListResponse(

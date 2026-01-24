@@ -29,7 +29,7 @@ from src.modules.training.api.schemas import (
 )
 from src.modules.training.application.services import CheckpointService, TrainingJobService
 from src.modules.training.domain.value_objects import JobPriority, JobStatus
-from src.shared.api.pagination import PageParam, PageSizeParam
+from src.shared.api.pagination import PageParam, PageSizeParam, SortByParam, SortOrder, SortOrderParam
 from src.shared.utils import EnumMapper, calculate_total_pages, utc_now
 
 router = APIRouter()
@@ -62,8 +62,8 @@ async def list_training_jobs(
     priority: JobPriorityEnum | None = Query(default=None, description="Filter by priority"),
     submitted_after: datetime | None = Query(default=None, description="Filter by submission date"),
     submitted_before: datetime | None = Query(default=None, description="Filter by submission date"),
-    sort_by: str = Query(default="created_at", description="Sort field"),
-    sort_order: str = Query(default="desc", description="Sort order"),
+    sort_by: SortByParam = "created_at",
+    sort_order: SortOrderParam = SortOrder.DESC,
     current_user: CurrentUser = Depends(get_current_active_user),
     service: TrainingJobService = Depends(get_training_job_service),
 ):
@@ -77,7 +77,7 @@ async def list_training_jobs(
         page=page,
         page_size=page_size,
         sort_by=sort_by,
-        sort_order=sort_order,
+        sort_order=sort_order.value,
     )
 
     return TrainingJobListResponse(
