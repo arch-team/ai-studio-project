@@ -217,15 +217,22 @@ class StorageStack(cdk.Stack):
 
         生命周期策略（基于 env_config.storage 配置）:
         - checkpoint_ia_transition_days 天后转换到 Standard-IA
-        - checkpoint_retention_days 天后过期删除
+        - checkpoint_retention_days 天后过期删除（仅 cold/ 前缀）
         - 3 天后删除未完成的分片上传（检查点频繁写入）
         - 7 天后删除旧版本（检查点可替换）
+
+        T038b-2 说明:
+        - 生命周期规则 1 (存储类转换): 所有检查点 30 天后转换到 Standard-IA，节省约 50% 存储成本
+        - 生命周期规则 2 (自动删除): 仅对 cold/ 前缀的冷检查点应用，避免误删热/温检查点
+        - 合规性: 90 天保留期满足审计要求和模型回滚需求
+        - 成本优化: Standard-IA 转换 + 冷检查点自动删除，预估可节省 60-70% 长期存储成本
         """
         bucket_name = f"{self.env_config.resource_prefix}-checkpoints"
         storage_config = self.env_config.storage
         builder = LifecycleRuleBuilder()
 
         lifecycle_rules = [
+            # 规则 1: 所有检查点转换到 Standard-IA (成本优化)
             builder.transition_rule(
                 "TransitionToIA",
                 [
@@ -235,11 +242,16 @@ class StorageStack(cdk.Stack):
                     )
                 ],
             ),
+            # 规则 2: 仅冷检查点自动删除 (使用 cold/ 前缀过滤，避免误删热/温检查点)
+            # CheckpointMigrationService (T038b-1) 将冷检查点迁移到 s3://bucket/cold/ 目录
             builder.expiration_rule(
                 "ExpireCheckpoints",
                 storage_config.checkpoint_retention_days,
+                prefix="cold/",
             ),
+            # 规则 3: 清理未完成的分片上传 (检查点频繁写入场景)
             builder.incomplete_multipart_rule(days=3),
+            # 规则 4: 清理旧版本 (检查点可替换，7 天足够故障恢复)
             builder.old_versions_rule(days=7),
         ]
 

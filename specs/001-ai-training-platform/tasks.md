@@ -495,7 +495,7 @@
   - **参考**: spec.md FR-022 停滞检测策略 (依赖 T037c 停滞检测服务)
 - [X] [T037a] [US1] SageMaker Managed MLflow 集成 - `backend/src/modules/training/application/services/mlflow_service.py`,部署 MLflow Tracking Server (使用 SageMaker Managed MLflow),配置 MLflow Tracking URI 环境变量注入,提供 Python SDK 示例代码 (`backend/examples/mlflow_training_example.py`),文档化指标记录最佳实践 (指标命名规范、记录频率、超参数追踪模式),实现 MLflow 实验查询 API 集成到前端监控页面
 - [SKIP] [T037b] [US1] ~~Prometheus Pushgateway 部署~~ - **已跳过**: MLflow 已满足训练业务指标监控需求，HyperPod Observability Add-on 覆盖基础设施监控，无即时告警场景需求
-- [ ] [T038] [US1] Checkpoint 自动保存逻辑 - `backend/src/modules/training/application/services/checkpoint_service.py`,实现 FR-010 定义的 5 种检查点创建触发场景:
+- [X] [T038] [US1] Checkpoint 自动保存逻辑 - `backend/src/modules/training/application/services/checkpoint_service.py`,实现 FR-010 定义的 5 种检查点创建触发场景:
   - **(1) 定期自动创建**: 定时任务 (10-15 分钟间隔) 为 Running 状态的训练任务自动创建检查点
   - **(2) 训练中断**: 检测到训练任务 Pods 异常终止时立即触发检查点创建
   - **(3) 节点故障**: 检测到 PodsReady=False 且持续 >30 秒时触发检查点创建
@@ -505,7 +505,7 @@
   - **接口设计**: 提供 `create_checkpoint(job_id, trigger_type)` 接口创建检查点,提供 `list_checkpoints(job_id, filters)` 接口供 T038b 查询检查点列表
   - **职责边界**: T038 负责检查点创建和初始保存,不负责后续迁移 (迁移由 T038b 负责)
   - **参考**: spec.md FR-010 检查点触发场景映射
-- [ ] [T038b-1] [US1] Checkpoint 分层迁移服务 - `backend/src/modules/training/application/services/checkpoint_migration_service.py`,实现 FR-011 分层存储迁移策略:
+- [X] [T038b-1] [US1] Checkpoint 分层迁移服务 - `backend/src/modules/training/application/services/checkpoint_migration_service.py`,实现 FR-011 分层存储迁移策略:
   - **依赖接口**: 调用 T038 的 `list_checkpoints(job_id)` 接口获取检查点列表和元数据 (创建时间、序号、存储路径、校验和)
   - **热检查点管理**: 保留最近 3 个检查点在 NVMe 本地存储
   - **温检查点迁移**: 第 4-10 个检查点自动迁移到 FSx for Lustre
@@ -529,7 +529,7 @@
   - **职责边界**: T038b-2 仅负责 S3 基础设施配置,不负责检查点迁移逻辑 (迁移由 T038b-1 负责)
   - **依赖**: T008b (S3 Buckets Stack,提供 checkpoint bucket 名称和 ARN)
   - **参考**: spec.md FR-011 S3 生命周期策略要求
-- [ ] [T038a] [US1] SageMaker Model Registry 集成 - `backend/src/modules/models/application/services/model_registry_service.py`,封装 SageMaker Model Registry API,自动注册训练完成的模型,管理模型版本生命周期(注册→批准→部署→归档)
+- [X] [T038a] [US1] SageMaker Model Registry 集成 - `backend/src/modules/models/application/services/model_registry_service.py`,封装 SageMaker Model Registry API,自动注册训练完成的模型,管理模型版本生命周期(注册→批准→部署→归档)
 
 ### 集成测试
 - [ ] [T038c] [US1] 抢占时序SLA集成测试 - `backend/tests/integration/test_preemption_timing.py`,验证 FR-004 抢占时序保证:

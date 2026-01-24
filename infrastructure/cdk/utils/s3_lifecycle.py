@@ -98,18 +98,34 @@ class LifecycleRuleBuilder:
         )
 
     @staticmethod
-    def expiration_rule(rule_id: str, days: int) -> s3.LifecycleRule:
+    def expiration_rule(
+        rule_id: str,
+        days: int,
+        prefix: str | None = None,
+    ) -> s3.LifecycleRule:
         """创建对象过期规则。
 
         Args:
             rule_id: 规则 ID
             days: 过期天数
+            prefix: 可选的对象前缀过滤 (例如 "cold/")
 
         Returns:
             配置好的生命周期规则
+
+        Example:
+            ```python
+            # 仅对 cold/ 前缀的对象应用 90 天过期规则
+            builder.expiration_rule("ExpireColdCheckpoints", 90, prefix="cold/")
+            ```
+
+        T038b-2 说明:
+            使用前缀过滤可以避免误删热/温检查点，仅对冷检查点应用自动删除规则。
+            冷检查点由 CheckpointMigrationService (T038b-1) 迁移到 S3 时放置在 cold/ 目录下。
         """
         return s3.LifecycleRule(
             id=rule_id,
             enabled=True,
             expiration=Duration.days(days),
+            prefix=prefix,
         )
