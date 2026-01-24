@@ -517,7 +517,7 @@
   - **定时任务调度**: 每 10 分钟执行一次迁移检查和执行
   - **职责边界**: T038b-1 仅负责迁移已创建的检查点,不负责创建检查点 (创建由 T038 负责)
   - **参考**: spec.md FR-011 分层检查点存储策略, Edge Cases (检查点存储满载/检查点损坏处理) (依赖 T038)
-- [ ] [T038b-2] [US1] S3 Lifecycle Policy IaC 配置 - `infrastructure/cdk/stacks/storage_stack.py`,实现 S3 检查点存储的生命周期自动化管理:
+- [X] [T038b-2] [US1] S3 Lifecycle Policy IaC 配置 - `infrastructure/cdk/stacks/storage_stack.py`,实现 S3 检查点存储的生命周期自动化管理:
   - **生命周期规则 1 - 存储类转换**: 配置 S3 Lifecycle Rule,对象创建 30 天后自动转换为 Standard-IA（低频访问，成本节省 ~50%）
   - **生命周期规则 2 - 自动删除**: 对象创建 90 天后自动删除冷检查点（默认值，可通过 CDK context 参数配置）
   - **CDK 参数化配置**:
