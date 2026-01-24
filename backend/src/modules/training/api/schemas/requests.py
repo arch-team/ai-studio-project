@@ -78,3 +78,69 @@ class CreateCheckpointRequest(BaseModel):
     """Request body for creating a manual checkpoint."""
 
     checkpoint_name: str | None = Field(None, max_length=256, description="Checkpoint name")
+
+
+class TemplateVisibilityEnum(str, Enum):
+    """Template visibility scope."""
+
+    PRIVATE = "private"
+    TEAM = "team"
+    PUBLIC = "public"
+
+
+class TrainingConfigSchema(BaseModel):
+    """Training configuration for templates."""
+
+    image: str = Field(..., description="Docker image URI")
+    script_path: str | None = Field(None, description="Training script path")
+    instance_type: str = Field(..., description="Instance type")
+    instance_count: int = Field(default=1, ge=1, description="Number of instances")
+    distribution_strategy: DistributionStrategyEnum = Field(
+        default=DistributionStrategyEnum.DDP,
+        description="Distribution strategy",
+    )
+    environment: dict[str, str] | None = Field(None, description="Environment variables")
+    hyperparameters: dict | None = Field(None, description="Default hyperparameters")
+
+
+class CreateJobTemplateRequest(BaseModel):
+    """Request body for creating a job template."""
+
+    name: str = Field(..., min_length=1, max_length=128, description="Template name")
+    description: str | None = Field(None, description="Template description")
+    visibility: TemplateVisibilityEnum = Field(
+        default=TemplateVisibilityEnum.PRIVATE,
+        description="Visibility scope",
+    )
+    training_config: TrainingConfigSchema = Field(..., description="Training configuration")
+
+
+class UpdateJobTemplateRequest(BaseModel):
+    """Request body for updating a job template."""
+
+    name: str | None = Field(None, min_length=1, max_length=128, description="Template name")
+    description: str | None = Field(None, description="Template description")
+    visibility: TemplateVisibilityEnum | None = Field(None, description="Visibility scope")
+    training_config: TrainingConfigSchema | None = Field(None, description="Training configuration")
+
+
+class CreateJobFromTemplateRequest(BaseModel):
+    """Request body for creating a training job from a template."""
+
+    job_name: str = Field(..., min_length=1, max_length=128, description="Job name")
+    display_name: str | None = Field(None, max_length=256, description="Display name")
+    node_count: int | None = Field(None, ge=1, description="Override node count")
+    priority: JobPriorityEnum | None = Field(None, description="Override priority")
+    environment_variables: dict[str, str] | None = Field(None, description="Additional env vars")
+
+    @field_validator("job_name")
+    @classmethod
+    def validate_job_name(cls, v: str) -> str:
+        """Validate job name format: lowercase alphanumeric with hyphens."""
+        pattern = r"^[a-z0-9][a-z0-9-]*[a-z0-9]$|^[a-z0-9]$"
+        if not re.match(pattern, v):
+            raise ValueError(
+                "Job name must be lowercase alphanumeric with hyphens, "
+                "start and end with alphanumeric characters"
+            )
+        return v

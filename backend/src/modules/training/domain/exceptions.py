@@ -62,3 +62,22 @@ class CheckpointMigrationError(TrainingError):
         self.source_tier = source_tier
         self.target_tier = target_tier
         self.reason = reason
+
+
+class JobTemplateNotFoundError(EntityNotFoundError):
+    """Raised when a job template is not found."""
+
+    def __init__(self, identifier: int):
+        super().__init__("JobTemplate", str(identifier))
+        self.identifier = identifier
+
+
+class JobTemplatePermissionDeniedError(TrainingError):
+    """Raised when user doesn't have permission for the template operation."""
+
+    def __init__(self, operation: str, template_id: int):
+        super().__init__(
+            f"Permission denied: cannot {operation} template {template_id}"
+        )
+        self.operation = operation
+        self.template_id = template_id

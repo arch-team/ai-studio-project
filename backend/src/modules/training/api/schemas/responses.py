@@ -141,3 +141,48 @@ class CheckpointResponse(AutoMappingEntitySchema["Checkpoint"]):
         "storage_tier": StorageTierEnum,
         "status": CheckpointStatusEnum,
     }
+
+
+# === Job Template Response Schemas ===
+
+
+class TemplateVisibilityEnum(str, Enum):
+    """Template visibility scope."""
+
+    PRIVATE = "private"
+    TEAM = "team"
+    PUBLIC = "public"
+
+
+class JobTemplateSummary(AutoMappingEntitySchema["JobTemplate"]):
+    """Job template summary for list view."""
+
+    id: int
+    name: str
+    description: str | None = None
+    visibility: TemplateVisibilityEnum
+    usage_count: int
+    owner_id: int
+    created_at: datetime
+
+    _enum_mappings: ClassVar[dict[str, type[Enum]]] = {
+        "visibility": TemplateVisibilityEnum,
+    }
+
+
+class JobTemplateDetail(JobTemplateSummary):
+    """Job template detailed view."""
+
+    training_config: dict
+    last_used_at: datetime | None = None
+    updated_at: datetime
+
+
+class JobTemplateListResponse(BaseModel):
+    """Paginated list of job templates."""
+
+    items: list[JobTemplateSummary]
+    total: int
+    page: int
+    page_size: int
+    total_pages: int

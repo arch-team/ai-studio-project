@@ -7,9 +7,9 @@ registers them with the FastAPI application.
 from fastapi import APIRouter
 
 # Import module routers
-# TODO: Uncomment as modules are migrated
 from src.modules.auth.api.endpoints import router as auth_router
 from src.modules.training.api.endpoints import router as training_router
+from src.modules.training.api.job_templates import router as job_templates_router
 from src.modules.models.api.endpoints import router as models_router
 from src.modules.quotas.api.endpoints import router as quotas_router
 from src.modules.datasets.api.endpoints import router as datasets_router
@@ -20,9 +20,9 @@ from src.modules.audit.api.endpoints import router as audit_router
 api_router = APIRouter(prefix="/api/v1")
 
 # Register module routers
-# TODO: Uncomment as modules are migrated
 api_router.include_router(auth_router, prefix="/auth", tags=["认证"])
 api_router.include_router(training_router, prefix="/training-jobs", tags=["训练任务"])
+api_router.include_router(job_templates_router, prefix="/job-templates", tags=["任务模板"])
 api_router.include_router(models_router, prefix="/models", tags=["模型"])
 api_router.include_router(quotas_router, prefix="/resource-limit-configs", tags=["资源限制配置"])
 api_router.include_router(datasets_router, prefix="/datasets", tags=["数据集"])

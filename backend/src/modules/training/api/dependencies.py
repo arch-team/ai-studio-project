@@ -8,12 +8,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.modules.training.application.interfaces import IMetricsService
 from src.modules.training.application.services import (
     CheckpointService,
+    JobTemplateService,
     MLflowService,
     TrainingJobService,
 )
 from src.modules.training.infrastructure.hyperpod import HyperPodClient
 from src.modules.training.infrastructure.repositories import (
     CheckpointRepository,
+    JobTemplateRepository,
     TrainingJobRepository,
 )
 from src.shared.infrastructure import get_db, get_settings
@@ -45,6 +47,14 @@ async def get_checkpoint_service(
     """Dependency for CheckpointService."""
     repository = CheckpointRepository(session)
     return CheckpointService(repository=repository)
+
+
+async def get_job_template_service(
+    session: AsyncSession = Depends(get_db),
+) -> JobTemplateService:
+    """Dependency for JobTemplateService."""
+    repository = JobTemplateRepository(session)
+    return JobTemplateService(repository=repository)
 
 
 @lru_cache(maxsize=1)

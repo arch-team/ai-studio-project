@@ -12,6 +12,7 @@ from src.modules.auth.api.permissions import (
 )
 from src.modules.training.api.dependencies import (
     get_checkpoint_service,
+    get_job_template_service,
     get_training_job_service,
 )
 from src.modules.training.api.schemas import (
@@ -19,6 +20,7 @@ from src.modules.training.api.schemas import (
     CheckpointStatusEnum,
     CheckpointTypeEnum,
     CreateCheckpointRequest,
+    CreateJobFromTemplateRequest,
     CreateTrainingJobRequest,
     JobPriorityEnum,
     JobStatusEnum,
@@ -27,7 +29,11 @@ from src.modules.training.api.schemas import (
     TrainingJobListResponse,
     TrainingJobSummary,
 )
-from src.modules.training.application.services import CheckpointService, TrainingJobService
+from src.modules.training.application.services import (
+    CheckpointService,
+    JobTemplateService,
+    TrainingJobService,
+)
 from src.modules.training.domain.value_objects import JobPriority, JobStatus
 from src.shared.api.pagination import (
     PageParam,
@@ -234,3 +240,56 @@ async def create_manual_checkpoint(
         metadata=None,
         created_at=checkpoint.created_at,
     )
+
+
+# === Create Job from Template ===
+
+
+@router.post(
+    "/from-template/{template_id}",
+    response_model=TrainingJobDetail,
+    status_code=status.HTTP_201_CREATED,
+)
+async def create_job_from_template(
+    template_id: int,
+    data: CreateJobFromTemplateRequest,
+    current_user: CurrentUser = Depends(require_engineer),
+    job_service: TrainingJobService = Depends(get_training_job_service),
+    template_service: JobTemplateService = Depends(get_job_template_service),
+):
+    """Create a training job from a template.
+
+    Uses the template's training configuration as the base,
+    with optional overrides from the request body.
+    """
+    # Get template (also checks visibility)
+    template = await template_service.get_template(template_id, current_user.user_id)
+
+    # Build job data from template config
+    config = template.training_config
+    job_data = {
+        "job_name": data.job_name,
+        "display_name": data.display_name,
+        "image_uri": config.get("image"),
+        "instance_type": config.get("instance_type"),
+        "node_count": data.node_count or config.get("instance_count", 1),
+        "distribution_strategy": config.get("distribution_strategy", "ddp"),
+        "entrypoint_command": config.get("script_path", "").split() if config.get("script_path") else ["python", "train.py"],
+        "environment_variables": {
+            **(config.get("environment") or {}),
+            **(data.environment_variables or {}),
+        },
+        "hyperparameters": config.get("hyperparameters"),
+    }
+
+    # Override priority if provided
+    if data.priority:
+        job_data["priority"] = data.priority.value
+
+    # Create the job
+    job = await job_service.create_job(owner_id=current_user.user_id, data=job_data)
+
+    # Increment template usage count
+    await template_service.increment_usage(template_id)
+
+    return TrainingJobDetail.from_entity(job)

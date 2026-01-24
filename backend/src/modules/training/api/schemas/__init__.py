@@ -1,6 +1,14 @@
 """Training API schemas."""
 
-from .requests import CreateTrainingJobRequest, CreateCheckpointRequest
+from .requests import (
+    CreateTrainingJobRequest,
+    CreateCheckpointRequest,
+    CreateJobTemplateRequest,
+    UpdateJobTemplateRequest,
+    CreateJobFromTemplateRequest,
+    TemplateVisibilityEnum as RequestTemplateVisibilityEnum,
+    TrainingConfigSchema,
+)
 from .responses import (
     CheckpointResponse,
     CheckpointStatusEnum,
@@ -11,6 +19,10 @@ from .responses import (
     TrainingJobDetail,
     TrainingJobListResponse,
     TrainingJobSummary,
+    JobTemplateDetail,
+    JobTemplateListResponse,
+    JobTemplateSummary,
+    TemplateVisibilityEnum,
 )
 
 __all__ = [
@@ -20,12 +32,20 @@ __all__ = [
     "CheckpointTypeEnum",
     "CheckpointStatusEnum",
     "StorageTierEnum",
+    "TemplateVisibilityEnum",
     # Requests
     "CreateTrainingJobRequest",
     "CreateCheckpointRequest",
+    "CreateJobTemplateRequest",
+    "UpdateJobTemplateRequest",
+    "CreateJobFromTemplateRequest",
+    "TrainingConfigSchema",
     # Responses
     "TrainingJobSummary",
     "TrainingJobDetail",
     "TrainingJobListResponse",
     "CheckpointResponse",
+    "JobTemplateSummary",
+    "JobTemplateDetail",
+    "JobTemplateListResponse",
 ]

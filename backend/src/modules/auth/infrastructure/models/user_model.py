@@ -15,7 +15,7 @@ from ...domain.value_objects import AuthType, UserRole, UserStatus
 if TYPE_CHECKING:
     from .login_attempt_model import LoginAttemptModel
     from .password_history_model import PasswordHistoryModel
-    from src.modules.training.infrastructure.models import TrainingJobModel
+    from src.modules.training.infrastructure.models import TrainingJobModel, JobTemplateModel
     from src.modules.models.infrastructure.models import ModelModel
     from src.modules.spaces.infrastructure.models import DevelopmentSpaceModel
     from src.modules.quotas.infrastructure.models import ResourceQuotaModel
@@ -161,6 +161,11 @@ class UserModel(Base, TimestampMixin):
     )
     training_jobs: Mapped[list["TrainingJobModel"]] = relationship(
         "TrainingJobModel",
+        back_populates="owner",
+        cascade="all, delete-orphan",
+    )
+    job_templates: Mapped[list["JobTemplateModel"]] = relationship(
+        "JobTemplateModel",
         back_populates="owner",
         cascade="all, delete-orphan",
     )
