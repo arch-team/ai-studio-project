@@ -10,9 +10,11 @@ from .pagination import (
     COMMON_SORT_FIELDS,
     PageParam,
     PageSizeParam,
+    PaginatedResponse,
     SortByParam,
     SortOrder,
     SortOrderParam,
+    build_paginated_response,
     get_pagination_params,
 )
 from .schemas import EntitySchema
@@ -32,4 +34,7 @@ __all__ = [
     "SortOrder",
     "SortOrderParam",
     "COMMON_SORT_FIELDS",
+    # 分页响应
+    "PaginatedResponse",
+    "build_paginated_response",
 ]

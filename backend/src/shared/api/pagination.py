@@ -1,9 +1,12 @@
 """通用分页和排序依赖."""
 
 from enum import Enum
-from typing import Annotated
+from typing import Annotated, Generic, Sequence, TypeVar
 
 from fastapi import Query
+from pydantic import BaseModel
+
+from src.shared.utils import calculate_total_pages
 
 
 # =========================================================================
@@ -38,6 +41,55 @@ class SortOrder(str, Enum):
 SortByParam = Annotated[str, Query(description="排序字段")]
 SortOrderParam = Annotated[SortOrder, Query(description="排序顺序 (asc/desc)")]
 
-
-# 预定义的常用排序字段选项 (用于文档和验证提示)
 COMMON_SORT_FIELDS = ["created_at", "updated_at", "name", "id", "status"]
+
+
+# =========================================================================
+# 分页响应
+# =========================================================================
+
+T = TypeVar("T")
+
+
+class PaginatedResponse(BaseModel, Generic[T]):
+    """通用分页响应基类.
+
+    使用示例:
+        class UserListResponse(PaginatedResponse[UserSummary]):
+            pass
+    """
+
+    items: list[T]
+    total: int
+    page: int
+    page_size: int
+    total_pages: int
+
+
+def build_paginated_response(
+    items: Sequence[T],
+    total: int,
+    page: int,
+    page_size: int,
+) -> dict:
+    """构建分页响应字段.
+
+    返回可直接解包到 ListResponse 类的字典:
+        return TrainingJobListResponse(**build_paginated_response(...))
+
+    Args:
+        items: 当前页的数据项列表
+        total: 总记录数
+        page: 当前页码
+        page_size: 每页数量
+
+    Returns:
+        包含 items, total, page, page_size, total_pages 的字典
+    """
+    return {
+        "items": list(items),
+        "total": total,
+        "page": page,
+        "page_size": page_size,
+        "total_pages": calculate_total_pages(total, page_size),
+    }

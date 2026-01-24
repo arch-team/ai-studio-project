@@ -14,8 +14,15 @@ from src.modules.quotas.api.schemas import (
 )
 from src.modules.quotas.application.services import ResourceLimitConfigService
 from src.modules.quotas.domain.value_objects import LimitRole
-from src.shared.api.pagination import PageParam, PageSizeParam, SortByParam, SortOrder, SortOrderParam
-from src.shared.utils import EnumMapper, calculate_total_pages
+from src.shared.api.pagination import (
+    PageParam,
+    PageSizeParam,
+    SortByParam,
+    SortOrder,
+    SortOrderParam,
+    build_paginated_response,
+)
+from src.shared.utils import EnumMapper
 
 router = APIRouter()
 
@@ -49,11 +56,12 @@ async def list_resource_limit_configs(
     )
 
     return ResourceLimitConfigListResponse(
-        items=[ResourceLimitConfigResponse.from_entity(c) for c in configs],
-        total=total,
-        page=page,
-        page_size=page_size,
-        total_pages=calculate_total_pages(total, page_size),
+        **build_paginated_response(
+            items=[ResourceLimitConfigResponse.from_entity(c) for c in configs],
+            total=total,
+            page=page,
+            page_size=page_size,
+        )
     )
 
 

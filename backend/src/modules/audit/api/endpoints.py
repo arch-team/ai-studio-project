@@ -8,9 +8,9 @@ from src.modules.audit.application import AuditService
 from src.modules.audit.domain.entities import AuditLog
 from src.modules.audit.domain.value_objects import ResourceType
 from src.modules.auth.api.dependencies import require_admin
-from src.shared.api import PageParam, PageSizeParam
+from src.shared.api import PageParam, PageSizeParam, build_paginated_response
 from src.shared.domain import EntityNotFoundError
-from src.shared.utils import calculate_offset, calculate_total_pages
+from src.shared.utils import calculate_offset
 
 from .dependencies import get_audit_service
 from .schemas import (
@@ -138,11 +138,12 @@ async def get_audit_logs(
         logs, total = await _get_all_logs(service, page_size, offset)
 
     return AuditLogListResponse(
-        items=[_to_response(log) for log in logs],
-        total=total,
-        page=page,
-        page_size=page_size,
-        total_pages=calculate_total_pages(total, page_size),
+        **build_paginated_response(
+            items=[_to_response(log) for log in logs],
+            total=total,
+            page=page,
+            page_size=page_size,
+        )
     )
 
 

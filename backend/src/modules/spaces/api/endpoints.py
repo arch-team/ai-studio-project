@@ -19,8 +19,14 @@ from src.modules.spaces.api.schemas import (
 )
 from src.modules.spaces.application.services import SpaceService
 from src.modules.spaces.domain.value_objects import SpaceStatus
-from src.shared.api.pagination import PageParam, PageSizeParam, SortByParam, SortOrder, SortOrderParam
-from src.shared.utils import calculate_total_pages
+from src.shared.api.pagination import (
+    PageParam,
+    PageSizeParam,
+    SortByParam,
+    SortOrder,
+    SortOrderParam,
+    build_paginated_response,
+)
 
 router = APIRouter()
 
@@ -72,11 +78,12 @@ async def list_spaces(
     )
 
     return SpaceListResponse(
-        items=[SpaceSummary.from_entity(space) for space in spaces],
-        total=total,
-        page=page,
-        page_size=page_size,
-        total_pages=calculate_total_pages(total, page_size),
+        **build_paginated_response(
+            items=[SpaceSummary.from_entity(space) for space in spaces],
+            total=total,
+            page=page,
+            page_size=page_size,
+        )
     )
 
 

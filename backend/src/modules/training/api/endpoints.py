@@ -29,8 +29,15 @@ from src.modules.training.api.schemas import (
 )
 from src.modules.training.application.services import CheckpointService, TrainingJobService
 from src.modules.training.domain.value_objects import JobPriority, JobStatus
-from src.shared.api.pagination import PageParam, PageSizeParam, SortByParam, SortOrder, SortOrderParam
-from src.shared.utils import EnumMapper, calculate_total_pages, utc_now
+from src.shared.api.pagination import (
+    PageParam,
+    PageSizeParam,
+    SortByParam,
+    SortOrder,
+    SortOrderParam,
+    build_paginated_response,
+)
+from src.shared.utils import EnumMapper, utc_now
 
 router = APIRouter()
 
@@ -81,11 +88,12 @@ async def list_training_jobs(
     )
 
     return TrainingJobListResponse(
-        items=[TrainingJobSummary.from_entity(job) for job in jobs],
-        total=total,
-        page=page,
-        page_size=page_size,
-        total_pages=calculate_total_pages(total, page_size),
+        **build_paginated_response(
+            items=[TrainingJobSummary.from_entity(job) for job in jobs],
+            total=total,
+            page=page,
+            page_size=page_size,
+        )
     )
 
 

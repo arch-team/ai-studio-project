@@ -22,8 +22,14 @@ from src.modules.models.api.schemas import (
     VersionComparison,
 )
 from src.modules.models.application.services import ModelService
-from src.shared.api.pagination import PageParam, PageSizeParam, SortByParam, SortOrder, SortOrderParam
-from src.shared.utils import calculate_total_pages
+from src.shared.api.pagination import (
+    PageParam,
+    PageSizeParam,
+    SortByParam,
+    SortOrder,
+    SortOrderParam,
+    build_paginated_response,
+)
 
 router = APIRouter()
 
@@ -88,11 +94,12 @@ async def list_models(
     )
 
     return ModelListResponse(
-        items=[ModelSummary.from_entity(model) for model in models],
-        total=total,
-        page=page,
-        page_size=page_size,
-        total_pages=calculate_total_pages(total, page_size),
+        **build_paginated_response(
+            items=[ModelSummary.from_entity(model) for model in models],
+            total=total,
+            page=page,
+            page_size=page_size,
+        )
     )
 
 
