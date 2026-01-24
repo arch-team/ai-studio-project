@@ -358,14 +358,15 @@ class CheckpointService(BaseService[Checkpoint, int]):
         timestamp = utc_now().strftime("%Y%m%d%H%M%S")
         prefix = trigger_type.value.lower()
 
-        if epoch is not None and step is not None:
-            return f"{prefix}-epoch{epoch}-step{step}-{timestamp}"
-        elif epoch is not None:
-            return f"{prefix}-epoch{epoch}-{timestamp}"
-        elif step is not None:
-            return f"{prefix}-step{step}-{timestamp}"
-        else:
-            return f"{prefix}-{timestamp}"
+        # 构建名称部分
+        parts = [prefix]
+        if epoch is not None:
+            parts.append(f"epoch{epoch}")
+        if step is not None:
+            parts.append(f"step{step}")
+        parts.append(timestamp)
+
+        return "-".join(parts)
 
     def _determine_checkpoint_type(
         self,
@@ -379,7 +380,6 @@ class CheckpointService(BaseService[Checkpoint, int]):
 
         if epoch is not None:
             return CheckpointType.EPOCH
-        elif step is not None:
+        if step is not None:
             return CheckpointType.STEP
-        else:
-            return CheckpointType.EPOCH  # 默认按轮次
+        return CheckpointType.EPOCH  # 默认按轮次

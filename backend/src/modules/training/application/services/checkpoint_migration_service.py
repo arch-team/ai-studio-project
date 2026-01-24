@@ -13,7 +13,6 @@
 
 import logging
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
 
 from src.modules.training.application.interfaces import (
     Alert,
@@ -24,9 +23,6 @@ from src.modules.training.domain.entities import Checkpoint
 from src.modules.training.domain.exceptions import CheckpointMigrationError
 from src.modules.training.domain.repositories import ICheckpointRepository
 from src.modules.training.domain.value_objects import StorageTier
-
-if TYPE_CHECKING:
-    pass
 
 logger = logging.getLogger(__name__)
 
@@ -347,11 +343,9 @@ class CheckpointMigrationService:
         tier_order = [StorageTier.NVME, StorageTier.FSX, StorageTier.S3]
         try:
             current_index = tier_order.index(current_tier)
-            if current_index < len(tier_order) - 1:
-                return tier_order[current_index + 1]
-        except ValueError:
-            pass
-        return None
+            return tier_order[current_index + 1] if current_index < len(tier_order) - 1 else None
+        except (ValueError, IndexError):
+            return None
 
     async def _send_migration_failure_alert(
         self,

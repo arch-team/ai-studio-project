@@ -19,6 +19,7 @@ from src.modules.spaces.api.schemas import (
 )
 from src.modules.spaces.application.services import SpaceService
 from src.modules.spaces.domain.value_objects import SpaceStatus
+from src.shared.api.pagination import PageParam, PageSizeParam
 from src.shared.utils import calculate_total_pages
 
 router = APIRouter()
@@ -50,8 +51,8 @@ async def create_space(
     responses={401: {"model": SpaceErrorResponse, "description": "Unauthorized"}},
 )
 async def list_spaces(
-    page: int = Query(default=1, ge=1, description="Page number"),
-    page_size: int = Query(default=20, ge=1, le=100, description="Items per page"),
+    page: PageParam,
+    page_size: PageSizeParam,
     status_filter: SpaceStatusEnum | None = Query(default=None, alias="status", description="Filter by status"),
     sort_by: str = Query(default="created_at", description="Sort field"),
     sort_order: str = Query(default="desc", description="Sort order (asc/desc)"),

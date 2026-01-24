@@ -7,6 +7,8 @@ from fastapi import APIRouter, Depends, Query
 from src.modules.audit.application import AuditService
 from src.modules.audit.domain.entities import AuditLog
 from src.modules.audit.domain.value_objects import ResourceType
+from src.modules.auth.api.dependencies import require_admin
+from src.shared.api import PageParam, PageSizeParam
 from src.shared.domain import EntityNotFoundError
 from src.shared.utils import calculate_offset, calculate_total_pages
 
@@ -105,8 +107,8 @@ async def _get_all_logs(
 
 @router.get("", response_model=AuditLogListResponse)
 async def get_audit_logs(
-    page: int = Query(default=1, ge=1, description="页码"),
-    page_size: int = Query(default=20, ge=1, le=100, description="每页数量"),
+    page: PageParam = 1,
+    page_size: PageSizeParam = 20,
     user_id: int | None = Query(default=None, description="用户ID过滤"),
     resource_type: str | None = Query(default=None, description="资源类型过滤"),
     resource_id: str | None = Query(default=None, description="资源ID过滤"),
@@ -114,7 +116,7 @@ async def get_audit_logs(
     end_date: datetime | None = Query(default=None, description="结束日期"),
     service: AuditService = Depends(get_audit_service),
 ) -> AuditLogListResponse:
-    """Get audit logs with optional filtering."""
+    """获取审计日志（支持过滤）."""
     offset = calculate_offset(page, page_size)
 
     # 根据过滤条件选择查询策略
@@ -145,7 +147,7 @@ async def get_audit_log(
     audit_log_id: int,
     service: AuditService = Depends(get_audit_service),
 ) -> AuditLogResponse:
-    """Get a specific audit log by ID."""
+    """根据ID获取指定的审计日志."""
     log = await service.get_audit_log_by_id(audit_log_id)
     if log is None:
         raise EntityNotFoundError("AuditLog", str(audit_log_id))
@@ -157,7 +159,7 @@ async def get_audit_log(
 async def get_audit_log_count(
     service: AuditService = Depends(get_audit_service),
 ) -> AuditLogCountResponse:
-    """Get total count of audit logs."""
+    """获取审计日志总数."""
     count = await service.count_total_logs()
     return AuditLogCountResponse(count=count)
 
@@ -165,9 +167,9 @@ async def get_audit_log_count(
 @router.delete("/expired", response_model=CleanupResultResponse)
 async def cleanup_expired_logs(
     service: AuditService = Depends(get_audit_service),
+    _: None = Depends(require_admin),  # 管理员权限检查
 ) -> CleanupResultResponse:
-    """Delete expired audit logs (admin only)."""
-    # TODO: 添加管理员权限检查
+    """删除过期的审计日志（仅管理员）."""
     deleted_count = await service.cleanup_expired_logs()
     return CleanupResultResponse(
         deleted_count=deleted_count,

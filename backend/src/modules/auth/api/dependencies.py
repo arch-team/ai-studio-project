@@ -148,16 +148,6 @@ require_engineer = RequireRole("engineer")
 
 
 # Common permission dependencies
-def require_user_management():
-    """Require user management permission."""
-    return RequirePermission(Permission.USER_CREATE)
-
-
-def require_audit_view():
-    """Require audit view permission."""
-    return RequirePermission(Permission.AUDIT_VIEW)
-
-
-def require_system_config():
-    """Require system configuration permission."""
-    return RequirePermission(Permission.SYSTEM_CONFIG)
+require_user_management = RequirePermission(Permission.USER_CREATE)
+require_audit_view = RequirePermission(Permission.AUDIT_VIEW)
+require_system_config = RequirePermission(Permission.SYSTEM_CONFIG)

@@ -21,6 +21,8 @@ from src.shared.domain.exceptions import (
 class TrainingJobService(BaseService[TrainingJob, int]):
     """Service for managing training jobs."""
 
+    _not_found_error_factory = TrainingJobNotFoundError
+
     def __init__(
         self,
         repository: ITrainingJobRepository,
@@ -30,13 +32,6 @@ class TrainingJobService(BaseService[TrainingJob, int]):
         super().__init__(repository, "TrainingJob")
         self._hyperpod_client = hyperpod_client
         self._cluster_name = cluster_name
-
-    async def _get_or_raise(self, job_id: int) -> TrainingJob:
-        """Get job by ID or raise TrainingJobNotFoundError."""
-        job = await self._repository.get_by_id(job_id)
-        if job is None:
-            raise TrainingJobNotFoundError(str(job_id))
-        return job
 
     async def create_job(self, owner_id: int, data: dict) -> TrainingJob:
         """Create a new training job."""
@@ -104,7 +99,16 @@ class TrainingJobService(BaseService[TrainingJob, int]):
         Args:
             job: 训练任务实体
         """
-        job_config = {
+        job_config = self._build_job_config(job)
+        await self._hyperpod_client.submit_training_job(
+            cluster_name=self._cluster_name,
+            job_name=job.job_name,
+            job_config=job_config,
+        )
+
+    def _build_job_config(self, job: TrainingJob) -> dict:
+        """构建 HyperPod 任务配置"""
+        return {
             "image_uri": job.image_uri,
             "instance_type": job.instance_type,
             "node_count": job.node_count,
@@ -112,11 +116,6 @@ class TrainingJobService(BaseService[TrainingJob, int]):
             "command": job.entrypoint_command,
             "environment": job.environment_variables,
         }
-        await self._hyperpod_client.submit_training_job(
-            cluster_name=self._cluster_name,
-            job_name=job.job_name,
-            job_config=job_config,
-        )
 
     async def get_job(self, job_id: int) -> TrainingJob:
         """Get training job by ID."""
@@ -173,14 +172,7 @@ class TrainingJobService(BaseService[TrainingJob, int]):
                 "TrainingJob", job.status.value, JobStatus.RUNNING.value
             )
 
-        job_config = {
-            "image_uri": job.image_uri,
-            "instance_type": job.instance_type,
-            "node_count": job.node_count,
-            "tasks_per_node": job.tasks_per_node,
-            "command": job.entrypoint_command,
-            "environment": job.environment_variables,
-        }
+        job_config = self._build_job_config(job)
         await self._hyperpod_client.submit_training_job(
             cluster_name=self._cluster_name,
             job_name=job.job_name,

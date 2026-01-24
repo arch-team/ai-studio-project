@@ -22,6 +22,7 @@ from src.modules.models.api.schemas import (
     VersionComparison,
 )
 from src.modules.models.application.services import ModelService
+from src.shared.api.pagination import PageParam, PageSizeParam
 from src.shared.utils import calculate_total_pages
 
 router = APIRouter()
@@ -57,8 +58,8 @@ async def create_model(
     responses={401: {"model": ModelErrorResponse, "description": "Unauthorized"}},
 )
 async def list_models(
-    page: int = Query(default=1, ge=1, description="Page number"),
-    page_size: int = Query(default=20, ge=1, le=100, description="Items per page"),
+    page: PageParam,
+    page_size: PageSizeParam,
     training_job_id: int | None = Query(default=None, description="Filter by training job"),
     status_filter: ModelStatusEnum | None = Query(default=None, alias="status", description="Filter by status"),
     framework: ModelFrameworkEnum | None = Query(default=None, description="Filter by framework"),

@@ -29,6 +29,7 @@ from src.modules.training.api.schemas import (
 )
 from src.modules.training.application.services import CheckpointService, TrainingJobService
 from src.modules.training.domain.value_objects import JobPriority, JobStatus
+from src.shared.api.pagination import PageParam, PageSizeParam
 from src.shared.utils import EnumMapper, calculate_total_pages, utc_now
 
 router = APIRouter()
@@ -55,8 +56,8 @@ async def create_training_job(
     response_model=TrainingJobListResponse,
 )
 async def list_training_jobs(
-    page: int = Query(default=1, ge=1, description="Page number"),
-    page_size: int = Query(default=20, ge=1, le=100, description="Items per page"),
+    page: PageParam,
+    page_size: PageSizeParam,
     status: JobStatusEnum | None = Query(default=None, description="Filter by status"),
     priority: JobPriorityEnum | None = Query(default=None, description="Filter by priority"),
     submitted_after: datetime | None = Query(default=None, description="Filter by submission date"),

@@ -22,10 +22,7 @@ class EnumMapper:
         Example:
             JobStatus.RUNNING → JobStatusEnum.RUNNING (value: "running")
         """
-        if domain_enum is None:
-            return None
-        api_value = domain_enum.value.lower()
-        return api_enum_class(api_value)
+        return api_enum_class(domain_enum.value.lower()) if domain_enum else None
 
     @staticmethod
     def to_domain(api_enum: ApiEnumT | None, domain_enum_class: type[DomainEnumT]) -> DomainEnumT | None:
@@ -34,10 +31,7 @@ class EnumMapper:
         Example:
             JobStatusEnum.RUNNING → JobStatus.RUNNING (value: "RUNNING")
         """
-        if api_enum is None:
-            return None
-        domain_value = api_enum.value.upper()
-        return domain_enum_class(domain_value)
+        return domain_enum_class(api_enum.value.upper()) if api_enum else None
 
     @overload
     @staticmethod

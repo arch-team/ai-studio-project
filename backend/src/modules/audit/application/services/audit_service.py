@@ -1,14 +1,14 @@
-"""Audit service - Business logic for audit log operations."""
+"""审计服务 - 审计日志操作的业务逻辑."""
 
 from datetime import datetime
 
 from src.modules.audit.domain.entities import AuditLog
 from src.modules.audit.domain.repositories import IAuditLogRepository
-from src.modules.audit.domain.value_objects import OperationType, ResourceType
+from src.modules.audit.domain.value_objects import ResourceType
 
 
 class AuditService:
-    """Service for audit log operations."""
+    """审计日志操作服务."""
 
     def __init__(self, repository: IAuditLogRepository):
         self._repository = repository
@@ -18,11 +18,11 @@ class AuditService:
         limit: int = 100,
         offset: int = 0,
     ) -> list[AuditLog]:
-        """Get audit logs with pagination."""
+        """获取审计日志（分页）."""
         return await self._repository.get_all(limit=limit, offset=offset)
 
     async def get_audit_log_by_id(self, audit_log_id: int) -> AuditLog | None:
-        """Get audit log by ID."""
+        """根据ID获取审计日志."""
         from uuid import UUID
 
         return await self._repository.get_by_id(UUID(int=audit_log_id))
@@ -33,7 +33,7 @@ class AuditService:
         limit: int = 100,
         offset: int = 0,
     ) -> list[AuditLog]:
-        """Get audit logs for a specific user."""
+        """获取指定用户的审计日志."""
         return await self._repository.get_by_user_id(
             user_id=user_id,
             limit=limit,
@@ -47,7 +47,7 @@ class AuditService:
         limit: int = 100,
         offset: int = 0,
     ) -> list[AuditLog]:
-        """Get audit logs for a specific resource."""
+        """获取指定资源的审计日志."""
         return await self._repository.get_by_resource(
             resource_type=resource_type,
             resource_id=resource_id,
@@ -62,7 +62,7 @@ class AuditService:
         limit: int = 100,
         offset: int = 0,
     ) -> list[AuditLog]:
-        """Get audit logs within a date range."""
+        """获取日期范围内的审计日志."""
         return await self._repository.get_by_date_range(
             start_date=start_date,
             end_date=end_date,
@@ -71,17 +71,17 @@ class AuditService:
         )
 
     async def create_audit_log(self, audit_log: AuditLog) -> AuditLog:
-        """Create a new audit log entry."""
+        """创建新的审计日志条目."""
         return await self._repository.add(audit_log)
 
     async def cleanup_expired_logs(self) -> int:
-        """Delete expired audit logs. Returns count of deleted records."""
+        """删除过期的审计日志. 返回删除的记录数."""
         return await self._repository.delete_expired()
 
     async def count_total_logs(self) -> int:
-        """Get total count of audit logs."""
+        """获取审计日志总数."""
         return await self._repository.count_total()
 
     async def count_user_logs(self, user_id: int) -> int:
-        """Get count of audit logs for a specific user."""
+        """获取指定用户的审计日志数量."""
         return await self._repository.count_by_user_id(user_id)
