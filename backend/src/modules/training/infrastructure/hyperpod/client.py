@@ -1,6 +1,7 @@
 """HyperPod Client - SageMaker HyperPod SDK integration."""
 
 import asyncio
+import logging
 from collections.abc import Callable
 from typing import Any, TypeVar
 
@@ -8,11 +9,19 @@ import boto3
 
 from src.modules.training.application.interfaces import IHyperPodClient
 
+logger = logging.getLogger(__name__)
+
 # Conditional imports for testing environments
 try:
     from sagemaker.hyperpod.training import HyperPodPytorchJob
 except ImportError:
     HyperPodPytorchJob = None  # type: ignore
+
+# set_cluster_context 用于配置 kubeconfig 连接 HyperPod 集群
+try:
+    from sagemaker.hyperpod import set_cluster_context
+except ImportError:
+    set_cluster_context = None  # type: ignore
 
 
 STATUS_MAPPING = {
@@ -38,12 +47,64 @@ T = TypeVar("T")
 
 
 class HyperPodClient(IHyperPodClient):
-    """HyperPod SDK client implementation."""
+    """HyperPod SDK client implementation.
 
-    def __init__(self, region: str = "us-east-1") -> None:
-        """Initialize HyperPod client."""
+    注意: HyperPod SDK 的训练任务操作 (submit/get_status/stop 等) 需要先设置
+    集群上下文，通过 set_cluster_context() 配置 kubeconfig。否则 SDK 无法与
+    Kubernetes API 交互，导致 job.status 始终为 None。
+    """
+
+    # 已设置上下文的集群缓存 (避免重复设置)
+    _cluster_contexts: set[str] = set()
+
+    def __init__(
+        self,
+        region: str = "us-east-1",
+        default_cluster_name: str | None = None,
+    ) -> None:
+        """Initialize HyperPod client.
+
+        Args:
+            region: AWS 区域
+            default_cluster_name: 默认集群名称 (可选，用于自动设置上下文)
+        """
         self._region = region
+        self._default_cluster_name = default_cluster_name
         self._sagemaker_client = boto3.client("sagemaker", region_name=region)
+
+    def _ensure_cluster_context(self, cluster_name: str | None = None) -> None:
+        """确保集群上下文已设置 (同步方法，在 executor 中调用)。
+
+        HyperPod SDK 需要先调用 set_cluster_context() 配置 kubeconfig，
+        才能正确执行 HyperPodPytorchJob 的操作 (create/get/refresh 等)。
+
+        Args:
+            cluster_name: 集群名称，如果为 None 则使用默认集群
+        """
+        target_cluster = cluster_name or self._default_cluster_name
+
+        if not target_cluster:
+            logger.warning("No cluster name provided for context setup")
+            return
+
+        # 检查是否已设置此集群的上下文
+        if target_cluster in self._cluster_contexts:
+            return
+
+        if set_cluster_context is None:
+            logger.warning(
+                "set_cluster_context not available, SDK status operations may fail"
+            )
+            return
+
+        try:
+            logger.info(f"Setting cluster context for: {target_cluster}")
+            set_cluster_context(target_cluster)
+            self._cluster_contexts.add(target_cluster)
+            logger.info(f"Cluster context set successfully: {target_cluster}")
+        except Exception as e:
+            logger.error(f"Failed to set cluster context: {e}")
+            # 不抛出异常，让操作继续尝试 (可能已经配置了 kubeconfig)
 
     async def _run_in_executor(self, func: Callable[[], T]) -> T:
         """Run a blocking function in executor."""
@@ -128,12 +189,14 @@ class HyperPodClient(IHyperPodClient):
             if HyperPodPytorchJob is None:
                 raise RuntimeError("HyperPod SDK not available")
 
+            # 确保集群上下文已设置
+            self._ensure_cluster_context(cluster_name)
+
             # 导入必要的配置类
             from sagemaker.hyperpod.common.config import Metadata
             from sagemaker.hyperpod.training.config.hyperpod_pytorch_job_unified_config import (
                 Containers,
                 ReplicaSpec,
-                Resources,
                 RunPolicy,
                 Spec,
                 Template,
@@ -209,10 +272,20 @@ class HyperPodClient(IHyperPodClient):
             if HyperPodPytorchJob is None:
                 raise RuntimeError("HyperPod SDK not available")
 
+            # 确保集群上下文已设置 (状态查询关键依赖)
+            self._ensure_cluster_context(cluster_name)
+
             job = HyperPodPytorchJob.get(name=job_name)
 
+            # 尝试刷新状态 (SDK 需要显式刷新)
+            try:
+                job.refresh()
+            except Exception:
+                # refresh 可能失败，继续使用当前状态
+                pass
+
             # 从 conditions 获取当前状态
-            status_str = "unknown"
+            status_str = "submitted"  # 默认状态: 已提交
             start_time = None
             end_time = None
 
@@ -249,6 +322,9 @@ class HyperPodClient(IHyperPodClient):
             if HyperPodPytorchJob is None:
                 raise RuntimeError("HyperPod SDK not available")
 
+            # 确保集群上下文已设置
+            self._ensure_cluster_context(cluster_name)
+
             job = HyperPodPytorchJob.get(name=job_name)
             job.delete()
 
@@ -268,6 +344,9 @@ class HyperPodClient(IHyperPodClient):
         def _list_pods() -> list[dict[str, Any]]:
             if HyperPodPytorchJob is None:
                 raise RuntimeError("HyperPod SDK not available")
+
+            # 确保集群上下文已设置
+            self._ensure_cluster_context(cluster_name)
 
             job = HyperPodPytorchJob.get(name=job_name)
             return job.list_pods()
@@ -294,6 +373,9 @@ class HyperPodClient(IHyperPodClient):
         def _get_status() -> dict[str, Any]:
             if HyperPodPytorchJob is None:
                 raise RuntimeError("HyperPod SDK not available")
+
+            # 确保集群上下文已设置
+            self._ensure_cluster_context(cluster_name)
 
             job = HyperPodPytorchJob.get(name=job_name)
             pods = job.list_pods()
@@ -399,6 +481,9 @@ class HyperPodClient(IHyperPodClient):
             if job_config is None:
                 raise ValueError("job_config is required for resume")
 
+            # 确保集群上下文已设置
+            self._ensure_cluster_context(cluster_name)
+
             # 导入必要的配置类
             from sagemaker.hyperpod.common.config import Metadata
             from sagemaker.hyperpod.training.config.hyperpod_pytorch_job_unified_config import (
@@ -488,6 +573,9 @@ class HyperPodClient(IHyperPodClient):
         def _trigger() -> dict[str, Any]:
             if HyperPodPytorchJob is None:
                 raise RuntimeError("HyperPod SDK not available")
+
+            # 确保集群上下文已设置
+            self._ensure_cluster_context(cluster_name)
 
             # 导入必要的配置类
             from sagemaker.hyperpod.common.config import Metadata
