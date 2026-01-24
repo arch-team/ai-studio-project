@@ -479,7 +479,7 @@ TrainingJob状态由底层Kueue Workload状态驱动:
 **系统行为**:
 1. 检测到Evicted condition
 2. 立即触发检查点创建(如果距上次检查点>5分钟)
-3. 等待检查点完成(超时30秒则强制终止)
+3. 等待检查点完成(超时5分钟则强制终止，参见 FR-004 §抢占时序保证)
 4. TrainingJob状态变更为Preempted
 5. Kueue清理Pods,释放资源
 

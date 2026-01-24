@@ -34,6 +34,34 @@ class EnumMapper:
         return domain_enum_class(api_enum.value.upper()) if api_enum else None
 
     @staticmethod
+    def model_to_domain(
+        model_enum: ApiEnumT | None,
+        domain_class: type[DomainEnumT],
+    ) -> DomainEnumT | None:
+        """Convert ORM Model enum to Domain enum (same value format).
+
+        Use this in repository _to_entity() methods.
+
+        Example:
+            JobStatusModel.RUNNING → JobStatus.RUNNING
+        """
+        return domain_class(model_enum.value) if model_enum else None
+
+    @staticmethod
+    def domain_to_model(
+        domain_enum: DomainEnumT | None,
+        model_class: type[ApiEnumT],
+    ) -> ApiEnumT | None:
+        """Convert Domain enum to ORM Model enum (same value format).
+
+        Use this in repository _to_model() methods.
+
+        Example:
+            JobStatus.RUNNING → JobStatusModel.RUNNING
+        """
+        return model_class(domain_enum.value) if domain_enum else None
+
+    @staticmethod
     def from_string(
         value: str | None,
         enum_class: type[EnumT],

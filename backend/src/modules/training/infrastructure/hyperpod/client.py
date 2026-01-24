@@ -34,7 +34,9 @@ STATUS_MAPPING = {
     "Completed": "completed",
     "Failed": "failed",
     "Error": "failed",
-    "Suspended": "paused",
+    # Kueue Task Governance 状态
+    "Suspended": "suspended",  # 被 Kueue 抢占或挂起
+    "Preempted": "preempted",  # 被更高优先级任务抢占
 }
 
 
@@ -180,6 +182,10 @@ class HyperPodClient(IHyperPodClient):
                 - command: 运行命令
                 - environment: 环境变量字典
                 - entrypoint_command: 入口命令
+                - namespace: Kubernetes namespace (Task Governance)
+                - queue_name: Kueue queue 名称 (Task Governance)
+                - priority_class: WorkloadPriorityClass 名称 (Task Governance)
+                - gpu_count: GPU 数量
         """
 
         def _submit() -> dict[str, Any]:
@@ -213,13 +219,36 @@ class HyperPodClient(IHyperPodClient):
 
                 env_list = [Env(name=k, value=str(v)) for k, v in env_dict.items()]
 
-            # 构建容器 (SDK 限制: 只能使用部分字段)
+            # 构建资源配置 (GPU 请求确保调度到 GPU 节点)
+            from sagemaker.hyperpod.training.config.hyperpod_pytorch_job_unified_config import (
+                Resources,
+            )
+
+            gpu_count = job_config.get("gpu_count", 1)
+            resources = Resources(
+                limits={"nvidia.com/gpu": str(gpu_count)},
+                requests={"nvidia.com/gpu": str(gpu_count)},
+            )
+
+            # 构建容器
             container = Containers(
                 name="pytorch",
                 image=image_uri,
                 command=command if isinstance(command, list) else [command] if command else None,
                 env=env_list,
+                resources=resources,
             )
+
+            # Task Governance 配置
+            namespace = job_config.get("namespace", "default")
+            queue_name = job_config.get("queue_name")
+            priority_class = job_config.get("priority_class")
+
+            # 构建 Spec (不在 Pod 级别设置 priorityClassName，使用 Kueue label)
+            # 原因: SageMaker Task Governance 创建 WorkloadPriorityClass (Kueue)，
+            # 但不创建 Kubernetes 原生 PriorityClass，导致 HyperPod 控制器报错
+            spec_kwargs: dict[str, Any] = {"containers": [container]}
+            # 注意: 不设置 priority_class_name，改用 Kueue label
 
             # 构建 ReplicaSpec
             # 注意: name 必须小写，符合 Kubernetes RFC 1123 命名规范
@@ -228,17 +257,32 @@ class HyperPodClient(IHyperPodClient):
                 name="worker",
                 replicas=node_count,
                 template=Template(
-                    spec=Spec(containers=[container])
+                    spec=Spec(**spec_kwargs)
                 ),
             )
 
             # 构建运行策略 (SDK 使用默认值)
             run_policy = RunPolicy()
 
+            # 构建 Metadata (包含 namespace 和 Kueue labels)
+            metadata_kwargs: dict[str, Any] = {
+                "name": job_name,
+                "namespace": namespace,
+            }
+            # Kueue 使用 labels 指定 queue 和 priority
+            labels: dict[str, str] = {}
+            if queue_name:
+                labels["kueue.x-k8s.io/queue-name"] = queue_name
+            if priority_class:
+                # 使用 Kueue 的 priority-class label 代替 Pod 的 priorityClassName
+                labels["kueue.x-k8s.io/priority-class"] = priority_class
+            if labels:
+                metadata_kwargs["labels"] = labels
+
             # 创建 HyperPodPytorchJob
             nproc_per_node = str(job_config.get("tasks_per_node", 1))
             job = HyperPodPytorchJob(
-                metadata=Metadata(name=job_name),
+                metadata=Metadata(**metadata_kwargs),
                 nproc_per_node=nproc_per_node,
                 replica_specs=[replica_spec],
                 run_policy=run_policy,
@@ -257,14 +301,21 @@ class HyperPodClient(IHyperPodClient):
                 "job_name": job_name,
                 "status": status_str,
                 "cluster_name": cluster_name,
+                "namespace": namespace,
             }
 
         return await self._run_in_executor(_submit)
 
     async def get_training_job_status(
-        self, cluster_name: str, job_name: str
+        self, cluster_name: str, job_name: str, namespace: str = "default"
     ) -> dict[str, Any]:
-        """Get training job status using HyperPod SDK."""
+        """Get training job status using HyperPod SDK.
+
+        Args:
+            cluster_name: 集群名称
+            job_name: 任务名称
+            namespace: Kubernetes namespace (默认 'default')
+        """
 
         def _get_status() -> dict[str, Any]:
             if HyperPodPytorchJob is None:
@@ -273,7 +324,7 @@ class HyperPodClient(IHyperPodClient):
             # 确保集群上下文已设置 (状态查询关键依赖)
             self._ensure_cluster_context(cluster_name)
 
-            job = HyperPodPytorchJob.get(name=job_name)
+            job = HyperPodPytorchJob.get(name=job_name, namespace=namespace)
 
             # 尝试刷新状态 (SDK 需要显式刷新)
             try:
@@ -292,14 +343,44 @@ class HyperPodClient(IHyperPodClient):
                 end_time = getattr(job.status, "completionTime", None)
 
                 # 从 conditions 提取状态
+                # HyperPodPytorchJob conditions 类型:
+                # - Created: 任务已创建
+                # - PodsRunning: Pod 正在运行 (有此 condition 表示已调度)
+                # - Suspended: 任务被挂起 (Kueue 抢占)
+                # - Completed/Succeeded: 任务完成
+                # - Failed: 任务失败
+                #
+                # 注意: HyperPod Task 界面显示 condition type (如 "Created")
+                # 但我们需要更细粒度的状态检测来支持 E2E 测试
                 conditions = getattr(job.status, "conditions", None)
                 if conditions:
+                    has_pods_running_condition = False
+
                     for condition in conditions:
                         cond_type = getattr(condition, "type", "")
                         cond_status = getattr(condition, "status", "")
+
+                        # 检查是否有 PodsRunning 条件 (表示已调度)
+                        if cond_type == "PodsRunning":
+                            has_pods_running_condition = True
+                            # 有 PodsRunning condition 表示 Pod 已被调度
+                            # 即使 status=False (ElasticAgent 未就绪)，也认为是 running
+                            status_str = "running"
+
+                        # 终止状态优先级最高
                         if cond_status == "True":
-                            status_str = _map_status(cond_type)
-                            break
+                            if cond_type in ("Succeeded", "Completed", "Failed", "Error", "Suspended"):
+                                status_str = _map_status(cond_type)
+                                break
+
+                    # 如果没有 PodsRunning 条件，使用传统方式
+                    if not has_pods_running_condition:
+                        for condition in conditions:
+                            cond_type = getattr(condition, "type", "")
+                            cond_status = getattr(condition, "status", "")
+                            if cond_status == "True":
+                                status_str = _map_status(cond_type)
+                                break
 
             return {
                 "job_name": job.metadata.name if job.metadata else job_name,
@@ -312,9 +393,15 @@ class HyperPodClient(IHyperPodClient):
         return await self._run_in_executor(_get_status)
 
     async def stop_training_job(
-        self, cluster_name: str, job_name: str
+        self, cluster_name: str, job_name: str, namespace: str = "default"
     ) -> dict[str, Any]:
-        """Stop a running training job using HyperPod SDK."""
+        """Stop a running training job using HyperPod SDK.
+
+        Args:
+            cluster_name: HyperPod 集群名称
+            job_name: 任务名称
+            namespace: Kubernetes namespace (Task Governance)
+        """
 
         def _stop() -> dict[str, Any]:
             if HyperPodPytorchJob is None:
@@ -323,13 +410,14 @@ class HyperPodClient(IHyperPodClient):
             # 确保集群上下文已设置
             self._ensure_cluster_context(cluster_name)
 
-            job = HyperPodPytorchJob.get(name=job_name)
+            job = HyperPodPytorchJob.get(name=job_name, namespace=namespace)
             job.delete()
 
             return {
                 "job_name": job_name,
                 "status": "stopped",
                 "cluster_name": cluster_name,
+                "namespace": namespace,
             }
 
         return await self._run_in_executor(_stop)
@@ -355,9 +443,18 @@ class HyperPodClient(IHyperPodClient):
     # E2E 测试支持方法 (抢占 SLA 测试)
     # ==========================================================================
 
-    async def cancel_training_job(self, job_id: str) -> dict[str, Any]:
-        """取消训练任务 (stop_training_job 的别名)"""
-        return await self.stop_training_job(cluster_name="", job_name=job_id)
+    async def cancel_training_job(
+        self, job_id: str, namespace: str = "default"
+    ) -> dict[str, Any]:
+        """取消训练任务 (stop_training_job 的别名)
+
+        Args:
+            job_id: 任务 ID/名称
+            namespace: Kubernetes namespace (Task Governance)
+        """
+        return await self.stop_training_job(
+            cluster_name="", job_name=job_id, namespace=namespace
+        )
 
     async def get_job_pods(self, job_id: str) -> list[dict[str, Any]]:
         """获取任务 Pod 列表 (list_training_job_pods 的别名)"""

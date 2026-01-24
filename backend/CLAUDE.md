@@ -255,6 +255,45 @@ class PasswordService:      # 密码处理
 | **问题** | SageMaker Spaces API 已提供这些信息，需要同步策略 |
 | **待确认** | 缓存更新机制（轮询/事件驱动） |
 
+### HyperPod Task Governance 集成问题
+
+#### 问题3: Kueue TopologyAwareScheduling (TAS) 配置问题 ✅ 已解决
+
+| 项目 | 说明 |
+|------|------|
+| **现状** | SageMaker Task Governance API 创建的 ResourceFlavor 自动启用 TAS (`topologyName: hyperpod-default`) |
+| **错误** | `topology "hyperpod-default" doesn't allow to fit any of 1 pod(s)` |
+| **根因** | Kueue TAS 无法正确匹配节点拓扑，即使节点有 `topology.k8s.aws/zone-id` 标签 |
+| **解决方案** | 重建 ResourceFlavor 时不指定 topologyName，禁用 TAS |
+
+#### 问题4: HyperPod SDK 配置注意事项 ✅ 已解决
+
+| 项目 | 说明 |
+|------|------|
+| **Spec 字段别名** | SDK 使用 snake_case 别名 (`priority_class_name`)，非 K8s 原生 camelCase |
+| **PriorityClass 双重资源** | `WorkloadPriorityClass` (Kueue) ≠ `PriorityClass` (K8s 原生)，SageMaker 只创建前者 |
+| **解决方式** | 使用 `kueue.x-k8s.io/priority-class` label 代替 Pod 的 `priorityClassName` |
+
+#### 问题5: Kueue 抢占配置要点 ✅ 已解决
+
+| 项目 | 说明 |
+|------|------|
+| **场景** | 高优先级任务抢占低优先级任务 |
+| **前提1** | 两个 ClusterQueue 必须在同一个 Cohort 中 |
+| **前提2** | 总 nominal quota 不能超过物理资源 |
+| **配置** | 高优先级队列: nominal=1, borrow=0; 低优先级队列: nominal=0, borrow=1 |
+| **注意** | `ResourceSharingConfig.Strategy=DontLend` 会创建独立 Cohort，阻止抢占 |
+
+#### 问题6: HyperPod PodsRunning 状态与实际 Pod 状态不一致
+
+| 项目 | 说明 |
+|------|------|
+| **现象** | HyperPod 界面显示 "Created"，但 Pod 实际已 Running |
+| **原因** | `PodsRunning` condition 依赖 ElasticAgent 就绪状态，简单脚本不启动 ElasticAgent |
+| **实际状态** | `Created=True, PodsRunning=False` 但 `Pod.status.phase=Running` |
+| **影响** | HyperPod 界面状态不准确，需通过 kubectl 确认真实 Pod 状态 |
+| **代码处理** | 检测到有 `PodsRunning` condition 存在即认为 "running"，不依赖其 status 值 |
+
 ## Related Documentation
 
 | 文档 | 位置 | 说明 |

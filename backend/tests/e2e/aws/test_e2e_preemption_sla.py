@@ -64,6 +64,7 @@ class TestPreemptionTimingSLAE2E:
         job_id: str,
         expected_status: str,
         timeout: int,
+        namespace: str = "default",
     ) -> str:
         """等待任务达到指定状态
 
@@ -72,6 +73,7 @@ class TestPreemptionTimingSLAE2E:
             job_id: 任务 ID
             expected_status: 期望的状态
             timeout: 超时时间 (秒)
+            namespace: Kubernetes namespace (Task Governance)
 
         Returns:
             达到的状态
@@ -86,7 +88,7 @@ class TestPreemptionTimingSLAE2E:
         while time.time() - start < timeout:
             try:
                 status = await client.get_training_job_status(
-                    cluster_name=cluster_name, job_name=job_id
+                    cluster_name=cluster_name, job_name=job_id, namespace=namespace
                 )
                 current_status = status.get("status", "").lower()
 
@@ -220,19 +222,32 @@ class TestPreemptionTimingSLAE2E:
     async def _cleanup_jobs(
         self,
         client: Any,
-        job_ids: list[str | None],
+        job_ids: list[tuple[str | None, str] | str | None],
     ) -> None:
         """清理测试任务
 
         Args:
             client: HyperPod 客户端
-            job_ids: 任务 ID 列表
+            job_ids: 任务 ID 列表，可以是:
+                - str: 任务 ID (使用 default namespace)
+                - tuple[str, str]: (任务 ID, namespace)
+                - None: 跳过
         """
-        for job_id in job_ids:
+        for item in job_ids:
+            if item is None:
+                continue
+
+            # 解析 job_id 和 namespace
+            if isinstance(item, tuple):
+                job_id, namespace = item
+            else:
+                job_id = item
+                namespace = "default"
+
             if job_id:
                 try:
-                    await client.cancel_training_job(job_id)
-                    print(f"✅ 清理任务: {job_id}")
+                    await client.cancel_training_job(job_id, namespace=namespace)
+                    print(f"✅ 清理任务: {job_id} (namespace: {namespace})")
                 except Exception as e:
                     print(f"⚠️ 清理任务 {job_id} 失败: {e}")
 
@@ -253,12 +268,18 @@ class TestPreemptionTimingSLAE2E:
         验证步骤:
         1. 提交低优先级任务，等待 Running
         2. 提交高优先级任务 (资源竞争)
-        3. 验证低优先级任务被抢占
+        3. 验证低优先级任务被抢占 (Suspended)
         4. 清理测试资源
+
+        依赖: HyperPod Task Governance 配置
+        - Cluster Scheduler Config (PriorityClasses)
+        - Compute Quotas (Team allocations)
         """
         cluster_name = getattr(hyperpod_client, "_cluster_name", "")
         low_job_id: str | None = None
         high_job_id: str | None = None
+        low_namespace = low_priority_job_config.get("namespace", "default")
+        high_namespace = high_priority_job_config.get("namespace", "default")
 
         try:
             # Step 1: 提交低优先级任务
@@ -270,7 +291,7 @@ class TestPreemptionTimingSLAE2E:
             )
             low_job_id = result.get("job_name", job_name)
             track_resource("training_job", low_job_id)
-            print(f"📤 已提交低优先级任务: {low_job_id}")
+            print(f"📤 已提交低优先级任务: {low_job_id} (namespace: {low_namespace})")
 
             # 等待任务 Running
             await self._wait_for_status(
@@ -278,6 +299,7 @@ class TestPreemptionTimingSLAE2E:
                 low_job_id,
                 "Running",
                 timeout=SLAConstants.JOB_SUBMISSION_TIMEOUT,
+                namespace=low_namespace,
             )
             print("✅ 低优先级任务已 Running")
 
@@ -290,25 +312,33 @@ class TestPreemptionTimingSLAE2E:
             )
             high_job_id = result.get("job_name", high_job_name)
             track_resource("training_job", high_job_id)
-            print(f"📤 已提交高优先级任务: {high_job_id}")
+            print(f"📤 已提交高优先级任务: {high_job_id} (namespace: {high_namespace})")
 
-            # Step 3: 验证低优先级任务被抢占
+            # Step 3: 验证低优先级任务被抢占 (状态变为 Suspended)
+            # Kueue 抢占会将任务挂起 (Suspended) 而不是 Preempted
             preemption_start = time.time()
             status = await self._wait_for_status(
                 hyperpod_client,
                 low_job_id,
-                "Preempted",
+                "Suspended",  # Kueue 使用 Suspended 状态
                 timeout=60,
+                namespace=low_namespace,
             )
             preemption_time = time.time() - preemption_start
 
             # Assert
-            assert status == "Preempted"
-            print(f"✅ 抢占完成，耗时: {preemption_time:.2f}s")
+            assert status == "Suspended"
+            print(f"✅ 抢占完成 (任务已 Suspended)，耗时: {preemption_time:.2f}s")
 
         finally:
-            # Cleanup
-            await self._cleanup_jobs(hyperpod_client, [low_job_id, high_job_id])
+            # Cleanup (传递 namespace)
+            await self._cleanup_jobs(
+                hyperpod_client,
+                [
+                    (low_job_id, low_namespace),
+                    (high_job_id, high_namespace),
+                ],
+            )
 
     @pytest.mark.asyncio
     @skip_write_tests

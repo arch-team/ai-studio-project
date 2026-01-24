@@ -48,6 +48,48 @@ def _check_sso_configured() -> bool:
     return True  # 默认允许运行
 
 
+def _check_task_governance() -> bool:
+    """检查 Task Governance 是否配置
+
+    使用 SageMaker API 检查:
+    - Cluster Scheduler Config (PriorityClasses)
+    - Compute Quotas (Team allocations)
+
+    参考: https://docs.aws.amazon.com/sagemaker/latest/dg/sagemaker-hyperpod-eks-operate-console-ui-governance.html
+    """
+    try:
+        cluster_name = os.getenv("HYPERPOD_CLUSTER_NAME")
+        if not cluster_name:
+            return False
+
+        sagemaker = boto3.client("sagemaker")
+
+        # 获取集群 ARN
+        clusters = sagemaker.list_clusters(NameContains=cluster_name)
+        if not clusters.get("ClusterSummaries"):
+            return False
+
+        cluster_arn = clusters["ClusterSummaries"][0]["ClusterArn"]
+
+        # 检查 Cluster Scheduler Config (PriorityClasses)
+        try:
+            configs = sagemaker.list_cluster_scheduler_configs(ClusterArn=cluster_arn)
+            has_scheduler_config = bool(configs.get("ClusterSchedulerConfigSummaries"))
+        except Exception:
+            has_scheduler_config = False
+
+        # 检查 Compute Quotas (Team allocations)
+        try:
+            quotas = sagemaker.list_compute_quotas(ClusterArn=cluster_arn)
+            has_compute_quotas = bool(quotas.get("ComputeQuotaSummaries"))
+        except Exception:
+            has_compute_quotas = False
+
+        return has_scheduler_config and has_compute_quotas
+    except Exception:
+        return False
+
+
 # AWS 凭证检查 - 支持 SSO/配置文件/环境变量
 skip_without_aws = pytest.mark.skipif(
     not _check_aws_credentials(),
@@ -67,6 +109,11 @@ skip_without_sso = pytest.mark.skipif(
 skip_write_tests = pytest.mark.skipif(
     os.getenv("E2E_READ_ONLY", "true").lower() == "true",
     reason="Write tests disabled (E2E_READ_ONLY=true)",
+)
+
+skip_without_task_governance = pytest.mark.skipif(
+    not _check_task_governance(),
+    reason="Task Governance not configured (requires ClusterQueues and WorkloadPriorityClasses)",
 )
 
 
@@ -218,66 +265,117 @@ def sso_health_endpoint() -> str:
 
 @pytest.fixture
 def low_priority_job_config() -> dict[str, Any]:
-    """低优先级测试任务配置"""
+    """低优先级测试任务配置
+
+    使用 Task Governance 配置:
+    - namespace: hyperpod-ns-e2e-low
+    - queue: hyperpod-ns-e2e-low-localqueue
+    - priority: low-priority
+
+    训练脚本使用简单的 sleep 循环模拟长时间训练。
+    """
     return {
         "job_name": f"e2e-low-priority-{int(time.time())}",
         "image_uri": os.getenv(
             "TEST_IMAGE_URI",
             "763104351884.dkr.ecr.us-west-2.amazonaws.com/pytorch-training:2.1.0-gpu-py310-cu121-ubuntu20.04-sagemaker",
         ),
-        "instance_type": os.getenv("TEST_INSTANCE_TYPE", "ml.g5.xlarge"),
+        "instance_type": os.getenv("TEST_INSTANCE_TYPE", "ml.g5.2xlarge"),
         "node_count": 1,
         "priority": "low",
-        "entrypoint_command": ["python", "-c", "import time; time.sleep(600)"],
+        # Task Governance 配置
+        "namespace": "hyperpod-ns-e2e-low",
+        "queue_name": "hyperpod-ns-e2e-low-localqueue",
+        "priority_class": "low-priority",
+        # 简单的训练命令 - sleep 模拟长时间训练
+        "entrypoint_command": ["python", "-c", "import time; print('Low priority job started'); [print(f'Step {i}') or time.sleep(1) for i in range(600)]"],
         "distribution_strategy": "ddp",
+        "gpu_count": 1,
     }
 
 
 @pytest.fixture
 def high_priority_job_config() -> dict[str, Any]:
-    """高优先级测试任务配置 (用于触发抢占)"""
+    """高优先级测试任务配置 (用于触发抢占)
+
+    使用 Task Governance 配置:
+    - namespace: hyperpod-ns-e2e-high
+    - queue: hyperpod-ns-e2e-high-localqueue
+    - priority: critical-priority (最高优先级，触发抢占)
+    """
     return {
         "job_name": f"e2e-high-priority-{int(time.time())}",
         "image_uri": os.getenv(
             "TEST_IMAGE_URI",
             "763104351884.dkr.ecr.us-west-2.amazonaws.com/pytorch-training:2.1.0-gpu-py310-cu121-ubuntu20.04-sagemaker",
         ),
-        "instance_type": os.getenv("TEST_INSTANCE_TYPE", "ml.g5.xlarge"),
+        "instance_type": os.getenv("TEST_INSTANCE_TYPE", "ml.g5.2xlarge"),
         "node_count": 1,
         "priority": "critical",
-        "entrypoint_command": ["python", "-c", "print('high priority job')"],
+        # Task Governance 配置
+        "namespace": "hyperpod-ns-e2e-high",
+        "queue_name": "hyperpod-ns-e2e-high-localqueue",
+        "priority_class": "high-priority",
+        # 简短任务 - 快速完成
+        "entrypoint_command": ["python", "-c", "print('High priority job completed')"],
         "distribution_strategy": "ddp",
+        "gpu_count": 1,
     }
 
 
 @pytest.fixture
 def checkpoint_enabled_job_config() -> dict[str, Any]:
-    """启用 Checkpoint 的测试任务配置"""
+    """启用 Checkpoint 的测试任务配置
+
+    使用 torchrun 启动训练并定期保存检查点。
+    """
+    # 训练脚本带检查点保存
+    training_command = """cat > /tmp/train.py << 'SCRIPT'
+import os
+import time
+import torch
+import torch.distributed as dist
+
+# 初始化分布式环境
+if 'WORLD_SIZE' in os.environ:
+    dist.init_process_group(backend='nccl')
+    rank = dist.get_rank()
+    print(f'Initialized rank {rank}')
+else:
+    rank = 0
+    print('Running in non-distributed mode')
+
+# 检查点目录
+checkpoint_dir = os.environ.get('CHECKPOINT_DIR', '/tmp/checkpoints')
+os.makedirs(checkpoint_dir, exist_ok=True)
+
+# 模拟训练并定期保存状态
+for epoch in range(100):
+    if rank == 0:
+        print(f'Training epoch {epoch}')
+        # 创建模拟 checkpoint
+        checkpoint_path = os.path.join(checkpoint_dir, f'checkpoint_{epoch}.pt')
+        torch.save({'epoch': epoch}, checkpoint_path)
+        print(f'Saved checkpoint: {checkpoint_path}')
+    time.sleep(10)
+
+if dist.is_initialized():
+    dist.destroy_process_group()
+SCRIPT
+torchrun --nproc_per_node=1 --nnodes=1 --rdzv_backend=c10d --rdzv_endpoint=localhost:29400 /tmp/train.py"""
+
     return {
         "job_name": f"e2e-checkpoint-{int(time.time())}",
         "image_uri": os.getenv(
             "TEST_IMAGE_URI",
             "763104351884.dkr.ecr.us-west-2.amazonaws.com/pytorch-training:2.1.0-gpu-py310-cu121-ubuntu20.04-sagemaker",
         ),
-        "instance_type": os.getenv("TEST_INSTANCE_TYPE", "ml.g5.xlarge"),
+        "instance_type": os.getenv("TEST_INSTANCE_TYPE", "ml.g5.2xlarge"),
         "node_count": 1,
         "priority": "medium",
-        "entrypoint_command": [
-            "python",
-            "-c",
-            """
-import time
-import torch
-
-# 模拟训练并定期保存状态
-for epoch in range(100):
-    print(f'Training epoch {epoch}')
-    time.sleep(10)
-    # 创建模拟 checkpoint
-    torch.save({'epoch': epoch}, f'/tmp/checkpoint_{epoch}.pt')
-""",
-        ],
+        "entrypoint_command": ["bash", "-c", training_command],
         "distribution_strategy": "ddp",
+        "gpu_count": 1,
         "checkpoint_config": {
             "enabled": True,
             "interval_seconds": 60,

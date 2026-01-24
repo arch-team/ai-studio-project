@@ -44,6 +44,86 @@ Kubernetes Scheduler (EKS)
 EC2 实例 (ml.p4d.24xlarge 等)
 ```
 
+**HyperPod Task Governance 架构图**:
+
+```mermaid
+flowchart TB
+    subgraph User["用户层"]
+        Console["SageMaker Console<br/>Policies 配置"]
+        CLI["HyperPod CLI<br/>hyp create job"]
+        SDK["HyperPod SDK<br/>Python API"]
+    end
+
+    subgraph TaskGov["Task Governance 层 (AWS 托管)"]
+        API["Task Governance API"]
+        Addon["EKS Add-on<br/>amazon-sagemaker-hyperpod-taskgovernance"]
+    end
+
+    subgraph Kueue["Kueue 调度层 (开源引擎)"]
+        CQ["ClusterQueue<br/>集群级资源池"]
+        LQ["LocalQueue<br/>命名空间级队列"]
+        WL["Workload<br/>工作负载对象"]
+        RF["ResourceFlavor<br/>资源类型定义"]
+        WPC["WorkloadPriorityClass<br/>优先级定义"]
+    end
+
+    subgraph K8s["Kubernetes 层"]
+        Operator["Training Operator<br/>PyTorchJob/MPIJob"]
+        Scheduler["K8s Scheduler"]
+        Pods["Training Pods"]
+    end
+
+    subgraph Infra["基础设施层"]
+        EC2["EC2 实例<br/>ml.p4d/p5/trn1"]
+        FSx["FSx for Lustre<br/>检查点存储"]
+    end
+
+    Console --> API
+    CLI --> API
+    SDK --> Operator
+
+    API --> Addon
+    Addon --> |"创建/管理"| CQ
+    Addon --> |"创建/管理"| LQ
+    Addon --> |"创建/管理"| RF
+    Addon --> |"创建/管理"| WPC
+
+    CQ --> |"配额分配"| LQ
+    RF --> |"资源定义"| CQ
+    WPC --> |"优先级"| WL
+
+    Operator --> |"提交"| WL
+    LQ --> |"准入控制"| WL
+    WL --> |"调度决策"| Scheduler
+    Scheduler --> Pods
+
+    Pods --> EC2
+    Pods --> FSx
+
+    style TaskGov fill:#ff9900,stroke:#232f3e,color:#fff
+    style Kueue fill:#326ce5,stroke:#232f3e,color:#fff
+    style User fill:#7aa116,stroke:#232f3e,color:#fff
+```
+
+**架构说明**:
+
+| 层级 | 组件 | 职责 | 配置方式 |
+|-----|------|------|---------|
+| **Task Governance** | EKS Add-on | 策略管理、资源配额、优先级调度 | Console / AWS CLI |
+| **Kueue** | ClusterQueue | 集群级资源池，定义 GPU/CPU/内存配额 | Task Governance 自动管理 |
+| **Kueue** | LocalQueue | 命名空间级队列，关联 ClusterQueue | Task Governance 自动管理 |
+| **Kueue** | Workload | 工作负载对象，映射训练任务 | 自动创建 |
+| **K8s** | Training Operator | 训练任务 CRD (PyTorchJob/MPIJob) | HyperPod SDK |
+
+**关键交互流程**:
+
+1. **策略配置**: 管理员通过 Console/CLI 配置配额和优先级策略
+2. **资源创建**: Task Governance 自动创建/更新 Kueue CRD (ClusterQueue, LocalQueue, etc.)
+3. **任务提交**: 用户通过 SDK/CLI 提交训练任务 → Training Operator 创建 PyTorchJob
+4. **准入控制**: Kueue Admission Controller 创建 Workload，进入队列等待
+5. **调度决策**: Kueue 根据配额、优先级、借用策略决定任务准入
+6. **Pod 调度**: K8s Scheduler 将 Pods 调度到合适节点
+
 #### 1.2 核心 API 类
 
 **`HyperPodPytorchJob` 类** (`sagemaker.hyperpod.training`):

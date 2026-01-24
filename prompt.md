@@ -375,5 +375,15 @@ specs
 
   短期 (1-2周): Repository 查询构建器统一、测试 fixture 复用                                                                     
   中期 (1个月): 事件驱动重构、Redis 缓存层                                                                                       
-  长期 (3个月): 微服务拆分准备、OpenTelemetry 集成                                                                               
-                                                      
+  长期 (3个月): 微服务拆分准备、OpenTelemetry 集成     
+
+
+
+  当前项目中的测试用例的执行，特别是E2E的测试依赖于真实的AWS环境，每次执行这些E2E的测试用例时都需要重新哦配置用于测试的AWSAWS环境相和相关的服务，请提供一个最佳实践的方案可以固化这些依赖的环境配置                                                                          
+
+
+低优先级任务被高优先级任务抢占，这个测试用例依赖于系统需要配置好基于：HyperPod task governance的Cluster policy ，你必须使用sagemaker-hyperpod sdk中的API来配置HyperPod task governance的Cluster policy，而不应该直接使用kubectl 或者K8S的API来配置
+
+SageMaker HyperPod task governance作为实现本项目中的资源配额管理和任务优先级调度的，其技术原理和最佳实践关系到当前项目中训练任务这些功能的实现，需要提供后续开发过程的中使用于实践参考，并且保证内容的正确性符合最佳实践
+
+
