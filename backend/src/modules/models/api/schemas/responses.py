@@ -2,15 +2,11 @@
 
 from datetime import datetime
 from enum import Enum
-from typing import TYPE_CHECKING, Any
+from typing import Any, ClassVar
 
 from pydantic import BaseModel
 
-from src.shared.api.schemas import EntitySchema
-from src.shared.utils import EnumMapper
-
-if TYPE_CHECKING:
-    from src.modules.models.domain.entities import Model
+from src.shared.api.schemas import AutoMappingEntitySchema
 
 
 class ModelFrameworkEnum(str, Enum):
@@ -32,7 +28,7 @@ class ModelStatusEnum(str, Enum):
     FAILED = "failed"
 
 
-class ModelSummary(EntitySchema["Model"]):
+class ModelSummary(AutoMappingEntitySchema["Model"]):
     """Model summary for list responses."""
 
     id: int
@@ -48,37 +44,18 @@ class ModelSummary(EntitySchema["Model"]):
     created_at: datetime
     registered_at: datetime | None = None
 
-    @classmethod
-    def _map_entity_fields(cls, entity: "Model") -> dict:
-        """Map Model entity to summary schema fields."""
-        return {
-            "id": entity.id,
-            "model_name": entity.model_name,
-            "version": entity.version,
-            "display_name": entity.display_name,
-            "owner_id": entity.owner_id,
-            "training_job_id": entity.training_job_id,
-            "status": EnumMapper.to_api(entity.status, ModelStatusEnum),
-            "framework": EnumMapper.to_api(entity.framework, ModelFrameworkEnum),
-            "metrics": entity.metrics,
-            "tags": entity.tags,
-            "created_at": entity.created_at,
-            "registered_at": entity.registered_at,
-        }
+    _enum_mappings: ClassVar[dict[str, type[Enum]]] = {
+        "status": ModelStatusEnum,
+        "framework": ModelFrameworkEnum,
+    }
 
 
-class ModelDetail(EntitySchema["Model"]):
-    """Model detail response."""
+class ModelDetail(ModelSummary):
+    """Model detail response - 继承 ModelSummary 扩展更多字段."""
 
-    id: int
-    model_name: str
-    version: str
-    display_name: str | None = None
     description: str | None = None
-    owner_id: int
 
     # Relationships
-    training_job_id: int | None = None
     checkpoint_id: int | None = None
 
     # Storage
@@ -87,55 +64,20 @@ class ModelDetail(EntitySchema["Model"]):
     registry_status: str | None = None
 
     # Training info
-    metrics: dict[str, Any] | None = None
     hyperparameters: dict[str, Any] | None = None
 
     # Framework
-    framework: ModelFrameworkEnum
     framework_version: str | None = None
-
-    # Status
-    status: ModelStatusEnum
 
     # Metadata
     size_bytes: int | None = None
     model_format: str | None = None
-    tags: list[str] | None = None
 
     # Timestamps
-    created_at: datetime
     updated_at: datetime
-    registered_at: datetime | None = None
     archived_at: datetime | None = None
 
-    @classmethod
-    def _map_entity_fields(cls, entity: "Model") -> dict:
-        """Map Model entity to detail schema fields."""
-        return {
-            "id": entity.id,
-            "model_name": entity.model_name,
-            "version": entity.version,
-            "display_name": entity.display_name,
-            "description": entity.description,
-            "owner_id": entity.owner_id,
-            "training_job_id": entity.training_job_id,
-            "checkpoint_id": entity.checkpoint_id,
-            "model_uri": entity.model_uri,
-            "registry_arn": entity.registry_arn,
-            "registry_status": entity.registry_status,
-            "metrics": entity.metrics,
-            "hyperparameters": entity.hyperparameters,
-            "framework": EnumMapper.to_api(entity.framework, ModelFrameworkEnum),
-            "framework_version": entity.framework_version,
-            "status": EnumMapper.to_api(entity.status, ModelStatusEnum),
-            "size_bytes": entity.size_bytes,
-            "model_format": entity.model_format,
-            "tags": entity.tags,
-            "created_at": entity.created_at,
-            "updated_at": entity.updated_at,
-            "registered_at": entity.registered_at,
-            "archived_at": entity.archived_at,
-        }
+    # 继承父类的枚举映射，无需重复声明
 
 
 class ModelListResponse(BaseModel):

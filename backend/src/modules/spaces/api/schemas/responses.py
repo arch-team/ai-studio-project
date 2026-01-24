@@ -2,15 +2,11 @@
 
 from datetime import datetime
 from enum import Enum
-from typing import TYPE_CHECKING
+from typing import ClassVar
 
 from pydantic import BaseModel
 
-from src.shared.api.schemas import EntitySchema
-from src.shared.utils import EnumMapper
-
-if TYPE_CHECKING:
-    from src.modules.spaces.domain.entities import Space
+from src.shared.api.schemas import AutoMappingEntitySchema
 
 
 class SpaceInstanceTypeEnum(str, Enum):
@@ -41,7 +37,7 @@ class SpaceStatusEnum(str, Enum):
     DELETED = "deleted"
 
 
-class SpaceSummary(EntitySchema["Space"]):
+class SpaceSummary(AutoMappingEntitySchema["Space"]):
     """Space summary for list responses."""
 
     id: str
@@ -52,53 +48,23 @@ class SpaceSummary(EntitySchema["Space"]):
     status: SpaceStatusEnum
     created_at: datetime
 
-    @classmethod
-    def _map_entity_fields(cls, entity: "Space") -> dict:
-        """Map Space entity to summary schema fields."""
-        return {
-            "id": entity.id,
-            "space_name": entity.space_name,
-            "owner_id": entity.owner_id,
-            "instance_type": EnumMapper.to_api(entity.instance_type, SpaceInstanceTypeEnum),
-            "space_type": EnumMapper.to_api(entity.space_type, SpaceTypeEnum),
-            "status": EnumMapper.to_api(entity.status, SpaceStatusEnum),
-            "created_at": entity.created_at,
-        }
+    _enum_mappings: ClassVar[dict[str, type[Enum]]] = {
+        "instance_type": SpaceInstanceTypeEnum,
+        "space_type": SpaceTypeEnum,
+        "status": SpaceStatusEnum,
+    }
 
 
-class SpaceDetail(EntitySchema["Space"]):
-    """Space detail response."""
+class SpaceDetail(SpaceSummary):
+    """Space detail response - 继承 SpaceSummary 扩展更多字段."""
 
-    id: str
-    space_name: str
-    owner_id: int
-    instance_type: SpaceInstanceTypeEnum
-    space_type: SpaceTypeEnum
     storage_size_gb: int
-    status: SpaceStatusEnum
     lifecycle_config_arn: str | None = None
     sagemaker_space_arn: str | None = None
-    created_at: datetime
     updated_at: datetime
     deleted_at: datetime | None = None
 
-    @classmethod
-    def _map_entity_fields(cls, entity: "Space") -> dict:
-        """Map Space entity to detail schema fields."""
-        return {
-            "id": entity.id,
-            "space_name": entity.space_name,
-            "owner_id": entity.owner_id,
-            "instance_type": EnumMapper.to_api(entity.instance_type, SpaceInstanceTypeEnum),
-            "space_type": EnumMapper.to_api(entity.space_type, SpaceTypeEnum),
-            "storage_size_gb": entity.storage_size_gb,
-            "status": EnumMapper.to_api(entity.status, SpaceStatusEnum),
-            "lifecycle_config_arn": entity.lifecycle_config_arn,
-            "sagemaker_space_arn": entity.sagemaker_space_arn,
-            "created_at": entity.created_at,
-            "updated_at": entity.updated_at,
-            "deleted_at": entity.deleted_at,
-        }
+    # 继承父类的枚举映射，无需重复声明
 
 
 class SpaceListResponse(BaseModel):

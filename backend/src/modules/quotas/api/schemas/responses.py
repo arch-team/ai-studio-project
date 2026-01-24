@@ -2,14 +2,11 @@
 
 from datetime import datetime
 from enum import Enum
-from typing import TYPE_CHECKING
+from typing import ClassVar
 
 from pydantic import BaseModel
 
-from src.shared.api.schemas import EntitySchema
-
-if TYPE_CHECKING:
-    from src.modules.quotas.domain.entities import ResourceLimitConfig
+from src.shared.api.schemas import AutoMappingEntitySchema
 
 
 class LimitRoleEnum(str, Enum):
@@ -29,8 +26,12 @@ class PriorityDefaultEnum(str, Enum):
     LOW = "low"
 
 
-class ResourceLimitConfigResponse(EntitySchema["ResourceLimitConfig"]):
-    """Resource limit config response."""
+class ResourceLimitConfigResponse(AutoMappingEntitySchema["ResourceLimitConfig"]):
+    """Resource limit config response.
+
+    使用 AutoMappingEntitySchema 自动映射同名字段，
+    只需声明枚举映射规则。
+    """
 
     id: int
     config_name: str
@@ -45,23 +46,10 @@ class ResourceLimitConfigResponse(EntitySchema["ResourceLimitConfig"]):
     created_at: datetime
     updated_at: datetime
 
-    @classmethod
-    def _map_entity_fields(cls, entity: "ResourceLimitConfig") -> dict:
-        """Map ResourceLimitConfig entity to schema fields."""
-        return {
-            "id": entity.id,
-            "config_name": entity.config_name,
-            "role": LimitRoleEnum(entity.role.value),
-            "project_id": entity.project_id,
-            "max_gpu_per_job": entity.max_gpu_per_job,
-            "max_cpu_per_job": entity.max_cpu_per_job,
-            "max_memory_gb_per_job": entity.max_memory_gb_per_job,
-            "max_storage_gb_per_job": entity.max_storage_gb_per_job,
-            "max_nodes_per_job": entity.max_nodes_per_job,
-            "priority_default": PriorityDefaultEnum(entity.priority_default.value),
-            "created_at": entity.created_at,
-            "updated_at": entity.updated_at,
-        }
+    _enum_mappings: ClassVar[dict[str, type[Enum]]] = {
+        "role": LimitRoleEnum,
+        "priority_default": PriorityDefaultEnum,
+    }
 
 
 class ResourceLimitConfigListResponse(BaseModel):

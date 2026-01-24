@@ -88,3 +88,51 @@ class TestEnumMapperRoundTrip:
         domain_status = EnumMapper.to_domain(api_status, JobStatus)
         back_to_api = EnumMapper.to_api(domain_status, JobStatusEnum)
         assert back_to_api == api_status
+
+
+class TestEnumMapperModelToDomain:
+    """Tests for EnumMapper.model_to_domain()."""
+
+    def test_converts_same_value_format(self):
+        """Model enum → Domain enum with same value."""
+        # 使用 JobStatusEnum 模拟 ORM 模型枚举（同值格式）
+        from enum import Enum
+
+        class MockModelStatus(Enum):
+            RUNNING = "RUNNING"
+            COMPLETED = "COMPLETED"
+
+        result = EnumMapper.model_to_domain(MockModelStatus.RUNNING, JobStatus)
+        assert result == JobStatus.RUNNING
+        assert result.value == "RUNNING"
+
+    def test_handles_none(self):
+        """None input returns None."""
+        result = EnumMapper.model_to_domain(None, JobStatus)
+        assert result is None
+
+
+class TestEnumMapperDomainToModel:
+    """Tests for EnumMapper.domain_to_model()."""
+
+    def test_converts_same_value_format(self):
+        """Domain enum → Model enum with same value."""
+        from enum import Enum
+
+        class MockModelStatus(Enum):
+            RUNNING = "RUNNING"
+            COMPLETED = "COMPLETED"
+
+        result = EnumMapper.domain_to_model(JobStatus.RUNNING, MockModelStatus)
+        assert result == MockModelStatus.RUNNING
+        assert result.value == "RUNNING"
+
+    def test_handles_none(self):
+        """None input returns None."""
+        from enum import Enum
+
+        class MockModelStatus(Enum):
+            RUNNING = "RUNNING"
+
+        result = EnumMapper.domain_to_model(None, MockModelStatus)
+        assert result is None

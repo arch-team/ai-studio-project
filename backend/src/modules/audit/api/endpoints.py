@@ -25,20 +25,7 @@ router = APIRouter()
 
 def _to_response(log: AuditLog) -> AuditLogResponse:
     """将审计日志实体转换为响应模型."""
-    return AuditLogResponse(
-        id=log.id,
-        operation_type=log.operation_type.value,
-        resource_type=log.resource_type.value,
-        status=log.status.value,
-        user_id=log.user_id,
-        resource_id=log.resource_id,
-        request_data=log.request_data,
-        response_data=log.response_data,
-        ip_address=log.ip_address,
-        user_agent=log.user_agent,
-        created_at=log.created_at,
-        expires_at=log.expires_at,
-    )
+    return AuditLogResponse.from_entity(log)
 
 
 async def _get_logs_by_user(
