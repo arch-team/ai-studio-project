@@ -371,3 +371,9 @@ specs
 
 
 
+
+
+  短期 (1-2周): Repository 查询构建器统一、测试 fixture 复用                                                                     
+  中期 (1个月): 事件驱动重构、Redis 缓存层                                                                                       
+  长期 (3个月): 微服务拆分准备、OpenTelemetry 集成                                                                               
+                                                      

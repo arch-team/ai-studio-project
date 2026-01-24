@@ -14,3 +14,10 @@
   文档路径: claudedocs/mvp-execution-plan.md                                                             
   内容: MVP 执行计划，包含 Phase 3-5 待执行任务清单、并行执行策略、关键文件参考                          
   两个文档都位于 backend/claudedocs/ 目录下。      
+
+
+/speckit.implement ## Phase 3: US1 (P1) - 训练任务管理 (33 tasks) 中的集成测试这个子阶段, 中的
+- SC-001: 支持 PyTorch DDP/FSDP/DeepSpeed ZeRO
+- SC-002: 检查点保存成功率 >99%
+这两个集成测试是否完成
+每个任务按照TDD（测试驱动开发的流程进行），完成后将tasks.md中已经明确完成的任务标记为完成状态
