@@ -379,11 +379,24 @@ specs
 
 
 
-  当前项目中的测试用例的执行，特别是E2E的测试依赖于真实的AWS环境，每次执行这些E2E的测试用例时都需要重新哦配置用于测试的AWSAWS环境相和相关的服务，请提供一个最佳实践的方案可以固化这些依赖的环境配置                                                                          
+当前项目中的测试用例的执行，特别是E2E的测试依赖于真实的AWS环境，每次执行这些E2E的测试用例时都需要重新哦配置用于测试的AWSAWS环境相和相关的服务，请提供一个最佳实践的配置管理方案，可以管理这些依赖的环境配置                                                                          
 
 
 低优先级任务被高优先级任务抢占，这个测试用例依赖于系统需要配置好基于：HyperPod task governance的Cluster policy ，你必须使用sagemaker-hyperpod sdk中的API来配置HyperPod task governance的Cluster policy，而不应该直接使用kubectl 或者K8S的API来配置
 
 SageMaker HyperPod task governance作为实现本项目中的资源配额管理和任务优先级调度的，其技术原理和最佳实践关系到当前项目中训练任务这些功能的实现，需要提供后续开发过程的中使用于实践参考，并且保证内容的正确性符合最佳实践
 
-
+research.md 是spec-kit生成的文档，请在完全理解research.md 在spec-kit开发中的作用的情况下，在严格要求不改变该文档作用的情况下，按照Claude code上下文关键的最佳实践优化这个文档，以减少token的消耗    
+❯ research.md 是spec-kit生成的文档，请在完全理解research.md 在spec-kit开发中的作用的情况下，在严格要求不改变该文档作用的情况下，按照Claude code上下文关键的最佳实践优化这个文档，以减少token的消耗，针对每个优化点，请先让我确认之后在执行优化，完成后再处理下一个     
+                                                                                                                                                                                                                                                                                    
+  推荐方案：                                                                                                                                                                                                                                                                        
+                                                                                                                                                                                                                                                                                    
+  优先使用 Task Governance API                                                                                                                                                                                                                                                      
+           ↓                                                                                                                                                                                                                                                                        
+      通过 Console/CLI 配置策略                                                                                                                                                                                                                                                     
+           ↓                                                                                                                                                                                                                                                                        
+      自动生成 Kueue CRD                                                                                                                                                                                                                                                            
+           ↓                                                                                                                                                                                                                                                                        
+      如有特定问题（如旧版 TAS），通过升级 Add-on 版本解决                                                                                                                                                                                                                          
+           ↓                                                                                                                                                                                                                                                                        
+      仅在 API 无法解决时，才用 K8s 原生方式修补（并记录原因）   

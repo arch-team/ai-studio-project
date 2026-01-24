@@ -8,7 +8,6 @@
 - 资源清理策略
 """
 
-import os
 import time
 from collections.abc import AsyncGenerator
 from datetime import datetime, UTC
@@ -19,7 +18,12 @@ import pytest
 from httpx import ASGITransport, AsyncClient
 
 from src.main import app
+from tests.e2e.config import get_e2e_settings
 from tests.shared.constants import TEST_API_BASE_URL
+
+
+# 获取配置实例
+settings = get_e2e_settings()
 
 
 # =============================================================================
@@ -39,7 +43,7 @@ def _check_aws_credentials() -> bool:
 
 def _check_hyperpod_cluster() -> bool:
     """检查 HyperPod 集群是否配置"""
-    return bool(os.getenv("HYPERPOD_CLUSTER_NAME"))
+    return bool(settings.hyperpod_cluster_name)
 
 
 def _check_sso_configured() -> bool:
@@ -58,7 +62,7 @@ def _check_task_governance() -> bool:
     参考: https://docs.aws.amazon.com/sagemaker/latest/dg/sagemaker-hyperpod-eks-operate-console-ui-governance.html
     """
     try:
-        cluster_name = os.getenv("HYPERPOD_CLUSTER_NAME")
+        cluster_name = settings.hyperpod_cluster_name
         if not cluster_name:
             return False
 
@@ -107,7 +111,7 @@ skip_without_sso = pytest.mark.skipif(
 )
 
 skip_write_tests = pytest.mark.skipif(
-    os.getenv("E2E_READ_ONLY", "true").lower() == "true",
+    settings.e2e_read_only,
     reason="Write tests disabled (E2E_READ_ONLY=true)",
 )
 
@@ -123,22 +127,25 @@ skip_without_task_governance = pytest.mark.skipif(
 
 
 class SLAConstants:
-    """SLA 时间窗口定义 (单位: 秒)"""
+    """SLA 时间窗口定义 (单位: 秒)
+
+    从配置中读取，支持环境变量覆盖
+    """
 
     # 抢占相关 SLA
-    CHECKPOINT_SAVE_TIMEOUT = 300  # 5 分钟 - checkpoint 保存超时
-    POD_RELEASE_TIMEOUT = 30  # 30 秒 - Pod 释放超时
+    CHECKPOINT_SAVE_TIMEOUT = settings.sla_checkpoint_save_timeout
+    POD_RELEASE_TIMEOUT = settings.sla_pod_release_timeout
 
     # SSO 相关 SLA
-    SSO_FAILOVER_TIMEOUT = 5  # 5 秒 - IdP 超时阈值
-    SSO_RECOVERY_CHECK_INTERVAL = 60  # 健康检查间隔
+    SSO_FAILOVER_TIMEOUT = settings.sla_sso_failover_timeout
+    SSO_RECOVERY_CHECK_INTERVAL = settings.sla_sso_recovery_check_interval
 
     # 任务相关超时
-    JOB_SUBMISSION_TIMEOUT = 120  # 任务提交超时
-    JOB_STATUS_POLL_INTERVAL = 5  # 状态轮询间隔
+    JOB_SUBMISSION_TIMEOUT = settings.sla_job_submission_timeout
+    JOB_STATUS_POLL_INTERVAL = settings.sla_job_status_poll_interval
 
     # 抢占限制
-    MAX_PREEMPTION_COUNT = 3  # 最大抢占次数
+    MAX_PREEMPTION_COUNT = settings.sla_max_preemption_count
 
 
 # =============================================================================
@@ -149,13 +156,13 @@ class SLAConstants:
 @pytest.fixture(scope="session")
 def aws_region() -> str:
     """AWS 区域"""
-    return os.getenv("AWS_REGION", "us-west-2")
+    return settings.aws_region
 
 
 @pytest.fixture(scope="session")
 def hyperpod_cluster_name() -> str:
     """HyperPod 集群名称"""
-    return os.getenv("HYPERPOD_CLUSTER_NAME", "ai-training-cluster-dev")
+    return settings.hyperpod_cluster_name
 
 
 @pytest.fixture(scope="session")
@@ -217,10 +224,13 @@ async def async_client() -> AsyncGenerator[AsyncClient, None]:
 async def admin_token(async_client: AsyncClient) -> str:
     """获取管理员 Token
 
-    在真实环境中需要配置测试管理员账号
+    使用配置中的管理员凭证
     """
-    admin_username = os.getenv("E2E_ADMIN_USERNAME", "admin")
-    admin_password = os.getenv("E2E_ADMIN_PASSWORD", "admin123")
+    admin_username = settings.e2e_admin_username
+    admin_password = settings.e2e_admin_password
+
+    if not admin_password:
+        pytest.skip("E2E_ADMIN_PASSWORD not configured")
 
     response = await async_client.post(
         "/api/v1/auth/login",
@@ -246,16 +256,16 @@ async def admin_token(async_client: AsyncClient) -> str:
 def test_local_user() -> dict[str, str]:
     """本地测试用户配置"""
     return {
-        "username": os.getenv("E2E_TEST_USERNAME", "e2e_test_user"),
-        "password": os.getenv("E2E_TEST_PASSWORD", "test_password_123"),
-        "email": os.getenv("E2E_TEST_EMAIL", "e2e_test@example.com"),
+        "username": settings.e2e_test_username,
+        "password": settings.e2e_test_password,
+        "email": settings.e2e_test_email,
     }
 
 
 @pytest.fixture
 def sso_health_endpoint() -> str:
     """SSO 健康检查端点"""
-    return os.getenv("SSO_HEALTH_ENDPOINT", "/api/v1/auth/sso/health")
+    return settings.sso_health_endpoint
 
 
 # =============================================================================
@@ -268,29 +278,26 @@ def low_priority_job_config() -> dict[str, Any]:
     """低优先级测试任务配置
 
     使用 Task Governance 配置:
-    - namespace: hyperpod-ns-e2e-low
-    - queue: hyperpod-ns-e2e-low-localqueue
-    - priority: low-priority
+    - namespace: 从 settings.e2e_low_namespace 读取
+    - queue: 从 settings.e2e_low_queue_name 读取
+    - priority: 从 settings.e2e_low_priority_class 读取
 
     训练脚本使用简单的 sleep 循环模拟长时间训练。
     """
     return {
         "job_name": f"e2e-low-priority-{int(time.time())}",
-        "image_uri": os.getenv(
-            "TEST_IMAGE_URI",
-            "763104351884.dkr.ecr.us-west-2.amazonaws.com/pytorch-training:2.1.0-gpu-py310-cu121-ubuntu20.04-sagemaker",
-        ),
-        "instance_type": os.getenv("TEST_INSTANCE_TYPE", "ml.g5.2xlarge"),
+        "image_uri": settings.resolved_image_uri,
+        "instance_type": settings.test_instance_type,
         "node_count": 1,
         "priority": "low",
         # Task Governance 配置
-        "namespace": "hyperpod-ns-e2e-low",
-        "queue_name": "hyperpod-ns-e2e-low-localqueue",
-        "priority_class": "low-priority",
+        "namespace": settings.e2e_low_namespace,
+        "queue_name": settings.e2e_low_queue_name,
+        "priority_class": settings.e2e_low_priority_class,
         # 简单的训练命令 - sleep 模拟长时间训练
         "entrypoint_command": ["python", "-c", "import time; print('Low priority job started'); [print(f'Step {i}') or time.sleep(1) for i in range(600)]"],
         "distribution_strategy": "ddp",
-        "gpu_count": 1,
+        "gpu_count": settings.test_gpu_count,
     }
 
 
@@ -299,27 +306,24 @@ def high_priority_job_config() -> dict[str, Any]:
     """高优先级测试任务配置 (用于触发抢占)
 
     使用 Task Governance 配置:
-    - namespace: hyperpod-ns-e2e-high
-    - queue: hyperpod-ns-e2e-high-localqueue
-    - priority: critical-priority (最高优先级，触发抢占)
+    - namespace: 从 settings.e2e_high_namespace 读取
+    - queue: 从 settings.e2e_high_queue_name 读取
+    - priority: 从 settings.e2e_high_priority_class 读取
     """
     return {
         "job_name": f"e2e-high-priority-{int(time.time())}",
-        "image_uri": os.getenv(
-            "TEST_IMAGE_URI",
-            "763104351884.dkr.ecr.us-west-2.amazonaws.com/pytorch-training:2.1.0-gpu-py310-cu121-ubuntu20.04-sagemaker",
-        ),
-        "instance_type": os.getenv("TEST_INSTANCE_TYPE", "ml.g5.2xlarge"),
+        "image_uri": settings.resolved_image_uri,
+        "instance_type": settings.test_instance_type,
         "node_count": 1,
         "priority": "critical",
         # Task Governance 配置
-        "namespace": "hyperpod-ns-e2e-high",
-        "queue_name": "hyperpod-ns-e2e-high-localqueue",
-        "priority_class": "high-priority",
+        "namespace": settings.e2e_high_namespace,
+        "queue_name": settings.e2e_high_queue_name,
+        "priority_class": settings.e2e_high_priority_class,
         # 简短任务 - 快速完成
         "entrypoint_command": ["python", "-c", "print('High priority job completed')"],
         "distribution_strategy": "ddp",
-        "gpu_count": 1,
+        "gpu_count": settings.test_gpu_count,
     }
 
 
@@ -366,23 +370,17 @@ torchrun --nproc_per_node=1 --nnodes=1 --rdzv_backend=c10d --rdzv_endpoint=local
 
     return {
         "job_name": f"e2e-checkpoint-{int(time.time())}",
-        "image_uri": os.getenv(
-            "TEST_IMAGE_URI",
-            "763104351884.dkr.ecr.us-west-2.amazonaws.com/pytorch-training:2.1.0-gpu-py310-cu121-ubuntu20.04-sagemaker",
-        ),
-        "instance_type": os.getenv("TEST_INSTANCE_TYPE", "ml.g5.2xlarge"),
+        "image_uri": settings.resolved_image_uri,
+        "instance_type": settings.test_instance_type,
         "node_count": 1,
         "priority": "medium",
         "entrypoint_command": ["bash", "-c", training_command],
         "distribution_strategy": "ddp",
-        "gpu_count": 1,
+        "gpu_count": settings.test_gpu_count,
         "checkpoint_config": {
             "enabled": True,
             "interval_seconds": 60,
-            "s3_path": os.getenv(
-                "TEST_CHECKPOINT_S3_PATH",
-                "s3://ai-training-checkpoints-dev/e2e-tests/",
-            ),
+            "s3_path": settings.checkpoint_s3_path or "s3://ai-training-checkpoints-dev/e2e-tests/",
         },
     }
 
@@ -432,4 +430,10 @@ async def cleanup_all_resources(hyperpod_client: Any) -> None:
 @pytest.fixture
 def e2e_timeout() -> int:
     """E2E 测试总体超时时间 (秒)"""
-    return int(os.getenv("E2E_TIMEOUT", "600"))  # 默认 10 分钟
+    return settings.e2e_timeout
+
+
+@pytest.fixture
+def e2e_settings():
+    """E2E 测试配置对象"""
+    return settings

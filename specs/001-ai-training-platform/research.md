@@ -163,22 +163,6 @@ job.delete()
 | **FSDP** | ⚠️ 用户脚本层面支持 | 用户在 `train.py` 中使用 `torch.distributed.fsdp` API | 🟡 中 |
 | **DeepSpeed ZeRO** | ⚠️ 用户脚本+容器支持 | Docker 镜像包含 DeepSpeed + 使用 deepspeed launcher | 🟡 中 |
 
-**DDP 示例** (SDK 原生支持):
-```python
-job = HyperPodPytorchJob.create(
-    name="ddp-training",
-    node_count=4,           # 4个节点
-    tasks_per_node=8,       # 每节点8个GPU
-    command=[
-        "torchrun",
-        "--nproc_per_node=8",
-        "--nnodes=4",
-        "train.py"
-    ]
-)
-# SDK 自动注入: MASTER_ADDR, MASTER_PORT, NODE_RANK, WORLD_SIZE
-```
-
 **FSDP 示例** (用户脚本实现):
 ```python
 # 在用户训练脚本 train.py 中
@@ -362,31 +346,7 @@ job = HyperPodPytorchJob.create(volumes=volumes, ...)
 | **训练指标** | ❌ 无内置支持 | 用户集成 TensorBoard/MLflow | 🔴 高 |
 | **自动重试** | ❌ 无 SDK API | 后端监听失败事件并重新提交 | 🔴 高 |
 
-#### 1.9 需要后端层实现的功能
-
-以下功能 **SDK 不直接提供**,需要平台后端层实现:
-
-1. **检查点元数据管理**
-   - SDK 不提供检查点列表 API
-   - 需要后端扫描 FSx/S3 存储并构建元数据索引
-
-2. **训练指标采集**
-   - SDK 不提供实时指标 API (如 epoch、loss)
-   - 需要从用户日志或集成 TensorBoard/MLflow
-
-3. **训练任务模板**
-   - SDK 不提供任务模板管理
-   - 需要后端实现模板存储和参数化
-
-4. **自动重试机制**
-   - SDK 不提供自动重试 (spot 实例被回收时)
-   - 需要后端监听任务失败事件并重新提交
-
-5. **成本追踪**
-   - SDK 不提供成本统计
-   - 需要后端集成 AWS Cost Explorer API
-
-#### 1.10 推荐架构
+#### 1.9 推荐架构
 
 ```
 ┌─────────────────────────────────────────────────────┐
@@ -423,14 +383,6 @@ job = HyperPodPytorchJob.create(volumes=volumes, ...)
 │ EKS 集群 (ml.p4d.24xlarge 节点)                      │
 └─────────────────────────────────────────────────────┘
 ```
-
-#### 1.11 参考文档
-
-- **官方文档**: https://sagemaker-hyperpod-cli.readthedocs.io/
-- **Training 快速开始**: https://sagemaker-hyperpod-cli.readthedocs.io/en/stable/getting_started/training.html
-- **CLI 参考**: https://sagemaker-hyperpod-cli.readthedocs.io/en/stable/cli/training/cli_training.html
-- **SDK 参考**: https://sagemaker-hyperpod-cli.readthedocs.io/en/stable/sdk/training/hyperpod_pytorch_job.html
-- **示例代码**: https://github.com/aws/sagemaker-hyperpod-cli/tree/main/examples/training
 
 ---
 
@@ -620,13 +572,6 @@ scrape_configs:
 | **<10秒日志延迟** (FR-007) | ✅ 可实现 | 标准配置可达到 |
 | **Amazon Managed Grafana** | ✅ 推荐使用 | 完全托管,预配置 Dashboard |
 
-#### 2.7 参考文档
-
-- **HyperPod Observability Add-on**: https://docs.aws.amazon.com/sagemaker/latest/dg/sagemaker-hyperpod-observability-addon.html
-- **Creating Custom Metrics**: https://docs.aws.amazon.com/sagemaker/latest/dg/hyperpod-observability-addon-custom-metrics.html
-- **Amazon Managed Grafana User Guide**: https://docs.aws.amazon.com/grafana/latest/userguide/
-- **Amazon Managed Prometheus User Guide**: https://docs.aws.amazon.com/prometheus/latest/userguide/
-
 ---
 
 ## 研究主题 3: MySQL 8.0 与 Aurora MySQL 3.x 兼容性
@@ -784,12 +729,6 @@ SQLALCHEMY_ENGINE_OPTIONS = {
 高可用: Multi-AZ + 至少 2 个 Aurora Replica
 备份: 自动备份 (保留 7-35 天)
 ```
-
-#### 3.7 参考文档
-
-- **Aurora MySQL version 3 compatible with MySQL 8.0**: https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/AuroraMySQL.MySQL80.html
-- **Aurora MySQL database engine updates (LTS 3.04.x)**: https://docs.aws.amazon.com/AmazonRDS/latest/AuroraMySQLReleaseNotes/AuroraMySQL.Updates.3040.html
-- **Best practices with Amazon Aurora MySQL**: https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/AuroraMySQL.BestPractices.html
 
 ---
 
@@ -949,65 +888,23 @@ Server State (TanStack Query) - API 数据缓存
 - **TanStack Query**: 管理服务器数据 (API 数据、缓存、乐观更新)
 - **⚠️ 不混用**: 避免在 Zustand 中存储服务器数据
 
-**Zustand 配置示例**:
+**配置示例**:
 ```typescript
-import { create } from 'zustand';
-import { devtools, persist } from 'zustand/middleware';
-
-interface AppState {
-  sidebarOpen: boolean;
-  darkMode: boolean;
-  filterValues: Record<string, any>;
-
-  toggleSidebar: () => void;
-  updateFilterValues: (key: string, value: any) => void;
-}
-
+// Zustand - 客户端状态
 export const useAppStore = create<AppState>()(
-  devtools(
-    persist(
-      (set) => ({
-        sidebarOpen: true,
-        darkMode: false,
-        filterValues: {},
-
-        toggleSidebar: () => set((state) => ({ sidebarOpen: !state.sidebarOpen })),
-        updateFilterValues: (key, value) =>
-          set((state) => ({ filterValues: { ...state.filterValues, [key]: value } })),
-      }),
-      {
-        name: 'app-storage',
-        partialize: (state) => ({
-          darkMode: state.darkMode,  // 只持久化用户偏好
-        }),
-      }
-    )
-  )
+  devtools(persist((set) => ({
+    sidebarOpen: true,
+    darkMode: false,
+    toggleSidebar: () => set((s) => ({ sidebarOpen: !s.sidebarOpen })),
+  }), { name: 'app-storage' }))
 );
-```
 
-**TanStack Query 配置示例**:
-```typescript
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-
+// TanStack Query - 服务器状态
 const queryClient = new QueryClient({
   defaultOptions: {
-    queries: {
-      staleTime: 5 * 60 * 1000,      // 5 分钟
-      gcTime: 10 * 60 * 1000,        // 10 分钟 (原 cacheTime)
-      retry: 3,
-      refetchOnWindowFocus: false,
-    },
+    queries: { staleTime: 5 * 60 * 1000, gcTime: 10 * 60 * 1000, retry: 3 },
   },
 });
-
-function App() {
-  return (
-    <QueryClientProvider client={queryClient}>
-      <YourApp />
-    </QueryClientProvider>
-  );
-}
 ```
 
 **在 Cloudscape 组件中集成**:
@@ -1033,86 +930,42 @@ export const JobListPage = () => {
 
 #### 4.6 布局模式
 
-**AppLayout 主框架**:
+**核心布局组件**: `AppLayout` (主框架) + `ContentLayout` (内容页面) + `SideNavigation` (侧边导航)
+
 ```typescript
-import AppLayout from '@cloudscape-design/components/app-layout';
-import SideNavigation from '@cloudscape-design/components/side-navigation';
-
-export const MainLayout = ({ children }) => {
-  const [navigationOpen, setNavigationOpen] = useState(true);
-
-  return (
-    <AppLayout
-      navigationOpen={navigationOpen}
-      navigation={
-        <SideNavigation
-          items={[
-            { type: 'link', text: '仪表板', href: '/dashboard' },
-            { type: 'link', text: '作业管理', href: '/jobs' },
-          ]}
-        />
-      }
-      content={children}
-    />
-  );
-};
-```
-
-**ContentLayout 内容页面**:
-```typescript
-import ContentLayout from '@cloudscape-design/components/content-layout';
-import Header from '@cloudscape-design/components/header';
-
-export const JobDetailPage = ({ jobId }) => {
-  return (
-    <ContentLayout
-      header={
-        <Header variant="h1" actions={<Button>重新运行</Button>}>
-          作业详情: {jobId}
-        </Header>
-      }
-    >
+// 主框架示例
+<AppLayout
+  navigation={<SideNavigation items={[{ type: 'link', text: '作业管理', href: '/jobs' }]} />}
+  content={
+    <ContentLayout header={<Header variant="h1">作业详情</Header>}>
       {/* 页面内容 */}
     </ContentLayout>
-  );
-};
+  }
+/>
 ```
 
-#### 4.7 推荐的项目结构
+#### 4.7 项目结构 (Feature-Sliced Design)
 
 ```
 src/
-├── main.tsx                    # 应用入口
-├── App.tsx                     # 根组件
-├── layouts/                    # 布局组件
-│   └── MainLayout.tsx          # AppLayout 主框架
-├── pages/                      # 页面组件
-│   ├── Dashboard/
-│   ├── Jobs/
-│   │   ├── JobList.tsx
-│   │   ├── JobDetail.tsx
-│   │   └── JobCreate.tsx
-│   └── Clusters/
-├── components/                 # 共享组件
-│   ├── EmptyState.tsx
-│   └── LoadingSpinner.tsx
-├── stores/                     # Zustand 状态管理
-│   └── appStore.ts
-├── api/                        # TanStack Query Hooks
-│   ├── jobs.ts
-│   └── client.ts
-├── hooks/                      # 共享 Hooks
-├── utils/                      # 工具函数
-└── types/                      # TypeScript 类型定义
+├── app/                        # 应用层
+│   ├── main.tsx                # 入口
+│   ├── App.tsx                 # 根组件
+│   ├── providers/              # QueryProvider 等
+│   └── router/                 # 路由配置 + Guards
+├── features/                   # 功能模块 (按业务划分)
+│   ├── training/               # 训练任务模块
+│   │   ├── api/                # trainingJobApi + queries
+│   │   ├── components/         # TrainingJobTable, TrainingJobForm
+│   │   ├── pages/              # TrainingJobListPage, DetailPage
+│   │   ├── hooks/
+│   │   └── types/
+│   ├── datasets/               # 数据集模块
+│   ├── models/                 # 模型管理模块
+│   ├── spaces/                 # 开发空间模块
+│   └── auth/                   # 认证模块 (含 store)
+└── types/                      # 全局类型定义
 ```
-
-#### 4.8 参考文档
-
-- **Cloudscape 官网**: https://cloudscape.design/
-- **组件文档**: https://cloudscape.design/components/
-- **GitHub 仓库**: https://github.com/cloudscape-design/components
-- **官方示例**: https://github.com/aws-samples/cloudscape-examples
-- **Workshop**: https://github.com/aws-samples/cloudscape-design-system-workshop
 
 ---
 
@@ -1289,53 +1142,10 @@ src/
 
 ## 下一步行动计划
 
-### Phase 0 POC 验证 (1 周)
-
-**目标**: 创建最小可行原型,验证关键技术假设
-
-**验证项**:
-
-1. **HyperPod 训练任务提交** (2 天)
-   - [ ] 创建简单的 2 节点 DDP 训练任务
-   - [ ] 挂载 FSx for Lustre 卷并保存检查点
-   - [ ] 验证 Gang Scheduling 是否生效
-   - [ ] 测试任务取消/删除
-
-2. **监控指标集成** (2 天)
-   - [ ] 安装 HyperPod Observability Add-on
-   - [ ] 验证预配置 Grafana Dashboard 可用性
-   - [ ] 在训练脚本中集成 OpenTelemetry
-   - [ ] 测试自定义指标 (Loss, Accuracy) 采集
-
-3. **数据库连接测试** (1 天)
-   - [ ] 本地 MySQL 8.0.28 + SQLAlchemy 2.0 + aiomysql
-   - [ ] Aurora MySQL 3.04.x 连接测试 (如有环境)
-
-4. **前端原型** (2 天)
-   - [ ] 使用 Vite 创建 React 18 + TypeScript 项目
-   - [ ] 集成 Cloudscape 组件库
-   - [ ] 实现基础 AppLayout 布局
-   - [ ] 创建简单的作业列表页 (Table + TanStack Query)
-
-### Phase 1 设计 (2 周)
-
-**输出文档**:
-- `data-model.md`: 数据库表设计 (training_jobs, datasets, checkpoints, users, resource_quotas)
-- `contracts/*.yaml`: API 合约定义 (OpenAPI 3.0)
-  - `training-jobs-api.yaml`
-  - `datasets-api.yaml`
-  - `resource-quotas-api.yaml`
-  - `users-api.yaml`
-  - `monitoring-api.yaml`
-- `quickstart.md`: 快速开始指南 (开发环境搭建、本地运行、测试)
-
-### Phase 2 实施 (详见 tasks.md)
-
-**输出**:
-- 完整的前后端代码实现
-- 单元测试 (覆盖率 ≥70%)
-- 集成测试 (API 端点 100%)
-- E2E 测试 (每个 User Story 至少 1 个)
+详细任务分解请参见 **[tasks.md](./tasks.md)**，包含 180 个任务按 Phase 组织：
+- **Phase 0**: 技术可行性研究 (SDK 方法验证)
+- **Phase 1**: Setup + IaC 基础
+- **Phase 2-5**: 核心功能实现 (US1-US5)
 
 ---
 
@@ -1365,24 +1175,9 @@ src/
 
 ### 需要实施的封装层
 
-**后端封装层**:
-```python
-backend/src/services/
-├── training_job_service.py      # 封装 HyperPodPytorchJob API
-├── checkpoint_service.py         # 扫描 FSx 存储,构建检查点元数据
-├── monitoring_service.py         # 集成 Prometheus API,解析训练日志
-├── resource_quota_service.py     # 集成 Kueue API,管理多租户配额
-└── cost_tracking_service.py      # 集成 AWS Cost Explorer API
-```
+**后端** (`backend/src/services/`): TrainingJobService, CheckpointService, MonitoringService, ResourceQuotaService, CostTrackingService
 
-**前端封装层**:
-```typescript
-frontend/src/api/
-├── jobs.ts                       # TanStack Query Hooks (训练任务)
-├── clusters.ts                   # TanStack Query Hooks (集群管理)
-├── monitoring.ts                 # TanStack Query Hooks (监控数据)
-└── client.ts                     # Axios 实例配置
-```
+**前端** (`frontend/src/api/`): TanStack Query Hooks (jobs, clusters, monitoring) + Axios client
 
 ---
 

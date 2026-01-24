@@ -58,6 +58,16 @@ dist-ssr/
 .env.production
 .env.staging
 
+# E2E test environment (keep .env.e2e.example as template)
+.env.e2e
+.env.e2e.dev
+.env.e2e.staging
+.env.e2e.prod
+backend/.env.e2e
+backend/.env.e2e.dev
+backend/.env.e2e.staging
+backend/.env.e2e.prod
+
 # IDE
 .vscode/
 .idea/
