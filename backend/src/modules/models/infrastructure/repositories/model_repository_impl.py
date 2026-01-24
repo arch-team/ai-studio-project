@@ -8,15 +8,15 @@ from src.modules.models.domain.entities import Model
 from src.modules.models.domain.repositories import IModelRepository
 from src.modules.models.domain.value_objects import ModelFramework, ModelStatus
 from src.modules.models.infrastructure.models import ModelModel
-from src.shared.domain.exceptions import EntityNotFoundError
+from src.shared.infrastructure.repository_base import EnhancedBaseRepository
 from src.shared.utils import utc_now
 
 
-class ModelRepository(IModelRepository):
+class ModelRepository(EnhancedBaseRepository[Model, ModelModel, int], IModelRepository):
     """SQLAlchemy implementation of model repository."""
 
     def __init__(self, session: AsyncSession):
-        self._session = session
+        super().__init__(session, ModelModel)
 
     def _to_entity(self, model: ModelModel) -> Model:
         """Convert ORM model to domain entity."""
@@ -72,8 +72,31 @@ class ModelRepository(IModelRepository):
             archived_at=entity.archived_at,
         )
 
+    def _update_model(self, model: ModelModel, entity: Model) -> None:
+        """Update ORM model fields from entity."""
+        model.model_name = entity.model_name
+        model.owner_id = entity.owner_id
+        model.version = entity.version
+        model.display_name = entity.display_name
+        model.description = entity.description
+        model.training_job_id = entity.training_job_id
+        model.checkpoint_id = entity.checkpoint_id
+        model.model_uri = entity.model_uri
+        model.registry_arn = entity.registry_arn
+        model.registry_status = entity.registry_status
+        model.metrics = entity.metrics
+        model.hyperparameters = entity.hyperparameters
+        model.framework = entity.framework
+        model.framework_version = entity.framework_version
+        model.status = entity.status
+        model.size_bytes = entity.size_bytes
+        model.model_format = entity.model_format
+        model.tags = entity.tags
+        model.registered_at = entity.registered_at
+        model.archived_at = entity.archived_at
+
     async def get_by_id(self, model_id: int) -> Model | None:
-        """Get model by ID."""
+        """Get model by ID with owner preloaded."""
         result = await self._session.execute(
             select(ModelModel)
             .options(selectinload(ModelModel.owner))
@@ -188,43 +211,6 @@ class ModelRepository(IModelRepository):
         )
         models = result.scalars().all()
         return [self._to_entity(m) for m in models]
-
-    async def create(self, model: Model) -> Model:
-        """Create a new model."""
-        db_model = self._to_model(model)
-        self._session.add(db_model)
-        await self._session.flush()
-        await self._session.refresh(db_model)
-        return self._to_entity(db_model)
-
-    async def update(self, model: Model) -> Model:
-        """Update an existing model."""
-        result = await self._session.execute(
-            select(ModelModel).where(ModelModel.id == model.id)
-        )
-        db_model = result.scalar_one_or_none()
-        if db_model is None:
-            raise EntityNotFoundError("Model", str(model.id))
-
-        # Update fields
-        db_model.display_name = model.display_name
-        db_model.description = model.description
-        db_model.model_uri = model.model_uri
-        db_model.registry_arn = model.registry_arn
-        db_model.registry_status = model.registry_status
-        db_model.metrics = model.metrics
-        db_model.hyperparameters = model.hyperparameters
-        db_model.status = model.status
-        db_model.size_bytes = model.size_bytes
-        db_model.model_format = model.model_format
-        db_model.tags = model.tags
-        db_model.registered_at = model.registered_at
-        db_model.archived_at = model.archived_at
-        db_model.updated_at = utc_now()
-
-        await self._session.flush()
-        await self._session.refresh(db_model)
-        return self._to_entity(db_model)
 
     async def soft_delete(self, model_id: int) -> bool:
         """Soft delete a model (archive it)."""

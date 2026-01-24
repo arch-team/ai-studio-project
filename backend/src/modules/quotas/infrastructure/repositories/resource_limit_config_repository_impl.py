@@ -3,18 +3,21 @@
 from sqlalchemy import and_, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.shared.infrastructure.repository_base import EnhancedBaseRepository
 from src.modules.quotas.domain.entities import ResourceLimitConfig
 from src.modules.quotas.domain.repositories import IResourceLimitConfigRepository
 from src.modules.quotas.domain.value_objects import LimitRole, PriorityDefault
 from src.modules.quotas.infrastructure.models import ResourceLimitConfigModel
-from src.shared.domain.exceptions import EntityNotFoundError
 
 
-class ResourceLimitConfigRepository(IResourceLimitConfigRepository):
+class ResourceLimitConfigRepository(
+    EnhancedBaseRepository[ResourceLimitConfig, ResourceLimitConfigModel, int],
+    IResourceLimitConfigRepository
+):
     """SQLAlchemy implementation of ResourceLimitConfig repository."""
 
     def __init__(self, session: AsyncSession):
-        self._session = session
+        super().__init__(session, ResourceLimitConfigModel)
 
     def _to_entity(self, model: ResourceLimitConfigModel) -> ResourceLimitConfig:
         """Convert ORM model to domain entity."""
@@ -47,18 +50,6 @@ class ResourceLimitConfigRepository(IResourceLimitConfigRepository):
             max_nodes_per_job=entity.max_nodes_per_job,
             priority_default=PriorityDefault(entity.priority_default.value),
         )
-
-    async def get_by_id(self, config_id: int) -> ResourceLimitConfig | None:
-        """Get config by ID."""
-        result = await self._session.execute(
-            select(ResourceLimitConfigModel).where(
-                ResourceLimitConfigModel.id == config_id
-            )
-        )
-        model = result.scalar_one_or_none()
-        if model is None:
-            return None
-        return self._to_entity(model)
 
     async def get_by_role_and_project(
         self, role: LimitRole, project_id: int | None
@@ -143,37 +134,7 @@ class ResourceLimitConfigRepository(IResourceLimitConfigRepository):
 
     async def create(self, config: ResourceLimitConfig) -> ResourceLimitConfig:
         """Create a new config."""
-        model = self._to_model(config)
-        self._session.add(model)
-        await self._session.flush()
-        await self._session.refresh(model)
-        return self._to_entity(model)
-
-    async def update(self, config: ResourceLimitConfig) -> ResourceLimitConfig:
-        """Update an existing config."""
-        result = await self._session.execute(
-            select(ResourceLimitConfigModel).where(
-                ResourceLimitConfigModel.id == config.id
-            )
-        )
-        model = result.scalar_one_or_none()
-        if model is None:
-            raise EntityNotFoundError("ResourceLimitConfig", str(config.id))
-
-        # Update fields
-        model.config_name = config.config_name
-        model.role = config.role
-        model.project_id = config.project_id
-        model.max_gpu_per_job = config.max_gpu_per_job
-        model.max_cpu_per_job = config.max_cpu_per_job
-        model.max_memory_gb_per_job = config.max_memory_gb_per_job
-        model.max_storage_gb_per_job = config.max_storage_gb_per_job
-        model.max_nodes_per_job = config.max_nodes_per_job
-        model.priority_default = config.priority_default
-
-        await self._session.flush()
-        await self._session.refresh(model)
-        return self._to_entity(model)
+        return await self.add(config)
 
     async def soft_delete(self, config_id: int) -> bool:
         """Soft delete a config (hard delete for now, no soft delete column)."""

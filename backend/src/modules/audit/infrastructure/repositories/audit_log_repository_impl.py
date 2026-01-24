@@ -6,6 +6,7 @@ from uuid import UUID
 from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.shared.infrastructure.repository_base import EnhancedBaseRepository
 from src.modules.audit.domain.entities import AuditLog
 from src.modules.audit.domain.repositories import IAuditLogRepository
 from src.modules.audit.domain.value_objects import (
@@ -20,11 +21,14 @@ from src.modules.audit.infrastructure.models import ResourceType as ModelResourc
 from src.shared.utils import utc_now
 
 
-class AuditLogRepositoryImpl(IAuditLogRepository):
+class AuditLogRepositoryImpl(
+    EnhancedBaseRepository[AuditLog, AuditLogModel, int],
+    IAuditLogRepository
+):
     """SQLAlchemy implementation of audit log repository."""
 
     def __init__(self, session: AsyncSession):
-        self._session = session
+        super().__init__(session, AuditLogModel)
 
     def _to_entity(self, model: AuditLogModel) -> AuditLog:
         """Convert ORM model to domain entity."""
@@ -59,59 +63,6 @@ class AuditLogRepositoryImpl(IAuditLogRepository):
             created_at=entity.created_at,
             expires_at=entity.expires_at,
         )
-
-    async def get_by_id(self, id: UUID) -> AuditLog | None:
-        """Get audit log by ID."""
-        # Note: AuditLog uses int ID, not UUID
-        result = await self._session.execute(
-            select(AuditLogModel).where(AuditLogModel.id == int(str(id)))
-        )
-        model = result.scalar_one_or_none()
-        return self._to_entity(model) if model else None
-
-    async def get_all(self, limit: int = 100, offset: int = 0) -> list[AuditLog]:
-        """Get all audit logs with pagination."""
-        result = await self._session.execute(
-            select(AuditLogModel)
-            .order_by(AuditLogModel.created_at.desc())
-            .limit(limit)
-            .offset(offset)
-        )
-        return [self._to_entity(model) for model in result.scalars()]
-
-    async def add(self, entity: AuditLog) -> AuditLog:
-        """Add new audit log."""
-        model = self._to_model(entity)
-        self._session.add(model)
-        await self._session.flush()
-        return self._to_entity(model)
-
-    async def update(self, entity: AuditLog) -> AuditLog:
-        """Update audit log (typically not used for audit logs)."""
-        result = await self._session.execute(
-            select(AuditLogModel).where(AuditLogModel.id == entity.id)
-        )
-        model = result.scalar_one_or_none()
-        if model:
-            model.status = ModelAuditStatus(entity.status.value)
-            model.response_data = entity.response_data
-            await self._session.flush()
-            return self._to_entity(model)
-        return entity
-
-    async def delete(self, id: UUID) -> bool:
-        """Delete audit log by ID."""
-        result = await self._session.execute(
-            delete(AuditLogModel).where(AuditLogModel.id == int(str(id)))
-        )
-        return result.rowcount > 0
-
-    async def exists(self, id: UUID) -> bool:
-        """Check if audit log exists."""
-        result = await self._session.execute(
-            select(func.count()).where(AuditLogModel.id == int(str(id)))
-        )
-        return result.scalar() > 0
 
     async def get_by_user_id(
         self,

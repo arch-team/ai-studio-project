@@ -3,16 +3,20 @@
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.shared.infrastructure.repository_base import EnhancedBaseRepository
 from ...domain.entities import LoginAttempt
 from ...domain.repositories import ILoginAttemptRepository
 from ..models import LoginAttemptModel
 
 
-class LoginAttemptRepositoryImpl(ILoginAttemptRepository):
+class LoginAttemptRepositoryImpl(
+    EnhancedBaseRepository[LoginAttempt, LoginAttemptModel, int],
+    ILoginAttemptRepository
+):
     """SQLAlchemy implementation of LoginAttempt repository."""
 
     def __init__(self, session: AsyncSession):
-        self._session = session
+        super().__init__(session, LoginAttemptModel)
 
     def _to_entity(self, model: LoginAttemptModel) -> LoginAttempt:
         """Convert ORM model to domain entity."""
@@ -39,7 +43,14 @@ class LoginAttemptRepositoryImpl(ILoginAttemptRepository):
             failure_reason=entity.failure_reason,
         )
 
-    async def create(self, attempt: LoginAttempt) -> LoginAttempt:
+    def _update_model(self, model: LoginAttemptModel, entity: LoginAttempt) -> None:
+        """Update ORM model fields from entity.
+
+        LoginAttempt records are immutable after creation, so this is a no-op.
+        """
+        pass
+
+    async def add(self, attempt: LoginAttempt) -> LoginAttempt:
         """Create a new login attempt record."""
         model = self._to_model(attempt)
         self._session.add(model)

@@ -86,57 +86,9 @@ class CheckpointRepository(EnhancedBaseRepository[Checkpoint, CheckpointModel, i
         models = result.scalars().all()
         return [self._to_entity(m) for m in models]
 
-    async def create(self, checkpoint: Checkpoint) -> Checkpoint:
-        """Create a new checkpoint."""
-        model = CheckpointModel(
-            training_job_id=checkpoint.training_job_id,
-            checkpoint_name=checkpoint.checkpoint_name,
-            storage_path=checkpoint.storage_path,
-            size_bytes=checkpoint.size_bytes,
-            checkpoint_type=checkpoint.checkpoint_type,
-            trigger_type=checkpoint.trigger_type,
-            epoch=checkpoint.epoch,
-            step=checkpoint.step,
-            checksum=checkpoint.checksum,
-            loss=checkpoint.loss,
-            accuracy=checkpoint.accuracy,
-            metrics=checkpoint.metrics,
-            storage_tier=checkpoint.storage_tier,
-            status=checkpoint.status,
-        )
-        self._session.add(model)
-        await self._session.flush()
-        await self._session.refresh(model)
-        return self._to_entity(model)
-
-    async def update(self, checkpoint: Checkpoint) -> Checkpoint:
-        """Update an existing checkpoint."""
-        result = await self._session.execute(
-            select(CheckpointModel).where(CheckpointModel.id == checkpoint.id)
-        )
-        model = result.scalar_one_or_none()
-        if model is None:
-            raise EntityNotFoundError("Checkpoint", str(checkpoint.id))
-
-        # Update fields
-        model.storage_tier = checkpoint.storage_tier
-        model.status = checkpoint.status
-        model.archived_at = checkpoint.archived_at
-        model.deleted_at = checkpoint.deleted_at
-
-        await self._session.flush()
-        await self._session.refresh(model)
-        return self._to_entity(model)
-
     async def delete(self, checkpoint_id: int) -> None:
         """Delete a checkpoint by ID."""
-        result = await self._session.execute(
-            select(CheckpointModel).where(CheckpointModel.id == checkpoint_id)
-        )
-        model = result.scalar_one_or_none()
-        if model is not None:
-            await self._session.delete(model)
-            await self._session.flush()
+        await super().delete(checkpoint_id)
 
     async def get_latest_by_training_job_id(
         self, training_job_id: int

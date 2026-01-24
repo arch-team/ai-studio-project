@@ -3,16 +3,20 @@
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.shared.infrastructure.repository_base import EnhancedBaseRepository
 from ...domain.entities import PasswordHistory
 from ...domain.repositories import IPasswordHistoryRepository
 from ..models import PasswordHistoryModel
 
 
-class PasswordHistoryRepositoryImpl(IPasswordHistoryRepository):
+class PasswordHistoryRepositoryImpl(
+    EnhancedBaseRepository[PasswordHistory, PasswordHistoryModel, int],
+    IPasswordHistoryRepository
+):
     """SQLAlchemy implementation of PasswordHistory repository."""
 
     def __init__(self, session: AsyncSession):
-        self._session = session
+        super().__init__(session, PasswordHistoryModel)
 
     def _to_entity(self, model: PasswordHistoryModel) -> PasswordHistory:
         """Convert ORM model to domain entity."""
@@ -31,7 +35,14 @@ class PasswordHistoryRepositoryImpl(IPasswordHistoryRepository):
             password_hash=entity.password_hash,
         )
 
-    async def create(self, history: PasswordHistory) -> PasswordHistory:
+    def _update_model(self, model: PasswordHistoryModel, entity: PasswordHistory) -> None:
+        """Update ORM model fields from entity.
+
+        PasswordHistory records are immutable after creation, so this is a no-op.
+        """
+        pass
+
+    async def add(self, history: PasswordHistory) -> PasswordHistory:
         """Create a new password history entry."""
         model = self._to_model(history)
         self._session.add(model)
