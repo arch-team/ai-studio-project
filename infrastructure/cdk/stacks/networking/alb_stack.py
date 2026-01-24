@@ -21,6 +21,7 @@ from aws_cdk import aws_wafv2 as wafv2
 
 from config import EnvironmentConfig, EnvironmentType
 from constructs import Construct
+from utils.outputs import create_output
 
 
 class AlbStack(cdk.Stack):
@@ -480,42 +481,31 @@ class AlbStack(cdk.Stack):
 
     def _create_outputs(self) -> None:
         """Create CloudFormation outputs for cross-stack references."""
-        # ALB DNS name
-        cdk.CfnOutput(
+        create_output(
             self,
             "AlbDnsName",
-            value=self._alb.load_balancer_dns_name,
-            description="ALB DNS name for frontend access",
-            export_name=f"{self.env_config.resource_prefix}-alb-dns",
+            self._alb.load_balancer_dns_name,
+            "ALB DNS name for frontend access",
+        )
+        create_output(
+            self, "AlbArn", self._alb.load_balancer_arn, "ALB ARN for reference"
         )
 
-        # ALB ARN
-        cdk.CfnOutput(
-            self,
-            "AlbArn",
-            value=self._alb.load_balancer_arn,
-            description="ALB ARN for reference",
-            export_name=f"{self.env_config.resource_prefix}-alb-arn",
-        )
-
-        # HTTPS Listener ARN (only if HTTPS is enabled)
         if self._https_listener:
-            cdk.CfnOutput(
+            create_output(
                 self,
                 "HttpsListenerArn",
-                value=self._https_listener.listener_arn,
-                description="HTTPS Listener ARN",
-                export_name=f"{self.env_config.resource_prefix}-https-listener-arn",
+                self._https_listener.listener_arn,
+                "HTTPS Listener ARN",
             )
         else:
-            # Output HTTP listener info for dev environment
-            cdk.CfnOutput(
+            create_output(
                 self,
                 "HttpListenerArn",
-                value=self._http_listener.listener_arn,
-                description="HTTP Listener ARN (dev environment - no TLS)",
-                export_name=f"{self.env_config.resource_prefix}-http-listener-arn",
+                self._http_listener.listener_arn,
+                "HTTP Listener ARN (dev environment - no TLS)",
             )
+            # Warning output without export_name (informational only)
             cdk.CfnOutput(
                 self,
                 "HttpOnlyWarning",
@@ -523,31 +513,23 @@ class AlbStack(cdk.Stack):
                 description="Security warning for HTTP-only configuration",
             )
 
-        # Backend Target Group ARN
-        cdk.CfnOutput(
+        create_output(
             self,
             "BackendTargetGroupArn",
-            value=self._backend_target_group.target_group_arn,
-            description="Backend API Target Group ARN",
-            export_name=f"{self.env_config.resource_prefix}-backend-tg-arn",
+            self._backend_target_group.target_group_arn,
+            "Backend API Target Group ARN",
         )
-
-        # Frontend Target Group ARN
-        cdk.CfnOutput(
+        create_output(
             self,
             "FrontendTargetGroupArn",
-            value=self._frontend_target_group.target_group_arn,
-            description="Frontend Target Group ARN",
-            export_name=f"{self.env_config.resource_prefix}-frontend-tg-arn",
+            self._frontend_target_group.target_group_arn,
+            "Frontend Target Group ARN",
         )
-
-        # Security Group ID
-        cdk.CfnOutput(
+        create_output(
             self,
             "SecurityGroupId",
-            value=self._security_group.security_group_id,
-            description="ALB Security Group ID",
-            export_name=f"{self.env_config.resource_prefix}-alb-sg-id",
+            self._security_group.security_group_id,
+            "ALB Security Group ID",
         )
 
     @property

@@ -23,18 +23,17 @@ Deployment Order:
 """
 
 # Layer 1: Foundation
-from .foundation.network_stack import NetworkStack
-from .foundation.iam_stack import IamStack
+# Layer 3: Compute
+from .compute.eks_stack import EksStack
+from .compute.hyperpod_addons_stack import HyperPodAddonsStack
+from .compute.sagemaker_hyperpod_stack import SagemakerHyperPodStack
 
 # Layer 2: Data
 from .data.database_stack import DatabaseStack
-from .data.storage_stack import StorageStack
 from .data.fsx_stack import FsxLustreStack
-
-# Layer 3: Compute
-from .compute.eks_stack import EksStack
-from .compute.sagemaker_hyperpod_stack import SagemakerHyperPodStack
-from .compute.hyperpod_addons_stack import HyperPodAddonsStack
+from .data.storage_stack import StorageStack
+from .foundation.iam_stack import IamStack
+from .foundation.network_stack import NetworkStack
 
 # Layer 4: Networking
 from .networking.alb_stack import AlbStack

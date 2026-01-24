@@ -12,6 +12,37 @@ from config.constants import TAG_KEYS
 from constructs import Construct
 
 
+def _build_tags_dict(
+    env_config: EnvironmentConfig,
+    resource_name: str,
+    component: str | None = None,
+    additional_tags: dict[str, str] | None = None,
+) -> dict[str, str]:
+    """Build a dictionary of tags for AWS resources (internal helper).
+
+    Args:
+        env_config: Environment configuration
+        resource_name: Name suffix for the resource
+        component: Optional component name for categorization
+        additional_tags: Additional tags to apply
+
+    Returns:
+        Dictionary of tag key-value pairs
+    """
+    tags = {
+        TAG_KEYS.NAME: f"{env_config.resource_prefix}-{resource_name}",
+        TAG_KEYS.MANAGED_BY: "cdk",
+    }
+
+    if component:
+        tags[TAG_KEYS.COMPONENT] = component
+
+    if additional_tags:
+        tags.update(additional_tags)
+
+    return tags
+
+
 def apply_standard_tags(
     resource: Construct,
     env_config: EnvironmentConfig,
@@ -31,14 +62,8 @@ def apply_standard_tags(
         resource_name: Name suffix for the resource
         additional_tags: Additional tags to apply
     """
-    tags = {
-        TAG_KEYS.NAME: f"{env_config.resource_prefix}-{resource_name}",
-        TAG_KEYS.ENVIRONMENT: env_config.name.value,
-        TAG_KEYS.MANAGED_BY: "cdk",
-    }
-
-    if additional_tags:
-        tags.update(additional_tags)
+    tags = _build_tags_dict(env_config, resource_name, additional_tags=additional_tags)
+    tags[TAG_KEYS.ENVIRONMENT] = env_config.name.value
 
     for key, value in tags.items():
         cdk.Tags.of(resource).add(key, value)
@@ -55,6 +80,18 @@ def apply_component_tag(
         component: Component name (e.g., 'training-operator', 'observability')
     """
     cdk.Tags.of(resource).add(TAG_KEYS.COMPONENT, component)
+
+
+def _dict_to_cfn_tags(tags: dict[str, str]) -> list[cdk.CfnTag]:
+    """Convert a dictionary of tags to a list of CfnTag objects.
+
+    Args:
+        tags: Dictionary of tag key-value pairs
+
+    Returns:
+        List of CfnTag objects
+    """
+    return [cdk.CfnTag(key=key, value=value) for key, value in tags.items()]
 
 
 def create_cfn_tags(
@@ -74,19 +111,9 @@ def create_cfn_tags(
     Returns:
         List of CfnTag objects
     """
-    tags = [
-        cdk.CfnTag(
-            key=TAG_KEYS.NAME, value=f"{env_config.resource_prefix}-{resource_name}"
-        ),
-        cdk.CfnTag(key=TAG_KEYS.ENVIRONMENT, value=env_config.name.value),
-        cdk.CfnTag(key=TAG_KEYS.MANAGED_BY, value="cdk"),
-    ]
-
-    if additional_tags:
-        for key, value in additional_tags.items():
-            tags.append(cdk.CfnTag(key=key, value=value))
-
-    return tags
+    tags = _build_tags_dict(env_config, resource_name, additional_tags=additional_tags)
+    tags[TAG_KEYS.ENVIRONMENT] = env_config.name.value
+    return _dict_to_cfn_tags(tags)
 
 
 def create_addon_tags(
@@ -104,10 +131,5 @@ def create_addon_tags(
     Returns:
         List of CfnTag objects for the add-on
     """
-    return [
-        cdk.CfnTag(
-            key=TAG_KEYS.NAME, value=f"{env_config.resource_prefix}-{addon_name}"
-        ),
-        cdk.CfnTag(key=TAG_KEYS.COMPONENT, value=component),
-        cdk.CfnTag(key=TAG_KEYS.MANAGED_BY, value="cdk"),
-    ]
+    tags = _build_tags_dict(env_config, addon_name, component=component)
+    return _dict_to_cfn_tags(tags)

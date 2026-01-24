@@ -14,6 +14,7 @@ from aws_cdk import aws_ec2 as ec2
 
 from config import DeploymentMode, EnvironmentConfig
 from constructs import Construct
+from utils.outputs import create_output
 
 
 class NetworkStack(cdk.Stack):
@@ -239,58 +240,31 @@ class NetworkStack(cdk.Stack):
 
     def _create_outputs(self) -> None:
         """Create CloudFormation outputs for cross-stack references."""
-        # VPC ID
-        cdk.CfnOutput(
-            self,
-            "VpcId",
-            value=self.vpc.vpc_id,
-            description="VPC ID",
-            export_name=f"{self.env_config.resource_prefix}-vpc-id",
-        )
-
-        # VPC CIDR
-        cdk.CfnOutput(
-            self,
-            "VpcCidr",
-            value=self.vpc.vpc_cidr_block,
-            description="VPC CIDR block",
-            export_name=f"{self.env_config.resource_prefix}-vpc-cidr",
-        )
-
-        # Public subnet IDs
-        cdk.CfnOutput(
+        create_output(self, "VpcId", self.vpc.vpc_id, "VPC ID")
+        create_output(self, "VpcCidr", self.vpc.vpc_cidr_block, "VPC CIDR block")
+        create_output(
             self,
             "PublicSubnetIds",
-            value=",".join([s.subnet_id for s in self.vpc.public_subnets]),
-            description="Public subnet IDs",
-            export_name=f"{self.env_config.resource_prefix}-public-subnet-ids",
+            ",".join([s.subnet_id for s in self.vpc.public_subnets]),
+            "Public subnet IDs",
         )
-
-        # Private App subnet IDs
-        cdk.CfnOutput(
+        create_output(
             self,
             "PrivateAppSubnetIds",
-            value=",".join([s.subnet_id for s in self.vpc.private_subnets]),
-            description="Private app layer subnet IDs",
-            export_name=f"{self.env_config.resource_prefix}-private-app-subnet-ids",
+            ",".join([s.subnet_id for s in self.vpc.private_subnets]),
+            "Private app layer subnet IDs",
         )
-
-        # Private Data subnet IDs (isolated subnets)
-        cdk.CfnOutput(
+        create_output(
             self,
             "PrivateDataSubnetIds",
-            value=",".join([s.subnet_id for s in self.vpc.isolated_subnets]),
-            description="Private data layer subnet IDs",
-            export_name=f"{self.env_config.resource_prefix}-private-data-subnet-ids",
+            ",".join([s.subnet_id for s in self.vpc.isolated_subnets]),
+            "Private data layer subnet IDs",
         )
-
-        # VPC Endpoint Security Group ID
-        cdk.CfnOutput(
+        create_output(
             self,
             "VpcEndpointSecurityGroupId",
-            value=self._vpc_endpoint_sg.security_group_id,
-            description="VPC endpoint security group ID",
-            export_name=f"{self.env_config.resource_prefix}-vpce-sg-id",
+            self._vpc_endpoint_sg.security_group_id,
+            "VPC endpoint security group ID",
         )
 
     @property

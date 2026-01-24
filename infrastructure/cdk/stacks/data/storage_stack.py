@@ -21,6 +21,7 @@ from aws_cdk import aws_s3 as s3
 from config import EnvironmentConfig
 from constructs import Construct
 from utils import LifecycleRuleBuilder
+from utils.outputs import create_output
 
 
 class StorageStack(cdk.Stack):
@@ -265,51 +266,43 @@ class StorageStack(cdk.Stack):
     def _create_outputs(self) -> None:
         """创建 CloudFormation 输出用于跨 Stack 引用。"""
         # Datasets bucket
-        cdk.CfnOutput(
+        create_output(
             self,
             "DatasetsBucketName",
-            value=self._datasets_bucket.bucket_name,
-            description="S3 bucket name for training datasets",
-            export_name=f"{self.env_config.resource_prefix}-datasets-bucket",
+            self._datasets_bucket.bucket_name,
+            "S3 bucket name for training datasets",
         )
-        cdk.CfnOutput(
+        create_output(
             self,
             "DatasetsBucketArn",
-            value=self._datasets_bucket.bucket_arn,
-            description="S3 bucket ARN for training datasets",
-            export_name=f"{self.env_config.resource_prefix}-datasets-bucket-arn",
+            self._datasets_bucket.bucket_arn,
+            "S3 bucket ARN for training datasets",
         )
-
         # Models bucket
-        cdk.CfnOutput(
+        create_output(
             self,
             "ModelsBucketName",
-            value=self._models_bucket.bucket_name,
-            description="S3 bucket name for model artifacts",
-            export_name=f"{self.env_config.resource_prefix}-models-bucket",
+            self._models_bucket.bucket_name,
+            "S3 bucket name for model artifacts",
         )
-        cdk.CfnOutput(
+        create_output(
             self,
             "ModelsBucketArn",
-            value=self._models_bucket.bucket_arn,
-            description="S3 bucket ARN for model artifacts",
-            export_name=f"{self.env_config.resource_prefix}-models-bucket-arn",
+            self._models_bucket.bucket_arn,
+            "S3 bucket ARN for model artifacts",
         )
-
         # Checkpoints bucket
-        cdk.CfnOutput(
+        create_output(
             self,
             "CheckpointsBucketName",
-            value=self._checkpoints_bucket.bucket_name,
-            description="S3 bucket name for training checkpoints",
-            export_name=f"{self.env_config.resource_prefix}-checkpoints-bucket",
+            self._checkpoints_bucket.bucket_name,
+            "S3 bucket name for training checkpoints",
         )
-        cdk.CfnOutput(
+        create_output(
             self,
             "CheckpointsBucketArn",
-            value=self._checkpoints_bucket.bucket_arn,
-            description="S3 bucket ARN for training checkpoints",
-            export_name=f"{self.env_config.resource_prefix}-checkpoints-bucket-arn",
+            self._checkpoints_bucket.bucket_arn,
+            "S3 bucket ARN for training checkpoints",
         )
 
     @property

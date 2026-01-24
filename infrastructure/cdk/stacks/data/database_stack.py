@@ -18,6 +18,7 @@ from aws_cdk import aws_secretsmanager as secretsmanager
 
 from config import EnvironmentConfig
 from constructs import Construct
+from utils.outputs import create_output
 
 
 class DatabaseStack(cdk.Stack):
@@ -293,60 +294,40 @@ class DatabaseStack(cdk.Stack):
 
     def _create_outputs(self) -> None:
         """创建 CloudFormation 输出用于跨 Stack 引用。"""
-        # Cluster endpoint
-        cdk.CfnOutput(
+        create_output(
             self,
             "ClusterEndpoint",
-            value=self._cluster.cluster_endpoint.hostname,
-            description="Aurora cluster writer endpoint",
-            export_name=f"{self.env_config.resource_prefix}-aurora-endpoint",
+            self._cluster.cluster_endpoint.hostname,
+            "Aurora cluster writer endpoint",
         )
-
-        # Reader endpoint
-        cdk.CfnOutput(
+        create_output(
             self,
             "ReaderEndpoint",
-            value=self._cluster.cluster_read_endpoint.hostname,
-            description="Aurora cluster reader endpoint",
-            export_name=f"{self.env_config.resource_prefix}-aurora-reader-endpoint",
+            self._cluster.cluster_read_endpoint.hostname,
+            "Aurora cluster reader endpoint",
         )
-
-        # Port
-        cdk.CfnOutput(
+        create_output(
             self,
             "Port",
-            value=str(self._cluster.cluster_endpoint.port),
-            description="Aurora cluster port",
-            export_name=f"{self.env_config.resource_prefix}-aurora-port",
+            str(self._cluster.cluster_endpoint.port),
+            "Aurora cluster port",
         )
-
-        # Secret ARN
         if self._secret:
-            cdk.CfnOutput(
+            create_output(
                 self,
                 "SecretArn",
-                value=self._secret.secret_arn,
-                description="Secrets Manager secret ARN for database credentials",
-                export_name=f"{self.env_config.resource_prefix}-aurora-secret-arn",
+                self._secret.secret_arn,
+                "Secrets Manager secret ARN for database credentials",
             )
-
-        # Proxy endpoint (if enabled)
         if self._proxy:
-            cdk.CfnOutput(
-                self,
-                "ProxyEndpoint",
-                value=self._proxy.endpoint,
-                description="RDS Proxy endpoint",
-                export_name=f"{self.env_config.resource_prefix}-aurora-proxy-endpoint",
+            create_output(
+                self, "ProxyEndpoint", self._proxy.endpoint, "RDS Proxy endpoint"
             )
-
-        # Security group ID
-        cdk.CfnOutput(
+        create_output(
             self,
             "SecurityGroupId",
-            value=self._security_group.security_group_id,
-            description="Aurora security group ID",
-            export_name=f"{self.env_config.resource_prefix}-aurora-sg-id",
+            self._security_group.security_group_id,
+            "Aurora security group ID",
         )
 
     @property

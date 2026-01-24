@@ -14,6 +14,38 @@ from config import EnvironmentConfig
 from constructs import Construct
 
 
+def _apply_role_configuration(
+    role: iam.Role,
+    env_config: EnvironmentConfig,
+    role_name_suffix: str,
+    managed_policies: list[str] | None = None,
+    additional_tags: dict[str, str] | None = None,
+) -> None:
+    """Apply common configuration to an IAM role (internal helper).
+
+    Args:
+        role: The IAM role to configure
+        env_config: Environment configuration
+        role_name_suffix: Suffix for the role name (used in tags)
+        managed_policies: List of AWS managed policy names to attach
+        additional_tags: Additional tags to apply
+    """
+    # Attach managed policies
+    if managed_policies:
+        for policy_name in managed_policies:
+            role.add_managed_policy(
+                iam.ManagedPolicy.from_aws_managed_policy_name(policy_name)
+            )
+
+    # Apply standard tags
+    cdk.Tags.of(role).add("Name", f"{env_config.resource_prefix}-{role_name_suffix}")
+
+    # Apply additional tags
+    if additional_tags:
+        for key, value in additional_tags.items():
+            cdk.Tags.of(role).add(key, value)
+
+
 def create_tagged_role(
     scope: Construct,
     construct_id: str,
@@ -47,20 +79,9 @@ def create_tagged_role(
         assumed_by=assumed_by,
     )
 
-    # Attach managed policies
-    if managed_policies:
-        for policy_name in managed_policies:
-            role.add_managed_policy(
-                iam.ManagedPolicy.from_aws_managed_policy_name(policy_name)
-            )
-
-    # Apply standard tags
-    cdk.Tags.of(role).add("Name", f"{env_config.resource_prefix}-{role_name_suffix}")
-
-    # Apply additional tags
-    if additional_tags:
-        for key, value in additional_tags.items():
-            cdk.Tags.of(role).add(key, value)
+    _apply_role_configuration(
+        role, env_config, role_name_suffix, managed_policies, additional_tags
+    )
 
     return role
 
@@ -121,22 +142,14 @@ def create_pod_identity_role(
 
     # Override with proper trust policy including sts:TagSession
     cfn_role = role.node.default_child
-    cfn_role.assume_role_policy_document = create_pod_identity_trust_policy().to_json()
+    if cfn_role is not None:
+        cfn_role.assume_role_policy_document = (  # type: ignore[attr-defined]
+            create_pod_identity_trust_policy().to_json()
+        )
 
-    # Attach managed policies
-    if managed_policies:
-        for policy_name in managed_policies:
-            role.add_managed_policy(
-                iam.ManagedPolicy.from_aws_managed_policy_name(policy_name)
-            )
-
-    # Apply standard tags
-    cdk.Tags.of(role).add("Name", f"{env_config.resource_prefix}-{role_name_suffix}")
-
-    # Apply additional tags
-    if additional_tags:
-        for key, value in additional_tags.items():
-            cdk.Tags.of(role).add(key, value)
+    _apply_role_configuration(
+        role, env_config, role_name_suffix, managed_policies, additional_tags
+    )
 
     return role
 

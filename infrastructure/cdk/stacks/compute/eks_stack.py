@@ -23,14 +23,19 @@ from aws_cdk import aws_iam as iam
 from aws_cdk import aws_s3_assets as s3_assets
 from aws_cdk.lambda_layer_kubectl_v33 import KubectlV33Layer
 
+from cdk_constructs.gpu_node_group import create_default_gpu_node_groups
 from config import EnvironmentConfig
 from config.constants import EKS_ADDON_NAMES
 from constructs import Construct
+from utils.outputs import create_output
 
 # Path to the HyperPod Helm Chart (relative to this file)
 # File location: stacks/compute/eks_stack.py -> resources/helm_charts/
 HELM_CHART_PATH = (
-    Path(__file__).parent.parent.parent / "resources" / "helm_charts" / "HyperPodHelmChart"
+    Path(__file__).parent.parent.parent
+    / "resources"
+    / "helm_charts"
+    / "HyperPodHelmChart"
 )
 
 
@@ -80,6 +85,16 @@ class EksStack(cdk.Stack):
 
         # Create System Node Group for control plane workloads
         self._create_system_node_group()
+
+        # Create GPU Node Groups (P4d, P5, Trn1)
+        self._gpu_node_groups = create_default_gpu_node_groups(
+            scope=self,
+            env_config=self.env_config,
+            eks_cluster=self._eks_cluster,
+            node_role=self._eks_node_role,
+            subnets=ec2.SubnetSelection(subnet_type=ec2.SubnetType.PRIVATE_WITH_EGRESS),
+            vpc=self._vpc,
+        )
 
         # Install EKS add-ons (including cert-manager community add-on)
         self._install_eks_addons()
@@ -462,65 +477,43 @@ class EksStack(cdk.Stack):
 
     def _create_outputs(self) -> None:
         """创建 CloudFormation 输出用于跨 Stack 引用。"""
-        # EKS Cluster outputs
-        cdk.CfnOutput(
-            self,
-            "EksClusterName",
-            value=self._eks_cluster.cluster_name,
-            description="EKS cluster name",
-            export_name=f"{self.env_config.resource_prefix}-eks-cluster-name",
+        create_output(
+            self, "EksClusterName", self._eks_cluster.cluster_name, "EKS cluster name"
         )
-
-        cdk.CfnOutput(
-            self,
-            "EksClusterArn",
-            value=self._eks_cluster.cluster_arn,
-            description="EKS cluster ARN",
-            export_name=f"{self.env_config.resource_prefix}-eks-cluster-arn",
+        create_output(
+            self, "EksClusterArn", self._eks_cluster.cluster_arn, "EKS cluster ARN"
         )
-
-        cdk.CfnOutput(
+        create_output(
             self,
             "EksClusterEndpoint",
-            value=self._eks_cluster.cluster_endpoint,
-            description="EKS cluster API endpoint",
-            export_name=f"{self.env_config.resource_prefix}-eks-endpoint",
+            self._eks_cluster.cluster_endpoint,
+            "EKS cluster API endpoint",
         )
-
-        cdk.CfnOutput(
+        create_output(
             self,
             "EksClusterSecurityGroupId",
-            value=self._eks_cluster.cluster_security_group_id,
-            description="EKS cluster security group ID",
-            export_name=f"{self.env_config.resource_prefix}-eks-sg-id",
+            self._eks_cluster.cluster_security_group_id,
+            "EKS cluster security group ID",
         )
-
-        cdk.CfnOutput(
+        create_output(
             self,
             "EksOidcProviderArn",
-            value=self._eks_cluster.open_id_connect_provider.open_id_connect_provider_arn,
-            description="EKS OIDC provider ARN for IRSA",
-            export_name=f"{self.env_config.resource_prefix}-eks-oidc-arn",
+            self._eks_cluster.open_id_connect_provider.open_id_connect_provider_arn,
+            "EKS OIDC provider ARN for IRSA",
         )
-
-        # Output kubeconfig command
+        # Informational outputs (no export_name needed)
         cdk.CfnOutput(
             self,
             "KubeconfigCommand",
             value=f"aws eks update-kubeconfig --name {self._eks_cluster.cluster_name} --region {self.env_config.region}",
             description="Command to configure kubectl",
         )
-
-        # cert-manager add-on output
-        cdk.CfnOutput(
+        create_output(
             self,
             "CertManagerAddonName",
-            value=EKS_ADDON_NAMES.CERT_MANAGER,
-            description="cert-manager EKS add-on name",
-            export_name=f"{self.env_config.resource_prefix}-cert-manager-addon",
+            EKS_ADDON_NAMES.CERT_MANAGER,
+            "cert-manager EKS add-on name",
         )
-
-        # Output Helm Chart installation status
         cdk.CfnOutput(
             self,
             "HelmChartStatus",

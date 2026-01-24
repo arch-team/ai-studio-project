@@ -13,6 +13,7 @@ from aws_cdk import aws_iam as iam
 
 from config import EnvironmentConfig
 from constructs import Construct
+from utils.outputs import create_output
 
 
 class IamStack(cdk.Stack):
@@ -407,38 +408,29 @@ class IamStack(cdk.Stack):
 
     def _create_outputs(self) -> None:
         """Create CloudFormation outputs for cross-stack references."""
-        # EKS Node Role
-        cdk.CfnOutput(
+        create_output(
             self,
             "EksNodeRoleArn",
-            value=self._eks_node_role.role_arn,
-            description="ARN of EKS node instance role",
-            export_name=f"{self.env_config.resource_prefix}-eks-node-role-arn",
+            self._eks_node_role.role_arn,
+            "ARN of EKS node instance role",
         )
-        cdk.CfnOutput(
+        create_output(
             self,
             "EksNodeRoleName",
-            value=self._eks_node_role.role_name,
-            description="Name of EKS node instance role",
-            export_name=f"{self.env_config.resource_prefix}-eks-node-role-name",
+            self._eks_node_role.role_name,
+            "Name of EKS node instance role",
         )
-
-        # Training Execution Role
-        cdk.CfnOutput(
+        create_output(
             self,
             "TrainingExecutionRoleArn",
-            value=self._training_execution_role.role_arn,
-            description="ARN of training job execution role",
-            export_name=f"{self.env_config.resource_prefix}-training-execution-role-arn",
+            self._training_execution_role.role_arn,
+            "ARN of training job execution role",
         )
-
-        # Backend Service Role
-        cdk.CfnOutput(
+        create_output(
             self,
             "BackendServiceRoleArn",
-            value=self._backend_service_role.role_arn,
-            description="ARN of backend service role",
-            export_name=f"{self.env_config.resource_prefix}-backend-service-role-arn",
+            self._backend_service_role.role_arn,
+            "ARN of backend service role",
         )
 
     @property

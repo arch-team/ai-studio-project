@@ -23,6 +23,7 @@ from aws_cdk import aws_s3 as s3
 
 from config import EnvironmentConfig
 from constructs import Construct
+from utils.outputs import create_output
 
 
 class FsxLustreStack(cdk.Stack):
@@ -315,63 +316,40 @@ class FsxLustreStack(cdk.Stack):
 
     def _create_outputs(self) -> None:
         """Create CloudFormation outputs for cross-stack references."""
-        # File System ID
-        cdk.CfnOutput(
-            self,
-            "FileSystemId",
-            value=self._file_system.ref,
-            description="FSx for Lustre file system ID",
-            export_name=f"{self.env_config.resource_prefix}-fsx-id",
+        create_output(
+            self, "FileSystemId", self._file_system.ref, "FSx for Lustre file system ID"
         )
-
-        # DNS Name (constructed from file system ID and region)
         dns_name = f"{self._file_system.ref}.fsx.{self.region}.amazonaws.com"
-        cdk.CfnOutput(
-            self,
-            "FileSystemDnsName",
-            value=dns_name,
-            description="FSx for Lustre DNS name for mounting",
-            export_name=f"{self.env_config.resource_prefix}-fsx-dns",
+        create_output(
+            self, "FileSystemDnsName", dns_name, "FSx for Lustre DNS name for mounting"
         )
-
-        # Mount Name output (using full Lustre mount name)
-        cdk.CfnOutput(
+        create_output(
             self,
             "FileSystemMountName",
-            value=self._file_system.attr_lustre_mount_name,
-            description="FSx for Lustre mount name",
-            export_name=f"{self.env_config.resource_prefix}-fsx-mount",
+            self._file_system.attr_lustre_mount_name,
+            "FSx for Lustre mount name",
         )
-
-        # Security Group ID
-        cdk.CfnOutput(
+        create_output(
             self,
             "SecurityGroupId",
-            value=self._security_group.security_group_id,
-            description="FSx security group ID",
-            export_name=f"{self.env_config.resource_prefix}-fsx-sg-id",
+            self._security_group.security_group_id,
+            "FSx security group ID",
         )
-
-        # Storage Capacity
         storage_capacity = self._get_validated_storage_capacity()
-        cdk.CfnOutput(
+        create_output(
             self,
             "StorageCapacityGiB",
-            value=str(storage_capacity),
-            description="FSx storage capacity in GiB",
-            export_name=f"{self.env_config.resource_prefix}-fsx-capacity",
+            str(storage_capacity),
+            "FSx storage capacity in GiB",
         )
-
-        # Calculated Throughput
         throughput_mbps = (
             storage_capacity // 1024
         ) * self.env_config.storage.fsx_throughput_per_tb
-        cdk.CfnOutput(
+        create_output(
             self,
             "TotalThroughputMBps",
-            value=str(throughput_mbps),
-            description="FSx total throughput in MB/s",
-            export_name=f"{self.env_config.resource_prefix}-fsx-throughput",
+            str(throughput_mbps),
+            "FSx total throughput in MB/s",
         )
 
     @property

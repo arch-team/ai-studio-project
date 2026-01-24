@@ -177,8 +177,11 @@ class GpuNodeGroupConstruct(Construct):
         """
         config = self._node_group_config
 
-        # Select subnets from VPC
-        selected_subnets = self._vpc.select_subnets(**subnets.__dict__)
+        # Select subnets from VPC using subnet_type
+        subnet_type = getattr(
+            subnets, "subnet_type", ec2.SubnetType.PRIVATE_WITH_EGRESS
+        )
+        selected_subnets = self._vpc.select_subnets(subnet_type=subnet_type)
         subnet_ids = [subnet.subnet_id for subnet in selected_subnets.subnets]
 
         # Prepare labels with GPU-specific labels
@@ -239,12 +242,10 @@ class GpuNodeGroupConstruct(Construct):
             update_config=eks.CfnNodegroup.UpdateConfigProperty(
                 max_unavailable=1,  # Rolling update with minimal disruption
             ),
-            # Tags
+            # Tags (static keys only - dynamic cluster name tags applied separately)
             tags={
                 "Name": f"{self.env_config.resource_prefix}-{config.name}",
-                "kubernetes.io/cluster/{cluster_name}": "owned",
                 "k8s.io/cluster-autoscaler/enabled": "true",
-                f"k8s.io/cluster-autoscaler/{eks_cluster.cluster_name}": "owned",
             },
         )
 
