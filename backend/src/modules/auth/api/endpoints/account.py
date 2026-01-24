@@ -13,22 +13,8 @@ from src.modules.auth.api.schemas import (
     UserResponse,
 )
 from src.modules.auth.application.services import AccountService
-from src.modules.auth.domain.entities import User
 
 router = APIRouter()
-
-
-def _create_user_response(user: User) -> UserResponse:
-    """从 User 实体创建 UserResponse."""
-    return UserResponse(
-        id=user.id,
-        username=user.username,
-        email=user.email,
-        display_name=user.display_name,
-        role=user.role.value,
-        status=user.status.value,
-        auth_type=user.auth_type.value,
-    )
 
 
 @router.post(
@@ -58,7 +44,7 @@ async def create_local_account(
         role=account_data.role,
         display_name=account_data.display_name,
     )
-    return _create_user_response(user)
+    return UserResponse.from_entity(user)
 
 
 @router.post(

@@ -202,6 +202,34 @@ class AuditLogRepositoryImpl(IAuditLogRepository):
         )
         return result.scalar() or 0
 
+    async def count_by_resource(
+        self,
+        resource_type: ResourceType,
+        resource_id: str,
+    ) -> int:
+        """Count audit logs for a specific resource."""
+        result = await self._session.execute(
+            select(func.count()).where(
+                AuditLogModel.resource_type == ModelResourceType(resource_type.value),
+                AuditLogModel.resource_id == resource_id,
+            )
+        )
+        return result.scalar() or 0
+
+    async def count_by_date_range(
+        self,
+        start_date: datetime,
+        end_date: datetime,
+    ) -> int:
+        """Count audit logs within a date range."""
+        result = await self._session.execute(
+            select(func.count()).where(
+                AuditLogModel.created_at >= start_date,
+                AuditLogModel.created_at <= end_date,
+            )
+        )
+        return result.scalar() or 0
+
     async def count_total(self) -> int:
         """Count total audit logs."""
         result = await self._session.execute(

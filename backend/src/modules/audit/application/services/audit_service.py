@@ -85,3 +85,25 @@ class AuditService:
     async def count_user_logs(self, user_id: int) -> int:
         """获取指定用户的审计日志数量."""
         return await self._repository.count_by_user_id(user_id)
+
+    async def count_resource_logs(
+        self,
+        resource_type: ResourceType,
+        resource_id: str,
+    ) -> int:
+        """获取指定资源的审计日志数量."""
+        return await self._repository.count_by_resource(
+            resource_type=resource_type,
+            resource_id=resource_id,
+        )
+
+    async def count_logs_by_date_range(
+        self,
+        start_date: datetime,
+        end_date: datetime,
+    ) -> int:
+        """获取日期范围内的审计日志数量."""
+        return await self._repository.count_by_date_range(
+            start_date=start_date,
+            end_date=end_date,
+        )

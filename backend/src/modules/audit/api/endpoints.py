@@ -70,8 +70,10 @@ async def _get_logs_by_resource(
             limit=page_size,
             offset=offset,
         )
-        # TODO: 添加资源计数方法
-        total = len(logs)
+        total = await service.count_resource_logs(
+            resource_type=rt,
+            resource_id=resource_id,
+        )
         return logs, total
     except ValueError:
         return [], 0
@@ -91,8 +93,10 @@ async def _get_logs_by_date_range(
         limit=page_size,
         offset=offset,
     )
-    # TODO: 添加日期范围计数方法
-    total = len(logs)
+    total = await service.count_logs_by_date_range(
+        start_date=start_date,
+        end_date=end_date,
+    )
     return logs, total
 
 

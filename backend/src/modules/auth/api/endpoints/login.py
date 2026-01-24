@@ -36,19 +36,6 @@ def _get_client_ip(request: Request) -> str:
     return request.client.host if request.client else "unknown"
 
 
-def _create_user_response(user: User) -> UserResponse:
-    """从 User 实体创建 UserResponse."""
-    return UserResponse(
-        id=user.id,
-        username=user.username,
-        email=user.email,
-        display_name=user.display_name,
-        role=user.role.value,
-        status=user.status.value,
-        auth_type=user.auth_type.value,
-    )
-
-
 def _create_login_response(user: User, tokens: TokenPair) -> LoginResponse:
     """从 User 实体和 TokenPair 创建 LoginResponse."""
     return LoginResponse(
@@ -58,7 +45,7 @@ def _create_login_response(user: User, tokens: TokenPair) -> LoginResponse:
             token_type=tokens.token_type,
             expires_in=tokens.expires_in,
         ),
-        user=_create_user_response(user),
+        user=UserResponse.from_entity(user),
     )
 
 
@@ -259,4 +246,4 @@ async def get_current_user_info(
             detail="User not found",
         )
 
-    return _create_user_response(user)
+    return UserResponse.from_entity(user)

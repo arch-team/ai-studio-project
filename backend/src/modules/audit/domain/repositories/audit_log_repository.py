@@ -59,5 +59,21 @@ class IAuditLogRepository(IRepository[AuditLog]):
         """Count audit logs for a specific user."""
 
     @abstractmethod
+    async def count_by_resource(
+        self,
+        resource_type: ResourceType,
+        resource_id: str,
+    ) -> int:
+        """Count audit logs for a specific resource."""
+
+    @abstractmethod
+    async def count_by_date_range(
+        self,
+        start_date: datetime,
+        end_date: datetime,
+    ) -> int:
+        """Count audit logs within a date range."""
+
+    @abstractmethod
     async def count_total(self) -> int:
         """Count total audit logs."""

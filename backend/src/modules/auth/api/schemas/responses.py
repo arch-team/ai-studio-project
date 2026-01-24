@@ -1,6 +1,11 @@
 """Authentication response schemas."""
 
+from typing import TYPE_CHECKING
+
 from pydantic import BaseModel, Field
+
+if TYPE_CHECKING:
+    from src.modules.auth.domain.entities import User
 
 
 class TokenResponse(BaseModel):
@@ -22,6 +27,19 @@ class UserResponse(BaseModel):
     role: str = Field(..., description="User role")
     status: str = Field(..., description="User status")
     auth_type: str = Field(..., description="Authentication type")
+
+    @classmethod
+    def from_entity(cls, user: "User") -> "UserResponse":
+        """从 User 实体创建响应."""
+        return cls(
+            id=user.id,
+            username=user.username,
+            email=user.email,
+            display_name=user.display_name,
+            role=user.role.value,
+            status=user.status.value,
+            auth_type=user.auth_type.value,
+        )
 
 
 class LoginResponse(BaseModel):
