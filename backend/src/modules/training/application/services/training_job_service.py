@@ -60,11 +60,25 @@ class TrainingJobService(BaseService[TrainingJob, int]):
         Returns:
             TrainingJob: 训练任务实体
         """
-        # Map enums (convert to uppercase for domain layer)
-        distribution_strategy = DistributionStrategy(
-            data.get("distribution_strategy", "DDP").upper()
+        # 使用 EnumMapper 统一处理枚举转换
+        from src.shared.utils import EnumMapper
+
+        distribution_strategy = EnumMapper.from_string(
+            data.get("distribution_strategy", "DDP"),
+            DistributionStrategy,
+            DistributionStrategy.DDP
         )
-        priority = JobPriority(data.get("priority", "MEDIUM").upper())
+        priority = EnumMapper.from_string(
+            data.get("priority", "MEDIUM"),
+            JobPriority,
+            JobPriority.MEDIUM
+        )
+
+        # 提取默认值常量
+        DEFAULT_NODE_COUNT = 1
+        DEFAULT_TASKS_PER_NODE = 1
+        DEFAULT_DATA_MOUNT = "/data"
+        DEFAULT_CHECKPOINT_MOUNT = "/checkpoints"
 
         return TrainingJob(
             id=0,
@@ -75,12 +89,12 @@ class TrainingJobService(BaseService[TrainingJob, int]):
             entrypoint_command=data["entrypoint_command"],
             display_name=data.get("display_name"),
             description=data.get("description"),
-            node_count=data.get("node_count", 1),
-            tasks_per_node=data.get("tasks_per_node", 1),
+            node_count=data.get("node_count", DEFAULT_NODE_COUNT),
+            tasks_per_node=data.get("tasks_per_node", DEFAULT_TASKS_PER_NODE),
             environment_variables=data.get("environment_variables"),
             dataset_id=data.get("dataset_id"),
-            data_mount_path=data.get("data_mount_path", "/data"),
-            checkpoint_mount_path=data.get("checkpoint_mount_path", "/checkpoints"),
+            data_mount_path=data.get("data_mount_path", DEFAULT_DATA_MOUNT),
+            checkpoint_mount_path=data.get("checkpoint_mount_path", DEFAULT_CHECKPOINT_MOUNT),
             checkpoint_interval=data.get("checkpoint_interval"),
             hyperparameters=data.get("hyperparameters"),
             max_epochs=data.get("max_epochs"),

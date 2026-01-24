@@ -128,24 +128,21 @@ class HyperPodClient(IHyperPodClient):
 
     async def describe_cluster(self, cluster_name: str) -> dict[str, Any]:
         """Get cluster details using boto3 SageMaker API."""
-
-        def _describe() -> dict[str, Any]:
-            return self._sagemaker_client.describe_cluster(ClusterName=cluster_name)
-
-        return await self._run_in_executor(_describe)
+        return await self._run_in_executor(
+            lambda: self._sagemaker_client.describe_cluster(ClusterName=cluster_name)
+        )
 
     async def list_clusters(
         self, max_results: int = 100, next_token: str | None = None
     ) -> dict[str, Any]:
         """List all HyperPod clusters."""
+        params: dict[str, Any] = {"MaxResults": max_results}
+        if next_token:
+            params["NextToken"] = next_token
 
-        def _list() -> dict[str, Any]:
-            params: dict[str, Any] = {"MaxResults": max_results}
-            if next_token:
-                params["NextToken"] = next_token
-            return self._sagemaker_client.list_clusters(**params)
-
-        return await self._run_in_executor(_list)
+        return await self._run_in_executor(
+            lambda: self._sagemaker_client.list_clusters(**params)
+        )
 
     async def delete_cluster(self, cluster_name: str) -> dict[str, Any]:
         """Delete a HyperPod cluster."""

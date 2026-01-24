@@ -171,6 +171,24 @@ class CheckpointService(BaseService[Checkpoint, int]):
 
         return checkpoints
 
+    async def _safe_create_checkpoint(
+        self,
+        job_id: int,
+        trigger_type: CheckpointTriggerType,
+        checkpoint_name: str | None = None,
+        metrics: dict | None = None,
+    ) -> Checkpoint | None:
+        """安全创建检查点 - 错误时返回 None 而不是抛出异常."""
+        try:
+            return await self.create_checkpoint(
+                job_id=job_id,
+                trigger_type=trigger_type,
+                checkpoint_name=checkpoint_name,
+                metrics=metrics,
+            )
+        except (TrainingJobNotFoundError, InvalidJobStateError, CheckpointStorageError):
+            return None
+
     async def create_checkpoint_on_interrupt(self, job_id: int) -> Checkpoint | None:
         """训练中断时创建检查点
 
@@ -180,13 +198,10 @@ class CheckpointService(BaseService[Checkpoint, int]):
         Returns:
             Checkpoint | None: 创建的检查点，失败返回 None
         """
-        try:
-            return await self.create_checkpoint(
-                job_id=job_id,
-                trigger_type=CheckpointTriggerType.INTERRUPT,
-            )
-        except (TrainingJobNotFoundError, InvalidJobStateError, CheckpointStorageError):
-            return None
+        return await self._safe_create_checkpoint(
+            job_id=job_id,
+            trigger_type=CheckpointTriggerType.INTERRUPT,
+        )
 
     async def create_checkpoint_on_node_failure(
         self,
@@ -204,16 +219,13 @@ class CheckpointService(BaseService[Checkpoint, int]):
         Returns:
             Checkpoint | None: 创建的检查点，失败返回 None
         """
-        try:
-            checkpoint_name = f"node-failure-{pod_name}-{utc_now().strftime('%Y%m%d%H%M%S')}"
-            return await self.create_checkpoint(
-                job_id=job_id,
-                trigger_type=CheckpointTriggerType.NODE_FAILURE,
-                checkpoint_name=checkpoint_name,
-                metrics={"failed_pod": pod_name},
-            )
-        except (TrainingJobNotFoundError, InvalidJobStateError, CheckpointStorageError):
-            return None
+        checkpoint_name = f"node-failure-{pod_name}-{utc_now().strftime('%Y%m%d%H%M%S')}"
+        return await self._safe_create_checkpoint(
+            job_id=job_id,
+            trigger_type=CheckpointTriggerType.NODE_FAILURE,
+            checkpoint_name=checkpoint_name,
+            metrics={"failed_pod": pod_name},
+        )
 
     async def create_checkpoint_on_preemption(
         self,
@@ -232,13 +244,10 @@ class CheckpointService(BaseService[Checkpoint, int]):
             Checkpoint | None: 创建的检查点，失败返回 None
         """
         # TODO: 实现超时控制逻辑
-        try:
-            return await self.create_checkpoint(
-                job_id=job_id,
-                trigger_type=CheckpointTriggerType.PREEMPTION,
-            )
-        except (TrainingJobNotFoundError, InvalidJobStateError, CheckpointStorageError):
-            return None
+        return await self._safe_create_checkpoint(
+            job_id=job_id,
+            trigger_type=CheckpointTriggerType.PREEMPTION,
+        )
 
     # =========================================================================
     # 原有方法 (保留兼容性)

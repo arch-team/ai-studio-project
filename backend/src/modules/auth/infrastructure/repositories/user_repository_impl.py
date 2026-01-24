@@ -1,9 +1,9 @@
 """User Repository Implementation - SQLAlchemy data access for users."""
 
-from sqlalchemy import func, select
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.shared.domain.exceptions import EntityNotFoundError
+from src.shared.infrastructure.repository_base import EnhancedBaseRepository
 
 from ...domain.entities import User
 from ...domain.repositories import IUserRepository
@@ -11,11 +11,11 @@ from ...domain.value_objects import AuthType, UserRole, UserStatus
 from ..models import UserModel
 
 
-class UserRepositoryImpl(IUserRepository):
+class UserRepositoryImpl(EnhancedBaseRepository[User, UserModel, int], IUserRepository):
     """SQLAlchemy implementation of User repository."""
 
     def __init__(self, session: AsyncSession):
-        self._session = session
+        super().__init__(session, UserModel)
 
     def _to_entity(self, model: UserModel) -> User:
         """Convert ORM model to domain entity."""
@@ -59,15 +59,22 @@ class UserRepositoryImpl(IUserRepository):
             failed_login_count=entity.failed_login_count,
         )
 
-    async def get_by_id(self, user_id: int) -> User | None:
-        """Get user by ID."""
-        result = await self._session.execute(
-            select(UserModel).where(UserModel.id == user_id)
-        )
-        model = result.scalar_one_or_none()
-        if model is None:
-            return None
-        return self._to_entity(model)
+    def _update_model(self, model: UserModel, entity: User) -> None:
+        """Update ORM model fields from entity."""
+        model.username = entity.username
+        model.email = entity.email
+        model.status = UserStatus(entity.status.value)
+        model.role = UserRole(entity.role.value)
+        model.display_name = entity.display_name
+        model.iam_identity_id = entity.iam_identity_id
+        model.iam_groups = entity.iam_groups
+        model.resource_quota_id = entity.resource_quota_id
+        model.last_login_at = entity.last_login_at
+        model.auth_type = AuthType(entity.auth_type.value)
+        model.password_hash = entity.password_hash
+        model.password_expires_at = entity.password_expires_at
+        model.locked_until = entity.locked_until
+        model.failed_login_count = entity.failed_login_count
 
     async def get_by_username(self, username: str) -> User | None:
         """Get user by username."""
@@ -89,58 +96,13 @@ class UserRepositoryImpl(IUserRepository):
             return None
         return self._to_entity(model)
 
-    async def create(self, user: User) -> User:
-        """Create a new user."""
-        model = self._to_model(user)
-        self._session.add(model)
-        await self._session.flush()
-        await self._session.refresh(model)
-        return self._to_entity(model)
-
-    async def update(self, user: User) -> User:
-        """Update an existing user."""
-        result = await self._session.execute(
-            select(UserModel).where(UserModel.id == user.id)
-        )
-        model = result.scalar_one_or_none()
-        if model is None:
-            raise EntityNotFoundError("User", str(user.id))
-
-        # Update fields
-        model.username = user.username
-        model.email = user.email
-        model.status = UserStatus(user.status.value)
-        model.role = UserRole(user.role.value)
-        model.display_name = user.display_name
-        model.iam_identity_id = user.iam_identity_id
-        model.iam_groups = user.iam_groups
-        model.resource_quota_id = user.resource_quota_id
-        model.last_login_at = user.last_login_at
-        model.auth_type = AuthType(user.auth_type.value)
-        model.password_hash = user.password_hash
-        model.password_expires_at = user.password_expires_at
-        model.locked_until = user.locked_until
-        model.failed_login_count = user.failed_login_count
-
-        await self._session.flush()
-        await self._session.refresh(model)
-        return self._to_entity(model)
-
     async def exists_by_username(self, username: str) -> bool:
         """Check if a user with the given username exists."""
-        result = await self._session.execute(
-            select(func.count(UserModel.id)).where(UserModel.username == username)
-        )
-        count = result.scalar() or 0
-        return count > 0
+        return await self.exists_by("username", username)
 
     async def exists_by_email(self, email: str) -> bool:
         """Check if a user with the given email exists."""
-        result = await self._session.execute(
-            select(func.count(UserModel.id)).where(UserModel.email == email)
-        )
-        count = result.scalar() or 0
-        return count > 0
+        return await self.exists_by("email", email)
 
     async def get_by_iam_identity_id(self, iam_identity_id: str) -> User | None:
         """Get user by IAM identity ID (for SSO users)."""

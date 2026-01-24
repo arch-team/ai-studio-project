@@ -81,21 +81,24 @@ class TestPreemptionTimingSLAE2E:
         """
         cluster_name = getattr(client, "_cluster_name", "")
         start = time.time()
+        failed_states = {"failed", "error"}
+
         while time.time() - start < timeout:
             try:
                 status = await client.get_training_job_status(
                     cluster_name=cluster_name, job_name=job_id
                 )
-                current_status = status.get("status", "")
-                if current_status.lower() == expected_status.lower():
+                current_status = status.get("status", "").lower()
+
+                if current_status == expected_status.lower():
                     return expected_status
-                # 如果任务失败，提前退出
-                if current_status.lower() in ["failed", "error"]:
-                    raise RuntimeError(
-                        f"Job {job_id} failed with status: {current_status}"
-                    )
+
+                if current_status in failed_states:
+                    raise RuntimeError(f"Job {job_id} failed with status: {current_status}")
+
             except Exception as e:
                 print(f"⚠️ 获取状态失败: {e}")
+
             await asyncio.sleep(SLAConstants.JOB_STATUS_POLL_INTERVAL)
 
         raise TimeoutError(
