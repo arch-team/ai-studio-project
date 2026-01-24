@@ -14,14 +14,14 @@ from src.modules.training.domain.value_objects import (
     StorageTier,
 )
 from src.modules.training.infrastructure.models import CheckpointModel
-from src.shared.domain.exceptions import EntityNotFoundError
+from src.shared.infrastructure.repository_base import EnhancedBaseRepository
 
 
-class CheckpointRepository(ICheckpointRepository):
+class CheckpointRepository(EnhancedBaseRepository[Checkpoint, CheckpointModel, int], ICheckpointRepository):
     """SQLAlchemy implementation of Checkpoint repository."""
 
     def __init__(self, session: AsyncSession):
-        self._session = session
+        super().__init__(session, CheckpointModel)
 
     def _to_entity(self, model: CheckpointModel) -> Checkpoint:
         """Convert ORM model to domain entity."""
@@ -47,15 +47,34 @@ class CheckpointRepository(ICheckpointRepository):
             deleted_at=model.deleted_at,
         )
 
-    async def get_by_id(self, checkpoint_id: int) -> Checkpoint | None:
-        """Get checkpoint by ID."""
-        result = await self._session.execute(
-            select(CheckpointModel).where(CheckpointModel.id == checkpoint_id)
+    def _to_model(self, entity: Checkpoint) -> CheckpointModel:
+        """Convert domain entity to ORM model."""
+        return CheckpointModel(
+            id=entity.id if entity.id else None,
+            training_job_id=entity.training_job_id,
+            checkpoint_name=entity.checkpoint_name,
+            storage_path=entity.storage_path,
+            size_bytes=entity.size_bytes,
+            checkpoint_type=entity.checkpoint_type,
+            trigger_type=entity.trigger_type,
+            epoch=entity.epoch,
+            step=entity.step,
+            checksum=entity.checksum,
+            loss=entity.loss,
+            accuracy=entity.accuracy,
+            metrics=entity.metrics,
+            storage_tier=entity.storage_tier,
+            status=entity.status,
+            archived_at=entity.archived_at,
+            deleted_at=entity.deleted_at,
         )
-        model = result.scalar_one_or_none()
-        if model is None:
-            return None
-        return self._to_entity(model)
+
+    def _update_model(self, model: CheckpointModel, entity: Checkpoint) -> None:
+        """Update ORM model fields from entity."""
+        model.storage_tier = entity.storage_tier
+        model.status = entity.status
+        model.archived_at = entity.archived_at
+        model.deleted_at = entity.deleted_at
 
     async def get_by_training_job_id(self, training_job_id: int) -> list[Checkpoint]:
         """Get all checkpoints for a training job."""
