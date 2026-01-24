@@ -90,62 +90,21 @@ source .venv/bin/activate  # macOS/Linux
 uv pip install -r requirements.txt
 ```
 
-**requirements.txt 核心依赖**:
-```txt
-fastapi==0.109.0
-uvicorn[standard]==0.27.0
-sqlalchemy[asyncio]==2.0.25
-alembic==1.13.1
-aiomysql==0.2.0
-pydantic==2.5.3
-pydantic-settings==2.1.0
-boto3==1.34.20
-sagemaker-hyperpod==0.1.0  # 注意: 实际版本可能不同
-python-jose[cryptography]==3.3.0
-passlib[bcrypt]==1.7.4
-python-multipart==0.0.6
-```
+> 核心依赖详见 `backend/requirements.txt`
 
 ### 2.2 启动 MySQL 数据库
 
-**使用 Docker Compose**:
-
 ```bash
-# 在项目根目录创建 docker-compose.yml
+# 在项目根目录启动 MySQL (使用项目提供的 docker-compose.yml)
 cd ..
-cat > docker-compose.yml <<EOF
-version: '3.8'
-
-services:
-  mysql:
-    image: mysql:8.0.28
-    container_name: ai-training-mysql
-    environment:
-      MYSQL_ROOT_PASSWORD: dev_root_password
-      MYSQL_DATABASE: ai_training_platform
-      MYSQL_USER: dev_user
-      MYSQL_PASSWORD: dev_password
-    ports:
-      - "3306:3306"
-    volumes:
-      - mysql_data:/var/lib/mysql
-    command: --default-authentication-plugin=mysql_native_password --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
-
-volumes:
-  mysql_data:
-EOF
-
-# 启动 MySQL
 docker-compose up -d mysql
 
-# 验证 MySQL 启动成功
+# 验证启动成功
 docker ps | grep ai-training-mysql
+mysql -h 127.0.0.1 -u dev_user -pdev_password ai_training_platform -e "SELECT 1"
 ```
 
-**验证数据库连接**:
-```bash
-mysql -h 127.0.0.1 -u dev_user -pdev_password ai_training_platform -e "SELECT 'Connection successful!'"
-```
+> MySQL 配置详见项目根目录 `docker-compose.yml`
 
 ### 2.3 配置环境变量
 
@@ -235,26 +194,7 @@ npm list --depth=0
 # typescript@5.3.x
 ```
 
-**package.json 核心依赖**:
-```json
-{
-  "dependencies": {
-    "react": "^18.2.0",
-    "react-dom": "^18.2.0",
-    "react-router-dom": "^6.20.0",
-    "@cloudscape-design/components": "^3.0.500",
-    "@cloudscape-design/global-styles": "^1.0.10",
-    "@tanstack/react-query": "^5.17.0",
-    "zustand": "^4.4.7",
-    "axios": "^1.6.5"
-  },
-  "devDependencies": {
-    "@vitejs/plugin-react": "^4.2.1",
-    "typescript": "^5.3.3",
-    "vite": "^5.0.11"
-  }
-}
-```
+> 核心依赖详见 `frontend/package.json`
 
 ### 3.2 配置前端环境变量
 
@@ -381,84 +321,21 @@ mypy src/
 
 ### 5.2 前端开发
 
-**目录结构** (Feature-based Architecture):
+**目录结构** (Feature-Sliced Design):
 ```
 frontend/src/
-├── app/                              # 应用层 - 全局配置和入口
-│   ├── App.tsx                       # 根组件
-│   ├── main.tsx                      # 应用入口
-│   ├── providers/                    # 全局 Provider 组件
-│   │   ├── index.tsx                 # 组合所有 Providers
-│   │   ├── QueryProvider.tsx         # TanStack Query Provider
-│   │   └── ThemeProvider.tsx         # Cloudscape 主题 Provider
-│   └── router/                       # 路由配置
-│       ├── index.tsx                 # 路由定义
-│       ├── routes.ts                 # 路由常量
-│       └── guards/                   # 路由守卫
-│           ├── AuthGuard.tsx         # 认证守卫
-│           └── RoleGuard.tsx         # 角色权限守卫
-│
-├── features/                         # 功能模块层 - 按业务域组织
-│   ├── training/                     # 训练任务管理
-│   │   ├── api/                      # API 调用和 TanStack Query hooks
-│   │   ├── components/               # 模块专用组件
-│   │   ├── hooks/                    # 模块专用 hooks
-│   │   ├── pages/                    # 页面组件 (*Page.tsx)
-│   │   └── types/                    # 模块类型定义
-│   ├── datasets/                     # 数据集管理模块
-│   ├── models/                       # 模型版本管理模块
-│   ├── resources/                    # 资源配额管理模块
-│   ├── monitoring/                   # 集群监控模块
-│   ├── spaces/                       # 开发空间模块
-│   ├── auth/                         # 认证授权模块
-│   ├── admin/                        # 管理后台模块 (用户管理、审计日志)
-│   ├── reports/                      # 报表分析模块 (资源使用、成本分析)
-│   └── dashboard/                    # 仪表盘模块
-│
-├── shared/                           # 共享层 - 跨模块复用
-│   ├── components/                   # 共享 UI 组件
-│   │   ├── feedback/                 # 反馈类 (ErrorBoundary, Spinner)
-│   │   ├── forms/                    # 表单类 (DateRangePicker)
-│   │   └── data-display/             # 数据展示 (DataTable)
-│   ├── hooks/                        # 共享 Hooks
-│   └── utils/                        # 工具函数
-│
-├── layouts/                          # 布局组件层
-│   └── MainLayout/                   # 主布局
-│       ├── MainLayout.tsx
-│       ├── Navigation.tsx            # 侧边栏导航
-│       └── TopNavigation.tsx         # 顶部导航
-│
-├── lib/                              # 基础设施层
-│   ├── api/                          # API 客户端
-│   │   ├── client.ts                 # HTTP 客户端
-│   │   └── interceptors.ts           # 请求/响应拦截器
-│   └── query/                        # TanStack Query 配置
-│       ├── queryClient.ts
-│       └── queryKeys.ts              # Query Key 工厂
-│
-├── store/                            # 全局状态管理 (Zustand)
-│   └── slices/
-│       ├── uiSlice.ts                # UI 状态
-│       └── notificationSlice.ts      # 通知状态
-│
-└── types/                            # 全局类型定义
-    └── entities/                     # 业务实体类型
+├── app/          # 应用层 (入口, providers, router)
+├── features/     # 功能模块 (training, datasets, models, spaces, auth...)
+├── shared/       # 共享组件和工具
+├── layouts/      # 布局组件
+├── lib/          # API 客户端, Query 配置
+├── store/        # Zustand 全局状态
+└── types/        # 全局类型定义
 ```
 
-> 📖 **完整目录结构**: 以上为简化版本，完整的前端目录结构（包含所有功能模块的详细文件清单）请参阅 [plan.md](./plan.md#directory-structure) 的 `frontend/` 部分。
+> 完整目录结构详见 [research.md](./research.md#47-项目结构-feature-sliced-design) 和 [plan.md](./plan.md)
 
-**路径别名配置** (vite.config.ts 和 tsconfig.json):
-```typescript
-// 支持的路径别名
-'@app/*'      → 'src/app/*'
-'@features/*' → 'src/features/*'
-'@shared/*'   → 'src/shared/*'
-'@layouts/*'  → 'src/layouts/*'
-'@lib/*'      → 'src/lib/*'
-'@store/*'    → 'src/store/*'
-'@types/*'    → 'src/types/*'
-```
+**路径别名**: `@app/*`, `@features/*`, `@shared/*`, `@layouts/*`, `@lib/*`, `@store/*`, `@types/*`
 
 **开发命令**:
 ```bash
@@ -566,51 +443,19 @@ npm install
 
 ## 附录
 
-### A. 常用开发命令
+### A. 命令速查
 
-**后端**:
-```bash
-# 激活虚拟环境
-source backend/.venv/bin/activate
+| 操作 | 命令 |
+|------|------|
+| 启动后端 | `cd backend && uvicorn src.main:app --reload` |
+| 启动前端 | `cd frontend && npm run dev` |
+| 启动 MySQL | `docker-compose up -d mysql` |
+| 运行后端测试 | `cd backend && pytest tests/` |
+| 数据库迁移 | `cd backend && alembic upgrade head` |
+| 前端构建 | `cd frontend && npm run build` |
+| 连接 MySQL | `mysql -h 127.0.0.1 -u dev_user -pdev_password ai_training_platform` |
 
-# 启动后端服务
-cd backend && uvicorn src.main:app --reload
-
-# 运行测试
-pytest tests/
-
-# 创建数据库迁移
-alembic revision --autogenerate -m "description"
-
-# 应用迁移
-alembic upgrade head
-```
-
-**前端**:
-```bash
-# 启动前端服务
-cd frontend && npm run dev
-
-# 类型检查
-npm run type-check
-
-# 构建生产版本
-npm run build
-```
-
-**数据库**:
-```bash
-# 连接 MySQL
-mysql -h 127.0.0.1 -u dev_user -pdev_password ai_training_platform
-
-# 查看表
-SHOW TABLES;
-
-# 查看表结构
-DESCRIBE training_jobs;
-```
-
-### B. 开发环境 URL 一览
+### B. 开发环境 URL
 
 | 服务 | URL | 说明 |
 |------|-----|------|
@@ -620,30 +465,11 @@ DESCRIBE training_jobs;
 | API 文档 (ReDoc) | http://localhost:8000/redoc | 可读性更好的 API 文档 |
 | MySQL 数据库 | localhost:3306 | MySQL 8.0.28 |
 
-### C. 推荐 IDE 配置
+### C. VS Code 推荐扩展
 
-**VS Code 推荐扩展**:
-- Python: `ms-python.python`
-- Pylance: `ms-python.vscode-pylance`
-- TypeScript: 内置
-- ESLint: `dbaeumer.vscode-eslint`
-- Prettier: `esbenp.prettier-vscode`
+`ms-python.python`, `ms-python.vscode-pylance`, `dbaeumer.vscode-eslint`, `esbenp.prettier-vscode`
 
-**VS Code 设置** (`.vscode/settings.json`):
-```json
-{
-  "python.linting.enabled": true,
-  "python.linting.ruffEnabled": true,
-  "python.formatting.provider": "black",
-  "editor.formatOnSave": true,
-  "[typescript]": {
-    "editor.defaultFormatter": "esbenp.prettier-vscode"
-  },
-  "[typescriptreact]": {
-    "editor.defaultFormatter": "esbenp.prettier-vscode"
-  }
-}
-```
+> 项目配置详见 `.vscode/settings.json`
 
 ---
 

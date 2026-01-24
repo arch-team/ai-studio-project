@@ -387,7 +387,11 @@ specs
 SageMaker HyperPod task governance作为实现本项目中的资源配额管理和任务优先级调度的，其技术原理和最佳实践关系到当前项目中训练任务这些功能的实现，需要提供后续开发过程的中使用于实践参考，并且保证内容的正确性符合最佳实践
 
 research.md 是spec-kit生成的文档，请在完全理解research.md 在spec-kit开发中的作用的情况下，在严格要求不改变该文档作用的情况下，按照Claude code上下文关键的最佳实践优化这个文档，以减少token的消耗    
-❯ research.md 是spec-kit生成的文档，请在完全理解research.md 在spec-kit开发中的作用的情况下，在严格要求不改变该文档作用的情况下，按照Claude code上下文关键的最佳实践优化这个文档，以减少token的消耗，针对每个优化点，请先让我确认之后在执行优化，完成后再处理下一个     
+
+research.md 是spec-kit生成的文档，请在完全理解research.md 在spec-kit开发中的作用的情况下，在严格要求不改变该文档作用的情况下，按照Claude code上下文关键的最佳实践优化这个文档，以减少token的消耗，针对每个优化点，请先让我确认之后在执行优化，完成后再处理下一个
+
+quickstart.md 是spec-kit生成的文档，请在完全理解quickstart.md 在spec-kit开发中的作用的情况下，在严格要求不改变该文档作用含义的情况下，按照Claude code上下文关键的最佳实践优化这个文档，以减少token的消耗，针对每个优化点，请先让我确认之后在执行优化，完成后再处理下一个     
+
                                                                                                                                                                                                                                                                                     
   推荐方案：                                                                                                                                                                                                                                                                        
                                                                                                                                                                                                                                                                                     
