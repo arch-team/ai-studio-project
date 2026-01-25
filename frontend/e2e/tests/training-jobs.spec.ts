@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { TrainingJobListPage } from '../pages/TrainingJobListPage';
+import { MockApi } from '../utils/mockApi';
 
 test.describe('训练任务列表', () => {
   let trainingJobListPage: TrainingJobListPage;
@@ -29,8 +30,16 @@ test.describe('训练任务列表', () => {
   });
 
   test('空状态显示正确', async ({ page }) => {
+    // 使用 Mock 返回空列表
+    const mockApi = new MockApi(page);
+    await mockApi.mockTrainingJobsList({ items: [] });
+
+    // 重新导航以触发新的 API 请求
+    await page.goto('/training-jobs');
+    await page.waitForLoadState('networkidle');
+
     // 验证空状态文本（使用 first() 避免多元素问题）
-    await expect(page.locator('text=暂无训练任务').first()).toBeVisible();
+    await expect(page.locator('text=暂无训练任务').first()).toBeVisible({ timeout: 5000 });
   });
 
   test('点击创建按钮跳转到创建页', async ({ page }) => {

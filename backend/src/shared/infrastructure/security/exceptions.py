@@ -63,7 +63,7 @@ class UserNotFoundError(SecurityError):
 
     http_status = 404
 
-    def __init__(self, user_id: str):
+    def __init__(self, user_id: str | int):
         self.user_id = user_id
         super().__init__(f"User with id '{user_id}' not found", code="USER_NOT_FOUND")
 

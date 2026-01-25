@@ -53,9 +53,9 @@ export class TrainingJobDetailPage extends BasePage {
     this.refreshButton = page.locator('button:has-text("刷新")');
     this.pauseButton = page.locator('button:has-text("暂停")');
     this.resumeButton = page.locator('button:has-text("恢复")');
-    // 删除按钮：只匹配文本完全是"删除"的按钮（排除"确认删除"）
-    // 使用 :text-is 精确匹配，并排除模态框内的按钮
-    this.deleteButton = page.locator('button:text-is("删除"):not([class*="modal"] button)');
+    // 删除按钮：使用 getByRole 精确匹配文本为"删除"的按钮
+    // 这样可以排除"确认删除"按钮
+    this.deleteButton = page.getByRole('button', { name: '删除', exact: true });
 
     // Overview Container
     this.overviewContainer = page.locator('text=概览').locator('..').locator('..');

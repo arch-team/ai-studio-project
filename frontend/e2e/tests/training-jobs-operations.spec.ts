@@ -20,6 +20,7 @@ test.describe('训练任务操作', () => {
       mockApi = new MockApi(page);
       await mockApi.mockTrainingJobsList();
       await mockApi.mockTrainingJobWithStatus('running');
+      await mockApi.mockCheckpoints();
       await mockApi.mockTrainingJobOperations();
 
       const detailPage = new TrainingJobDetailPage(page);
@@ -40,6 +41,7 @@ test.describe('训练任务操作', () => {
       mockApi = new MockApi(page);
       await mockApi.mockTrainingJobsList();
       await mockApi.mockTrainingJobWithStatus('completed');
+      await mockApi.mockCheckpoints();
 
       const detailPage = new TrainingJobDetailPage(page);
       await detailPage.goto(2);
@@ -52,6 +54,7 @@ test.describe('训练任务操作', () => {
       mockApi = new MockApi(page);
       await mockApi.mockTrainingJobsList();
       await mockApi.mockTrainingJobWithStatus('paused');
+      await mockApi.mockCheckpoints();
 
       const detailPage = new TrainingJobDetailPage(page);
       await detailPage.goto(3);
@@ -87,6 +90,7 @@ test.describe('训练任务操作', () => {
       mockApi = new MockApi(page);
       await mockApi.mockTrainingJobsList();
       await mockApi.mockTrainingJobWithStatus('paused');
+      await mockApi.mockCheckpoints();
       await mockApi.mockTrainingJobOperations();
 
       const detailPage = new TrainingJobDetailPage(page);
@@ -107,6 +111,7 @@ test.describe('训练任务操作', () => {
       mockApi = new MockApi(page);
       await mockApi.mockTrainingJobsList();
       await mockApi.mockTrainingJobWithStatus('preempted');
+      await mockApi.mockCheckpoints();
       await mockApi.mockTrainingJobOperations();
 
       const detailPage = new TrainingJobDetailPage(page);
@@ -127,6 +132,7 @@ test.describe('训练任务操作', () => {
       mockApi = new MockApi(page);
       await mockApi.mockTrainingJobsList();
       await mockApi.mockTrainingJobWithStatus('running');
+      await mockApi.mockCheckpoints();
 
       const detailPage = new TrainingJobDetailPage(page);
       await detailPage.goto(1);
@@ -139,6 +145,7 @@ test.describe('训练任务操作', () => {
       mockApi = new MockApi(page);
       await mockApi.mockTrainingJobsList();
       await mockApi.mockTrainingJobWithStatus('completed');
+      await mockApi.mockCheckpoints();
 
       const detailPage = new TrainingJobDetailPage(page);
       await detailPage.goto(2);
@@ -173,6 +180,7 @@ test.describe('训练任务操作', () => {
       mockApi = new MockApi(page);
       await mockApi.mockTrainingJobsList();
       await mockApi.mockTrainingJobWithStatus('completed');
+      await mockApi.mockCheckpoints();
       await mockApi.mockDeleteTrainingJob();
 
       const detailPage = new TrainingJobDetailPage(page);
@@ -199,6 +207,7 @@ test.describe('训练任务操作', () => {
       mockApi = new MockApi(page);
       await mockApi.mockTrainingJobsList();
       await mockApi.mockTrainingJobWithStatus('running');
+      await mockApi.mockCheckpoints();
 
       const detailPage = new TrainingJobDetailPage(page);
       await detailPage.goto(1);
@@ -212,6 +221,7 @@ test.describe('训练任务操作', () => {
       mockApi = new MockApi(page);
       await mockApi.mockTrainingJobsList();
       await mockApi.mockTrainingJobWithStatus('completed');
+      await mockApi.mockCheckpoints();
 
       const detailPage = new TrainingJobDetailPage(page);
       await detailPage.goto(2);
@@ -232,6 +242,7 @@ test.describe('训练任务操作', () => {
       mockApi = new MockApi(page);
       await mockApi.mockTrainingJobsList();
       await mockApi.mockTrainingJobWithStatus('failed');
+      await mockApi.mockCheckpoints();
       await mockApi.mockDeleteTrainingJob();
 
       const detailPage = new TrainingJobDetailPage(page);
@@ -246,6 +257,7 @@ test.describe('训练任务操作', () => {
       mockApi = new MockApi(page);
       await mockApi.mockTrainingJobsList();
       await mockApi.mockTrainingJobWithStatus('paused');
+      await mockApi.mockCheckpoints();
       await mockApi.mockDeleteTrainingJob();
 
       const detailPage = new TrainingJobDetailPage(page);
@@ -299,6 +311,7 @@ test.describe('训练任务操作', () => {
         mockApi = new MockApi(page);
         await mockApi.mockTrainingJobsList();
         await mockApi.mockTrainingJobWithStatus(status);
+        await mockApi.mockCheckpoints();
 
         const detailPage = new TrainingJobDetailPage(page);
         await detailPage.goto(1);
