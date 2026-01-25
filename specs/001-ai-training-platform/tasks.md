@@ -596,7 +596,7 @@
 **用户故事**: 数据工程师管理和版本控制训练数据集
 
 ### 数据表迁移
-- [ ] [T039] 创建 datasets 表迁移 - `backend/alembic/versions/006_create_datasets.py`,字段: id, name, version, storage_type (enum: s3/fsx), storage_uri, dataset_type (enum: image/text/audio/video), size_bytes, owner_id (FK users), created_at, updated_at
+- [x] [T039] 创建 datasets 表迁移 - `backend/alembic/versions/20260125_100100_9a1b2c3d4e5f_create_datasets.py`,字段: id, name, description, version, storage_type (enum: FSX/S3/EFS), storage_uri, total_size_bytes, file_count, dataset_type (enum: IMAGE/TEXT/AUDIO/VIDEO/TABULAR/CUSTOM), data_format, tags (JSON), visibility (enum: PUBLIC/PRIVATE/RESTRICTED), owner_id (FK users), status (enum: AVAILABLE/PREPARING/ARCHIVED/ERROR), created_at, updated_at, last_accessed_at; 索引: uk_name_version (UNIQUE), ix_owner_id, ix_storage_type, ix_dataset_type, ix_status, ix_created_at, ft_name_desc (FULLTEXT)
 
 ### SQLAlchemy 模型
 - [ ] [T040] 创建 Dataset 模型 - 领域实体 `backend/src/modules/datasets/domain/entities/dataset.py` + ORM 模型 `backend/src/modules/datasets/infrastructure/models/dataset_model.py`,包含版本控制逻辑,关联 User,支持元数据存储
