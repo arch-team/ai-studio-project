@@ -16,6 +16,15 @@ SecurityError (本模块)
 └── AuthError (auth/domain/exceptions.py)
     └── InvalidCredentialsError, TokenExpiredError, ...
 
+设计说明:
+---------
+每个异常类包含以下类属性：
+- http_status: 对应的 HTTP 状态码
+- 实例属性 code: 错误代码，供前端程序化处理
+
+异常处理器会自动读取这些属性，无需维护映射表。
+新增异常只需定义 http_status 类属性即可。
+
 使用指南:
 --------
 - 基础设施代码 → 使用本模块异常
@@ -24,7 +33,15 @@ SecurityError (本模块)
 
 
 class SecurityError(Exception):
-    """Base class for security-related errors."""
+    """Base class for security-related errors.
+
+    Attributes:
+        http_status: HTTP 状态码，默认 401
+        message: 错误消息
+        code: 错误代码
+    """
+
+    http_status: int = 401
 
     def __init__(self, message: str, code: str | None = None):
         self.message = message
@@ -35,12 +52,16 @@ class SecurityError(Exception):
 class AuthenticationError(SecurityError):
     """Raised when authentication fails."""
 
+    http_status = 401
+
     def __init__(self, message: str = "Authentication failed"):
         super().__init__(message, code="AUTHENTICATION_FAILED")
 
 
 class UserNotFoundError(SecurityError):
     """Raised when user is not found (for enable/disable account)."""
+
+    http_status = 404
 
     def __init__(self, user_id: str):
         self.user_id = user_id
@@ -50,12 +71,16 @@ class UserNotFoundError(SecurityError):
 class InvalidCredentialsError(SecurityError):
     """Raised when login credentials are invalid."""
 
+    http_status = 401
+
     def __init__(self, message: str = "Invalid username or password"):
         super().__init__(message, code="INVALID_CREDENTIALS")
 
 
 class AccountValidationError(SecurityError):
     """Raised when account validation fails (for create account)."""
+
+    http_status = 400
 
     def __init__(self, message: str):
         super().__init__(message, code="ACCOUNT_VALIDATION_FAILED")
@@ -64,6 +89,8 @@ class AccountValidationError(SecurityError):
 class TokenExpiredError(SecurityError):
     """Raised when a token has expired."""
 
+    http_status = 401
+
     def __init__(self, message: str = "Token has expired"):
         super().__init__(message, code="TOKEN_EXPIRED")
 
@@ -71,12 +98,16 @@ class TokenExpiredError(SecurityError):
 class InvalidTokenError(SecurityError):
     """Raised when a token is invalid."""
 
+    http_status = 401
+
     def __init__(self, message: str = "Invalid token"):
         super().__init__(message, code="INVALID_TOKEN")
 
 
 class AccountLockedError(SecurityError):
     """Raised when an account is locked due to too many failed login attempts."""
+
+    http_status = 423
 
     def __init__(
         self, message: str = "Account is locked", locked_until: str | None = None
@@ -88,6 +119,8 @@ class AccountLockedError(SecurityError):
 class PasswordTooWeakError(SecurityError):
     """Raised when a password does not meet strength requirements."""
 
+    http_status = 400
+
     def __init__(self, violations: list[str]):
         self.violations = violations
         message = "Password does not meet requirements: " + "; ".join(violations)
@@ -97,6 +130,8 @@ class PasswordTooWeakError(SecurityError):
 class PasswordHistoryViolationError(SecurityError):
     """Raised when a password was recently used."""
 
+    http_status = 400
+
     def __init__(self, message: str = "Cannot reuse recent passwords"):
         super().__init__(message, code="PASSWORD_HISTORY_VIOLATION")
 
@@ -104,12 +139,16 @@ class PasswordHistoryViolationError(SecurityError):
 class PasswordExpiredError(SecurityError):
     """Raised when a password has expired."""
 
+    http_status = 401
+
     def __init__(self, message: str = "Password has expired"):
         super().__init__(message, code="PASSWORD_EXPIRED")
 
 
 class InsufficientPermissionsError(SecurityError):
     """Raised when a user lacks required permissions."""
+
+    http_status = 403
 
     def __init__(self, required_permission: str):
         self.required_permission = required_permission
@@ -120,6 +159,8 @@ class InsufficientPermissionsError(SecurityError):
 class SSOError(SecurityError):
     """Raised when SSO authentication fails."""
 
+    http_status = 401
+
     def __init__(
         self, message: str = "SSO authentication failed", degraded: bool = False
     ):
@@ -129,6 +170,8 @@ class SSOError(SecurityError):
 
 class SSODegradedModeError(SSOError):
     """Raised when SSO is in degraded mode."""
+
+    http_status = 503
 
     def __init__(self, message: str = "SSO service is temporarily unavailable"):
         super().__init__(message, degraded=True)

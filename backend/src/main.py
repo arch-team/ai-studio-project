@@ -14,7 +14,7 @@ from src.shared.api import (
     domain_exception_handler,
     security_exception_handler,
 )
-from src.shared.api.middleware import AuthenticationMiddleware
+from src.shared.api.middleware import AuthenticationMiddleware, TracingMiddleware
 from src.shared.domain.exceptions import DomainError
 from src.shared.infrastructure import get_settings
 from src.shared.infrastructure.security.exceptions import SecurityError
@@ -49,13 +49,14 @@ def create_app() -> FastAPI:
     )
 
     # Middleware execution order (LIFO - Last In, First Out):
-    # Request:  CORS → Auth → Audit
-    # Response: Audit → Auth → CORS
+    # Request:  Tracing → CORS → Auth → Audit
+    # Response: Audit → Auth → CORS → Tracing
     #
     # To achieve this, add in reverse order:
-    # 1. Audit (added first, executes last on request)
-    # 2. Auth  (added second)
-    # 3. CORS  (added last, executes first on request)
+    # 1. Audit   (added first, executes last on request)
+    # 2. Auth    (added second)
+    # 3. CORS    (added third)
+    # 4. Tracing (added last, executes first on request - provides trace_id)
 
     app.add_middleware(AuditMiddleware)
     app.add_middleware(AuthenticationMiddleware)
@@ -71,7 +72,9 @@ def create_app() -> FastAPI:
             "Content-Type",
             "X-Request-ID",
         ],
+        expose_headers=["X-Request-ID"],
     )
+    app.add_middleware(TracingMiddleware)
 
     # Register API routers
     app.include_router(api_router)
@@ -86,13 +89,17 @@ def create_app() -> FastAPI:
         request: Request, exc: Exception
     ) -> JSONResponse:
         """Handle unhandled exceptions and return 500 response."""
-        return JSONResponse(
-            status_code=500,
-            content={
-                "detail": "Internal server error",
-                "error_type": type(exc).__name__,
-            },
-        )
+        trace_id = getattr(request.state, "trace_id", None)
+        error_response: dict = {
+            "error": {
+                "code": "INTERNAL_SERVER_ERROR",
+                "message": "Internal server error",
+            }
+        }
+        if trace_id:
+            error_response["error"]["trace_id"] = trace_id
+
+        return JSONResponse(status_code=500, content=error_response)
 
     @app.get("/health", tags=["Health"])
     async def _health_check() -> dict:

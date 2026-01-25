@@ -1,4 +1,12 @@
-"""Auth domain exceptions unit tests."""
+"""Auth domain exceptions unit tests.
+
+测试说明:
+---------
+测试 auth 模块异常的:
+1. 继承关系 (AuthError -> SecurityError)
+2. 属性正确性 (message, code, http_status)
+3. 捕获机制 (SecurityError/AuthError 统一捕获)
+"""
 
 import pytest
 from fastapi import status
@@ -19,7 +27,6 @@ from src.modules.auth.domain.exceptions import (
     TokenExpiredError,
     UserNotFoundError,
 )
-from src.shared.api.exception_handlers import SECURITY_EXCEPTION_MAP
 from src.shared.infrastructure.security.exceptions import SecurityError
 
 
@@ -281,12 +288,13 @@ class TestSSODegradedModeError:
         assert exc.code == "SSO_DEGRADED_MODE"
 
 
-class TestAuthExceptionsHttpMapping:
-    """验证 auth 异常在 SECURITY_EXCEPTION_MAP 中有正确映射"""
+class TestAuthExceptionsHttpStatus:
+    """验证 auth 异常的 http_status 类属性"""
 
     @pytest.mark.parametrize(
         "exception_class,expected_status",
         [
+            (AuthError, status.HTTP_401_UNAUTHORIZED),
             (InvalidCredentialsError, status.HTTP_401_UNAUTHORIZED),
             (UserNotFoundError, status.HTTP_404_NOT_FOUND),
             (TokenExpiredError, status.HTTP_401_UNAUTHORIZED),
@@ -301,45 +309,11 @@ class TestAuthExceptionsHttpMapping:
             (SSODegradedModeError, status.HTTP_503_SERVICE_UNAVAILABLE),
         ],
     )
-    def test_exception_maps_to_correct_status(self, exception_class, expected_status):
-        """验证每个 auth 异常映射到正确的 HTTP 状态码"""
-        # 需要使用别名导入的类名查找
-        from src.shared.api.exception_handlers import (
-            AuthAccountInactiveError,
-            AuthAccountLockedError,
-            AuthInsufficientPermissionsError,
-            AuthInvalidCredentialsError,
-            AuthInvalidTokenError,
-            AuthPasswordExpiredError,
-            AuthPasswordHistoryViolationError,
-            AuthPasswordTooWeakError,
-            AuthSSODegradedModeError,
-            AuthSSOError,
-            AuthTokenExpiredError,
-            AuthUserNotFoundError,
-        )
-
-        # 映射本地类到别名类
-        alias_map = {
-            InvalidCredentialsError: AuthInvalidCredentialsError,
-            UserNotFoundError: AuthUserNotFoundError,
-            TokenExpiredError: AuthTokenExpiredError,
-            InvalidTokenError: AuthInvalidTokenError,
-            AccountLockedError: AuthAccountLockedError,
-            AccountInactiveError: AuthAccountInactiveError,
-            PasswordExpiredError: AuthPasswordExpiredError,
-            PasswordTooWeakError: AuthPasswordTooWeakError,
-            PasswordHistoryViolationError: AuthPasswordHistoryViolationError,
-            InsufficientPermissionsError: AuthInsufficientPermissionsError,
-            SSOError: AuthSSOError,
-            SSODegradedModeError: AuthSSODegradedModeError,
-        }
-
-        alias_class = alias_map[exception_class]
-        actual_status = SECURITY_EXCEPTION_MAP.get(alias_class)
-        assert actual_status == expected_status, (
-            f"{exception_class.__name__} should map to {expected_status}, "
-            f"but got {actual_status}"
+    def test_exception_has_correct_http_status(self, exception_class, expected_status):
+        """验证每个 auth 异常类的 http_status 属性正确"""
+        assert exception_class.http_status == expected_status, (
+            f"{exception_class.__name__}.http_status should be {expected_status}, "
+            f"but got {exception_class.http_status}"
         )
 
 

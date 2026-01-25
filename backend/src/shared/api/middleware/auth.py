@@ -1,15 +1,26 @@
 """Authentication Middleware - JWT token validation for protected routes."""
 
 import re
+from datetime import UTC
 
 from fastapi import Request
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 from starlette.responses import JSONResponse, Response
 
-from src.shared.infrastructure.security.exceptions import InvalidTokenError, TokenExpiredError
-from src.shared.infrastructure.security.jwt import TokenPayload, TokenType, get_jwt_manager
-from src.shared.infrastructure.security.paths import AUTH_EXEMPT_PATHS, AUTH_EXEMPT_PATTERNS
 from src.shared.infrastructure import get_settings
+from src.shared.infrastructure.security.exceptions import (
+    InvalidTokenError,
+    TokenExpiredError,
+)
+from src.shared.infrastructure.security.jwt import (
+    TokenPayload,
+    TokenType,
+    get_jwt_manager,
+)
+from src.shared.infrastructure.security.paths import (
+    AUTH_EXEMPT_PATHS,
+    AUTH_EXEMPT_PATTERNS,
+)
 
 # Development mock token
 DEV_MOCK_TOKEN = "dev-mock-token"
@@ -34,8 +45,11 @@ class AuthenticationMiddleware(BaseHTTPMiddleware):
             return JSONResponse(
                 status_code=401,
                 content={
-                    "code": "UNAUTHORIZED",
-                    "message": "Authorization header required",
+                    "error": {
+                        "code": "UNAUTHORIZED",
+                        "message": "Authorization header required",
+                        "trace_id": getattr(request.state, "trace_id", None),
+                    }
                 },
             )
 
@@ -45,8 +59,11 @@ class AuthenticationMiddleware(BaseHTTPMiddleware):
             return JSONResponse(
                 status_code=401,
                 content={
-                    "code": "INVALID_TOKEN",
-                    "message": "Invalid or expired token",
+                    "error": {
+                        "code": "INVALID_TOKEN",
+                        "message": "Invalid or expired token",
+                        "trace_id": getattr(request.state, "trace_id", None),
+                    }
                 },
             )
 
@@ -89,9 +106,9 @@ class AuthenticationMiddleware(BaseHTTPMiddleware):
         # Development mode: accept mock token
         settings = get_settings()
         if settings.environment == "development" and token == DEV_MOCK_TOKEN:
-            from datetime import datetime, timedelta, timezone
+            from datetime import datetime, timedelta
 
-            now = datetime.now(timezone.utc)
+            now = datetime.now(UTC)
             return TokenPayload(
                 sub="1",
                 username="dev_user",
