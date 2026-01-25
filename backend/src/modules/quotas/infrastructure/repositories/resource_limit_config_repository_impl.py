@@ -51,6 +51,20 @@ class ResourceLimitConfigRepository(
             priority_default=PriorityDefault(entity.priority_default.value),
         )
 
+    def _update_model(
+        self, model: ResourceLimitConfigModel, entity: ResourceLimitConfig
+    ) -> None:
+        """Update ORM model fields from entity."""
+        model.config_name = entity.config_name
+        model.role = LimitRole(entity.role.value)
+        model.project_id = entity.project_id
+        model.max_gpu_per_job = entity.max_gpu_per_job
+        model.max_cpu_per_job = entity.max_cpu_per_job
+        model.max_memory_gb_per_job = entity.max_memory_gb_per_job
+        model.max_storage_gb_per_job = entity.max_storage_gb_per_job
+        model.max_nodes_per_job = entity.max_nodes_per_job
+        model.priority_default = PriorityDefault(entity.priority_default.value)
+
     async def get_by_role_and_project(
         self, role: LimitRole, project_id: int | None
     ) -> ResourceLimitConfig | None:

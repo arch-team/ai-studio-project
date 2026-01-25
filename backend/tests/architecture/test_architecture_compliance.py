@@ -23,20 +23,43 @@ def get_python_files(directory: Path) -> list[Path]:
     return list(directory.rglob("*.py"))
 
 
-def get_imports_from_file(file_path: Path) -> list[str]:
-    """Extract all import statements from a Python file."""
+def get_imports_from_file(file_path: Path, include_type_checking: bool = False) -> list[str]:
+    """Extract all import statements from a Python file.
+
+    Args:
+        file_path: Path to the Python file
+        include_type_checking: If False, exclude imports inside TYPE_CHECKING blocks
+
+    Returns:
+        List of import module names
+    """
     imports = []
     try:
         with open(file_path, encoding="utf-8") as f:
             tree = ast.parse(f.read())
 
+        # 找出所有 TYPE_CHECKING 块的位置
+        type_checking_ranges: list[tuple[int, int]] = []
+        if not include_type_checking:
+            for node in ast.walk(tree):
+                if isinstance(node, ast.If):
+                    # 检查条件是否为 TYPE_CHECKING
+                    if isinstance(node.test, ast.Name) and node.test.id == "TYPE_CHECKING":
+                        type_checking_ranges.append((node.lineno, node.end_lineno or node.lineno))
+
+        def is_in_type_checking(lineno: int) -> bool:
+            """检查行号是否在 TYPE_CHECKING 块内."""
+            return any(start <= lineno <= end for start, end in type_checking_ranges)
+
         for node in ast.walk(tree):
             if isinstance(node, ast.Import):
-                for alias in node.names:
-                    imports.append(alias.name)
+                if include_type_checking or not is_in_type_checking(node.lineno):
+                    for alias in node.names:
+                        imports.append(alias.name)
             elif isinstance(node, ast.ImportFrom):
                 if node.module:
-                    imports.append(node.module)
+                    if include_type_checking or not is_in_type_checking(node.lineno):
+                        imports.append(node.module)
     except SyntaxError:
         pass
     return imports

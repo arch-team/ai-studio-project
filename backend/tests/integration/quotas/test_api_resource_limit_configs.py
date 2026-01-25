@@ -197,6 +197,7 @@ class TestListResourceLimitConfigsEndpoint:
         """Test listing configs returns paginated response."""
         response = await client.get(
             "/api/v1/resource-limit-configs",
+            params={"page": 1, "page_size": 20},
             headers=admin_auth_headers,
         )
         assert response.status_code in [200, 500]
@@ -236,7 +237,7 @@ class TestListResourceLimitConfigsEndpoint:
         """Test filtering configs by role."""
         response = await client.get(
             "/api/v1/resource-limit-configs",
-            params={"role": "engineer"},
+            params={"role": "engineer", "page": 1, "page_size": 20},
             headers=admin_auth_headers,
         )
         assert response.status_code in [200, 500]
@@ -254,7 +255,7 @@ class TestListResourceLimitConfigsEndpoint:
         """Test filtering configs by project_id."""
         response = await client.get(
             "/api/v1/resource-limit-configs",
-            params={"project_id": 100},
+            params={"project_id": 100, "page": 1, "page_size": 20},
             headers=admin_auth_headers,
         )
         assert response.status_code in [200, 500]
@@ -268,7 +269,7 @@ class TestListResourceLimitConfigsEndpoint:
         """Test sorting configs by created_at."""
         response = await client.get(
             "/api/v1/resource-limit-configs",
-            params={"sort_by": "created_at", "sort_order": "desc"},
+            params={"sort_by": "created_at", "sort_order": "desc", "page": 1, "page_size": 20},
             headers=admin_auth_headers,
         )
         assert response.status_code in [200, 500]
@@ -442,6 +443,7 @@ class TestResourceLimitConfigsRBAC:
         """Test engineer role cannot access config endpoints."""
         response = await client.get(
             "/api/v1/resource-limit-configs",
+            params={"page": 1, "page_size": 20},
             headers=engineer_auth_headers,
         )
         assert response.status_code in [403, 500, 503]
@@ -455,6 +457,7 @@ class TestResourceLimitConfigsRBAC:
         """Test admin role can access config endpoints."""
         response = await client.get(
             "/api/v1/resource-limit-configs",
+            params={"page": 1, "page_size": 20},
             headers=admin_auth_headers,
         )
         # Admin should be allowed (200) or DB error (500)

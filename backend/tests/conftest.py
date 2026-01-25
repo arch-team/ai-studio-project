@@ -23,6 +23,11 @@ from collections.abc import AsyncGenerator
 import pytest
 from httpx import ASGITransport, AsyncClient
 
+# 确保所有 ORM 模型在测试前被加载
+from src.shared.infrastructure.database import import_all_models
+
+import_all_models()
+
 from src.main import app
 
 

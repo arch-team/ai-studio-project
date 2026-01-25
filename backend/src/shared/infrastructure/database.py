@@ -11,6 +11,41 @@ from src.shared.infrastructure.config import get_settings
 logger = logging.getLogger(__name__)
 
 
+def import_all_models() -> None:
+    """Import all ORM models to ensure proper SQLAlchemy mapper registration.
+
+    This must be called before using any ORM relationships that use string references.
+    """
+    # Auth module models
+    from src.modules.auth.infrastructure.models import UserModel, LoginAttemptModel  # noqa: F401
+
+    # Training module models
+    from src.modules.training.infrastructure.models import (  # noqa: F401
+        TrainingJobModel,
+        CheckpointModel,
+    )
+
+    # Quotas module models
+    from src.modules.quotas.infrastructure.models import (  # noqa: F401
+        ResourceQuotaModel,
+        ResourceLimitConfigModel,
+    )
+
+    # Models module models
+    from src.modules.models.infrastructure.models import ModelModel  # noqa: F401
+
+    # Spaces module models
+    from src.modules.spaces.infrastructure.models import DevelopmentSpaceModel  # noqa: F401
+
+    # Datasets module models
+    from src.modules.datasets.infrastructure.models import DatasetModel  # noqa: F401
+
+    # Audit module models
+    from src.modules.audit.infrastructure.models import AuditLogModel  # noqa: F401
+
+    logger.debug("All ORM models imported successfully")
+
+
 class Base(DeclarativeBase):
     """SQLAlchemy declarative base for all ORM models."""
 
@@ -54,4 +89,4 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
             await session.close()
 
 
-__all__ = ["Base", "engine", "AsyncSessionLocal", "get_db"]
+__all__ = ["Base", "engine", "AsyncSessionLocal", "get_db", "import_all_models"]

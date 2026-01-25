@@ -19,6 +19,7 @@ from src.shared.api.middleware import AuthenticationMiddleware, TracingMiddlewar
 from src.shared.domain.exceptions import DomainError
 from src.shared.domain.problem import Problem
 from src.shared.infrastructure import get_settings
+from src.shared.infrastructure.database import import_all_models
 from src.shared.infrastructure.security.exceptions import SecurityError
 
 logger = logging.getLogger(__name__)
@@ -27,6 +28,9 @@ logger = logging.getLogger(__name__)
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     """Application lifecycle manager."""
+    # 确保所有 ORM 模型在启动时被加载，解决 relationship 字符串引用问题
+    import_all_models()
+
     settings = get_settings()
     logger.info(f"Starting {settings.app_name} v{settings.app_version}")
     logger.info(f"Environment: {settings.environment}")
