@@ -9,6 +9,9 @@ from .domain import (
     CheckpointType,
     DistributionStrategy,
     DuplicateJobNameError,
+    HyperPodOperationError,
+    HyperPodPodNotFoundError,
+    HyperPodSDKUnavailableError,
     ICheckpointRepository,
     InvalidJobStateError,
     ITrainingJobRepository,
@@ -51,4 +54,7 @@ __all__ = [
     "CheckpointNotFoundError",
     "DuplicateJobNameError",
     "InvalidJobStateError",
+    "HyperPodSDKUnavailableError",
+    "HyperPodPodNotFoundError",
+    "HyperPodOperationError",
 ]

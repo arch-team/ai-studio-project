@@ -8,6 +8,11 @@ from typing import Any, TypeVar
 import boto3
 
 from src.modules.training.application.interfaces import IHyperPodClient
+from src.modules.training.domain.exceptions import (
+    HyperPodOperationError,
+    HyperPodPodNotFoundError,
+    HyperPodSDKUnavailableError,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -105,7 +110,10 @@ class HyperPodClient(IHyperPodClient):
             self._cluster_contexts.add(target_cluster)
             logger.info(f"Cluster context set successfully: {target_cluster}")
         except Exception as e:
-            logger.error(f"Failed to set cluster context: {e}")
+            logger.error(
+                f"Failed to set cluster context for {target_cluster}: {type(e).__name__}: {e}",
+                exc_info=True,
+            )
             # 不抛出异常，让操作继续尝试 (可能已经配置了 kubeconfig)
 
     async def _run_in_executor(self, func: Callable[[], T]) -> T:
@@ -260,7 +268,7 @@ class HyperPodClient(IHyperPodClient):
 
         def _submit() -> dict[str, Any]:
             if HyperPodPytorchJob is None:
-                raise RuntimeError("HyperPod SDK not available")
+                raise HyperPodSDKUnavailableError()
 
             self._ensure_cluster_context(cluster_name)
 
@@ -329,7 +337,7 @@ class HyperPodClient(IHyperPodClient):
 
         def _get_status() -> dict[str, Any]:
             if HyperPodPytorchJob is None:
-                raise RuntimeError("HyperPod SDK not available")
+                raise HyperPodSDKUnavailableError()
 
             # 确保集群上下文已设置 (状态查询关键依赖)
             self._ensure_cluster_context(cluster_name)
@@ -339,9 +347,9 @@ class HyperPodClient(IHyperPodClient):
             # 尝试刷新状态 (SDK 需要显式刷新)
             try:
                 job.refresh()
-            except Exception:
+            except Exception as e:
                 # refresh 可能失败，继续使用当前状态
-                pass
+                logger.debug(f"Job refresh failed for {job_name}, using cached status: {e}")
 
             # 从 conditions 获取当前状态
             status_str = "submitted"  # 默认状态: 已提交
@@ -415,7 +423,7 @@ class HyperPodClient(IHyperPodClient):
 
         def _stop() -> dict[str, Any]:
             if HyperPodPytorchJob is None:
-                raise RuntimeError("HyperPod SDK not available")
+                raise HyperPodSDKUnavailableError()
 
             # 确保集群上下文已设置
             self._ensure_cluster_context(cluster_name)
@@ -439,7 +447,7 @@ class HyperPodClient(IHyperPodClient):
 
         def _list_pods() -> list[dict[str, Any]]:
             if HyperPodPytorchJob is None:
-                raise RuntimeError("HyperPod SDK not available")
+                raise HyperPodSDKUnavailableError()
 
             # 确保集群上下文已设置
             self._ensure_cluster_context(cluster_name)
@@ -477,7 +485,7 @@ class HyperPodClient(IHyperPodClient):
 
         def _get_status() -> dict[str, Any]:
             if HyperPodPytorchJob is None:
-                raise RuntimeError("HyperPod SDK not available")
+                raise HyperPodSDKUnavailableError()
 
             # 确保集群上下文已设置
             self._ensure_cluster_context(cluster_name)
@@ -493,7 +501,7 @@ class HyperPodClient(IHyperPodClient):
                         "status": pod.get("status", {}),
                     }
 
-            raise ValueError(f"Pod {pod_name} not found")
+            raise HyperPodPodNotFoundError(job_name, pod_name)
 
         return await self._run_in_executor(_get_status)
 
@@ -510,7 +518,9 @@ class HyperPodClient(IHyperPodClient):
         def _check_exists() -> bool:
             match = re.match(r"s3://([^/]+)/(.+)", s3_path)
             if not match:
-                raise ValueError(f"Invalid S3 path: {s3_path}")
+                raise HyperPodOperationError(
+                    "verify_checkpoint", f"Invalid S3 path format: {s3_path}"
+                )
 
             bucket, key = match.groups()
             s3_client = boto3.client("s3", region_name=self._region)
@@ -581,10 +591,12 @@ class HyperPodClient(IHyperPodClient):
 
         def _resume() -> dict[str, Any]:
             if HyperPodPytorchJob is None:
-                raise RuntimeError("HyperPod SDK not available")
+                raise HyperPodSDKUnavailableError()
 
             if job_config is None:
-                raise ValueError("job_config is required for resume")
+                raise HyperPodOperationError(
+                    "resume", "job_config is required", job_name
+                )
 
             # 确保集群上下文已设置
             self._ensure_cluster_context(cluster_name)
@@ -677,7 +689,7 @@ class HyperPodClient(IHyperPodClient):
 
         def _trigger() -> dict[str, Any]:
             if HyperPodPytorchJob is None:
-                raise RuntimeError("HyperPod SDK not available")
+                raise HyperPodSDKUnavailableError()
 
             # 确保集群上下文已设置
             self._ensure_cluster_context(cluster_name)
@@ -696,7 +708,9 @@ class HyperPodClient(IHyperPodClient):
             # 验证目标任务存在
             target_job = HyperPodPytorchJob.get(name=target_job_name)
             if target_job.status != "Running":
-                raise ValueError(f"Target job {target_job_name} is not running")
+                raise HyperPodOperationError(
+                    "trigger_preemption", "Target job is not running", target_job_name
+                )
 
             # 生成高优先级任务名称
             preemption_job_name = f"preempt-{target_job_name}-{int(time.time())}"

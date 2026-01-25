@@ -68,6 +68,27 @@ class AuditMiddleware(BaseHTTPMiddleware):
     # Maximum request body size to store (64KB)
     MAX_BODY_SIZE: int = 65536
 
+    async def _safe_call_next(
+        self,
+        request: Request,
+        call_next: Callable,
+    ) -> Response:
+        """调用下一个中间件并安全处理异常。
+
+        将未捕获的异常转换为 500 响应，避免中间件链中断。
+        """
+        try:
+            return await call_next(request)
+        except Exception as e:
+            logger.error(
+                f"Unhandled exception in request {request.method} {request.url.path}: {e}",
+                exc_info=True,
+            )
+            return JSONResponse(
+                status_code=500,
+                content={"detail": "Internal server error"},
+            )
+
     async def dispatch(
         self,
         request: Request,
@@ -76,39 +97,18 @@ class AuditMiddleware(BaseHTTPMiddleware):
         """Process request and create audit log entry."""
         # Skip exempt paths
         if self._should_skip(request):
-            try:
-                return await call_next(request)
-            except Exception as e:
-                logger.error(f"Unhandled exception in request: {e}")
-                return JSONResponse(
-                    status_code=500,
-                    content={"detail": "Internal server error"},
-                )
+            return await self._safe_call_next(request, call_next)
 
         # Get operation type from HTTP method
         operation_type = self.METHOD_OPERATION_MAP.get(request.method)
         if operation_type is None:
-            try:
-                return await call_next(request)
-            except Exception as e:
-                logger.error(f"Unhandled exception in request: {e}")
-                return JSONResponse(
-                    status_code=500,
-                    content={"detail": "Internal server error"},
-                )
+            return await self._safe_call_next(request, call_next)
 
         # Capture request data before processing
         request_data = await self._capture_request_data(request)
 
         # Execute the actual request with error handling
-        try:
-            response = await call_next(request)
-        except Exception as e:
-            logger.error(f"Unhandled exception in request: {e}")
-            response = JSONResponse(
-                status_code=500,
-                content={"detail": "Internal server error"},
-            )
+        response = await self._safe_call_next(request, call_next)
 
         # Create audit log asynchronously (non-blocking)
         asyncio.create_task(
@@ -154,7 +154,11 @@ class AuditMiddleware(BaseHTTPMiddleware):
         except (json.JSONDecodeError, UnicodeDecodeError):
             return None
         except Exception as e:
-            logger.warning(f"Failed to capture request data: {e}")
+            logger.warning(
+                f"Failed to capture request data: {e}",
+                exc_info=True,
+                extra={"path": request.url.path},
+            )
             return None
 
     def _sanitize_data(self, data: Any) -> Any:
@@ -251,5 +255,12 @@ class AuditMiddleware(BaseHTTPMiddleware):
                 )
 
         except Exception as e:
-            # Log error but don't fail the request
-            logger.error(f"Failed to write audit log: {e}")
+            # Log error but don't fail the request (audit should never block main flow)
+            logger.error(
+                f"Failed to write audit log: {e}",
+                exc_info=True,
+                extra={
+                    "operation_type": operation_type.value if operation_type else None,
+                    "path": request.url.path,
+                },
+            )

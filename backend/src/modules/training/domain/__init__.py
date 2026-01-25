@@ -4,6 +4,9 @@ from .entities import Checkpoint, TrainingJob
 from .exceptions import (
     CheckpointNotFoundError,
     DuplicateJobNameError,
+    HyperPodOperationError,
+    HyperPodPodNotFoundError,
+    HyperPodSDKUnavailableError,
     InvalidJobStateError,
     TrainingError,
     TrainingJobNotFoundError,
@@ -42,4 +45,7 @@ __all__ = [
     "CheckpointNotFoundError",
     "DuplicateJobNameError",
     "InvalidJobStateError",
+    "HyperPodSDKUnavailableError",
+    "HyperPodPodNotFoundError",
+    "HyperPodOperationError",
 ]

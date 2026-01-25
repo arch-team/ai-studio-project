@@ -178,7 +178,10 @@ class MLflowService(IMetricsService):
         except MlflowException:
             return False
         except Exception as e:
-            logger.warning(f"MLflow 健康检查失败: {e}")
+            logger.warning(
+                f"MLflow 健康检查失败: {type(e).__name__}: {e}",
+                exc_info=True,
+            )
             return False
 
     async def _find_run_by_job_id(self, job_id: int) -> Any | None:

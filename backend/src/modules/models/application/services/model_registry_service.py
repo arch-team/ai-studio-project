@@ -63,9 +63,9 @@ class ModelRegistryService:
                 model_package_group_name=group_name,
                 model_package_group_description=f"Model group for {model.model_name}",
             )
-        except Exception:
-            # 组已存在，忽略错误
-            pass
+        except Exception as e:
+            # 组已存在或其他错误，记录并继续
+            logger.debug(f"Model package group '{group_name}' creation skipped: {type(e).__name__}: {e}")
 
         # 创建模型包
         model_package_arn = await self._sagemaker.create_model_package(

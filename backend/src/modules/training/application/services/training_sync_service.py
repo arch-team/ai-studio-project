@@ -121,7 +121,11 @@ class TrainingSyncService:
             return await self._process_status_change(job, hyperpod_response)
 
         except Exception as e:
-            logger.error(f"同步任务 {job.job_name} 失败: {e}")
+            logger.error(
+                f"同步任务 {job.job_name} 失败: {type(e).__name__}: {e}",
+                exc_info=True,
+                extra={"job_id": job.id, "job_name": job.job_name},
+            )
             return False
 
     async def _process_status_change(
@@ -173,7 +177,11 @@ class TrainingSyncService:
             await self._repo.update(job)
             return None
         except Exception as e:
-            logger.error(f"获取任务 {job.job_name} 状态失败: {e}")
+            logger.error(
+                f"获取任务 {job.job_name} 状态失败: {type(e).__name__}: {e}",
+                exc_info=True,
+                extra={"job_id": job.id, "job_name": job.job_name},
+            )
             return None
 
     async def _apply_status_transition(

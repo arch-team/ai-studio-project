@@ -215,9 +215,12 @@ class CheckpointMigrationService:
                 )
 
             except Exception as e:
-                last_error = str(e)
+                last_error = f"{type(e).__name__}: {e}"
                 logger.warning(
-                    f"Migration attempt {attempt + 1}/{max_retries} failed for checkpoint {checkpoint.id}: {e}"
+                    f"Migration attempt {attempt + 1}/{max_retries} failed for "
+                    f"checkpoint {checkpoint.id}: {type(e).__name__}: {e}",
+                    exc_info=True,
+                    extra={"checkpoint_id": checkpoint.id, "attempt": attempt + 1},
                 )
                 continue
 

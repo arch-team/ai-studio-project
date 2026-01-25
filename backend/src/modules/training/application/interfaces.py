@@ -163,7 +163,6 @@ class IMetricsService(ABC):
         Returns:
             list[MetricPoint]: 指标数据点列表，按时间升序排列
         """
-        pass
 
 
 # =============================================================================
@@ -196,7 +195,6 @@ class INotificationService(ABC):
         Args:
             alert: 告警消息
         """
-        pass
 
 
 # =============================================================================
@@ -230,7 +228,6 @@ class IStorageService(ABC):
         Returns:
             bool: NVMe 存储是否可用
         """
-        pass
 
     @abstractmethod
     async def check_fsx_available(self, job_id: int) -> bool:
@@ -242,7 +239,6 @@ class IStorageService(ABC):
         Returns:
             bool: FSx 存储是否可用
         """
-        pass
 
     @abstractmethod
     async def get_storage_path(
@@ -261,7 +257,6 @@ class IStorageService(ABC):
         Returns:
             str: 完整存储路径
         """
-        pass
 
     @abstractmethod
     async def save_checkpoint(
@@ -280,7 +275,6 @@ class IStorageService(ABC):
         Returns:
             StorageInfo: 包含路径、大小、校验和的存储信息
         """
-        pass
 
     @abstractmethod
     async def calculate_checksum(self, storage_path: str) -> str:
@@ -292,7 +286,6 @@ class IStorageService(ABC):
         Returns:
             str: SHA-256 校验和
         """
-        pass
 
     @abstractmethod
     async def get_checkpoint_size(self, storage_path: str) -> int:
@@ -304,7 +297,6 @@ class IStorageService(ABC):
         Returns:
             int: 文件大小 (字节)
         """
-        pass
 
     @abstractmethod
     async def migrate_checkpoint(
@@ -323,7 +315,6 @@ class IStorageService(ABC):
         Returns:
             str: 新的存储路径
         """
-        pass
 
     @abstractmethod
     async def verify_integrity(self, storage_path: str, expected_checksum: str) -> bool:
@@ -336,7 +327,6 @@ class IStorageService(ABC):
         Returns:
             bool: 文件是否完整
         """
-        pass
 
     @abstractmethod
     async def get_storage_usage(self, storage_tier: str) -> float:
@@ -348,7 +338,6 @@ class IStorageService(ABC):
         Returns:
             float: 使用率 (0.0 - 1.0)
         """
-        pass
 
     @abstractmethod
     async def delete_checkpoint(self, storage_path: str) -> None:
@@ -357,4 +346,3 @@ class IStorageService(ABC):
         Args:
             storage_path: 文件存储路径
         """
-        pass

@@ -81,3 +81,41 @@ class JobTemplatePermissionDeniedError(TrainingError):
         )
         self.operation = operation
         self.template_id = template_id
+
+
+# =============================================================================
+# HyperPod Client Exceptions
+# =============================================================================
+
+
+class HyperPodSDKUnavailableError(TrainingError):
+    """HyperPod SDK 不可用（未安装或导入失败）"""
+
+    def __init__(self, component: str = "HyperPodPytorchJob"):
+        super().__init__(
+            f"HyperPod SDK component '{component}' is not available. "
+            "Please install sagemaker-hyperpod package."
+        )
+        self.component = component
+
+
+class HyperPodPodNotFoundError(TrainingError):
+    """HyperPod Pod 不存在"""
+
+    def __init__(self, job_name: str, pod_name: str):
+        super().__init__(f"Pod '{pod_name}' not found in job '{job_name}'")
+        self.job_name = job_name
+        self.pod_name = pod_name
+
+
+class HyperPodOperationError(TrainingError):
+    """HyperPod 操作失败（参数错误、状态不匹配等）"""
+
+    def __init__(self, operation: str, reason: str, job_name: str | None = None):
+        message = f"HyperPod operation '{operation}' failed: {reason}"
+        if job_name:
+            message = f"HyperPod operation '{operation}' on job '{job_name}' failed: {reason}"
+        super().__init__(message)
+        self.operation = operation
+        self.reason = reason
+        self.job_name = job_name

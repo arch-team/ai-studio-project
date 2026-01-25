@@ -114,13 +114,17 @@ class StallDetectionService:
                 result = await self.check_job_stall(job, config)
                 results.append(result)
             except Exception as e:
-                logger.error(f"检查任务 {job.job_name} 停滞状态失败: {e}")
+                logger.error(
+                    f"检查任务 {job.job_name} 停滞状态失败: {type(e).__name__}: {e}",
+                    exc_info=True,
+                    extra={"job_id": job.id, "job_name": job.job_name},
+                )
                 results.append(
                     StallCheckResult(
                         job_id=job.id,
                         is_stalled=False,
                         skipped=True,
-                        skip_reason=f"error: {str(e)}",
+                        skip_reason=f"error: {type(e).__name__}: {e}",
                     )
                 )
 
