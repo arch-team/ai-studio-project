@@ -13,6 +13,7 @@ markers = [
     "slow: Slow running tests",
     "performance: Performance and load tests",
     "architecture: Architecture compliance tests",
+    "regression: Regression tests to ensure existing functionality",
 ]
 # Default: exclude AWS integration, slow, and performance tests
 addopts = "-m 'not aws_integration and not slow and not performance'"
