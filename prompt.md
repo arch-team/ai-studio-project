@@ -394,3 +394,23 @@ quickstart.md 是spec-kit生成的文档，请在完全理解quickstart.md 在sp
 
 
 check hyperpod-integration-service 检查各评估项状态
+
+
+/everything-claude-code:code-review  代码中存在大量   async def generate_presigned_urls_batch(                                                                                                                           
+          self,                                                                                                                                                                                                            
+          key: str,                                                                                                                                                                                                        
+          upload_id: str,                                                                                                                                                                                                  
+          part_numbers: list[int],                                                                                                                                                                                         
+          expiration: int = 3600,                                                                                                                                                                                          
+      ) -> list[dict[str, Any]]:                                                                                                                                                                                           
+          """批量生成分片上传预签名 URL。                                                                                                                                                                                  
+                                                                                                                                                                                                                           
+          Args:                                                                                                                                                                                                            
+              key: S3 对象键                                                                                                                                                                                               
+              upload_id: 分片上传 ID                                                                                                                                                                                       
+              part_numbers: 分片编号列表                                                                                                                                                                                   
+              expiration: URL 过期时间 (秒)                                                                                                                                                                                
+                                                                                                                                                                                                                           
+          Returns:                                                                                                                                                                                                         
+              包含 part_number 和 presigned_url 的字典列表                                                                                                                                                                 
+          """ 这样的多行注释，且方法的参数是否可以考虑放在一行避免真个文件的行数过多   

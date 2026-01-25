@@ -30,7 +30,9 @@
 
 
 /everything-claude-code:eval 对这个文件中的 '## Phase 4: US2 (P1) - 数据集管理 (14 tasks)'下的 
-‘ ‘制定评估，评估要使用真实的AWS环境 
+‘ ### 存储集成服务
+- [ ] [T047] [US2] S3 上传集成 - `backend/src/modules/datasets/application/services/dataset_upload.py`,实现分片上传,计算 MD5 校验和,支持断点续传
+- [ ] [T048] [US2] FSx for Lustre 路径管理 - `backend/src/modules/datasets/application/services/fsx_service.py`,管理 FSx 挂载路径,自动同步 S3 到 FSx (≥5GB/s 吞吐量),数据预热逻辑‘制定评估，相关评估项要使用真实的AWS环境 
 参考文件：/Users/jinhuasu/Project_Workspace/Anker-Projects/ml-platform-research/llm-platform-solution/ai-studio-project/specs/001-ai-training-platform/tasks.md  
 
 
