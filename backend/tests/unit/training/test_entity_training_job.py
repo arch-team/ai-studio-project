@@ -7,7 +7,6 @@ Tests cover:
 - Entity creation
 """
 
-
 import pytest
 
 from src.modules.training.domain.entities.training_job import (

@@ -3,8 +3,8 @@
 from dataclasses import dataclass, field
 from datetime import datetime
 
-from src.shared.utils import utc_now
 from src.shared.domain.exceptions import InvalidStateTransitionError
+from src.shared.utils import utc_now
 
 from ..value_objects import (
     INSTANCE_TYPE_RESOURCES,
@@ -52,9 +52,7 @@ class Space:
             InvalidStateTransitionError: If transition is not allowed
         """
         if not self.can_transition_to(new_status):
-            raise InvalidStateTransitionError(
-                "Space", self.status.value, new_status.value
-            )
+            raise InvalidStateTransitionError("Space", self.status.value, new_status.value)
         self.status = new_status
         self.updated_at = utc_now()
 
@@ -76,25 +74,19 @@ class Space:
     def start(self) -> None:
         """Start the space."""
         if not self.can_start():
-            raise InvalidStateTransitionError(
-                "Space", self.status.value, SpaceStatus.RUNNING.value
-            )
+            raise InvalidStateTransitionError("Space", self.status.value, SpaceStatus.RUNNING.value)
         self.transition_to(SpaceStatus.RUNNING)
 
     def stop(self) -> None:
         """Stop the space."""
         if not self.can_stop():
-            raise InvalidStateTransitionError(
-                "Space", self.status.value, SpaceStatus.STOPPED.value
-            )
+            raise InvalidStateTransitionError("Space", self.status.value, SpaceStatus.STOPPED.value)
         self.transition_to(SpaceStatus.STOPPED)
 
     def delete(self) -> None:
         """Mark space as deleted (soft delete)."""
         if not self.can_delete():
-            raise InvalidStateTransitionError(
-                "Space", self.status.value, SpaceStatus.DELETED.value
-            )
+            raise InvalidStateTransitionError("Space", self.status.value, SpaceStatus.DELETED.value)
         self.transition_to(SpaceStatus.DELETED)
 
     def mark_failed(self) -> None:

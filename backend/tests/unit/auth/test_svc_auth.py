@@ -180,10 +180,7 @@ class TestLocalLogin:
                 ip_address="127.0.0.1",
             )
 
-        assert (
-            "user_not_found" in str(exc_info.value).lower()
-            or "invalid" in str(exc_info.value).lower()
-        )
+        assert "user_not_found" in str(exc_info.value).lower() or "invalid" in str(exc_info.value).lower()
 
     @pytest.mark.asyncio
     async def test_local_login_invalid_password(
@@ -258,10 +255,7 @@ class TestLocalLogin:
                 ip_address="127.0.0.1",
             )
 
-        assert (
-            "sso" in str(exc_info.value).lower()
-            or "local" in str(exc_info.value).lower()
-        )
+        assert "sso" in str(exc_info.value).lower() or "local" in str(exc_info.value).lower()
 
     @pytest.mark.asyncio
     async def test_local_login_inactive_account(
@@ -280,10 +274,7 @@ class TestLocalLogin:
                 ip_address="127.0.0.1",
             )
 
-        assert (
-            "inactive" in str(exc_info.value).lower()
-            or "active" in str(exc_info.value).lower()
-        )
+        assert "inactive" in str(exc_info.value).lower() or "active" in str(exc_info.value).lower()
 
     @pytest.mark.asyncio
     async def test_local_login_5_failures_triggers_lock(

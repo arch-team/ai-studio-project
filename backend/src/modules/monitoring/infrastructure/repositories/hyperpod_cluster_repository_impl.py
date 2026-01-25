@@ -1,6 +1,6 @@
 """HyperPodCluster Repository Implementation (T068)."""
 
-from sqlalchemy import asc, desc, func, select
+from sqlalchemy import desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.shared.infrastructure.repository_base import EnhancedBaseRepository
@@ -35,9 +35,7 @@ class HyperPodClusterRepositoryImpl(
             total_gpu_count=model.total_gpu_count,
             total_memory_gb=model.total_memory_gb,
             status=ClusterStatus(model.status.value) if model.status else ClusterStatus.CREATING,
-            health_status=(
-                HealthStatus(model.health_status.value) if model.health_status else None
-            ),
+            health_status=(HealthStatus(model.health_status.value) if model.health_status else None),
             prometheus_endpoint=model.prometheus_endpoint,
             grafana_workspace_id=model.grafana_workspace_id,
             fsx_filesystem_id=model.fsx_filesystem_id,
@@ -62,9 +60,7 @@ class HyperPodClusterRepositoryImpl(
             total_gpu_count=entity.total_gpu_count,
             total_memory_gb=entity.total_memory_gb,
             status=ClusterStatus(entity.status.value),
-            health_status=(
-                HealthStatus(entity.health_status.value) if entity.health_status else None
-            ),
+            health_status=(HealthStatus(entity.health_status.value) if entity.health_status else None),
             prometheus_endpoint=entity.prometheus_endpoint,
             grafana_workspace_id=entity.grafana_workspace_id,
             fsx_filesystem_id=entity.fsx_filesystem_id,
@@ -85,9 +81,7 @@ class HyperPodClusterRepositoryImpl(
         model.total_gpu_count = entity.total_gpu_count
         model.total_memory_gb = entity.total_memory_gb
         model.status = ClusterStatus(entity.status.value)
-        model.health_status = (
-            HealthStatus(entity.health_status.value) if entity.health_status else None
-        )
+        model.health_status = HealthStatus(entity.health_status.value) if entity.health_status else None
         model.prometheus_endpoint = entity.prometheus_endpoint
         model.grafana_workspace_id = entity.grafana_workspace_id
         model.fsx_filesystem_id = entity.fsx_filesystem_id
@@ -97,9 +91,7 @@ class HyperPodClusterRepositoryImpl(
     async def get_by_name(self, cluster_name: str) -> HyperPodCluster | None:
         """Get cluster by name."""
         result = await self._session.execute(
-            select(HyperPodClusterModel).where(
-                HyperPodClusterModel.cluster_name == cluster_name
-            )
+            select(HyperPodClusterModel).where(HyperPodClusterModel.cluster_name == cluster_name)
         )
         model = result.scalar_one_or_none()
         if model is None:
@@ -109,9 +101,7 @@ class HyperPodClusterRepositoryImpl(
     async def get_by_arn(self, cluster_arn: str) -> HyperPodCluster | None:
         """Get cluster by ARN."""
         result = await self._session.execute(
-            select(HyperPodClusterModel).where(
-                HyperPodClusterModel.cluster_arn == cluster_arn
-            )
+            select(HyperPodClusterModel).where(HyperPodClusterModel.cluster_arn == cluster_arn)
         )
         model = result.scalar_one_or_none()
         if model is None:

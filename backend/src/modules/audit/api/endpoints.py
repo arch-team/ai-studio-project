@@ -89,9 +89,7 @@ async def _get_logs_by_date_range(
     return logs, total
 
 
-async def _get_all_logs(
-    service: AuditService, page_size: int, offset: int
-) -> tuple[list[AuditLog], int]:
+async def _get_all_logs(service: AuditService, page_size: int, offset: int) -> tuple[list[AuditLog], int]:
     """获取所有审计日志."""
     logs = await service.get_audit_logs(limit=page_size, offset=offset)
     total = await service.count_total_logs()
@@ -123,13 +121,9 @@ async def get_audit_logs(
     if user_id is not None:
         logs, total = await _get_logs_by_user(service, user_id, page_size, offset)
     elif resource_type is not None and resource_id is not None:
-        logs, total = await _get_logs_by_resource(
-            service, resource_type, resource_id, page_size, offset
-        )
+        logs, total = await _get_logs_by_resource(service, resource_type, resource_id, page_size, offset)
     elif start_date is not None and end_date is not None:
-        logs, total = await _get_logs_by_date_range(
-            service, start_date, end_date, page_size, offset
-        )
+        logs, total = await _get_logs_by_date_range(service, start_date, end_date, page_size, offset)
     else:
         logs, total = await _get_all_logs(service, page_size, offset)
 

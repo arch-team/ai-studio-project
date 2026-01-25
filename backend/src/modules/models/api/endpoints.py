@@ -51,7 +51,7 @@ async def create_model(
     data: CreateModelRequest,
     current_user: CurrentUser = Depends(require_engineer),
     service: ModelService = Depends(get_model_service),
-):
+) -> ModelDetail:
     """Create/register a new model."""
     model_data = data.model_dump(mode="json")
     model = await service.create_model(owner_id=current_user.user_id, data=model_data)
@@ -73,7 +73,7 @@ async def list_models(
     sort_order: SortOrderParam = SortOrder.DESC,
     current_user: CurrentUser = Depends(get_current_active_user),
     service: ModelService = Depends(get_model_service),
-):
+) -> ModelListResponse:
     """List models with pagination and filters."""
     # Validate sort_by field
     if sort_by not in VALID_SORT_FIELDS:
@@ -115,7 +115,7 @@ async def get_model(
     model_id: int,
     current_user: CurrentUser = Depends(get_current_active_user),
     service: ModelService = Depends(get_model_service),
-):
+) -> ModelDetail:
     """Get model details by ID."""
     model = await service.get_model(model_id)
     check_resource_owner_or_privileged(model.owner_id, current_user, "model", "view")
@@ -134,12 +134,10 @@ async def get_model_versions(
     compare_with: int | None = Query(default=None, description="Version ID to compare with"),
     current_user: CurrentUser = Depends(get_current_active_user),
     service: ModelService = Depends(get_model_service),
-):
+) -> ModelVersionsResponse:
     """Get all versions of a model with optional comparison."""
     model = await service.get_model(model_id)
-    check_resource_owner_or_privileged(
-        model.owner_id, current_user, "model", "view versions of"
-    )
+    check_resource_owner_or_privileged(model.owner_id, current_user, "model", "view versions of")
     result = await service.get_model_versions(model_id, compare_with)
 
     # Convert to response format
@@ -185,7 +183,7 @@ async def delete_model(
     model_id: int,
     current_user: CurrentUser = Depends(require_engineer),
     service: ModelService = Depends(get_model_service),
-):
+) -> None:
     """Delete/archive a model."""
     model = await service.get_model(model_id)
     check_resource_owner_or_privileged(model.owner_id, current_user, "model", "delete")
@@ -205,7 +203,7 @@ async def archive_model(
     model_id: int,
     current_user: CurrentUser = Depends(require_engineer),
     service: ModelService = Depends(get_model_service),
-):
+) -> ModelDetail:
     """Archive a model."""
     model = await service.get_model(model_id)
     check_resource_owner_or_privileged(model.owner_id, current_user, "model", "archive")

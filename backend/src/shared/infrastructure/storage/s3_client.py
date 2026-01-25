@@ -3,7 +3,8 @@
 Implements IStorageService interface using aioboto3 for native async operations.
 """
 
-from typing import Any, AsyncIterator
+from collections.abc import AsyncIterator
+from typing import Any
 
 import aioboto3
 from botocore.exceptions import ClientError
@@ -21,7 +22,7 @@ class S3StorageClient(IStorageService):
     def __init__(
         self,
         bucket_name: str,
-        region: str = "us-west-2",
+        region: str = "us-east-1",
         kms_key_id: str | None = None,
     ) -> None:
         """Initialize S3 storage client.

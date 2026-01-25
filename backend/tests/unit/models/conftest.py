@@ -1,6 +1,5 @@
 """Models module test fixtures."""
 
-from datetime import UTC, datetime
 from unittest.mock import AsyncMock
 
 import pytest

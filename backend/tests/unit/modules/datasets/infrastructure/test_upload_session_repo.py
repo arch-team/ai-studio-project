@@ -101,7 +101,7 @@ class TestUploadSessionRepositoryImplToEntity:
 
     def test_to_entity_with_completed_parts(self) -> None:
         """验证带已完成分片的模型转换。"""
-        from src.modules.datasets.domain.value_objects import UploadPart, UploadSession
+        from src.modules.datasets.domain.value_objects import UploadPart
         from src.modules.datasets.infrastructure.repositories import (
             UploadSessionRepositoryImpl,
         )
@@ -414,7 +414,7 @@ class TestUploadSessionRepositoryImplAdd:
 
         mock_session.refresh = mock_refresh
 
-        result = await repo.add(entity)
+        await repo.add(entity)
 
         mock_session.add.assert_called_once()
         mock_session.flush.assert_called_once()

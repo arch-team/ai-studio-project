@@ -7,7 +7,6 @@ from src.shared.infrastructure.security import ROLE_HIERARCHY
 from ...domain.exceptions import InsufficientPermissionsError
 from ...domain.value_objects import Permission
 
-
 # Role to permission mapping
 ROLE_PERMISSIONS: dict[str, set[Permission]] = {
     "admin": set(Permission),  # Admin has all permissions
@@ -130,11 +129,7 @@ class RBACService:
 
     def get_allowed_roles_for_permission(self, permission: Permission) -> list[str]:
         """Get list of roles that have a specific permission."""
-        return [
-            role
-            for role, permissions in ROLE_PERMISSIONS.items()
-            if permission in permissions
-        ]
+        return [role for role, permissions in ROLE_PERMISSIONS.items() if permission in permissions]
 
 
 @lru_cache

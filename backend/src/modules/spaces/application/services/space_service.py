@@ -29,9 +29,7 @@ class SpaceService(BaseService[Space, str]):
         space_name = data["space_name"]
 
         # Check for duplicate name for same owner
-        existing = await self._space_repository.get_by_name_and_owner(
-            space_name, owner_id
-        )
+        existing = await self._space_repository.get_by_name_and_owner(space_name, owner_id)
         if existing:
             raise DuplicateSpaceNameError(space_name, owner_id)
 

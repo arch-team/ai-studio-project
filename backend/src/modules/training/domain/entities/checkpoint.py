@@ -4,8 +4,8 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from decimal import Decimal
 
-from src.shared.utils import utc_now
 from src.shared.domain.exceptions import InvalidStateTransitionError
+from src.shared.utils import utc_now
 
 from ..value_objects import (
     CheckpointStatus,
@@ -63,9 +63,7 @@ class Checkpoint:
             InvalidStateTransitionError: If migration is not allowed
         """
         if not self.can_migrate_to(target_tier):
-            raise InvalidStateTransitionError(
-                "Checkpoint.storage_tier", self.storage_tier.value, target_tier.value
-            )
+            raise InvalidStateTransitionError("Checkpoint.storage_tier", self.storage_tier.value, target_tier.value)
         self.storage_tier = target_tier
         self.updated_at = utc_now()
 
@@ -101,9 +99,7 @@ class Checkpoint:
             InvalidStateTransitionError: If checkpoint cannot be archived
         """
         if not self.can_archive():
-            raise InvalidStateTransitionError(
-                "Checkpoint", self.status.value, CheckpointStatus.ARCHIVED.value
-            )
+            raise InvalidStateTransitionError("Checkpoint", self.status.value, CheckpointStatus.ARCHIVED.value)
         self.status = CheckpointStatus.ARCHIVED
         self.archived_at = utc_now()
         self.updated_at = utc_now()
@@ -115,9 +111,7 @@ class Checkpoint:
             InvalidStateTransitionError: If checkpoint cannot be deleted
         """
         if not self.can_delete():
-            raise InvalidStateTransitionError(
-                "Checkpoint", self.status.value, CheckpointStatus.DELETED.value
-            )
+            raise InvalidStateTransitionError("Checkpoint", self.status.value, CheckpointStatus.DELETED.value)
         self.status = CheckpointStatus.DELETED
         self.deleted_at = utc_now()
         self.updated_at = utc_now()

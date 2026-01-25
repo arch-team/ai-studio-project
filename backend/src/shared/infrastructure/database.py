@@ -17,31 +17,30 @@ def import_all_models() -> None:
     This must be called before using any ORM relationships that use string references.
     """
     # Auth module models
-    from src.modules.auth.infrastructure.models import UserModel, LoginAttemptModel  # noqa: F401
-
-    # Training module models
-    from src.modules.training.infrastructure.models import (  # noqa: F401
-        TrainingJobModel,
-        CheckpointModel,
-    )
-
-    # Quotas module models
-    from src.modules.quotas.infrastructure.models import (  # noqa: F401
-        ResourceQuotaModel,
-        ResourceLimitConfigModel,
-    )
-
-    # Models module models
-    from src.modules.models.infrastructure.models import ModelModel  # noqa: F401
-
-    # Spaces module models
-    from src.modules.spaces.infrastructure.models import DevelopmentSpaceModel  # noqa: F401
+    # Audit module models
+    from src.modules.audit.infrastructure.models import AuditLogModel  # noqa: F401
+    from src.modules.auth.infrastructure.models import LoginAttemptModel, UserModel  # noqa: F401
 
     # Datasets module models
     from src.modules.datasets.infrastructure.models import DatasetModel  # noqa: F401
 
-    # Audit module models
-    from src.modules.audit.infrastructure.models import AuditLogModel  # noqa: F401
+    # Models module models
+    from src.modules.models.infrastructure.models import ModelModel  # noqa: F401
+
+    # Quotas module models
+    from src.modules.quotas.infrastructure.models import (  # noqa: F401
+        ResourceLimitConfigModel,
+        ResourceQuotaModel,
+    )
+
+    # Spaces module models
+    from src.modules.spaces.infrastructure.models import DevelopmentSpaceModel  # noqa: F401
+
+    # Training module models
+    from src.modules.training.infrastructure.models import (  # noqa: F401
+        CheckpointModel,
+        TrainingJobModel,
+    )
 
     logger.debug("All ORM models imported successfully")
 

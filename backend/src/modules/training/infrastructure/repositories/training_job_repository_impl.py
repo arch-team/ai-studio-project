@@ -47,7 +47,11 @@ class TrainingJobRepository(
             distribution_strategy=DistributionStrategy(model.distribution_strategy.value),
             mixed_precision=model.mixed_precision,
             use_spot_instances=model.use_spot_instances,
-            spot_interruption_behavior=SpotInterruptionBehavior(model.spot_interruption_behavior.value) if model.spot_interruption_behavior else None,
+            spot_interruption_behavior=(
+                SpotInterruptionBehavior(model.spot_interruption_behavior.value)
+                if model.spot_interruption_behavior
+                else None
+            ),
             priority=JobPriority(model.priority.value),
             status=JobStatus(model.status.value),
             dataset_id=model.dataset_id,
@@ -130,9 +134,7 @@ class TrainingJobRepository(
 
     async def get_by_name(self, job_name: str) -> TrainingJob | None:
         """Get training job by unique name."""
-        result = await self._session.execute(
-            select(TrainingJobModel).where(TrainingJobModel.job_name == job_name)
-        )
+        result = await self._session.execute(select(TrainingJobModel).where(TrainingJobModel.job_name == job_name))
         model = result.scalar_one_or_none()
         if model is None:
             return None
@@ -199,9 +201,7 @@ class TrainingJobRepository(
     async def exists_by_name(self, job_name: str) -> bool:
         """Check if a job with the given name exists."""
         result = await self._session.execute(
-            select(func.count(TrainingJobModel.id)).where(
-                TrainingJobModel.job_name == job_name
-            )
+            select(func.count(TrainingJobModel.id)).where(TrainingJobModel.job_name == job_name)
         )
         count = result.scalar() or 0
         return count > 0

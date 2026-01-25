@@ -22,11 +22,14 @@ raise UserNotFoundError(user_id="123")
 完全替换旧的 DomainError / SecurityError 体系，所有异常迁移到 Problem 基类。
 """
 
+from collections.abc import Callable
 from dataclasses import dataclass, field, fields
-from typing import Any, ClassVar
+from typing import Any, ClassVar, TypeVar
+
+T = TypeVar("T", bound=type)
 
 
-def problem(status: int, code: str, message_template: str | None = None):
+def problem(status: int, code: str, message_template: str | None = None) -> Callable[[T], T]:
     """装饰器：注入 HTTP 状态码、错误代码和消息模板。
 
     Args:
@@ -45,12 +48,14 @@ def problem(status: int, code: str, message_template: str | None = None):
         # err.http_status == 404
         # err.error_code == "USER_NOT_FOUND"
     """
-    def decorator(cls):
-        cls.http_status = status
-        cls.error_code = code
+
+    def decorator(cls: T) -> T:
+        cls.http_status = status  # type: ignore[attr-defined]
+        cls.error_code = code  # type: ignore[attr-defined]
         if message_template:
-            cls._message_template = message_template
+            cls._message_template = message_template  # type: ignore[attr-defined]
         return cls
+
     return decorator
 
 
@@ -111,11 +116,7 @@ class Problem(Exception):
 
     def _get_field_values(self) -> dict[str, Any]:
         """获取所有数据字段的值（排除 message）。"""
-        return {
-            f.name: getattr(self, f.name)
-            for f in fields(self)
-            if f.name != "message" and f.init
-        }
+        return {f.name: getattr(self, f.name) for f in fields(self) if f.name != "message" and f.init}
 
     def get_details(self) -> dict[str, Any] | None:
         """返回结构化错误详情。自动包含所有数据字段。"""

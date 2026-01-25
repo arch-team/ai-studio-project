@@ -534,9 +534,7 @@ class TestAuditMiddlewareResponseCapture:
         from src.modules.audit.api.middleware import AuditMiddleware
         from src.modules.audit.domain.value_objects import AuditStatus
 
-        app = self._create_test_app(
-            AuditMiddleware, mock_audit_repository, status_code=201
-        )
+        app = self._create_test_app(AuditMiddleware, mock_audit_repository, status_code=201)
         client = TestClient(app)
 
         response = client.post("/api/v1/training-jobs", json={"name": "test"})
@@ -555,9 +553,7 @@ class TestAuditMiddlewareResponseCapture:
         from src.modules.audit.api.middleware import AuditMiddleware
         from src.modules.audit.domain.value_objects import AuditStatus
 
-        app = self._create_test_app(
-            AuditMiddleware, mock_audit_repository, status_code=400
-        )
+        app = self._create_test_app(AuditMiddleware, mock_audit_repository, status_code=400)
         client = TestClient(app)
 
         response = client.post("/api/v1/training-jobs", json={"name": "test"})
@@ -576,9 +572,7 @@ class TestAuditMiddlewareResponseCapture:
         from src.modules.audit.api.middleware import AuditMiddleware
         from src.modules.audit.domain.value_objects import AuditStatus
 
-        app = self._create_test_app(
-            AuditMiddleware, mock_audit_repository, status_code=500
-        )
+        app = self._create_test_app(AuditMiddleware, mock_audit_repository, status_code=500)
         client = TestClient(app)
 
         response = client.post("/api/v1/training-jobs", json={"name": "test"})
@@ -596,9 +590,7 @@ class TestAuditMiddlewareResponseCapture:
         """Include response status code in response_data."""
         from src.modules.audit.api.middleware import AuditMiddleware
 
-        app = self._create_test_app(
-            AuditMiddleware, mock_audit_repository, status_code=201
-        )
+        app = self._create_test_app(AuditMiddleware, mock_audit_repository, status_code=201)
         client = TestClient(app)
 
         response = client.post("/api/v1/training-jobs", json={"name": "test"})

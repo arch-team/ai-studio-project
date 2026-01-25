@@ -6,18 +6,19 @@ registers them with the FastAPI application.
 
 from fastapi import APIRouter
 
+from src.modules.audit.api.endpoints import router as audit_router
+
 # Import module routers
 from src.modules.auth.api.endpoints import router as auth_router
 from src.modules.auth.api.endpoints.users import router as users_router
-from src.modules.training.api.endpoints import router as training_router
-from src.modules.training.api.job_templates import router as job_templates_router
+from src.modules.datasets.api.endpoints import router as datasets_router
 from src.modules.models.api.endpoints import router as models_router
+from src.modules.monitoring.api.endpoints import router as monitoring_router
 from src.modules.quotas.api.endpoints import router as quotas_router
 from src.modules.quotas.api.resource_quota_endpoints import router as resource_quotas_router
-from src.modules.datasets.api.endpoints import router as datasets_router
 from src.modules.spaces.api.endpoints import router as spaces_router
-from src.modules.audit.api.endpoints import router as audit_router
-from src.modules.monitoring.api.endpoints import router as monitoring_router
+from src.modules.training.api.endpoints import router as training_router
+from src.modules.training.api.job_templates import router as job_templates_router
 
 # API v1 router
 api_router = APIRouter(prefix="/api/v1")

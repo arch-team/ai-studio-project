@@ -218,9 +218,7 @@ class FsxSyncService:
         """获取数据集路径。"""
         return f"datasets/{dataset_id}/"
 
-    def _build_sync_paths(
-        self, dataset_id: int, paths: list[str] | None = None
-    ) -> list[str]:
+    def _build_sync_paths(self, dataset_id: int, paths: list[str] | None = None) -> list[str]:
         """构建同步路径列表。
 
         Args:

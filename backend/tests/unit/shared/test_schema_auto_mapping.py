@@ -6,8 +6,6 @@ from decimal import Decimal
 from enum import Enum
 from typing import ClassVar
 
-import pytest
-
 from src.shared.api.schemas.enhanced_base import AutoMappingEntitySchema
 
 

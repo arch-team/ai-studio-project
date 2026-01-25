@@ -12,7 +12,6 @@ from src.modules.monitoring.application.services.cluster_health_service import (
 from src.modules.monitoring.domain.entities import HyperPodCluster
 from src.modules.monitoring.domain.value_objects import ClusterStatus, HealthStatus
 
-
 # === Fixtures ===
 
 

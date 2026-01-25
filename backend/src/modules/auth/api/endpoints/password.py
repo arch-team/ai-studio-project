@@ -61,9 +61,7 @@ async def request_password_reset(
 
     # 注意: 生产环境应发送包含 Token 的重置链接邮件
     # 目前仅确认请求，出于安全考虑不透露用户是否存在
-    return MessageResponse(
-        message="If an account exists with this email, a password reset link will be sent"
-    )
+    return MessageResponse(message="If an account exists with this email, a password reset link will be sent")
 
 
 @router.post(

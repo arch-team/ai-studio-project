@@ -18,10 +18,9 @@ import pytest_asyncio
 
 from src.modules.training.application.services.hyperpod_service import (
     HyperPodService,
-    HyperPodServiceError,
 )
-from src.shared.domain.exceptions import EntityNotFoundError
 from src.modules.training.infrastructure.hyperpod.client import HyperPodClient
+from src.shared.domain.exceptions import EntityNotFoundError
 
 # Mark all tests as AWS integration tests
 pytestmark = [
@@ -209,9 +208,7 @@ class TestHyperPodServiceClusterOperations:
         """Verify test cluster appears in cluster list."""
         result = await hyperpod_client.list_clusters(max_results=100)
 
-        cluster_names = [
-            c.get("ClusterName", "") for c in result.get("ClusterSummaries", [])
-        ]
+        cluster_names = [c.get("ClusterName", "") for c in result.get("ClusterSummaries", [])]
         assert test_cluster_name in cluster_names
 
 
@@ -250,9 +247,7 @@ class TestHyperPodServiceWriteOperations:
             await asyncio.sleep(5)
 
             # Check status
-            status_result = await hyperpod_service.get_job_status(
-                job_name=test_job_name
-            )
+            status_result = await hyperpod_service.get_job_status(job_name=test_job_name)
             assert status_result["job_name"] == test_job_name
 
         finally:

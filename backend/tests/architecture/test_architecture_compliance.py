@@ -12,7 +12,6 @@ Modular Monolith Rules (see docs/module-dependency-spec.md):
 """
 
 import ast
-import os
 from pathlib import Path
 
 import pytest
@@ -81,9 +80,7 @@ class TestApplicationLayerDoesNotImportInfrastructure:
         app_path = backend_src_path / "application"
         return get_python_files(app_path)
 
-    def test_application_services_do_not_import_infrastructure_models(
-        self, application_files: list[Path]
-    ):
+    def test_application_services_do_not_import_infrastructure_models(self, application_files: list[Path]):
         """Application services should not import infrastructure persistence models.
 
         Violation of this rule indicates that the application layer is tightly
@@ -97,20 +94,14 @@ class TestApplicationLayerDoesNotImportInfrastructure:
             for imp in imports:
                 # Check for direct infrastructure model imports
                 if "infrastructure.persistence.models" in imp:
-                    violations.append(
-                        f"{file_path.relative_to(file_path.parent.parent.parent)}: "
-                        f"imports '{imp}'"
-                    )
+                    violations.append(f"{file_path.relative_to(file_path.parent.parent.parent)}: " f"imports '{imp}'")
 
         assert not violations, (
             f"Application layer should not import infrastructure models.\n"
-            f"Found {len(violations)} violation(s):\n"
-            + "\n".join(f"  - {v}" for v in violations)
+            f"Found {len(violations)} violation(s):\n" + "\n".join(f"  - {v}" for v in violations)
         )
 
-    def test_application_services_do_not_use_sqlalchemy_select(
-        self, application_files: list[Path]
-    ):
+    def test_application_services_do_not_use_sqlalchemy_select(self, application_files: list[Path]):
         """Application services should not use SQLAlchemy select directly.
 
         Database queries should be encapsulated in repository implementations.
@@ -124,29 +115,23 @@ class TestApplicationLayerDoesNotImportInfrastructure:
                 if imp == "sqlalchemy" or imp.startswith("sqlalchemy."):
                     if "ext.asyncio" not in imp:  # Allow AsyncSession type hint
                         violations.append(
-                            f"{file_path.relative_to(file_path.parent.parent.parent)}: "
-                            f"imports '{imp}'"
+                            f"{file_path.relative_to(file_path.parent.parent.parent)}: " f"imports '{imp}'"
                         )
 
         # Note: This test may need adjustment based on your specific rules
         # For now, we allow AsyncSession for dependency injection
-        sqlalchemy_query_imports = [
-            v for v in violations if "select" in v.lower() or "sqlalchemy" in v.lower()
-        ]
+        sqlalchemy_query_imports = [v for v in violations if "select" in v.lower() or "sqlalchemy" in v.lower()]
 
         if sqlalchemy_query_imports:
             # Filter out acceptable imports (AsyncSession for DI)
             actual_violations = [
-                v
-                for v in sqlalchemy_query_imports
-                if "ext.asyncio" not in v and "AsyncSession" not in v
+                v for v in sqlalchemy_query_imports if "ext.asyncio" not in v and "AsyncSession" not in v
             ]
 
             if actual_violations:
                 assert False, (
-                    f"Application layer should not use SQLAlchemy queries directly.\n"
-                    f"Found violation(s):\n"
-                    + "\n".join(f"  - {v}" for v in actual_violations)
+                    "Application layer should not use SQLAlchemy queries directly.\n"
+                    "Found violation(s):\n" + "\n".join(f"  - {v}" for v in actual_violations)
                 )
 
 
@@ -165,9 +150,7 @@ class TestDomainLayerIndependence:
         domain_path = backend_src_path / "domain"
         return get_python_files(domain_path)
 
-    def test_domain_layer_does_not_import_infrastructure(
-        self, domain_files: list[Path]
-    ):
+    def test_domain_layer_does_not_import_infrastructure(self, domain_files: list[Path]):
         """Domain layer should not import infrastructure modules."""
         violations = []
 
@@ -176,15 +159,11 @@ class TestDomainLayerIndependence:
 
             for imp in imports:
                 if "infrastructure" in imp:
-                    violations.append(
-                        f"{file_path.relative_to(file_path.parent.parent.parent)}: "
-                        f"imports '{imp}'"
-                    )
+                    violations.append(f"{file_path.relative_to(file_path.parent.parent.parent)}: " f"imports '{imp}'")
 
         assert not violations, (
             f"Domain layer should not import infrastructure modules.\n"
-            f"Found {len(violations)} violation(s):\n"
-            + "\n".join(f"  - {v}" for v in violations)
+            f"Found {len(violations)} violation(s):\n" + "\n".join(f"  - {v}" for v in violations)
         )
 
     def test_domain_layer_does_not_import_api(self, domain_files: list[Path]):
@@ -196,15 +175,12 @@ class TestDomainLayerIndependence:
 
             for imp in imports:
                 if "api." in imp or imp.startswith("src.api"):
-                    violations.append(
-                        f"{file_path.relative_to(file_path.parent.parent.parent)}: "
-                        f"imports '{imp}'"
-                    )
+                    violations.append(f"{file_path.relative_to(file_path.parent.parent.parent)}: " f"imports '{imp}'")
 
-        assert not violations, (
-            f"Domain layer should not import API modules.\n"
-            f"Found {len(violations)} violation(s):\n"
-            + "\n".join(f"  - {v}" for v in violations)
+        assert (
+            not violations
+        ), f"Domain layer should not import API modules.\n" f"Found {len(violations)} violation(s):\n" + "\n".join(
+            f"  - {v}" for v in violations
         )
 
 
@@ -226,9 +202,7 @@ class TestApiLayerDoesNotImportInfrastructureModels:
         api_path = backend_src_path / "api" / "v1" / "endpoints"
         return get_python_files(api_path)
 
-    def test_api_endpoints_do_not_import_orm_models(
-        self, api_endpoint_files: list[Path]
-    ):
+    def test_api_endpoints_do_not_import_orm_models(self, api_endpoint_files: list[Path]):
         """API endpoints should not import infrastructure ORM models.
 
         Endpoints should work with domain entities through services,
@@ -242,20 +216,15 @@ class TestApiLayerDoesNotImportInfrastructureModels:
             for imp in imports:
                 # Check for direct ORM model imports
                 if "infrastructure.persistence.models" in imp:
-                    violations.append(
-                        f"{file_path.name}: imports '{imp}'"
-                    )
+                    violations.append(f"{file_path.name}: imports '{imp}'")
 
         assert not violations, (
             f"API endpoints should not import infrastructure ORM models.\n"
             f"Use services/repositories instead of direct ORM access.\n"
-            f"Found {len(violations)} violation(s):\n"
-            + "\n".join(f"  - {v}" for v in violations)
+            f"Found {len(violations)} violation(s):\n" + "\n".join(f"  - {v}" for v in violations)
         )
 
-    def test_api_endpoints_do_not_use_session_add(
-        self, api_endpoint_files: list[Path]
-    ):
+    def test_api_endpoints_do_not_use_session_add(self, api_endpoint_files: list[Path]):
         """API endpoints should not call session.add() directly.
 
         Database writes should be encapsulated in services/repositories.
@@ -274,17 +243,14 @@ class TestApiLayerDoesNotImportInfrastructureModels:
                     if stripped.startswith("#"):
                         continue
                     if "session.add(" in line:
-                        violations.append(
-                            f"{file_path.name}:{i}: contains 'session.add()'"
-                        )
+                        violations.append(f"{file_path.name}:{i}: contains 'session.add()'")
             except Exception:
                 pass
 
         assert not violations, (
             f"API endpoints should not call session.add() directly.\n"
             f"Database writes should go through services/repositories.\n"
-            f"Found {len(violations)} violation(s):\n"
-            + "\n".join(f"  - {v}" for v in violations)
+            f"Found {len(violations)} violation(s):\n" + "\n".join(f"  - {v}" for v in violations)
         )
 
 
@@ -303,9 +269,7 @@ class TestDomainExceptionUsage:
         entities_path = backend_src_path / "domain" / "entities"
         return get_python_files(entities_path)
 
-    def test_domain_entities_do_not_use_valueerror_for_state_transitions(
-        self, domain_entity_files: list[Path]
-    ):
+    def test_domain_entities_do_not_use_valueerror_for_state_transitions(self, domain_entity_files: list[Path]):
         """Domain entities should use InvalidStateTransitionError, not ValueError.
 
         State transition errors are domain-specific and should be expressed
@@ -328,16 +292,13 @@ class TestDomainExceptionUsage:
                         continue
                     # Check for ValueError usage in state transition context
                     if "raise ValueError" in line:
-                        violations.append(
-                            f"{file_path.name}:{i}: uses ValueError instead of domain exception"
-                        )
+                        violations.append(f"{file_path.name}:{i}: uses ValueError instead of domain exception")
             except Exception:
                 pass
 
         assert not violations, (
             f"Domain entities should use domain exceptions (e.g., InvalidStateTransitionError).\n"
-            f"Found {len(violations)} violation(s):\n"
-            + "\n".join(f"  - {v}" for v in violations)
+            f"Found {len(violations)} violation(s):\n" + "\n".join(f"  - {v}" for v in violations)
         )
 
 
@@ -370,7 +331,6 @@ class TestMiddlewareExecutionOrder:
         # We need to find the actual add_middleware calls, not imports
         audit_add_pos = source.find("add_middleware(AuditMiddleware")
         auth_add_pos = source.find("add_middleware(AuthenticationMiddleware")
-        cors_add_pos = source.find("add_middleware")  # First occurrence is CORS
 
         # For correct LIFO execution order (CORS -> Auth -> Audit on request),
         # the add order in code should be: Audit -> Auth -> CORS
@@ -443,9 +403,7 @@ class TestApiErrorResponseConsistency:
         schema_path = backend_src_path / "api" / "v1" / "schemas"
         return get_python_files(schema_path)
 
-    def test_error_response_defined_only_in_common(
-        self, api_schema_files: list[Path]
-    ):
+    def test_error_response_defined_only_in_common(self, api_schema_files: list[Path]):
         """ErrorResponse should only be defined in common.py.
 
         All other schema files should import from common.py.
@@ -462,22 +420,17 @@ class TestApiErrorResponseConsistency:
 
                 # Check for local ErrorResponse class definition
                 if "class ErrorResponse" in content:
-                    violations.append(
-                        f"{file_path.name}: defines its own ErrorResponse class"
-                    )
+                    violations.append(f"{file_path.name}: defines its own ErrorResponse class")
             except Exception:
                 pass
 
         assert not violations, (
             f"ErrorResponse should only be defined in common.py.\n"
             f"Other schema files should import from common.py.\n"
-            f"Found {len(violations)} violation(s):\n"
-            + "\n".join(f"  - {v}" for v in violations)
+            f"Found {len(violations)} violation(s):\n" + "\n".join(f"  - {v}" for v in violations)
         )
 
-    def test_middleware_uses_consistent_error_format(
-        self, backend_src_path: Path
-    ):
+    def test_middleware_uses_consistent_error_format(self, backend_src_path: Path):
         """Middleware should use consistent error response format.
 
         All error responses should use 'code' field, not 'error'.
@@ -494,16 +447,13 @@ class TestApiErrorResponseConsistency:
                 lines = content.split("\n")
                 for i, line in enumerate(lines, 1):
                     if '"error":' in line and "JSONResponse" in content:
-                        violations.append(
-                            f"{file_path.name}:{i}: uses 'error' instead of 'code'"
-                        )
+                        violations.append(f"{file_path.name}:{i}: uses 'error' instead of 'code'")
             except Exception:
                 pass
 
         assert not violations, (
             f"Middleware should use 'code' field for error responses.\n"
-            f"Found {len(violations)} violation(s):\n"
-            + "\n".join(f"  - {v}" for v in violations)
+            f"Found {len(violations)} violation(s):\n" + "\n".join(f"  - {v}" for v in violations)
         )
 
 
@@ -523,72 +473,56 @@ class TestApiStateTransitionEndpoints:
         current = Path(__file__).parent
         return current.parent.parent / "src"
 
-    def test_training_jobs_has_dedicated_pause_endpoint(
-        self, backend_src_path: Path
-    ):
+    def test_training_jobs_has_dedicated_pause_endpoint(self, backend_src_path: Path):
         """Training jobs API should have a dedicated POST /pause endpoint."""
         # Updated path for modular architecture
-        endpoint_file = (
-            backend_src_path / "modules" / "training" / "api" / "endpoints.py"
-        )
+        endpoint_file = backend_src_path / "modules" / "training" / "api" / "endpoints.py"
 
         with open(endpoint_file, encoding="utf-8") as f:
             content = f.read()
 
         # Check for dedicated pause endpoint
-        assert '/{job_id}/pause' in content or "/{job_id}/pause" in content, (
+        assert "/{job_id}/pause" in content or "/{job_id}/pause" in content, (
             "Training jobs API should have a dedicated POST /{job_id}/pause endpoint.\n"
             "State transitions should use dedicated action endpoints, not generic PATCH."
         )
 
-    def test_training_jobs_has_dedicated_resume_endpoint(
-        self, backend_src_path: Path
-    ):
+    def test_training_jobs_has_dedicated_resume_endpoint(self, backend_src_path: Path):
         """Training jobs API should have a dedicated POST /resume endpoint."""
         # Updated path for modular architecture
-        endpoint_file = (
-            backend_src_path / "modules" / "training" / "api" / "endpoints.py"
-        )
+        endpoint_file = backend_src_path / "modules" / "training" / "api" / "endpoints.py"
 
         with open(endpoint_file, encoding="utf-8") as f:
             content = f.read()
 
         # Check for dedicated resume endpoint
-        assert '/{job_id}/resume' in content or "/{job_id}/resume" in content, (
+        assert "/{job_id}/resume" in content or "/{job_id}/resume" in content, (
             "Training jobs API should have a dedicated POST /{job_id}/resume endpoint.\n"
             "State transitions should use dedicated action endpoints, not generic PATCH."
         )
 
-    def test_training_jobs_has_dedicated_cancel_endpoint(
-        self, backend_src_path: Path
-    ):
+    def test_training_jobs_has_dedicated_cancel_endpoint(self, backend_src_path: Path):
         """Training jobs API should have a dedicated POST /cancel endpoint."""
         # Updated path for modular architecture
-        endpoint_file = (
-            backend_src_path / "modules" / "training" / "api" / "endpoints.py"
-        )
+        endpoint_file = backend_src_path / "modules" / "training" / "api" / "endpoints.py"
 
         with open(endpoint_file, encoding="utf-8") as f:
             content = f.read()
 
         # Check for dedicated cancel endpoint
-        assert '/{job_id}/cancel' in content or "/{job_id}/cancel" in content, (
+        assert "/{job_id}/cancel" in content or "/{job_id}/cancel" in content, (
             "Training jobs API should have a dedicated POST /{job_id}/cancel endpoint.\n"
             "State transitions should use dedicated action endpoints, not generic PATCH."
         )
 
-    def test_no_generic_action_parameter_in_update_request(
-        self, backend_src_path: Path
-    ):
+    def test_no_generic_action_parameter_in_update_request(self, backend_src_path: Path):
         """UpdateTrainingJobRequest should not use generic action parameter.
 
         The action parameter pattern indicates mixing multiple operations
         in a single endpoint, which reduces API clarity.
         """
         # Updated path for modular architecture
-        schema_file = (
-            backend_src_path / "modules" / "training" / "api" / "schemas" / "requests.py"
-        )
+        schema_file = backend_src_path / "modules" / "training" / "api" / "schemas" / "requests.py"
 
         with open(schema_file, encoding="utf-8") as f:
             content = f.read()
@@ -597,8 +531,7 @@ class TestApiStateTransitionEndpoints:
         # We look for Literal["pause", "resume", "cancel"] pattern which indicates
         # the anti-pattern of using a single endpoint for multiple state transitions
         has_action_literal = (
-            'Literal["pause", "resume", "cancel"]' in content
-            or "Literal['pause', 'resume', 'cancel']" in content
+            'Literal["pause", "resume", "cancel"]' in content or "Literal['pause', 'resume', 'cancel']" in content
         )
 
         assert not has_action_literal, (
@@ -645,9 +578,7 @@ class TestModuleDomainLayerIsolation:
                         result.append((module_dir.name, py_file))
         return result
 
-    def test_domain_layer_no_cross_module_imports(
-        self, module_domain_files: list[tuple[str, Path]]
-    ):
+    def test_domain_layer_no_cross_module_imports(self, module_domain_files: list[tuple[str, Path]]):
         """Module domain layer should not import from other modules.
 
         Allowed:
@@ -674,15 +605,13 @@ class TestModuleDomainLayerIsolation:
                         imported_module = parts[2]
                         if imported_module != module_name:
                             violations.append(
-                                f"{module_name}/domain/{file_path.name}: "
-                                f"imports '{imp}' (cross-module dependency)"
+                                f"{module_name}/domain/{file_path.name}: " f"imports '{imp}' (cross-module dependency)"
                             )
 
         assert not violations, (
             "Module domain layer MUST NOT import from other modules.\n"
             "See docs/module-dependency-spec.md Rule R1.\n"
-            f"Found {len(violations)} violation(s):\n"
-            + "\n".join(f"  - {v}" for v in violations)
+            f"Found {len(violations)} violation(s):\n" + "\n".join(f"  - {v}" for v in violations)
         )
 
 
@@ -718,9 +647,7 @@ class TestModuleApplicationLayerDependencies:
                         result.append((module_dir.name, py_file))
         return result
 
-    def test_no_cross_module_service_imports(
-        self, module_application_files: list[tuple[str, Path]]
-    ):
+    def test_no_cross_module_service_imports(self, module_application_files: list[tuple[str, Path]]):
         """Application layer should not import other modules' services.
 
         Cross-module communication should use:
@@ -751,13 +678,10 @@ class TestModuleApplicationLayerDependencies:
             "Application layer MUST NOT import other modules' services directly.\n"
             "Use EventBus or shared interfaces for cross-module communication.\n"
             "See docs/module-dependency-spec.md Rule R3.\n"
-            f"Found {len(violations)} violation(s):\n"
-            + "\n".join(f"  - {v}" for v in violations)
+            f"Found {len(violations)} violation(s):\n" + "\n".join(f"  - {v}" for v in violations)
         )
 
-    def test_no_cross_module_repository_impl_imports(
-        self, module_application_files: list[tuple[str, Path]]
-    ):
+    def test_no_cross_module_repository_impl_imports(self, module_application_files: list[tuple[str, Path]]):
         """Application layer should not import other modules' repository implementations.
 
         Application services should depend on repository interfaces (IRepository),
@@ -787,8 +711,7 @@ class TestModuleApplicationLayerDependencies:
             "Application layer MUST NOT import other modules' infrastructure.\n"
             "Depend on interfaces, not implementations.\n"
             "See docs/module-dependency-spec.md Rule R2.\n"
-            f"Found {len(violations)} violation(s):\n"
-            + "\n".join(f"  - {v}" for v in violations)
+            f"Found {len(violations)} violation(s):\n" + "\n".join(f"  - {v}" for v in violations)
         )
 
 
@@ -825,9 +748,7 @@ class TestModuleApiLayerAuthDependency:
                             result.append((module_dir.name, layer, py_file))
         return result
 
-    def test_only_api_layer_imports_auth(
-        self, non_api_module_files: list[tuple[str, str, Path]]
-    ):
+    def test_only_api_layer_imports_auth(self, non_api_module_files: list[tuple[str, str, Path]]):
         """Only API layer should import auth module dependencies.
 
         Domain and Application layers should not depend on auth module
@@ -847,16 +768,14 @@ class TestModuleApiLayerAuthDependency:
             for imp in imports:
                 if "src.modules.auth" in imp:
                     violations.append(
-                        f"{module_name}/{layer}/{file_path.name}: "
-                        f"imports '{imp}' (auth import outside API layer)"
+                        f"{module_name}/{layer}/{file_path.name}: " f"imports '{imp}' (auth import outside API layer)"
                     )
 
         assert not violations, (
             "Only API layer can import auth module dependencies.\n"
             "Domain/Application layers should not import auth.\n"
             "See docs/module-dependency-spec.md Rule R4.\n"
-            f"Found {len(violations)} violation(s):\n"
-            + "\n".join(f"  - {v}" for v in violations)
+            f"Found {len(violations)} violation(s):\n" + "\n".join(f"  - {v}" for v in violations)
         )
 
 
@@ -882,9 +801,7 @@ class TestModuleInfrastructureLayerIsolation:
                         result.append((module_dir.name, py_file))
         return result
 
-    def test_no_cross_module_infrastructure_imports(
-        self, module_infrastructure_files: list[tuple[str, Path]]
-    ):
+    def test_no_cross_module_infrastructure_imports(self, module_infrastructure_files: list[tuple[str, Path]]):
         """Infrastructure layer should not import from other modules' infrastructure.
 
         Each module's infrastructure should be self-contained.
@@ -923,8 +840,7 @@ class TestModuleInfrastructureLayerIsolation:
             "Infrastructure layer MUST NOT import from other modules' infrastructure.\n"
             "Shared infrastructure should be in shared/infrastructure/.\n"
             "Exception: ORM model files (*_model.py) for FK relationships.\n"
-            f"Found {len(violations)} violation(s):\n"
-            + "\n".join(f"  - {v}" for v in violations)
+            f"Found {len(violations)} violation(s):\n" + "\n".join(f"  - {v}" for v in violations)
         )
 
 
@@ -954,13 +870,12 @@ class TestModulePublicApiExports:
 
                 content = init_file.read_text()
                 if "__all__" not in content:
-                    violations.append(
-                        f"{module_dir.name}: __init__.py missing __all__ definition"
-                    )
+                    violations.append(f"{module_dir.name}: __init__.py missing __all__ definition")
 
         # This is a soft check - warn but don't fail
         if violations:
             import warnings
+
             warnings.warn(
                 "Some modules are missing proper __init__.py or __all__ exports:\n"
                 + "\n".join(f"  - {v}" for v in violations)

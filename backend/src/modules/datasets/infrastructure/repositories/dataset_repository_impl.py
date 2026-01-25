@@ -113,9 +113,7 @@ class DatasetRepositoryImpl(
     ) -> tuple[list[Dataset], int]:
         """列出用户的数据集。"""
         query = select(DatasetModel).where(DatasetModel.owner_id == owner_id)
-        count_query = select(func.count(DatasetModel.id)).where(
-            DatasetModel.owner_id == owner_id
-        )
+        count_query = select(func.count(DatasetModel.id)).where(DatasetModel.owner_id == owner_id)
 
         # 应用过滤条件
         if status is not None:

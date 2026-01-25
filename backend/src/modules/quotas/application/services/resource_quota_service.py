@@ -90,9 +90,7 @@ class ResourceQuotaService:
 
         return await self._repository.create(quota)
 
-    async def update_quota(
-        self, quota_id: int, data: dict[str, Any]
-    ) -> ResourceQuota:
+    async def update_quota(self, quota_id: int, data: dict[str, Any]) -> ResourceQuota:
         """Update an existing quota.
 
         Raises:

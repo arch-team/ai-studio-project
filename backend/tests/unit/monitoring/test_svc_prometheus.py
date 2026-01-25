@@ -1,20 +1,17 @@
 """PrometheusService Unit Tests - TDD Red-Green-Refactor (T062)."""
 
 from datetime import UTC, datetime, timedelta
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock
 
 import pytest
 
 from src.modules.monitoring.application.services.prometheus_service import (
-    MetricDataPoint,
     PrometheusService,
-    StorageAlert,
     StorageCapacityMetrics,
 )
 from src.modules.monitoring.infrastructure.external.prometheus_client import (
     IPrometheusClient,
 )
-
 
 # === Fixtures ===
 

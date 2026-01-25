@@ -83,9 +83,7 @@ class TestTokenRefreshEndpoint:
         assert response.status_code == 401
 
     @pytest.mark.asyncio
-    async def test_token_refresh_expired(
-        self, client: AsyncClient, expired_refresh_token: str
-    ) -> None:
+    async def test_token_refresh_expired(self, client: AsyncClient, expired_refresh_token: str) -> None:
         """Test refresh with expired token."""
         response = await client.post(
             "/api/v1/auth/token/refresh",
@@ -106,9 +104,7 @@ class TestLogoutEndpoint:
         assert response.status_code == 401
 
     @pytest.mark.asyncio
-    async def test_logout_success(
-        self, client: AsyncClient, engineer_auth_headers: dict[str, str]
-    ) -> None:
+    async def test_logout_success(self, client: AsyncClient, engineer_auth_headers: dict[str, str]) -> None:
         """Test successful logout."""
         response = await client.post(
             "/api/v1/auth/logout",
@@ -295,9 +291,7 @@ class TestPasswordResetEndpoints:
         assert "message" in data
 
     @pytest.mark.asyncio
-    async def test_password_reset_request_valid_email(
-        self, client: AsyncClient
-    ) -> None:
+    async def test_password_reset_request_valid_email(self, client: AsyncClient) -> None:
         """Test password reset request with valid email format."""
         try:
             response = await client.post(
@@ -312,9 +306,7 @@ class TestPasswordResetEndpoints:
             raise
 
     @pytest.mark.asyncio
-    async def test_password_reset_request_invalid_email(
-        self, client: AsyncClient
-    ) -> None:
+    async def test_password_reset_request_invalid_email(self, client: AsyncClient) -> None:
         """Test password reset request with invalid email format."""
         response = await client.post(
             "/api/v1/auth/password-reset/request",
@@ -324,9 +316,7 @@ class TestPasswordResetEndpoints:
         assert response.status_code == 422
 
     @pytest.mark.asyncio
-    async def test_password_reset_confirm_invalid_token(
-        self, client: AsyncClient
-    ) -> None:
+    async def test_password_reset_confirm_invalid_token(self, client: AsyncClient) -> None:
         """Test password reset confirm with invalid token."""
         response = await client.post(
             "/api/v1/auth/password-reset/confirm",
@@ -339,9 +329,7 @@ class TestPasswordResetEndpoints:
         assert response.status_code == 401
 
     @pytest.mark.asyncio
-    async def test_password_reset_confirm_weak_password(
-        self, client: AsyncClient
-    ) -> None:
+    async def test_password_reset_confirm_weak_password(self, client: AsyncClient) -> None:
         """Test password reset confirm with weak password."""
         try:
             response = await client.post(

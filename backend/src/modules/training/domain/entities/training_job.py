@@ -4,8 +4,8 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from decimal import Decimal
 
-from src.shared.utils import utc_now
 from src.shared.domain.exceptions import InvalidStateTransitionError
+from src.shared.utils import utc_now
 
 from ..value_objects import (
     DistributionStrategy,
@@ -112,9 +112,7 @@ class TrainingJob:
             InvalidStateTransitionError: If transition is not allowed
         """
         if not self.can_transition_to(new_status):
-            raise InvalidStateTransitionError(
-                "TrainingJob", self.status.value, new_status.value
-            )
+            raise InvalidStateTransitionError("TrainingJob", self.status.value, new_status.value)
 
         # Track preemption count
         if new_status == JobStatus.PREEMPTED:
@@ -148,26 +146,20 @@ class TrainingJob:
     def pause(self) -> None:
         """Pause the training job."""
         if not self.can_pause():
-            raise InvalidStateTransitionError(
-                "TrainingJob", self.status.value, JobStatus.PAUSED.value
-            )
+            raise InvalidStateTransitionError("TrainingJob", self.status.value, JobStatus.PAUSED.value)
         self.transition_to(JobStatus.PAUSED)
 
     def resume(self) -> None:
         """Resume a paused or preempted job."""
         if not self.can_resume():
-            raise InvalidStateTransitionError(
-                "TrainingJob", self.status.value, JobStatus.RUNNING.value
-            )
+            raise InvalidStateTransitionError("TrainingJob", self.status.value, JobStatus.RUNNING.value)
         self.transition_to(JobStatus.RUNNING)
 
     def complete(self) -> None:
         """Mark job as completed."""
         self.transition_to(JobStatus.COMPLETED)
 
-    def fail(
-        self, error_message: str | None = None, failure_reason: str | None = None
-    ) -> None:
+    def fail(self, error_message: str | None = None, failure_reason: str | None = None) -> None:
         """Mark job as failed with optional error details."""
         self.error_message = error_message
         self.failure_reason = failure_reason

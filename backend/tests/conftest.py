@@ -28,8 +28,7 @@ from src.shared.infrastructure.database import import_all_models
 
 import_all_models()
 
-from src.main import app
-
+from src.main import app  # noqa: E402  # 必须在 import_all_models() 之后
 
 # =============================================================================
 # Global Fixtures

@@ -14,9 +14,7 @@ class IResourceLimitConfigRepository(ABC):
         """Get config by ID."""
 
     @abstractmethod
-    async def get_by_role_and_project(
-        self, role: LimitRole, project_id: int | None
-    ) -> ResourceLimitConfig | None:
+    async def get_by_role_and_project(self, role: LimitRole, project_id: int | None) -> ResourceLimitConfig | None:
         """Get config by role and project combination."""
 
     @abstractmethod
@@ -45,7 +43,5 @@ class IResourceLimitConfigRepository(ABC):
         """Soft delete a config."""
 
     @abstractmethod
-    async def exists_by_role_and_project(
-        self, role: LimitRole, project_id: int | None
-    ) -> bool:
+    async def exists_by_role_and_project(self, role: LimitRole, project_id: int | None) -> bool:
         """Check if config with role and project combination exists."""

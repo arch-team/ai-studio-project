@@ -9,11 +9,9 @@ from .requests import (
 from .responses import (
     SpaceDetail,
     SpaceErrorResponse,
-    SpaceInstanceTypeEnum,
     SpaceListResponse,
     SpaceStatusEnum,
     SpaceSummary,
-    SpaceTypeEnum,
 )
 
 __all__ = [

@@ -13,13 +13,14 @@ from src.shared.utils import utc_now
 from ...domain.value_objects import AuthType, UserRole, UserStatus
 
 if TYPE_CHECKING:
+    from src.modules.datasets.infrastructure.models import DatasetModel, UploadSessionModel
+    from src.modules.models.infrastructure.models import ModelModel
+    from src.modules.quotas.infrastructure.models import ResourceQuotaModel
+    from src.modules.spaces.infrastructure.models import DevelopmentSpaceModel
+    from src.modules.training.infrastructure.models import JobTemplateModel, TrainingJobModel
+
     from .login_attempt_model import LoginAttemptModel
     from .password_history_model import PasswordHistoryModel
-    from src.modules.training.infrastructure.models import TrainingJobModel, JobTemplateModel
-    from src.modules.models.infrastructure.models import ModelModel
-    from src.modules.spaces.infrastructure.models import DevelopmentSpaceModel
-    from src.modules.quotas.infrastructure.models import ResourceQuotaModel
-    from src.modules.datasets.infrastructure.models import DatasetModel, UploadSessionModel
 
 
 class TimestampMixin:

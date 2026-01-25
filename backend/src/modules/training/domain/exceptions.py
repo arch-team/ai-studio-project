@@ -9,7 +9,6 @@ from dataclasses import dataclass, field
 
 from src.shared.domain.problem import Problem, problem
 
-
 # =============================================================================
 # 训练任务异常
 # =============================================================================
@@ -144,10 +143,7 @@ class HyperPodOperationError(Problem):
     def __post_init__(self) -> None:
         """根据 job_name 生成消息."""
         if self.job_name:
-            self.message = (
-                f"HyperPod operation '{self.operation}' on job '{self.job_name}' "
-                f"failed: {self.reason}"
-            )
+            self.message = f"HyperPod operation '{self.operation}' on job '{self.job_name}' " f"failed: {self.reason}"
         else:
             self.message = f"HyperPod operation '{self.operation}' failed: {self.reason}"
         super().__post_init__()

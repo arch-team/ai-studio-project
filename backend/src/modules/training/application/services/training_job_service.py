@@ -12,8 +12,6 @@ from src.modules.training.domain.repositories import (
     ICheckpointRepository,
     ITrainingJobRepository,
 )
-from src.shared.domain.exceptions import ResourceQuotaExceededError
-from src.shared.domain.interfaces import IQuotaChecker
 from src.modules.training.domain.value_objects import (
     DistributionStrategy,
     JobPriority,
@@ -21,9 +19,10 @@ from src.modules.training.domain.value_objects import (
 )
 from src.shared.application.enhanced_base_service import EnhancedBaseService
 from src.shared.domain.exceptions import (
-    DuplicateEntityError,
     InvalidStateTransitionError,
+    ResourceQuotaExceededError,
 )
+from src.shared.domain.interfaces import IQuotaChecker
 
 
 class TrainingJobService(EnhancedBaseService[TrainingJob, int]):
@@ -65,9 +64,7 @@ class TrainingJobService(EnhancedBaseService[TrainingJob, int]):
                 amount=total_gpus,
             )
             if not has_quota:
-                available = await self._quota_checker.get_available_quota(
-                    user_id=owner_id, resource_type="gpu"
-                )
+                available = await self._quota_checker.get_available_quota(user_id=owner_id, resource_type="gpu")
                 raise ResourceQuotaExceededError(
                     resource_type="gpu",
                     limit=available,
@@ -123,15 +120,9 @@ class TrainingJobService(EnhancedBaseService[TrainingJob, int]):
         from src.shared.utils import EnumMapper
 
         distribution_strategy = EnumMapper.from_string(
-            data.get("distribution_strategy", "DDP"),
-            DistributionStrategy,
-            DistributionStrategy.DDP
+            data.get("distribution_strategy", "DDP"), DistributionStrategy, DistributionStrategy.DDP
         )
-        priority = EnumMapper.from_string(
-            data.get("priority", "MEDIUM"),
-            JobPriority,
-            JobPriority.MEDIUM
-        )
+        priority = EnumMapper.from_string(data.get("priority", "MEDIUM"), JobPriority, JobPriority.MEDIUM)
 
         # 提取默认值常量
         DEFAULT_NODE_COUNT = 1
@@ -224,9 +215,7 @@ class TrainingJobService(EnhancedBaseService[TrainingJob, int]):
         job = await self._get_or_raise(job_id)
 
         # Use base class method for state transition validation
-        self._validate_state_transition(
-            job, JobStatus.PAUSED, [JobStatus.RUNNING]
-        )
+        self._validate_state_transition(job, JobStatus.PAUSED, [JobStatus.RUNNING])
 
         await self._hyperpod_client.stop_training_job(
             cluster_name=self._cluster_name,
@@ -241,15 +230,11 @@ class TrainingJobService(EnhancedBaseService[TrainingJob, int]):
         job = await self._get_or_raise(job_id)
 
         # Use base class method for state transition validation
-        self._validate_state_transition(
-            job, JobStatus.RUNNING, [JobStatus.PAUSED, JobStatus.PREEMPTED]
-        )
+        self._validate_state_transition(job, JobStatus.RUNNING, [JobStatus.PAUSED, JobStatus.PREEMPTED])
 
         # CE-07-06: Check if there is a valid checkpoint for recovery
         if self._checkpoint_repository is not None:
-            latest_checkpoint = await self._checkpoint_repository.get_latest_by_training_job_id(
-                job_id
-            )
+            latest_checkpoint = await self._checkpoint_repository.get_latest_by_training_job_id(job_id)
             if latest_checkpoint is None and job.current_epoch and job.current_epoch > 0:
                 # Job has progress but no checkpoint - cannot resume safely
                 raise NoValidCheckpointError(job_id=job_id)
@@ -269,9 +254,7 @@ class TrainingJobService(EnhancedBaseService[TrainingJob, int]):
         job = await self._get_or_raise(job_id)
 
         if job.is_terminal():
-            raise InvalidStateTransitionError(
-                "TrainingJob", job.status.value, JobStatus.FAILED.value
-            )
+            raise InvalidStateTransitionError("TrainingJob", job.status.value, JobStatus.FAILED.value)
 
         if job.status in (JobStatus.RUNNING, JobStatus.SUBMITTED):
             await self._hyperpod_client.stop_training_job(
@@ -279,9 +262,7 @@ class TrainingJobService(EnhancedBaseService[TrainingJob, int]):
                 job_name=job.job_name,
             )
 
-        job.fail(
-            error_message="Job cancelled by user", failure_reason="CANCELLED_BY_USER"
-        )
+        job.fail(error_message="Job cancelled by user", failure_reason="CANCELLED_BY_USER")
         return await self._repository.update(job)
 
     async def update_job(self, job_id: int, data: dict) -> TrainingJob:
@@ -306,9 +287,8 @@ class TrainingJobService(EnhancedBaseService[TrainingJob, int]):
         # Update allowed fields
         if "priority" in data and data["priority"] is not None:
             from src.shared.utils import EnumMapper
-            job.priority = EnumMapper.from_string(
-                data["priority"], JobPriority, job.priority
-            )
+
+            job.priority = EnumMapper.from_string(data["priority"], JobPriority, job.priority)
 
         if "description" in data:
             job.description = data["description"]

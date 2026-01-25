@@ -11,7 +11,6 @@ from src.modules.spaces.domain.repositories import ISpaceRepository
 from src.modules.spaces.domain.value_objects import SpaceStatus
 from src.modules.spaces.infrastructure.models import DevelopmentSpaceModel
 from src.shared.infrastructure.repository_base import EnhancedBaseRepository
-from src.shared.utils import utc_now
 
 
 class SpaceRepository(
@@ -81,9 +80,7 @@ class SpaceRepository(
             return None
         return self._to_entity(model)
 
-    async def get_by_name_and_owner(
-        self, space_name: str, owner_id: int
-    ) -> Space | None:
+    async def get_by_name_and_owner(self, space_name: str, owner_id: int) -> Space | None:
         """Get space by name and owner ID."""
         result = await self._session.execute(
             select(DevelopmentSpaceModel)
@@ -122,4 +119,3 @@ class SpaceRepository(
             sort_by=sort_by,
             sort_order=sort_order,
         )
-

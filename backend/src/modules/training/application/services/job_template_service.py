@@ -57,9 +57,7 @@ class JobTemplateService(EnhancedBaseService[JobTemplate, int]):
 
         return template
 
-    async def update_template(
-        self, template_id: int, user_id: int, data: dict
-    ) -> JobTemplate:
+    async def update_template(self, template_id: int, user_id: int, data: dict) -> JobTemplate:
         """Update a template (owner only)."""
         template = await self._repository.get_by_id(template_id)
         if not template:
@@ -72,9 +70,7 @@ class JobTemplateService(EnhancedBaseService[JobTemplate, int]):
         if "name" in data and data["name"] is not None:
             # Check for duplicate name if changing
             if data["name"] != template.name:
-                if await self._repository.exists_by_name_and_owner(
-                    data["name"], user_id
-                ):
+                if await self._repository.exists_by_name_and_owner(data["name"], user_id):
                     raise DuplicateEntityError("JobTemplate", f"name={data['name']}")
             template.update_name(data["name"])
 

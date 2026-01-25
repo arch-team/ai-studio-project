@@ -11,11 +11,11 @@ from src.modules.training.domain.entities.training_job import (
     JobStatus,
     TrainingJob,
 )
+from src.modules.training.domain.exceptions import TrainingJobNotFoundError
 from src.shared.domain.exceptions import (
     DuplicateEntityError,
     InvalidStateTransitionError,
 )
-from src.modules.training.domain.exceptions import TrainingJobNotFoundError
 
 # === Fixtures ===
 
@@ -52,9 +52,7 @@ def mock_hyperpod_client() -> AsyncMock:
             "start_time": datetime.utcnow(),
         }
     )
-    client.stop_training_job = AsyncMock(
-        return_value={"job_name": "test-job", "status": "stopped"}
-    )
+    client.stop_training_job = AsyncMock(return_value={"job_name": "test-job", "status": "stopped"})
     return client
 
 
@@ -157,9 +155,7 @@ class TestCreateTrainingJob:
         # Assert
         assert result is not None
         assert result.job_name == sample_job.job_name
-        mock_repository.exists_by_name.assert_called_once_with(
-            create_job_data["job_name"]
-        )
+        mock_repository.exists_by_name.assert_called_once_with(create_job_data["job_name"])
         mock_repository.create.assert_called_once()
         mock_hyperpod_client.submit_training_job.assert_called_once()
 

@@ -94,9 +94,7 @@ class TestChangePassword:
         mock_password_history_repository.get_recent.return_value = []
         mock_password_history_repository.cleanup_old_entries.return_value = 0
 
-        with patch.object(
-            password_service._hasher, "verify_password", return_value=True
-        ):
+        with patch.object(password_service._hasher, "verify_password", return_value=True):
             await password_service.change_password(
                 user_id=1,
                 current_password="OldP@ssw0rd123!",
@@ -116,9 +114,7 @@ class TestChangePassword:
         """Test change password with wrong current password."""
         mock_user_repository.get_by_id.return_value = mock_user
 
-        with patch.object(
-            password_service._hasher, "verify_password", return_value=False
-        ):
+        with patch.object(password_service._hasher, "verify_password", return_value=False):
             with pytest.raises(InvalidCredentialsError) as exc_info:
                 await password_service.change_password(
                     user_id=1,
@@ -140,9 +136,7 @@ class TestChangePassword:
         mock_user_repository.get_by_id.return_value = mock_user
         mock_password_history_repository.get_recent.return_value = []
 
-        with patch.object(
-            password_service._hasher, "verify_password", return_value=True
-        ):
+        with patch.object(password_service._hasher, "verify_password", return_value=True):
             with pytest.raises(PasswordTooWeakError):
                 await password_service.change_password(
                     user_id=1,

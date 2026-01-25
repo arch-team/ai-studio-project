@@ -163,12 +163,8 @@ class UploadSessionRepositoryImpl(
         page_size: int = 20,
     ) -> tuple[list[UploadSession], int]:
         """列出用户的上传会话。"""
-        query = select(UploadSessionModel).where(
-            UploadSessionModel.owner_id == owner_id
-        )
-        count_query = select(func.count(UploadSessionModel.id)).where(
-            UploadSessionModel.owner_id == owner_id
-        )
+        query = select(UploadSessionModel).where(UploadSessionModel.owner_id == owner_id)
+        count_query = select(func.count(UploadSessionModel.id)).where(UploadSessionModel.owner_id == owner_id)
 
         # 应用状态过滤
         if status is not None:

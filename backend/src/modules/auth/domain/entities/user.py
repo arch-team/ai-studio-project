@@ -73,10 +73,7 @@ class User:
 
     def is_password_expired(self) -> bool:
         """Check if password has expired."""
-        return (
-            self.password_expires_at is not None
-            and utc_now() > self.password_expires_at
-        )
+        return self.password_expires_at is not None and utc_now() > self.password_expires_at
 
     def is_local_account(self) -> bool:
         """Check if this is a local authentication account."""

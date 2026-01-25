@@ -94,9 +94,7 @@ class TestS3StorageClient:
         )
 
         assert result == "/tmp/downloaded.txt"
-        mock_s3_client.download_file.assert_called_once_with(
-            "test-bucket", "data/test.txt", "/tmp/downloaded.txt"
-        )
+        mock_s3_client.download_file.assert_called_once_with("test-bucket", "data/test.txt", "/tmp/downloaded.txt")
 
     # ==================== Delete Operations ====================
 
@@ -112,9 +110,7 @@ class TestS3StorageClient:
         result = await s3_client.delete_file(remote_path="data/test.txt")
 
         assert result is True
-        mock_s3_client.delete_object.assert_called_once_with(
-            Bucket="test-bucket", Key="data/test.txt"
-        )
+        mock_s3_client.delete_object.assert_called_once_with(Bucket="test-bucket", Key="data/test.txt")
 
     # ==================== List Operations ====================
 
@@ -145,9 +141,7 @@ class TestS3StorageClient:
 
         assert len(result) == 2
         assert result[0]["Key"] == "data/file1.txt"
-        mock_s3_client.list_objects_v2.assert_called_once_with(
-            Bucket="test-bucket", Prefix="data/", MaxKeys=100
-        )
+        mock_s3_client.list_objects_v2.assert_called_once_with(Bucket="test-bucket", Prefix="data/", MaxKeys=100)
 
     @pytest.mark.asyncio
     async def test_list_files_empty(
@@ -183,9 +177,7 @@ class TestS3StorageClient:
 
         assert result["ContentLength"] == 1024
         assert result["ContentType"] == "text/plain"
-        mock_s3_client.head_object.assert_called_once_with(
-            Bucket="test-bucket", Key="data/test.txt"
-        )
+        mock_s3_client.head_object.assert_called_once_with(Bucket="test-bucket", Key="data/test.txt")
 
     # ==================== Existence Check ====================
 
@@ -201,9 +193,7 @@ class TestS3StorageClient:
         result = await s3_client.file_exists(remote_path="data/exists.txt")
 
         assert result is True
-        mock_s3_client.head_object.assert_called_once_with(
-            Bucket="test-bucket", Key="data/exists.txt"
-        )
+        mock_s3_client.head_object.assert_called_once_with(Bucket="test-bucket", Key="data/exists.txt")
 
     @pytest.mark.asyncio
     async def test_file_exists_returns_false(
@@ -279,9 +269,7 @@ class TestS3StorageClient:
         mock_s3_client: AsyncMock,
     ) -> None:
         """Test successful file copy."""
-        mock_s3_client.copy_object.return_value = {
-            "CopyObjectResult": {"ETag": '"abc123"'}
-        }
+        mock_s3_client.copy_object.return_value = {"CopyObjectResult": {"ETag": '"abc123"'}}
 
         result = await s3_client.copy_file(
             source_path="data/source.txt",
@@ -304,6 +292,7 @@ class TestS3StorageClient:
         mock_s3_client: AsyncMock,
     ) -> None:
         """Test file streaming yields chunks."""
+
         # 创建异步迭代器 mock
         async def mock_iter_chunks(chunk_size: int):
             yield b"chunk1"
@@ -314,17 +303,13 @@ class TestS3StorageClient:
         mock_s3_client.get_object.return_value = {"Body": mock_body}
 
         chunks = []
-        async for chunk in s3_client.stream_file(
-            remote_path="data/large.bin", chunk_size=1024
-        ):
+        async for chunk in s3_client.stream_file(remote_path="data/large.bin", chunk_size=1024):
             chunks.append(chunk)
 
         assert len(chunks) == 2
         assert chunks[0] == b"chunk1"
         assert chunks[1] == b"chunk2"
-        mock_s3_client.get_object.assert_called_once_with(
-            Bucket="test-bucket", Key="data/large.bin"
-        )
+        mock_s3_client.get_object.assert_called_once_with(Bucket="test-bucket", Key="data/large.bin")
 
     # ==================== Error Handling ====================
 

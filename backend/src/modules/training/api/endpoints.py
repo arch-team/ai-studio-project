@@ -22,13 +22,15 @@ from src.modules.training.api.schemas import (
     CreateCheckpointRequest,
     CreateJobFromTemplateRequest,
     CreateTrainingJobRequest,
-    UpdateTrainingJobRequest,
     JobPriorityEnum,
     JobStatusEnum,
+    KueueDebugResponse,
     StorageTierEnum,
     TrainingJobDetail,
     TrainingJobListResponse,
     TrainingJobSummary,
+    TrainingLogsResponse,
+    UpdateTrainingJobRequest,
 )
 from src.modules.training.application.services import (
     CheckpointService,
@@ -54,7 +56,7 @@ async def create_training_job(
     data: CreateTrainingJobRequest,
     current_user: CurrentUser = Depends(require_engineer),
     service: TrainingJobService = Depends(get_training_job_service),
-):
+) -> TrainingJobDetail:
     """Create a new training job."""
     job_data = data.model_dump(mode="json")
     job = await service.create_job(owner_id=current_user.user_id, data=job_data)
@@ -73,7 +75,7 @@ async def list_training_jobs(
     sort_order: SortOrderParam = SortOrder.DESC,
     current_user: CurrentUser = Depends(get_current_active_user),
     service: TrainingJobService = Depends(get_training_job_service),
-):
+) -> TrainingJobListResponse:
     """List training jobs with pagination and filters."""
     jobs, total = await service.list_jobs(
         owner_id=get_owner_filter(current_user),
@@ -102,7 +104,7 @@ async def get_training_job(
     job_id: int,
     current_user: CurrentUser = Depends(get_current_active_user),
     service: TrainingJobService = Depends(get_training_job_service),
-):
+) -> TrainingJobDetail:
     """Get training job details by ID."""
     job = await service.get_job(job_id)
     check_resource_owner_or_privileged(job.owner_id, current_user, "training job", "view")
@@ -119,7 +121,7 @@ async def update_training_job(
     data: UpdateTrainingJobRequest,
     current_user: CurrentUser = Depends(require_engineer),
     service: TrainingJobService = Depends(get_training_job_service),
-):
+) -> TrainingJobDetail:
     """Update a training job.
 
     Only certain fields can be updated:
@@ -139,7 +141,7 @@ async def pause_training_job(
     job_id: int,
     current_user: CurrentUser = Depends(require_engineer),
     service: TrainingJobService = Depends(get_training_job_service),
-):
+) -> TrainingJobDetail:
     """Pause a running training job."""
     job = await service.get_job(job_id)
     check_resource_owner_or_privileged(job.owner_id, current_user, "training job", "pause")
@@ -152,7 +154,7 @@ async def resume_training_job(
     job_id: int,
     current_user: CurrentUser = Depends(require_engineer),
     service: TrainingJobService = Depends(get_training_job_service),
-):
+) -> TrainingJobDetail:
     """Resume a paused training job."""
     job = await service.get_job(job_id)
     check_resource_owner_or_privileged(job.owner_id, current_user, "training job", "resume")
@@ -165,7 +167,7 @@ async def cancel_training_job(
     job_id: int,
     current_user: CurrentUser = Depends(require_engineer),
     service: TrainingJobService = Depends(get_training_job_service),
-):
+) -> TrainingJobDetail:
     """Cancel a training job."""
     job = await service.get_job(job_id)
     check_resource_owner_or_privileged(job.owner_id, current_user, "training job", "cancel")
@@ -178,7 +180,7 @@ async def delete_training_job(
     job_id: int,
     current_user: CurrentUser = Depends(require_engineer),
     service: TrainingJobService = Depends(get_training_job_service),
-):
+) -> None:
     """Delete a training job."""
     job = await service.get_job(job_id)
     check_resource_owner_or_privileged(job.owner_id, current_user, "training job", "delete")
@@ -196,7 +198,7 @@ async def create_manual_checkpoint(
     current_user: CurrentUser = Depends(require_engineer),
     service: TrainingJobService = Depends(get_training_job_service),
     checkpoint_service: CheckpointService = Depends(get_checkpoint_service),
-):
+) -> CheckpointResponse:
     """Create a manual checkpoint for a running training job."""
     job = await service.get_job(job_id)
     check_resource_owner_or_privileged(job.owner_id, current_user, "training job", "create checkpoints for")
@@ -252,7 +254,7 @@ async def create_job_from_template(
     current_user: CurrentUser = Depends(require_engineer),
     job_service: TrainingJobService = Depends(get_training_job_service),
     template_service: JobTemplateService = Depends(get_job_template_service),
-):
+) -> TrainingJobDetail:
     """Create a training job from a template.
 
     Uses the template's training configuration as the base,
@@ -270,7 +272,9 @@ async def create_job_from_template(
         "instance_type": config.get("instance_type"),
         "node_count": data.node_count or config.get("instance_count", 1),
         "distribution_strategy": config.get("distribution_strategy", "ddp"),
-        "entrypoint_command": config.get("script_path", "").split() if config.get("script_path") else ["python", "train.py"],
+        "entrypoint_command": (
+            config.get("script_path", "").split() if config.get("script_path") else ["python", "train.py"]
+        ),
         "environment_variables": {
             **(config.get("environment") or {}),
             **(data.environment_variables or {}),
@@ -304,7 +308,7 @@ async def get_training_job_logs(
     pod_name: str | None = Query(default=None, description="Filter by specific pod"),
     current_user: CurrentUser = Depends(get_current_active_user),
     service: TrainingJobService = Depends(get_training_job_service),
-):
+) -> TrainingLogsResponse:
     """Get training job logs.
 
     Retrieves logs from the training containers (stdout/stderr).
@@ -336,7 +340,7 @@ async def get_kueue_debug_info(
     job_id: int,
     current_user: CurrentUser = Depends(get_current_active_user),
     service: TrainingJobService = Depends(get_training_job_service),
-):
+) -> KueueDebugResponse:
     """Get Kueue Workload debug information.
 
     Returns detailed Kueue scheduling status for troubleshooting.

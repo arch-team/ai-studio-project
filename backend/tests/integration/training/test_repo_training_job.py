@@ -22,7 +22,6 @@ from src.modules.training.domain.value_objects import (
 from src.modules.training.infrastructure.repositories import TrainingJobRepository
 from src.shared.domain.exceptions import EntityNotFoundError
 
-
 # =============================================================================
 # Test Fixtures
 # =============================================================================
@@ -362,6 +361,7 @@ class TestTrainingJobRepositoryCreate:
         mock_training_job_model: MagicMock,
     ):
         """Test create adds model to session and flushes."""
+
         # Arrange - mock the refresh to update the model with DB values
         async def mock_refresh(model):
             model.id = 1
@@ -409,7 +409,7 @@ class TestTrainingJobRepositoryUpdate:
         sample_training_job.started_at = datetime.utcnow()
 
         # Act
-        result = await repository.update(sample_training_job)
+        await repository.update(sample_training_job)
 
         # Assert
         mock_session.flush.assert_called_once()

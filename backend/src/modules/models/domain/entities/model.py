@@ -70,9 +70,7 @@ class Model:
             InvalidStateTransitionError: If transition is not allowed
         """
         if not self.can_transition_to(new_status):
-            raise InvalidStateTransitionError(
-                "Model", self.status.value, new_status.value
-            )
+            raise InvalidStateTransitionError("Model", self.status.value, new_status.value)
         self.status = new_status
         self.updated_at = utc_now()
 
@@ -107,9 +105,7 @@ class Model:
             InvalidStateTransitionError: If model cannot be registered
         """
         if self.status != ModelStatus.TRAINING:
-            raise InvalidStateTransitionError(
-                "Model", self.status.value, ModelStatus.REGISTERED.value
-            )
+            raise InvalidStateTransitionError("Model", self.status.value, ModelStatus.REGISTERED.value)
         self.transition_to(ModelStatus.REGISTERED)
         self.registered_at = utc_now()
 
@@ -120,9 +116,7 @@ class Model:
             InvalidStateTransitionError: If model cannot be deployed
         """
         if not self.can_deploy():
-            raise InvalidStateTransitionError(
-                "Model", self.status.value, ModelStatus.DEPLOYED.value
-            )
+            raise InvalidStateTransitionError("Model", self.status.value, ModelStatus.DEPLOYED.value)
         self.transition_to(ModelStatus.DEPLOYED)
 
     def archive(self) -> None:
@@ -132,9 +126,7 @@ class Model:
             InvalidStateTransitionError: If model cannot be archived
         """
         if not self.can_transition_to(ModelStatus.ARCHIVED):
-            raise InvalidStateTransitionError(
-                "Model", self.status.value, ModelStatus.ARCHIVED.value
-            )
+            raise InvalidStateTransitionError("Model", self.status.value, ModelStatus.ARCHIVED.value)
         self.transition_to(ModelStatus.ARCHIVED)
         self.archived_at = utc_now()
 

@@ -39,9 +39,7 @@ class GPUUtilizationResponse(BaseModel):
     """GPU 利用率响应."""
 
     job_id: int = Field(..., description="任务 ID")
-    data_points: list[GPUUtilizationPointResponse] = Field(
-        default_factory=list, description="GPU 利用率数据点列表"
-    )
+    data_points: list[GPUUtilizationPointResponse] = Field(default_factory=list, description="GPU 利用率数据点列表")
 
 
 class GrafanaDashboardInfo(BaseModel):
@@ -56,9 +54,7 @@ class GrafanaDashboardInfo(BaseModel):
 class GrafanaDashboardsResponse(BaseModel):
     """Grafana 仪表盘列表响应."""
 
-    dashboards: list[GrafanaDashboardInfo] = Field(
-        default_factory=list, description="仪表盘列表"
-    )
+    dashboards: list[GrafanaDashboardInfo] = Field(default_factory=list, description="仪表盘列表")
 
 
 class StorageMetricsResponse(BaseModel):

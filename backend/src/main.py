@@ -87,16 +87,15 @@ def create_app() -> FastAPI:
 
     # Register exception handlers (more specific first)
     # Problem 处理器用于新的 dataclass 异常体系
-    app.add_exception_handler(Problem, problem_exception_handler)
+    # Starlette 类型签名过于严格，运行时类型匹配是正确的
+    app.add_exception_handler(Problem, problem_exception_handler)  # type: ignore[arg-type]
     # 旧的处理器用于向后兼容（迁移完成后移除）
-    app.add_exception_handler(DomainError, domain_exception_handler)
-    app.add_exception_handler(SecurityError, security_exception_handler)
+    app.add_exception_handler(DomainError, domain_exception_handler)  # type: ignore[arg-type]
+    app.add_exception_handler(SecurityError, security_exception_handler)  # type: ignore[arg-type]
 
     # Global exception handler for unhandled exceptions
     @app.exception_handler(Exception)
-    async def global_exception_handler(
-        request: Request, exc: Exception
-    ) -> JSONResponse:
+    async def global_exception_handler(request: Request, exc: Exception) -> JSONResponse:
         """Handle unhandled exceptions and return 500 response."""
         trace_id = getattr(request.state, "trace_id", None)
         error_response: dict = {

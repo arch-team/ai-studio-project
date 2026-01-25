@@ -183,9 +183,7 @@ class ResourceQuotaRepository(IResourceQuotaRepository):
 
     async def exists_by_name(self, name: str) -> bool:
         """Check if quota with name exists."""
-        stmt = select(func.count(ResourceQuotaModel.id)).where(
-            ResourceQuotaModel.name == name
-        )
+        stmt = select(func.count(ResourceQuotaModel.id)).where(ResourceQuotaModel.name == name)
         result = await self._session.execute(stmt)
         count = result.scalar() or 0
         return count > 0

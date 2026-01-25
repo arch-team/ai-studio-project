@@ -40,9 +40,7 @@ class DatasetService(EnhancedBaseService[Dataset, int]):
         if await self._repository.exists_by_name_and_version(name, version):
             raise DuplicateEntityError("Dataset", f"{name}/{version}")
 
-    def _build_dataset_entity(
-        self, owner_id: int, data: dict, name: str, version: str
-    ) -> Dataset:
+    def _build_dataset_entity(self, owner_id: int, data: dict, name: str, version: str) -> Dataset:
         """构建数据集实体。"""
         return Dataset(
             id=0,  # 数据库分配
@@ -61,15 +59,11 @@ class DatasetService(EnhancedBaseService[Dataset, int]):
 
     def _parse_storage_type(self, data: dict) -> DatasetStorageType:
         """解析存储类型。"""
-        return EnumMapper.from_string(
-            data["storage_type"], DatasetStorageType, DatasetStorageType.S3
-        )
+        return EnumMapper.from_string(data["storage_type"], DatasetStorageType, DatasetStorageType.S3)
 
     def _parse_dataset_type(self, data: dict) -> DatasetType:
         """解析数据集类型。"""
-        return EnumMapper.from_string(
-            data["dataset_type"], DatasetType, DatasetType.CUSTOM
-        )
+        return EnumMapper.from_string(data["dataset_type"], DatasetType, DatasetType.CUSTOM)
 
     def _parse_visibility(self, data: dict) -> DatasetVisibility:
         """解析可见性设置。"""
@@ -128,9 +122,7 @@ class DatasetService(EnhancedBaseService[Dataset, int]):
             dataset.tags = data["tags"]
 
         if "visibility" in data and data["visibility"] is not None:
-            dataset.visibility = EnumMapper.from_string(
-                data["visibility"], DatasetVisibility, dataset.visibility
-            )
+            dataset.visibility = EnumMapper.from_string(data["visibility"], DatasetVisibility, dataset.visibility)
 
     async def delete_dataset(self, dataset_id: int) -> None:
         """删除（归档）数据集。

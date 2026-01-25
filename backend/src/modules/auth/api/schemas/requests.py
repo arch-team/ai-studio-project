@@ -6,9 +6,7 @@ from pydantic import BaseModel, EmailStr, Field
 class LoginRequest(BaseModel):
     """Login request schema."""
 
-    username: str | None = Field(
-        None, min_length=1, max_length=64, description="Username for local login"
-    )
+    username: str | None = Field(None, min_length=1, max_length=64, description="Username for local login")
     password: str | None = Field(None, description="Password for local login")
     id_token: str | None = Field(None, description="SSO ID token")
 

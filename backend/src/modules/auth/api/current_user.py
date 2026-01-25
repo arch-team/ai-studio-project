@@ -28,10 +28,12 @@ class CurrentUser:
             )
         return None
 
+    @property
     def is_admin(self) -> bool:
         """Check if user is admin."""
         return self.role == "admin"
 
+    @property
     def is_privileged(self) -> bool:
         """Check if user has privileged access (admin or manager)."""
         return self.role in {"admin", "project_manager"}

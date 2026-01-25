@@ -3,12 +3,12 @@
 from .api import router
 from .application import SpaceService
 from .domain import (
-    DuplicateSpaceNameError,
     INSTANCE_TYPE_RESOURCES,
+    SPACE_STATE_TRANSITIONS,
+    DuplicateSpaceNameError,
     InvalidSpaceStateError,
     ISpaceRepository,
     Space,
-    SPACE_STATE_TRANSITIONS,
     SpaceError,
     SpaceInstanceType,
     SpaceNotFoundError,

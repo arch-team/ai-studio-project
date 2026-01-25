@@ -105,9 +105,7 @@ async def get_owned_dataset(
         HTTPException 403: 用户无权限
     """
     dataset = await service.get_dataset(dataset_id)
-    check_resource_owner_or_privileged(
-        dataset.owner_id, current_user, "dataset", "access"
-    )
+    check_resource_owner_or_privileged(dataset.owner_id, current_user, "dataset", "access")
     return dataset
 
 
@@ -118,9 +116,7 @@ async def get_owned_dataset_for_upload(
 ) -> Dataset:
     """获取数据集并验证上传权限。"""
     dataset = await service.get_dataset(dataset_id)
-    check_resource_owner_or_privileged(
-        dataset.owner_id, current_user, "dataset", "upload to"
-    )
+    check_resource_owner_or_privileged(dataset.owner_id, current_user, "dataset", "upload to")
     return dataset
 
 
@@ -131,7 +127,5 @@ async def get_owned_dataset_for_fsx(
 ) -> Dataset:
     """获取数据集并验证 FSx 操作权限。"""
     dataset = await service.get_dataset(dataset_id)
-    check_resource_owner_or_privileged(
-        dataset.owner_id, current_user, "dataset", "manage FSx"
-    )
+    check_resource_owner_or_privileged(dataset.owner_id, current_user, "dataset", "manage FSx")
     return dataset

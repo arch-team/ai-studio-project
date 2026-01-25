@@ -103,9 +103,7 @@ class TestPreemptionTimingSLAE2E:
 
             await asyncio.sleep(SLAConstants.JOB_STATUS_POLL_INTERVAL)
 
-        raise TimeoutError(
-            f"Job {job_id} did not reach {expected_status} within {timeout}s"
-        )
+        raise TimeoutError(f"Job {job_id} did not reach {expected_status} within {timeout}s")
 
     async def _wait_for_api_status(
         self,
@@ -139,9 +137,7 @@ class TestPreemptionTimingSLAE2E:
                     return expected_status
             await asyncio.sleep(SLAConstants.JOB_STATUS_POLL_INTERVAL)
 
-        raise TimeoutError(
-            f"Job {job_id} did not reach {expected_status} within {timeout}s"
-        )
+        raise TimeoutError(f"Job {job_id} did not reach {expected_status} within {timeout}s")
 
     async def _wait_for_checkpoint(
         self,
@@ -164,14 +160,8 @@ class TestPreemptionTimingSLAE2E:
         start = time.time()
         while time.time() - start < timeout:
             try:
-                checkpoints = await client.list_checkpoints(
-                    job_id=job_id, checkpoint_base_path=checkpoint_base_path
-                )
-                preemption_ckpts = [
-                    c
-                    for c in checkpoints
-                    if c.get("trigger_type", "").upper() == "PREEMPTION"
-                ]
+                checkpoints = await client.list_checkpoints(job_id=job_id, checkpoint_base_path=checkpoint_base_path)
+                preemption_ckpts = [c for c in checkpoints if c.get("trigger_type", "").upper() == "PREEMPTION"]
                 if preemption_ckpts:
                     return preemption_ckpts[-1]
                 # 如果没有 trigger_type，返回任何 checkpoint
@@ -364,9 +354,9 @@ class TestPreemptionTimingSLAE2E:
         cluster_name = getattr(hyperpod_client, "_cluster_name", "")
         job_id: str | None = None
         namespace = checkpoint_enabled_job_config.get("namespace", "default")
-        checkpoint_base_path = checkpoint_enabled_job_config.get(
-            "checkpoint_config", {}
-        ).get("s3_path", "s3://ai-training-checkpoints-dev/checkpoints")
+        checkpoint_base_path = checkpoint_enabled_job_config.get("checkpoint_config", {}).get(
+            "s3_path", "s3://ai-training-checkpoints-dev/checkpoints"
+        )
 
         try:
             # Step 1: 提交任务
@@ -516,10 +506,7 @@ class TestPreemptionTimingSLAE2E:
 
             # Assert
             assert release_time < SLAConstants.POD_RELEASE_TIMEOUT
-            print(
-                f"✅ Pod 释放完成，耗时: {release_time:.2f}s "
-                f"(SLA: {SLAConstants.POD_RELEASE_TIMEOUT}s)"
-            )
+            print(f"✅ Pod 释放完成，耗时: {release_time:.2f}s " f"(SLA: {SLAConstants.POD_RELEASE_TIMEOUT}s)")
 
         finally:
             await self._cleanup_jobs(hyperpod_client, [(job_id, namespace)])
@@ -636,9 +623,9 @@ class TestPreemptionTimingSLAE2E:
         job_id: str | None = None
         resumed_job_id: str | None = None
         namespace = checkpoint_enabled_job_config.get("namespace", "default")
-        checkpoint_base_path = checkpoint_enabled_job_config.get(
-            "checkpoint_config", {}
-        ).get("s3_path", "s3://ai-training-checkpoints-dev/checkpoints")
+        checkpoint_base_path = checkpoint_enabled_job_config.get("checkpoint_config", {}).get(
+            "s3_path", "s3://ai-training-checkpoints-dev/checkpoints"
+        )
 
         try:
             # Step 1: 提交任务
@@ -733,10 +720,13 @@ class TestPreemptionTimingSLAE2E:
             print(f"✅ 自动恢复成功，耗时: {recovery_time:.2f}s")
 
         finally:
-            await self._cleanup_jobs(hyperpod_client, [
-                (job_id, namespace),
-                (resumed_job_id, namespace),
-            ])
+            await self._cleanup_jobs(
+                hyperpod_client,
+                [
+                    (job_id, namespace),
+                    (resumed_job_id, namespace),
+                ],
+            )
 
 
 @pytest.mark.e2e
@@ -776,10 +766,7 @@ class TestPreemptionEdgeCasesE2E:
 
             # 模拟多次抢占
             # 注：这个测试在真实环境中可能需要较长时间
-            print(
-                f"⚠️ 此测试验证抢占次数限制 "
-                f"(MAX_PREEMPTION_COUNT = {SLAConstants.MAX_PREEMPTION_COUNT})"
-            )
+            print(f"⚠️ 此测试验证抢占次数限制 " f"(MAX_PREEMPTION_COUNT = {SLAConstants.MAX_PREEMPTION_COUNT})")
             print("   在真实环境中可能需要较长时间")
 
             # 查询当前抢占次数
@@ -822,10 +809,7 @@ class TestPreemptionEdgeCasesE2E:
             print(f"📊 当前 preempted 状态任务数: {len(items)}")
 
             for job in items[:3]:  # 只显示前 3 个
-                print(
-                    f"   - {job.get('job_name')}: "
-                    f"preemption_count={job.get('preemption_count')}"
-                )
+                print(f"   - {job.get('job_name')}: " f"preemption_count={job.get('preemption_count')}")
         elif response.status_code == 404:
             pytest.skip("Training jobs API not available")
         else:

@@ -55,9 +55,7 @@ class PasswordService:
         if not user.is_local_account():
             raise InvalidCredentialsError("Cannot change password for SSO account")
 
-        if not user.password_hash or not self._hasher.verify_password(
-            current_password, user.password_hash
-        ):
+        if not user.password_hash or not self._hasher.verify_password(current_password, user.password_hash):
             raise InvalidCredentialsError("Current password is incorrect")
 
         await self._validate_new_password(user_id, new_password)
@@ -97,14 +95,10 @@ class PasswordService:
         if violations:
             raise PasswordTooWeakError(violations)
 
-        password_history = await self._password_history_repository.get_recent(
-            user_id, PASSWORD_HISTORY_COUNT
-        )
+        password_history = await self._password_history_repository.get_recent(user_id, PASSWORD_HISTORY_COUNT)
         history_hashes = [h.password_hash for h in password_history]
 
-        if not self._validator.check_password_history(
-            new_password, history_hashes, self._hasher
-        ):
+        if not self._validator.check_password_history(new_password, history_hashes, self._hasher):
             raise PasswordHistoryViolationError()
 
     async def _update_user_password(self, user: User, new_password: str) -> None:
@@ -124,9 +118,7 @@ class PasswordService:
         await self._password_history_repository.create(history)
 
         # Cleanup old password history entries
-        await self._password_history_repository.cleanup_old_entries(
-            user.id, PASSWORD_HISTORY_COUNT
-        )
+        await self._password_history_repository.cleanup_old_entries(user.id, PASSWORD_HISTORY_COUNT)
 
     async def _ensure_user_exists(self, user_id: int) -> User:
         """Get user by ID, raising error if not found."""

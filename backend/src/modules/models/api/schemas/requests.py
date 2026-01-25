@@ -27,34 +27,18 @@ class CreateModelRequest(BaseModel):
         pattern=r"^[a-z0-9][a-z0-9-]*[a-z0-9]$",
         description="Model name (lowercase alphanumeric with hyphens)",
     )
-    display_name: str | None = Field(
-        None, max_length=256, description="Human-readable display name"
-    )
-    description: str | None = Field(
-        None, max_length=2000, description="Model description"
-    )
-    framework: ModelFrameworkEnum = Field(
-        default=ModelFrameworkEnum.PYTORCH, description="ML framework"
-    )
-    framework_version: str | None = Field(
-        None, max_length=32, description="Framework version"
-    )
-    metrics: dict[str, Any] | None = Field(
-        None, description="Training metrics (accuracy, loss, f1_score, etc.)"
-    )
-    hyperparameters: dict[str, Any] | None = Field(
-        None, description="Training hyperparameters"
-    )
+    display_name: str | None = Field(None, max_length=256, description="Human-readable display name")
+    description: str | None = Field(None, max_length=2000, description="Model description")
+    framework: ModelFrameworkEnum = Field(default=ModelFrameworkEnum.PYTORCH, description="ML framework")
+    framework_version: str | None = Field(None, max_length=32, description="Framework version")
+    metrics: dict[str, Any] | None = Field(None, description="Training metrics (accuracy, loss, f1_score, etc.)")
+    hyperparameters: dict[str, Any] | None = Field(None, description="Training hyperparameters")
     tags: list[str] | None = Field(None, max_length=10, description="Model tags")
 
 
 class UpdateModelRequest(BaseModel):
     """Request body for updating a model."""
 
-    display_name: str | None = Field(
-        None, max_length=256, description="Human-readable display name"
-    )
-    description: str | None = Field(
-        None, max_length=2000, description="Model description"
-    )
+    display_name: str | None = Field(None, max_length=256, description="Human-readable display name")
+    description: str | None = Field(None, max_length=2000, description="Model description")
     tags: list[str] | None = Field(None, max_length=10, description="Model tags")

@@ -10,7 +10,6 @@ SecurityError 是 Problem 的别名，用于向后兼容。
 import pytest
 from fastapi import status
 
-from src.shared.domain.problem import Problem
 from src.modules.auth.domain.exceptions import (
     AccountInactiveError,
     AccountLockedError,
@@ -28,6 +27,7 @@ from src.modules.auth.domain.exceptions import (
     TokenExpiredError,
     UserNotFoundError,
 )
+from src.shared.domain.problem import Problem
 
 
 class TestAuthErrorInheritance:

@@ -13,7 +13,5 @@ class ILoginAttemptRepository(ABC):
         """Create a new login attempt record."""
 
     @abstractmethod
-    async def get_recent_failures(
-        self, username: str, limit: int = 5
-    ) -> list[LoginAttempt]:
+    async def get_recent_failures(self, username: str, limit: int = 5) -> list[LoginAttempt]:
         """Get recent failed login attempts for a username."""

@@ -10,11 +10,10 @@ from unittest.mock import AsyncMock, MagicMock, Mock, patch
 
 import pytest
 
+from src.modules.auth.domain.entities.user import UserRole, UserStatus
 from src.shared.infrastructure.security.constants import PASSWORD_BCRYPT_COST
 from src.shared.infrastructure.security.jwt import JWTManager, TokenPayload, TokenType
 from src.shared.infrastructure.security.password import PasswordHasher, PasswordValidator
-from src.modules.auth.domain.entities.user import UserRole, UserStatus
-
 
 # =============================================================================
 # JWT Manager Fixtures

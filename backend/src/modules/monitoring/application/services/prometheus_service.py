@@ -170,7 +170,7 @@ class PrometheusService:
         alerts: list[StorageAlert] = []
 
         # 查询存储使用率
-        query = '100 - (node_filesystem_avail_bytes / node_filesystem_size_bytes * 100)'
+        query = "100 - (node_filesystem_avail_bytes / node_filesystem_size_bytes * 100)"
         result = await self._client.query_instant(query)
 
         for item in result:
@@ -300,9 +300,7 @@ class PrometheusService:
             for value in item.get("values", []):
                 timestamp = datetime.fromtimestamp(float(value[0]))
                 metric_value = float(value[1])
-                data_points.append(
-                    MetricDataPoint(timestamp=timestamp, value=metric_value)
-                )
+                data_points.append(MetricDataPoint(timestamp=timestamp, value=metric_value))
 
         return data_points
 

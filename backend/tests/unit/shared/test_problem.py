@@ -6,10 +6,9 @@ Problem 基类使用 @problem 装饰器注入 http_status 和 error_code，
 使用 @dataclass 自动生成 get_details() 方法。
 """
 
-import pytest
 from dataclasses import dataclass, field
-from typing import Any
 
+import pytest
 from fastapi import status
 
 from src.shared.domain.problem import Problem, problem
@@ -20,6 +19,7 @@ class TestProblemDecorator:
 
     def test_decorator_injects_status_and_code(self):
         """装饰器应注入 http_status 和 error_code."""
+
         @problem(404, "TEST_NOT_FOUND")
         @dataclass
         class TestError(Problem):
@@ -30,6 +30,7 @@ class TestProblemDecorator:
 
     def test_decorator_with_message_template(self):
         """装饰器应支持消息模板."""
+
         @problem(404, "TEST_NOT_FOUND", "Item '{item_id}' not found")
         @dataclass
         class TestError(Problem):
@@ -40,6 +41,7 @@ class TestProblemDecorator:
 
     def test_decorator_with_multiple_fields_in_template(self):
         """消息模板应支持多个字段."""
+
         @problem(409, "STATE_ERROR", "Cannot {operation} {entity} in {state} state")
         @dataclass
         class StateError(Problem):
@@ -52,6 +54,7 @@ class TestProblemDecorator:
 
     def test_decorator_without_template_generates_default_message(self):
         """没有模板时应生成默认消息."""
+
         @problem(500, "INTERNAL_ERROR")
         @dataclass
         class InternalError(Problem):
@@ -67,6 +70,7 @@ class TestProblemGetDetails:
 
     def test_returns_all_fields(self):
         """应返回所有数据字段."""
+
         @problem(404, "TEST_ERROR")
         @dataclass
         class TestError(Problem):
@@ -80,6 +84,7 @@ class TestProblemGetDetails:
 
     def test_excludes_message_field(self):
         """应排除 message 字段."""
+
         @problem(400, "TEST_ERROR")
         @dataclass
         class TestError(Problem):
@@ -93,6 +98,7 @@ class TestProblemGetDetails:
 
     def test_returns_none_for_no_fields(self):
         """无字段时应返回 None."""
+
         @problem(400, "TEST_ERROR")
         @dataclass
         class TestError(Problem):
@@ -109,6 +115,7 @@ class TestProblemException:
 
     def test_can_be_raised_and_caught(self):
         """应能正常抛出和捕获."""
+
         @problem(404, "NOT_FOUND", "Resource not found")
         @dataclass
         class NotFoundError(Problem):
@@ -123,6 +130,7 @@ class TestProblemException:
 
     def test_str_returns_message(self):
         """str() 应返回消息."""
+
         @problem(400, "TEST", "Test message")
         @dataclass
         class TestError(Problem):
@@ -133,6 +141,7 @@ class TestProblemException:
 
     def test_exception_args_contains_message(self):
         """异常 args 应包含消息."""
+
         @problem(400, "TEST", "Test message")
         @dataclass
         class TestError(Problem):
@@ -151,6 +160,7 @@ class TestProblemInheritance:
 
     def test_custom_error_is_instance_of_problem(self):
         """自定义异常应是 Problem 实例."""
+
         @problem(400, "TEST")
         @dataclass
         class TestError(Problem):
@@ -166,6 +176,7 @@ class TestProblemCustomPostInit:
 
     def test_custom_post_init_can_modify_message(self):
         """自定义 __post_init__ 应能修改消息."""
+
         @problem(500, "OPERATION_ERROR")
         @dataclass
         class OperationError(Problem):
@@ -175,9 +186,7 @@ class TestProblemCustomPostInit:
 
             def __post_init__(self) -> None:
                 if self.target:
-                    self.message = (
-                        f"Operation '{self.operation}' on '{self.target}' failed: {self.reason}"
-                    )
+                    self.message = f"Operation '{self.operation}' on '{self.target}' failed: {self.reason}"
                 else:
                     self.message = f"Operation '{self.operation}' failed: {self.reason}"
                 super().__post_init__()
@@ -290,6 +299,7 @@ class TestProblemDefaultFieldValues:
 
     def test_custom_message_override(self):
         """应能通过参数覆盖自动生成的消息."""
+
         @problem(400, "TEST", "Default message for {field}")
         @dataclass
         class TestError(Problem):

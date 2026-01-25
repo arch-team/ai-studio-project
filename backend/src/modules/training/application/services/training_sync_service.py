@@ -86,8 +86,7 @@ class TrainingSyncService:
                 result.skipped_count += 1
 
         logger.info(
-            f"同步完成: synced={result.synced_count}, "
-            f"skipped={result.skipped_count}, failed={result.failed_count}"
+            f"同步完成: synced={result.synced_count}, " f"skipped={result.skipped_count}, failed={result.failed_count}"
         )
         return result
 
@@ -128,9 +127,7 @@ class TrainingSyncService:
             )
             return False
 
-    async def _process_status_change(
-        self, job: TrainingJob, hyperpod_response: dict[str, Any]
-    ) -> bool | None:
+    async def _process_status_change(self, job: TrainingJob, hyperpod_response: dict[str, Any]) -> bool | None:
         """处理状态变化
 
         Returns:
@@ -150,10 +147,7 @@ class TrainingSyncService:
 
         # 检查状态转换是否合法
         if not job.can_transition_to(new_status):
-            logger.warning(
-                f"任务 {job.job_name} 状态转换非法: "
-                f"{job.status.value} → {new_status.value}"
-            )
+            logger.warning(f"任务 {job.job_name} 状态转换非法: " f"{job.status.value} → {new_status.value}")
             return False
 
         # 执行状态转换
@@ -203,9 +197,7 @@ class TrainingSyncService:
             job.transition_to(new_status)
 
         await self._repo.update(job)
-        logger.info(
-            f"任务 {job.job_name} 状态更新: {old_status.value} → {new_status.value}"
-        )
+        logger.info(f"任务 {job.job_name} 状态更新: {old_status.value} → {new_status.value}")
 
     async def _handle_preemption(self, job: TrainingJob) -> None:
         """处理抢占状态转换"""
@@ -218,15 +210,11 @@ class TrainingSyncService:
                 error_message=f"连续抢占次数超限 ({new_preemption_count}/{MAX_PREEMPTION_COUNT})",
                 failure_reason="PreemptionExhausted",
             )
-            logger.warning(
-                f"任务 {job.job_name} 连续抢占 {new_preemption_count} 次，标记为 Failed"
-            )
+            logger.warning(f"任务 {job.job_name} 连续抢占 {new_preemption_count} 次，标记为 Failed")
         else:
             # 正常抢占，transition_to 会累加 preemption_count
             job.transition_to(JobStatus.PREEMPTED)
-            logger.info(
-                f"任务 {job.job_name} 被抢占，preemption_count={job.preemption_count}"
-            )
+            logger.info(f"任务 {job.job_name} 被抢占，preemption_count={job.preemption_count}")
 
     async def _get_active_jobs(self) -> list[TrainingJob]:
         """获取所有需要同步的活跃任务"""

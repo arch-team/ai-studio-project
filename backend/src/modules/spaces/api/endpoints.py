@@ -44,7 +44,7 @@ async def create_space(
     data: CreateSpaceRequest,
     current_user: CurrentUser = Depends(require_engineer),
     service: SpaceService = Depends(get_space_service),
-):
+) -> SpaceDetail:
     """Create a new development space."""
     space_data = data.model_dump(mode="json")
     space = await service.create_space(owner_id=current_user.user_id, data=space_data)
@@ -64,7 +64,7 @@ async def list_spaces(
     sort_order: SortOrderParam = SortOrder.DESC,
     current_user: CurrentUser = Depends(get_current_active_user),
     service: SpaceService = Depends(get_space_service),
-):
+) -> SpaceListResponse:
     """List development spaces with pagination and filters."""
     status_domain = SpaceStatus(status_filter.value) if status_filter else None
 
@@ -98,7 +98,7 @@ async def get_space(
     space_id: str,
     current_user: CurrentUser = Depends(get_current_active_user),
     service: SpaceService = Depends(get_space_service),
-):
+) -> SpaceDetail:
     """Get development space details by ID."""
     space = await service.get_space(space_id)
     check_resource_owner_or_privileged(space.owner_id, current_user, "space", "view")
@@ -117,7 +117,7 @@ async def start_space(
     space_id: str,
     current_user: CurrentUser = Depends(require_engineer),
     service: SpaceService = Depends(get_space_service),
-):
+) -> SpaceDetail:
     """Start a development space."""
     space = await service.get_space(space_id)
     check_resource_owner_or_privileged(space.owner_id, current_user, "space", "start")
@@ -137,7 +137,7 @@ async def stop_space(
     space_id: str,
     current_user: CurrentUser = Depends(require_engineer),
     service: SpaceService = Depends(get_space_service),
-):
+) -> SpaceDetail:
     """Stop a development space."""
     space = await service.get_space(space_id)
     check_resource_owner_or_privileged(space.owner_id, current_user, "space", "stop")
@@ -157,7 +157,7 @@ async def delete_space(
     space_id: str,
     current_user: CurrentUser = Depends(require_engineer),
     service: SpaceService = Depends(get_space_service),
-):
+) -> None:
     """Delete a development space."""
     space = await service.get_space(space_id)
     check_resource_owner_or_privileged(space.owner_id, current_user, "space", "delete")

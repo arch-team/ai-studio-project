@@ -2,7 +2,7 @@
 
 import time
 from collections.abc import AsyncGenerator
-from datetime import datetime, UTC
+from datetime import UTC, datetime
 from typing import Any
 
 import boto3
@@ -47,13 +47,9 @@ def _has_task_governance() -> bool:
 
         # 检查 Scheduler Config 和 Compute Quotas
         has_scheduler = bool(
-            sagemaker.list_cluster_scheduler_configs(ClusterArn=cluster_arn)
-            .get("ClusterSchedulerConfigSummaries")
+            sagemaker.list_cluster_scheduler_configs(ClusterArn=cluster_arn).get("ClusterSchedulerConfigSummaries")
         )
-        has_quotas = bool(
-            sagemaker.list_compute_quotas(ClusterArn=cluster_arn)
-            .get("ComputeQuotaSummaries")
-        )
+        has_quotas = bool(sagemaker.list_compute_quotas(ClusterArn=cluster_arn).get("ComputeQuotaSummaries"))
 
         return has_scheduler and has_quotas
     except Exception:
@@ -227,9 +223,9 @@ def _create_job_config(priority: str, job_type: str, command: list[str]) -> dict
 def low_priority_job_config() -> dict[str, Any]:
     """低优先级任务配置"""
     command = [
-        "python", "-c",
-        "import time; print('Low priority job started'); "
-        "[print(f'Step {i}') or time.sleep(1) for i in range(600)]"
+        "python",
+        "-c",
+        "import time; print('Low priority job started'); " "[print(f'Step {i}') or time.sleep(1) for i in range(600)]",
     ]
     return _create_job_config("low", "low-priority", command)
 
@@ -295,11 +291,13 @@ _created_resources: list[dict[str, Any]] = []
 
 def track_resource(resource_type: str, resource_id: str) -> None:
     """跟踪创建的资源"""
-    _created_resources.append({
-        "type": resource_type,
-        "id": resource_id,
-        "created_at": datetime.now(UTC),
-    })
+    _created_resources.append(
+        {
+            "type": resource_type,
+            "id": resource_id,
+            "created_at": datetime.now(UTC),
+        }
+    )
 
 
 async def cleanup_all_resources(hyperpod_client: Any) -> None:

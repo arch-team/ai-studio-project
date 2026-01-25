@@ -10,14 +10,12 @@
 参考: SageMaker Model Registry 集成规范
 """
 
-from datetime import datetime
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock
 
 import pytest
 
 from src.modules.models.domain.entities import Model
 from src.modules.models.domain.value_objects import ModelFramework, ModelStatus
-
 
 # =============================================================================
 # 测试 Fixtures
@@ -30,14 +28,16 @@ def mock_model_repository():
     repository = AsyncMock()
     repository.get_by_id = AsyncMock(return_value=None)
     repository.get_by_name = AsyncMock(return_value=None)
-    repository.create = AsyncMock(side_effect=lambda m: Model(
-        id=1,
-        model_name=m.model_name,
-        owner_id=m.owner_id,
-        version=m.version,
-        status=m.status,
-        registry_arn=m.registry_arn,
-    ))
+    repository.create = AsyncMock(
+        side_effect=lambda m: Model(
+            id=1,
+            model_name=m.model_name,
+            owner_id=m.owner_id,
+            version=m.version,
+            status=m.status,
+            registry_arn=m.registry_arn,
+        )
+    )
     repository.update = AsyncMock(side_effect=lambda m: m)
     return repository
 
@@ -46,13 +46,19 @@ def mock_model_repository():
 def mock_sagemaker_client():
     """Mock ISageMakerClient"""
     client = AsyncMock()
-    client.create_model_package = AsyncMock(return_value="arn:aws:sagemaker:us-east-1:123456789:model-package/test-model/1")
+    client.create_model_package = AsyncMock(
+        return_value="arn:aws:sagemaker:us-east-1:123456789:model-package/test-model/1"
+    )
     client.update_model_package = AsyncMock()
-    client.describe_model_package = AsyncMock(return_value={
-        "ModelPackageArn": "arn:aws:sagemaker:us-east-1:123456789:model-package/test-model/1",
-        "ModelApprovalStatus": "Approved",
-    })
-    client.create_model_package_group = AsyncMock(return_value="arn:aws:sagemaker:us-east-1:123456789:model-package-group/test-group")
+    client.describe_model_package = AsyncMock(
+        return_value={
+            "ModelPackageArn": "arn:aws:sagemaker:us-east-1:123456789:model-package/test-model/1",
+            "ModelApprovalStatus": "Approved",
+        }
+    )
+    client.create_model_package_group = AsyncMock(
+        return_value="arn:aws:sagemaker:us-east-1:123456789:model-package-group/test-group"
+    )
     return client
 
 
@@ -116,9 +122,7 @@ class TestAutoRegistration:
         assert result is not None
 
     @pytest.mark.asyncio
-    async def test_register_model_with_metrics(
-        self, registry_service, mock_model_repository, mock_sagemaker_client
-    ):
+    async def test_register_model_with_metrics(self, registry_service, mock_model_repository, mock_sagemaker_client):
         """验证注册时包含训练指标"""
         # Arrange
         model = _create_model(status=ModelStatus.TRAINING)
@@ -147,9 +151,7 @@ class TestVersionManagement:
     """测试模型版本管理"""
 
     @pytest.mark.asyncio
-    async def test_create_model_version(
-        self, registry_service, mock_model_repository, mock_sagemaker_client
-    ):
+    async def test_create_model_version(self, registry_service, mock_model_repository, mock_sagemaker_client):
         """验证创建模型版本"""
         # Arrange
         model = _create_model(status=ModelStatus.REGISTERED)
@@ -166,9 +168,7 @@ class TestVersionManagement:
         mock_sagemaker_client.create_model_package.assert_called()
 
     @pytest.mark.asyncio
-    async def test_approve_model_version(
-        self, registry_service, mock_model_repository, mock_sagemaker_client
-    ):
+    async def test_approve_model_version(self, registry_service, mock_model_repository, mock_sagemaker_client):
         """验证批准模型版本"""
         # Arrange
         model = _create_model(status=ModelStatus.REGISTERED)
@@ -185,9 +185,7 @@ class TestVersionManagement:
         mock_sagemaker_client.update_model_package.assert_called()
 
     @pytest.mark.asyncio
-    async def test_reject_model_version(
-        self, registry_service, mock_model_repository, mock_sagemaker_client
-    ):
+    async def test_reject_model_version(self, registry_service, mock_model_repository, mock_sagemaker_client):
         """验证拒绝模型版本"""
         # Arrange
         model = _create_model(status=ModelStatus.REGISTERED)
@@ -213,9 +211,7 @@ class TestArchiving:
     """测试模型归档"""
 
     @pytest.mark.asyncio
-    async def test_archive_model(
-        self, registry_service, mock_model_repository
-    ):
+    async def test_archive_model(self, registry_service, mock_model_repository):
         """验证归档模型"""
         # Arrange
         model = _create_model(status=ModelStatus.REGISTERED)
@@ -238,9 +234,7 @@ class TestLineage:
     """测试模型血缘关系"""
 
     @pytest.mark.asyncio
-    async def test_get_model_lineage(
-        self, registry_service, mock_model_repository
-    ):
+    async def test_get_model_lineage(self, registry_service, mock_model_repository):
         """验证获取模型血缘关系"""
         # Arrange
         model = _create_model(status=ModelStatus.REGISTERED)
@@ -266,9 +260,7 @@ class TestStatusSync:
     """测试 Registry 状态同步"""
 
     @pytest.mark.asyncio
-    async def test_sync_registry_status(
-        self, registry_service, mock_model_repository, mock_sagemaker_client
-    ):
+    async def test_sync_registry_status(self, registry_service, mock_model_repository, mock_sagemaker_client):
         """验证同步 Registry 状态到本地数据库"""
         # Arrange
         model = _create_model(status=ModelStatus.REGISTERED)

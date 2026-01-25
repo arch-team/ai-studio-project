@@ -189,11 +189,7 @@ class AuditMiddleware(BaseHTTPMiddleware):
         """Recursively sanitize sensitive fields in data."""
         if isinstance(data, dict):
             return {
-                key: (
-                    "***"
-                    if key.lower() in self.SENSITIVE_FIELDS
-                    else self._sanitize_data(value)
-                )
+                key: ("***" if key.lower() in self.SENSITIVE_FIELDS else self._sanitize_data(value))
                 for key, value in data.items()
             }
         elif isinstance(data, list):
@@ -246,11 +242,7 @@ class AuditMiddleware(BaseHTTPMiddleware):
         """Write audit log to database asynchronously."""
         try:
             # Determine audit status based on response code
-            status = (
-                AuditStatus.SUCCESS
-                if response.status_code < 400
-                else AuditStatus.FAILED
-            )
+            status = AuditStatus.SUCCESS if response.status_code < 400 else AuditStatus.FAILED
 
             # Build response data
             response_data = {"status_code": response.status_code}
@@ -259,8 +251,7 @@ class AuditMiddleware(BaseHTTPMiddleware):
             audit_log = AuditLog(
                 id=0,  # Will be assigned by database
                 operation_type=operation_type,
-                resource_type=self._get_resource_type(request.url.path)
-                or ResourceType.USER,
+                resource_type=self._get_resource_type(request.url.path) or ResourceType.USER,
                 status=status,
                 user_id=self._get_user_id(request),
                 resource_id=self._get_resource_id(request.url.path),
@@ -274,9 +265,7 @@ class AuditMiddleware(BaseHTTPMiddleware):
             if hasattr(request.app.state, "audit_repository"):
                 await request.app.state.audit_repository.create(audit_log)
             else:
-                logger.debug(
-                    "Audit repository not configured, skipping audit log write"
-                )
+                logger.debug("Audit repository not configured, skipping audit log write")
 
         except Exception as e:
             # Log error but don't fail the request (audit should never block main flow)

@@ -7,13 +7,13 @@ from sqlalchemy import BigInteger, Enum, ForeignKey, Integer, String
 from sqlalchemy.dialects.mysql import CHAR
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from src.shared.infrastructure.database import Base
-from src.shared.infrastructure.models.base import SoftDeleteMixin, TimestampMixin
 from src.modules.spaces.domain.value_objects import (
     SpaceInstanceType,
     SpaceStatus,
     SpaceType,
 )
+from src.shared.infrastructure.database import Base
+from src.shared.infrastructure.models.base import SoftDeleteMixin, TimestampMixin
 
 if TYPE_CHECKING:
     from src.modules.auth.infrastructure.models import UserModel

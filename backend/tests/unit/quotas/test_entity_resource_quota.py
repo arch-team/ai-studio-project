@@ -274,9 +274,7 @@ class TestResourceQuotaJobValidation:
         assert is_valid is False
         assert "GPU" in error
 
-    def test_validate_job_submission_memory_exceeded(
-        self, quota: ResourceQuota
-    ) -> None:
+    def test_validate_job_submission_memory_exceeded(self, quota: ResourceQuota) -> None:
         """Test validate_job_submission fails when memory exceeds quota."""
         is_valid, error = quota.validate_job_submission(
             cpu_cores=32,
@@ -287,9 +285,7 @@ class TestResourceQuotaJobValidation:
         assert is_valid is False
         assert "Memory" in error
 
-    def test_validate_job_submission_gpu_type_not_allowed(
-        self, quota: ResourceQuota
-    ) -> None:
+    def test_validate_job_submission_gpu_type_not_allowed(self, quota: ResourceQuota) -> None:
         """Test validate_job_submission fails for disallowed GPU type."""
         is_valid, error = quota.validate_job_submission(
             cpu_cores=32,
@@ -301,9 +297,7 @@ class TestResourceQuotaJobValidation:
         assert is_valid is False
         assert "GPU type" in error
 
-    def test_validate_job_submission_concurrent_limit_reached(
-        self, quota: ResourceQuota
-    ) -> None:
+    def test_validate_job_submission_concurrent_limit_reached(self, quota: ResourceQuota) -> None:
         """Test validate_job_submission fails when concurrent limit reached."""
         is_valid, error = quota.validate_job_submission(
             cpu_cores=32,

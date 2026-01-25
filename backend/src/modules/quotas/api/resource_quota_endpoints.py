@@ -35,9 +35,7 @@ router = APIRouter()
 async def list_resource_quotas(
     page: PageParam,
     page_size: PageSizeParam,
-    quota_type: QuotaTypeEnum | None = Query(
-        default=None, description="Filter by quota type"
-    ),
+    quota_type: QuotaTypeEnum | None = Query(default=None, description="Filter by quota type"),
     status: QuotaStatusEnum | None = Query(default=None, description="Filter by status"),
     sort_by: SortByParam = "created_at",
     sort_order: SortOrderParam = SortOrder.DESC,
@@ -93,9 +91,7 @@ async def create_resource_quota(
 
     # Parse valid_until if provided
     if data.valid_until:
-        quota_data["valid_until"] = datetime.fromisoformat(
-            data.valid_until.replace("Z", "+00:00")
-        )
+        quota_data["valid_until"] = datetime.fromisoformat(data.valid_until.replace("Z", "+00:00"))
 
     quota = await service.create_quota(quota_data)
     return ResourceQuotaResponse.from_entity(quota)
@@ -148,9 +144,7 @@ async def update_resource_quota(
     if data.status is not None:
         update_data["status"] = data.status.value
     if data.valid_until is not None:
-        update_data["valid_until"] = datetime.fromisoformat(
-            data.valid_until.replace("Z", "+00:00")
-        )
+        update_data["valid_until"] = datetime.fromisoformat(data.valid_until.replace("Z", "+00:00"))
 
     quota = await service.update_quota(quota_id, update_data)
     return ResourceQuotaResponse.from_entity(quota)

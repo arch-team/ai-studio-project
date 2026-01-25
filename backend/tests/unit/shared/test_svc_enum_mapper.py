@@ -2,9 +2,9 @@
 
 import pytest
 
+from src.modules.training.api.schemas import JobPriorityEnum, JobStatusEnum
+from src.modules.training.domain.entities.training_job import JobPriority, JobStatus
 from src.shared.utils.mapping import EnumMapper
-from src.modules.training.domain.entities.training_job import JobStatus, JobPriority
-from src.modules.training.api.schemas import JobStatusEnum, JobPriorityEnum
 
 
 class TestEnumMapperToApi:

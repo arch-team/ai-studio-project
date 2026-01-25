@@ -11,7 +11,6 @@
 import logging
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
-from typing import Any
 
 from src.modules.training.application.interfaces import (
     Alert,
@@ -160,9 +159,7 @@ class StallDetectionService:
         start_time = end_time - timedelta(minutes=config.detection_window_minutes)
 
         # 获取指标数据
-        metric_points, used_metric = await self._fetch_metric_points(
-            job, config, start_time, end_time
-        )
+        metric_points, used_metric = await self._fetch_metric_points(job, config, start_time, end_time)
 
         # 没有可用指标
         if not metric_points:
@@ -195,9 +192,7 @@ class StallDetectionService:
             return DEFAULT_METRIC_FALLBACK
 
         # 主指标在前，其余按默认顺序
-        return [config.primary_metric] + [
-            m for m in DEFAULT_METRIC_FALLBACK if m != config.primary_metric
-        ]
+        return [config.primary_metric] + [m for m in DEFAULT_METRIC_FALLBACK if m != config.primary_metric]
 
     async def _fetch_metric_points(
         self,

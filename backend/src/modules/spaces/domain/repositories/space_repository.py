@@ -14,9 +14,7 @@ class ISpaceRepository(ABC):
         """Get space by ID."""
 
     @abstractmethod
-    async def get_by_name_and_owner(
-        self, space_name: str, owner_id: int
-    ) -> Space | None:
+    async def get_by_name_and_owner(self, space_name: str, owner_id: int) -> Space | None:
         """Get space by name and owner ID."""
 
     @abstractmethod

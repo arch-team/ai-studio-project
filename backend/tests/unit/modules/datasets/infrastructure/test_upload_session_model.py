@@ -82,10 +82,7 @@ class TestUploadSessionModelColumnTypes:
 
         mapper = inspect(UploadSessionModel)
         col = mapper.columns["upload_id"]
-        assert (
-            "VARCHAR" in str(col.type).upper()
-            or "STRING" in str(col.type).upper()
-        )
+        assert "VARCHAR" in str(col.type).upper() or "STRING" in str(col.type).upper()
 
     def test_total_size_is_bigint(self) -> None:
         """验证 total_size 为 BigInteger 类型。"""

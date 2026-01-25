@@ -99,9 +99,7 @@ class TrainingMetricsService:
             return self._cache[cache_key]
 
         # 转换指标类型为 Prometheus 指标名称
-        prometheus_metric_names = [
-            METRIC_TYPE_MAPPING.get(mt, f"training_{mt}") for mt in metric_types
-        ]
+        prometheus_metric_names = [METRIC_TYPE_MAPPING.get(mt, f"training_{mt}") for mt in metric_types]
 
         # 查询 Prometheus
         raw_metrics = await self._prometheus.query_metrics(
@@ -115,13 +113,10 @@ class TrainingMetricsService:
         result_metrics: dict[str, list[MetricPoint]] = {}
 
         for metric_type in metric_types:
-            prometheus_name = METRIC_TYPE_MAPPING.get(
-                metric_type, f"training_{metric_type}"
-            )
+            prometheus_name = METRIC_TYPE_MAPPING.get(metric_type, f"training_{metric_type}")
             if prometheus_name in raw_metrics:
                 result_metrics[metric_type] = [
-                    MetricPoint(timestamp=dp.timestamp, value=dp.value)
-                    for dp in raw_metrics[prometheus_name]
+                    MetricPoint(timestamp=dp.timestamp, value=dp.value) for dp in raw_metrics[prometheus_name]
                 ]
 
         result = TrainingMetricsResult(job_id=job_id, metrics=result_metrics)

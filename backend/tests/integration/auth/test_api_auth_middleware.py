@@ -1,6 +1,5 @@
 """Authentication Middleware Integration Tests."""
 
-
 import pytest
 from httpx import AsyncClient
 
@@ -56,9 +55,7 @@ class TestExemptPaths:
         assert response.status_code in [401, 422]
 
     @pytest.mark.asyncio
-    async def test_exempt_path_password_reset_request(
-        self, client: AsyncClient
-    ) -> None:
+    async def test_exempt_path_password_reset_request(self, client: AsyncClient) -> None:
         """Test /api/v1/auth/password-reset/request is accessible without authentication."""
         try:
             response = await client.post(
@@ -74,9 +71,7 @@ class TestExemptPaths:
             raise
 
     @pytest.mark.asyncio
-    async def test_exempt_path_password_reset_confirm(
-        self, client: AsyncClient
-    ) -> None:
+    async def test_exempt_path_password_reset_confirm(self, client: AsyncClient) -> None:
         """Test /api/v1/auth/password-reset/confirm is accessible without authentication."""
         response = await client.post(
             "/api/v1/auth/password-reset/confirm",
@@ -120,9 +115,7 @@ class TestProtectedPaths:
         assert response.status_code == 401
 
     @pytest.mark.asyncio
-    async def test_protected_path_valid_token(
-        self, client: AsyncClient, engineer_auth_headers: dict[str, str]
-    ) -> None:
+    async def test_protected_path_valid_token(self, client: AsyncClient, engineer_auth_headers: dict[str, str]) -> None:
         """Test protected path accepts valid token."""
         response = await client.get("/api/v1/auth/me", headers=engineer_auth_headers)
 
@@ -144,9 +137,7 @@ class TestBearerTokenFormat:
     """Tests for Bearer token format handling."""
 
     @pytest.mark.asyncio
-    async def test_bearer_lowercase(
-        self, client: AsyncClient, engineer_access_token: str
-    ) -> None:
+    async def test_bearer_lowercase(self, client: AsyncClient, engineer_access_token: str) -> None:
         """Test bearer (lowercase) is accepted by middleware."""
         try:
             response = await client.get(
@@ -163,9 +154,7 @@ class TestBearerTokenFormat:
             raise
 
     @pytest.mark.asyncio
-    async def test_bearer_uppercase(
-        self, client: AsyncClient, engineer_access_token: str
-    ) -> None:
+    async def test_bearer_uppercase(self, client: AsyncClient, engineer_access_token: str) -> None:
         """Test BEARER (uppercase) is accepted."""
         response = await client.get(
             "/api/v1/auth/me",
@@ -176,9 +165,7 @@ class TestBearerTokenFormat:
         assert response.status_code in [200, 401, 404, 500]
 
     @pytest.mark.asyncio
-    async def test_bearer_mixed_case(
-        self, client: AsyncClient, engineer_access_token: str
-    ) -> None:
+    async def test_bearer_mixed_case(self, client: AsyncClient, engineer_access_token: str) -> None:
         """Test Bearer (mixed case) is accepted by middleware."""
         try:
             response = await client.get(
@@ -218,9 +205,7 @@ class TestRequestStatePopulation:
     """Tests for request.state population by middleware."""
 
     @pytest.mark.asyncio
-    async def test_request_state_user_id(
-        self, client: AsyncClient, engineer_auth_headers: dict[str, str]
-    ) -> None:
+    async def test_request_state_user_id(self, client: AsyncClient, engineer_auth_headers: dict[str, str]) -> None:
         """Test that request.state contains user_id."""
         response = await client.get("/api/v1/auth/me", headers=engineer_auth_headers)
 
@@ -230,9 +215,7 @@ class TestRequestStatePopulation:
             assert "id" in data or "user_id" in data
 
     @pytest.mark.asyncio
-    async def test_request_state_role(
-        self, client: AsyncClient, admin_auth_headers: dict[str, str]
-    ) -> None:
+    async def test_request_state_role(self, client: AsyncClient, admin_auth_headers: dict[str, str]) -> None:
         """Test that request.state contains role."""
         try:
             response = await client.get("/api/v1/auth/me", headers=admin_auth_headers)
@@ -279,9 +262,7 @@ class TestAuthenticationErrors:
 
         assert response.status_code == 401
         # Either WWW-Authenticate header or error body should be present
-        has_www_auth = "www-authenticate" in [
-            h.lower() for h in response.headers.keys()
-        ]
+        has_www_auth = "www-authenticate" in [h.lower() for h in response.headers.keys()]
         # Middleware returns {"code": "...", "message": "..."} format
         data = response.json()
         has_error_body = any(k in data for k in ("code", "error", "detail", "message"))

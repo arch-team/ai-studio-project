@@ -92,9 +92,7 @@ def build_job_config(job: TrainingJob) -> dict[str, Any]:
 class HyperPodServiceError(Exception):
     """HyperPod service error with retry information."""
 
-    def __init__(
-        self, message: str, retries: int = 0, original_error: Exception | None = None
-    ):
+    def __init__(self, message: str, retries: int = 0, original_error: Exception | None = None):
         super().__init__(message)
         self.retries = retries
         self.original_error = original_error

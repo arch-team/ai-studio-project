@@ -118,17 +118,13 @@ class GangSchedulingValidator:
         pods = await self._hyperpod_service.list_job_pods(job_name=job_name)
 
         if len(pods) != expected_pod_count:
-            raise GangSchedulingError(
-                f"Expected {expected_pod_count} pods, got {len(pods)}"
-            )
+            raise GangSchedulingError(f"Expected {expected_pod_count} pods, got {len(pods)}")
 
         # Check all pods are in Running state
         pod_ready_times = []
         for pod in pods:
             if pod.get("status") != "Running":
-                raise GangSchedulingError(
-                    f"Pod {pod['name']} not in Running state: {pod.get('status')}"
-                )
+                raise GangSchedulingError(f"Pod {pod['name']} not in Running state: {pod.get('status')}")
             ready_time = pod.get("ready_time", start_time)
             pod_ready_times.append(ready_time)
 
@@ -149,9 +145,7 @@ class GangSchedulingValidator:
             "pod_count": len(pods),
             "all_pods_ready": True,
             "ready_window_seconds": (
-                (max(pod_ready_times) - min(pod_ready_times)).total_seconds()
-                if pod_ready_times
-                else 0
+                (max(pod_ready_times) - min(pod_ready_times)).total_seconds() if pod_ready_times else 0
             ),
             "verification_time": datetime.utcnow(),
         }
@@ -173,16 +167,12 @@ class GangSchedulingValidator:
 
         # Job should be in Failed state
         if job_status.get("status") != "failed":
-            raise GangSchedulingError(
-                f"Expected job status 'failed', got {job_status.get('status')}"
-            )
+            raise GangSchedulingError(f"Expected job status 'failed', got {job_status.get('status')}")
 
         # All pods should be cleaned up
         pods = await self._hyperpod_service.list_job_pods(job_name=job_name)
         if pods:
-            raise GangSchedulingError(
-                f"Expected all pods to be cleaned up, found {len(pods)} pods"
-            )
+            raise GangSchedulingError(f"Expected all pods to be cleaned up, found {len(pods)} pods")
 
         return {
             "job_name": job_name,
@@ -589,15 +579,14 @@ class TestGangSchedulingRealAWS:
         cluster_info = await client.describe_cluster(test_cluster_name)
 
         # Verify cluster is in service
-        assert cluster_info.get("ClusterStatus") == "InService", (
-            f"Cluster not in service: {cluster_info.get('ClusterStatus')}"
-        )
+        assert (
+            cluster_info.get("ClusterStatus") == "InService"
+        ), f"Cluster not in service: {cluster_info.get('ClusterStatus')}"
 
         # List instance groups
         instance_groups = cluster_info.get("InstanceGroups", [])
         group_info = [
-            f"{g.get('InstanceGroupName')}: {g.get('InstanceType')} x {g.get('CurrentCount')}"
-            for g in instance_groups
+            f"{g.get('InstanceGroupName')}: {g.get('InstanceType')} x {g.get('CurrentCount')}" for g in instance_groups
         ]
         print(f"\nCluster instance groups: {group_info}")
 
@@ -643,9 +632,7 @@ class TestGangSchedulingRealAWS:
 
             while (datetime.utcnow() - start_time).total_seconds() < timeout_seconds:
                 try:
-                    pods = await real_hyperpod_service.list_job_pods(
-                        job_name=gang_test_job_name
-                    )
+                    pods = await real_hyperpod_service.list_job_pods(job_name=gang_test_job_name)
 
                     running_pods = [p for p in pods if p.get("status") == "Running"]
                     print(f"Pods status: {len(running_pods)}/{gang_test_job_config['node_count']} running")
@@ -662,9 +649,7 @@ class TestGangSchedulingRealAWS:
             # Verify gang scheduling result
             if pods_ready:
                 # All pods ready - verify time window
-                pods = await real_hyperpod_service.list_job_pods(
-                    job_name=gang_test_job_name
-                )
+                pods = await real_hyperpod_service.list_job_pods(job_name=gang_test_job_name)
                 print(f"\nGang scheduling successful: {len(pods)} pods ready")
 
                 # Verify all pods on different nodes (gang scheduling)
@@ -672,13 +657,10 @@ class TestGangSchedulingRealAWS:
                 print(f"Pod distribution: {node_names}")
             else:
                 # Check job status
-                job_status = await real_hyperpod_service.get_job_status(
-                    job_name=gang_test_job_name
-                )
+                job_status = await real_hyperpod_service.get_job_status(job_name=gang_test_job_name)
                 print(f"\nJob status: {job_status}")
                 pytest.skip(
-                    f"Pods did not become ready within {timeout_seconds}s - "
-                    "cluster may lack GPU worker nodes"
+                    f"Pods did not become ready within {timeout_seconds}s - " "cluster may lack GPU worker nodes"
                 )
 
         finally:
@@ -716,9 +698,7 @@ class TestGangSchedulingRealAWS:
             await asyncio.sleep(30)
 
             # Get pods with timing info
-            pods = await real_hyperpod_service.list_job_pods(
-                job_name=gang_test_job_name
-            )
+            pods = await real_hyperpod_service.list_job_pods(job_name=gang_test_job_name)
 
             if len(pods) < 2:
                 pytest.skip("Not enough pods scheduled - cluster may lack resources")
@@ -735,9 +715,7 @@ class TestGangSchedulingRealAWS:
                 print(f"\nPod readiness time window: {time_window}s")
 
                 # FR-003 requirement
-                assert time_window <= 60, (
-                    f"Pod readiness window {time_window}s exceeds 60s limit"
-                )
+                assert time_window <= 60, f"Pod readiness window {time_window}s exceeds 60s limit"
 
         finally:
             try:

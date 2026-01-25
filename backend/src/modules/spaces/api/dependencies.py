@@ -3,9 +3,9 @@
 from fastapi import Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.shared.infrastructure.database import get_db
 from src.modules.spaces.application.services import SpaceService
 from src.modules.spaces.infrastructure.repositories import SpaceRepository
+from src.shared.infrastructure.database import get_db
 
 
 async def get_space_service(

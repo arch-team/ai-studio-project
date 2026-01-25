@@ -77,9 +77,7 @@ class UpdateDatasetRequest(BaseModel):
 
     description: str | None = Field(None, description="Dataset description")
     tags: list[str] | None = Field(None, description="Tags for categorization")
-    visibility: DatasetVisibilityEnum | None = Field(
-        None, description="Visibility scope"
-    )
+    visibility: DatasetVisibilityEnum | None = Field(None, description="Visibility scope")
 
 
 class CreateDatasetVersionRequest(BaseModel):

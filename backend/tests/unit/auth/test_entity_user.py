@@ -8,7 +8,7 @@ Tests cover:
 - Password management
 """
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import pytest
 
@@ -131,52 +131,38 @@ class TestUserPermissions:
 
     def test_has_admin_privileges_for_admin(self) -> None:
         """Test has_admin_privileges returns True for ADMIN role."""
-        user = User(
-            id=1, username="admin", email="admin@example.com", role=UserRole.ADMIN
-        )
+        user = User(id=1, username="admin", email="admin@example.com", role=UserRole.ADMIN)
         assert user.has_admin_privileges()
 
     def test_has_admin_privileges_for_engineer(self) -> None:
         """Test has_admin_privileges returns False for ENGINEER role."""
-        user = User(
-            id=1, username="engineer", email="eng@example.com", role=UserRole.ENGINEER
-        )
+        user = User(id=1, username="engineer", email="eng@example.com", role=UserRole.ENGINEER)
         assert not user.has_admin_privileges()
 
     def test_can_create_training_job_when_active_engineer(self) -> None:
         """Test ENGINEER can create training jobs when active."""
-        user = User(
-            id=1, username="engineer", email="eng@example.com", role=UserRole.ENGINEER
-        )
+        user = User(id=1, username="engineer", email="eng@example.com", role=UserRole.ENGINEER)
         assert user.can_create_training_job()
 
     def test_cannot_create_training_job_when_suspended(self) -> None:
         """Test user cannot create training jobs when suspended."""
-        user = User(
-            id=1, username="engineer", email="eng@example.com", role=UserRole.ENGINEER
-        )
+        user = User(id=1, username="engineer", email="eng@example.com", role=UserRole.ENGINEER)
         user.suspend()
         assert not user.can_create_training_job()
 
     def test_viewer_cannot_create_training_job(self) -> None:
         """Test VIEWER cannot create training jobs."""
-        user = User(
-            id=1, username="viewer", email="viewer@example.com", role=UserRole.VIEWER
-        )
+        user = User(id=1, username="viewer", email="viewer@example.com", role=UserRole.VIEWER)
         assert not user.can_create_training_job()
 
     def test_can_view_resources_when_active(self) -> None:
         """Test active user can view resources."""
-        user = User(
-            id=1, username="viewer", email="viewer@example.com", role=UserRole.VIEWER
-        )
+        user = User(id=1, username="viewer", email="viewer@example.com", role=UserRole.VIEWER)
         assert user.can_view_resources()
 
     def test_cannot_view_resources_when_suspended(self) -> None:
         """Test suspended user cannot view resources."""
-        user = User(
-            id=1, username="viewer", email="viewer@example.com", role=UserRole.VIEWER
-        )
+        user = User(id=1, username="viewer", email="viewer@example.com", role=UserRole.VIEWER)
         user.suspend()
         assert not user.can_view_resources()
 
@@ -226,19 +212,19 @@ class TestUserAccountLocking:
 
     def test_is_locked_when_locked(self, user: User) -> None:
         """Test is_locked returns True when locked."""
-        future_time = datetime.now(timezone.utc) + timedelta(hours=1)
+        future_time = datetime.now(UTC) + timedelta(hours=1)
         user.lock_account(future_time)
         assert user.is_locked()
 
     def test_is_locked_when_lock_expired(self, user: User) -> None:
         """Test is_locked returns False when lock has expired."""
-        past_time = datetime.now(timezone.utc) - timedelta(hours=1)
+        past_time = datetime.now(UTC) - timedelta(hours=1)
         user.lock_account(past_time)
         assert not user.is_locked()
 
     def test_reset_login_failures_unlocks_account(self, user: User) -> None:
         """Test reset_login_failures also unlocks account."""
-        future_time = datetime.now(timezone.utc) + timedelta(hours=1)
+        future_time = datetime.now(UTC) + timedelta(hours=1)
         user.lock_account(future_time)
         assert user.is_locked()
         user.reset_login_failures()
@@ -273,33 +259,31 @@ class TestUserPasswordManagement:
 
     def test_is_password_expired_when_expired(self, local_user: User) -> None:
         """Test is_password_expired returns True when password has expired."""
-        past_time = datetime.now(timezone.utc) - timedelta(days=1)
+        past_time = datetime.now(UTC) - timedelta(days=1)
         local_user.password_expires_at = past_time
         assert local_user.is_password_expired()
 
     def test_is_password_expired_when_not_expired(self, local_user: User) -> None:
         """Test is_password_expired returns False when password is valid."""
-        future_time = datetime.now(timezone.utc) + timedelta(days=30)
+        future_time = datetime.now(UTC) + timedelta(days=30)
         local_user.password_expires_at = future_time
         assert not local_user.is_password_expired()
 
     def test_update_password_sets_hash_and_expiration(self, local_user: User) -> None:
         """Test update_password sets password_hash and password_expires_at."""
-        future_time = datetime.now(timezone.utc) + timedelta(days=90)
+        future_time = datetime.now(UTC) + timedelta(days=90)
         local_user.update_password("new_hash", future_time)
         assert local_user.password_hash == "new_hash"
         assert local_user.password_expires_at == future_time
 
-    def test_update_password_resets_failed_count_and_lock(
-        self, local_user: User
-    ) -> None:
+    def test_update_password_resets_failed_count_and_lock(self, local_user: User) -> None:
         """Test update_password resets failed_login_count and locked_until."""
         local_user.record_failed_login()
         local_user.record_failed_login()
-        lock_time = datetime.now(timezone.utc) + timedelta(hours=1)
+        lock_time = datetime.now(UTC) + timedelta(hours=1)
         local_user.lock_account(lock_time)
 
-        future_time = datetime.now(timezone.utc) + timedelta(days=90)
+        future_time = datetime.now(UTC) + timedelta(days=90)
         local_user.update_password("new_hash", future_time)
 
         assert local_user.failed_login_count == 0

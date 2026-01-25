@@ -280,12 +280,8 @@ class TestUploadSession:
 
         # 添加 2/5 分片 → 40%
         now = datetime.now()
-        session.add_part(
-            UploadPart(1, '"e1"', 100_000_000, "m1", now)
-        )
-        session.add_part(
-            UploadPart(2, '"e2"', 100_000_000, "m2", now)
-        )
+        session.add_part(UploadPart(1, '"e1"', 100_000_000, "m1", now))
+        session.add_part(UploadPart(2, '"e2"', 100_000_000, "m2", now))
 
         assert session.progress_percentage == 40.0
 
@@ -376,10 +372,9 @@ class TestUploadSession:
 
         # 添加分片
         import time
+
         time.sleep(0.01)  # 确保时间差异
-        session.add_part(
-            UploadPart(1, '"e1"', 100_000_000, "m1", datetime.now())
-        )
+        session.add_part(UploadPart(1, '"e1"', 100_000_000, "m1", datetime.now()))
 
         assert session.updated_at > original_updated
 

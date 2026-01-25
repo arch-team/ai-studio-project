@@ -211,9 +211,7 @@ class TestFsxClientGetTaskStatus:
         from src.modules.datasets.infrastructure.fsx import FsxClient
 
         mock_fsx = MagicMock()
-        mock_fsx.describe_data_repository_tasks = AsyncMock(
-            return_value={"DataRepositoryTasks": []}
-        )
+        mock_fsx.describe_data_repository_tasks = AsyncMock(return_value={"DataRepositoryTasks": []})
 
         with patch("aioboto3.Session") as mock_session_class:
             mock_session_class.return_value = create_mock_session(mock_fsx)

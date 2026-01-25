@@ -144,22 +144,16 @@ class TestLoginAttemptAttributes:
             user_id=1,
         )
 
-    def test_failed_attempt_has_failure_reason(
-        self, failed_attempt: LoginAttempt
-    ) -> None:
+    def test_failed_attempt_has_failure_reason(self, failed_attempt: LoginAttempt) -> None:
         """Test failed attempt has failure_reason set."""
         assert failed_attempt.failure_reason is not None
         assert failed_attempt.failure_reason == "Too many attempts"
 
-    def test_successful_attempt_has_no_failure_reason(
-        self, successful_attempt: LoginAttempt
-    ) -> None:
+    def test_successful_attempt_has_no_failure_reason(self, successful_attempt: LoginAttempt) -> None:
         """Test successful attempt has no failure_reason."""
         assert successful_attempt.failure_reason is None
 
-    def test_successful_attempt_has_user_id(
-        self, successful_attempt: LoginAttempt
-    ) -> None:
+    def test_successful_attempt_has_user_id(self, successful_attempt: LoginAttempt) -> None:
         """Test successful attempt always has user_id."""
         assert successful_attempt.user_id is not None
         assert successful_attempt.user_id == 1

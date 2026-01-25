@@ -10,21 +10,16 @@
 参考: spec.md 检查点管理规范
 """
 
-from datetime import datetime, timedelta
-from decimal import Decimal
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
 from src.modules.training.domain.entities import Checkpoint
 from src.modules.training.domain.value_objects import (
-    CheckpointStatus,
     CheckpointTriggerType,
-    CheckpointType,
     JobStatus,
     StorageTier,
 )
-
 
 # =============================================================================
 # 测试 Fixtures
@@ -38,19 +33,21 @@ def mock_checkpoint_repository():
     repository.get_by_id = AsyncMock(return_value=None)
     repository.get_by_training_job_id = AsyncMock(return_value=[])
     repository.get_latest_by_training_job_id = AsyncMock(return_value=None)
-    repository.create = AsyncMock(side_effect=lambda cp: Checkpoint(
-        id=1,
-        training_job_id=cp.training_job_id,
-        checkpoint_name=cp.checkpoint_name,
-        storage_path=cp.storage_path,
-        size_bytes=cp.size_bytes,
-        checkpoint_type=cp.checkpoint_type,
-        trigger_type=cp.trigger_type,
-        epoch=cp.epoch,
-        step=cp.step,
-        checksum=cp.checksum,
-        storage_tier=cp.storage_tier,
-    ))
+    repository.create = AsyncMock(
+        side_effect=lambda cp: Checkpoint(
+            id=1,
+            training_job_id=cp.training_job_id,
+            checkpoint_name=cp.checkpoint_name,
+            storage_path=cp.storage_path,
+            size_bytes=cp.size_bytes,
+            checkpoint_type=cp.checkpoint_type,
+            trigger_type=cp.trigger_type,
+            epoch=cp.epoch,
+            step=cp.step,
+            checksum=cp.checksum,
+            storage_tier=cp.storage_tier,
+        )
+    )
     repository.update = AsyncMock(side_effect=lambda cp: cp)
     repository.count_by_training_job_id = AsyncMock(return_value=0)
     repository.get_by_storage_tier = AsyncMock(return_value=[])
@@ -130,9 +127,7 @@ class TestCreateCheckpoint:
         mock_checkpoint_repository.create.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_create_checkpoint_on_training_interrupt(
-        self, checkpoint_service, mock_checkpoint_repository
-    ):
+    async def test_create_checkpoint_on_training_interrupt(self, checkpoint_service, mock_checkpoint_repository):
         """验证训练中断时创建检查点 (INTERRUPT)"""
         # Arrange
         job_id = 1
@@ -148,9 +143,7 @@ class TestCreateCheckpoint:
         mock_checkpoint_repository.create.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_create_checkpoint_on_node_failure(
-        self, checkpoint_service, mock_checkpoint_repository
-    ):
+    async def test_create_checkpoint_on_node_failure(self, checkpoint_service, mock_checkpoint_repository):
         """验证节点故障时创建检查点 (NODE_FAILURE)"""
         # Arrange
         job_id = 1
@@ -165,9 +158,7 @@ class TestCreateCheckpoint:
         assert result.trigger_type == CheckpointTriggerType.NODE_FAILURE
 
     @pytest.mark.asyncio
-    async def test_create_checkpoint_on_preemption(
-        self, checkpoint_service, mock_checkpoint_repository
-    ):
+    async def test_create_checkpoint_on_preemption(self, checkpoint_service, mock_checkpoint_repository):
         """验证资源抢占时创建检查点 (PREEMPTION)"""
         # Arrange
         job_id = 1
@@ -182,9 +173,7 @@ class TestCreateCheckpoint:
         assert result.trigger_type == CheckpointTriggerType.PREEMPTION
 
     @pytest.mark.asyncio
-    async def test_create_manual_checkpoint_via_api(
-        self, checkpoint_service, mock_checkpoint_repository
-    ):
+    async def test_create_manual_checkpoint_via_api(self, checkpoint_service, mock_checkpoint_repository):
         """验证用户手动触发检查点 (MANUAL)"""
         # Arrange
         job_id = 1
@@ -285,20 +274,24 @@ class TestCheckpointQueries:
     """测试检查点查询功能"""
 
     @pytest.mark.asyncio
-    async def test_list_checkpoints_for_job(
-        self, checkpoint_service, mock_checkpoint_repository
-    ):
+    async def test_list_checkpoints_for_job(self, checkpoint_service, mock_checkpoint_repository):
         """验证查询任务的所有检查点"""
         # Arrange
         job_id = 1
         checkpoints = [
             Checkpoint(
-                id=1, training_job_id=job_id, checkpoint_name="cp-1",
-                storage_path="/path/1", size_bytes=100,
+                id=1,
+                training_job_id=job_id,
+                checkpoint_name="cp-1",
+                storage_path="/path/1",
+                size_bytes=100,
             ),
             Checkpoint(
-                id=2, training_job_id=job_id, checkpoint_name="cp-2",
-                storage_path="/path/2", size_bytes=200,
+                id=2,
+                training_job_id=job_id,
+                checkpoint_name="cp-2",
+                storage_path="/path/2",
+                size_bytes=200,
             ),
         ]
         mock_checkpoint_repository.get_by_training_job_id.return_value = checkpoints
@@ -320,9 +313,7 @@ class TestJobStatusValidation:
     """测试任务状态验证"""
 
     @pytest.mark.asyncio
-    async def test_only_running_jobs_can_create_checkpoint(
-        self, checkpoint_service, mock_training_job_repository
-    ):
+    async def test_only_running_jobs_can_create_checkpoint(self, checkpoint_service, mock_training_job_repository):
         """验证仅 Running 状态的任务可创建检查点"""
         from src.modules.training.domain.entities import TrainingJob
 
@@ -447,9 +438,7 @@ class TestEdgeCases:
     """测试边界情况"""
 
     @pytest.mark.asyncio
-    async def test_job_not_found_raises_error(
-        self, checkpoint_service, mock_training_job_repository
-    ):
+    async def test_job_not_found_raises_error(self, checkpoint_service, mock_training_job_repository):
         """验证任务不存在时抛出错误"""
         # Arrange
         mock_training_job_repository.get_by_id.return_value = None
@@ -464,9 +453,7 @@ class TestEdgeCases:
             )
 
     @pytest.mark.asyncio
-    async def test_storage_failure_raises_error(
-        self, checkpoint_service, mock_storage_service
-    ):
+    async def test_storage_failure_raises_error(self, checkpoint_service, mock_storage_service):
         """验证存储不可用时抛出错误"""
         # Arrange: 所有存储都不可用
         mock_storage_service.check_nvme_available.return_value = False

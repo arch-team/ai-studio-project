@@ -34,9 +34,7 @@ class IHyperPodClient(ABC):
         """Get cluster details."""
 
     @abstractmethod
-    async def list_clusters(
-        self, max_results: int = 100, next_token: str | None = None
-    ) -> dict[str, Any]:
+    async def list_clusters(self, max_results: int = 100, next_token: str | None = None) -> dict[str, Any]:
         """List all HyperPod clusters."""
 
     @abstractmethod
@@ -44,9 +42,7 @@ class IHyperPodClient(ABC):
         """Delete a HyperPod cluster."""
 
     @abstractmethod
-    async def update_cluster(
-        self, cluster_name: str, instance_groups: list[dict[str, Any]]
-    ) -> dict[str, Any]:
+    async def update_cluster(self, cluster_name: str, instance_groups: list[dict[str, Any]]) -> dict[str, Any]:
         """Update cluster instance groups."""
 
     @abstractmethod
@@ -59,21 +55,15 @@ class IHyperPodClient(ABC):
         """Submit a training job to the cluster."""
 
     @abstractmethod
-    async def get_training_job_status(
-        self, cluster_name: str, job_name: str
-    ) -> dict[str, Any]:
+    async def get_training_job_status(self, cluster_name: str, job_name: str) -> dict[str, Any]:
         """Get training job status."""
 
     @abstractmethod
-    async def stop_training_job(
-        self, cluster_name: str, job_name: str
-    ) -> dict[str, Any]:
+    async def stop_training_job(self, cluster_name: str, job_name: str) -> dict[str, Any]:
         """Stop a running training job."""
 
     @abstractmethod
-    async def list_training_job_pods(
-        self, cluster_name: str, job_name: str
-    ) -> list[dict[str, Any]]:
+    async def list_training_job_pods(self, cluster_name: str, job_name: str) -> list[dict[str, Any]]:
         """List pods for a training job."""
 
     # =========================================================================
@@ -89,9 +79,7 @@ class IHyperPodClient(ABC):
         """获取任务 Pod 列表 (list_training_job_pods 的别名)"""
 
     @abstractmethod
-    async def get_pod_status(
-        self, cluster_name: str, job_name: str, pod_name: str
-    ) -> dict[str, Any]:
+    async def get_pod_status(self, cluster_name: str, job_name: str, pod_name: str) -> dict[str, Any]:
         """获取单个 Pod 状态"""
 
     @abstractmethod
@@ -99,9 +87,7 @@ class IHyperPodClient(ABC):
         """验证检查点文件是否存在"""
 
     @abstractmethod
-    async def list_checkpoints(
-        self, job_id: str, checkpoint_base_path: str
-    ) -> list[dict[str, Any]]:
+    async def list_checkpoints(self, job_id: str, checkpoint_base_path: str) -> list[dict[str, Any]]:
         """列出任务检查点"""
 
     @abstractmethod

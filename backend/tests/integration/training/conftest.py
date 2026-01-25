@@ -11,9 +11,7 @@ import pytest
 
 def pytest_configure(config: pytest.Config) -> None:
     """Register custom markers."""
-    config.addinivalue_line(
-        "markers", "aws_integration: mark test as requiring AWS credentials"
-    )
+    config.addinivalue_line("markers", "aws_integration: mark test as requiring AWS credentials")
     config.addinivalue_line("markers", "hyperpod: mark test as HyperPod-specific")
     config.addinivalue_line("markers", "slow: mark test as slow running")
 
@@ -56,9 +54,7 @@ def aws_account_id() -> str | None:
 def s3_test_config() -> dict[str, Any]:
     """S3 test configuration from environment."""
     return {
-        "bucket_name": os.environ.get(
-            "S3_TEST_BUCKET", "ai-training-platform-integration-test"
-        ),
+        "bucket_name": os.environ.get("S3_TEST_BUCKET", "ai-training-platform-integration-test"),
         "kms_key_id": os.environ.get("S3_TEST_KMS_KEY_ID"),
         "prefix": os.environ.get("S3_TEST_PREFIX", "integration-tests/"),
     }
@@ -69,8 +65,5 @@ def hyperpod_test_config() -> dict[str, Any]:
     """HyperPod test configuration from environment."""
     return {
         "cluster_name": os.environ.get("HYPERPOD_TEST_CLUSTER_NAME"),
-        "enable_write_tests": os.environ.get(
-            "HYPERPOD_ENABLE_WRITE_TESTS", "false"
-        ).lower()
-        == "true",
+        "enable_write_tests": os.environ.get("HYPERPOD_ENABLE_WRITE_TESTS", "false").lower() == "true",
     }

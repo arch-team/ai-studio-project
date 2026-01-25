@@ -21,13 +21,13 @@ logger = logging.getLogger(__name__)
 try:
     from sagemaker.hyperpod.training import HyperPodPytorchJob
 except ImportError:
-    HyperPodPytorchJob = None  # type: ignore
+    HyperPodPytorchJob = None
 
 # set_cluster_context 用于配置 kubeconfig 连接 HyperPod 集群
 try:
     from sagemaker.hyperpod import set_cluster_context
 except ImportError:
-    set_cluster_context = None  # type: ignore
+    set_cluster_context = None
 
 
 STATUS_MAPPING = {

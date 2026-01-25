@@ -1,13 +1,13 @@
 """通用分页和排序依赖."""
 
+from collections.abc import Sequence
 from enum import Enum
-from typing import Annotated, Generic, Sequence, TypeVar
+from typing import Annotated, Generic, TypeVar
 
 from fastapi import Query
 from pydantic import BaseModel
 
 from src.shared.utils import calculate_total_pages
-
 
 # =========================================================================
 # 分页参数

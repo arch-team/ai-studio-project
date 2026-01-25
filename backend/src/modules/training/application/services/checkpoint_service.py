@@ -107,9 +107,7 @@ class CheckpointService(EnhancedBaseService[Checkpoint, int]):
             checkpoint_name = self._generate_checkpoint_name(trigger_type, epoch, step)
 
         # 3. 确定存储层并保存
-        storage_tier, storage_path, checksum, size_bytes = await self._save_to_storage(
-            job_id, checkpoint_name
-        )
+        storage_tier, storage_path, checksum, size_bytes = await self._save_to_storage(job_id, checkpoint_name)
 
         # 4. 确定检查点类型
         checkpoint_type = self._determine_checkpoint_type(trigger_type, epoch, step)
@@ -346,9 +344,7 @@ class CheckpointService(EnhancedBaseService[Checkpoint, int]):
             )
 
         # 获取存储路径
-        storage_path = await self._storage_service.get_storage_path(
-            job_id, checkpoint_name, storage_tier.value
-        )
+        storage_path = await self._storage_service.get_storage_path(job_id, checkpoint_name, storage_tier.value)
 
         # 计算校验和和大小
         checksum = await self._storage_service.calculate_checksum(storage_path)

@@ -36,9 +36,7 @@ def hyperpod_write_tests_enabled() -> bool:
     return os.environ.get("HYPERPOD_ENABLE_WRITE_TESTS", "false").lower() == "true"
 
 
-skip_without_aws = pytest.mark.skipif(
-    not aws_credentials_available(), reason="AWS credentials not available"
-)
+skip_without_aws = pytest.mark.skipif(not aws_credentials_available(), reason="AWS credentials not available")
 
 skip_write_tests = pytest.mark.skipif(
     not hyperpod_write_tests_enabled(),
@@ -89,9 +87,7 @@ class TestHyperPodReadOnly:
         result1 = await hyperpod_client.list_clusters(max_results=1)
 
         if "NextToken" in result1 and result1["NextToken"]:
-            result2 = await hyperpod_client.list_clusters(
-                max_results=1, next_token=result1["NextToken"]
-            )
+            result2 = await hyperpod_client.list_clusters(max_results=1, next_token=result1["NextToken"])
             assert isinstance(result2, dict)
 
     @skip_without_aws
@@ -124,9 +120,7 @@ class TestHyperPodReadOnly:
         from botocore.exceptions import ClientError
 
         with pytest.raises(ClientError) as exc_info:
-            await hyperpod_client.describe_cluster(
-                cluster_name="nonexistent-cluster-12345"
-            )
+            await hyperpod_client.describe_cluster(cluster_name="nonexistent-cluster-12345")
 
         error_code = exc_info.value.response["Error"]["Code"]
         assert error_code in ("ResourceNotFound", "ValidationException")

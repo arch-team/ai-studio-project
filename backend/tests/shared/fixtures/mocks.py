@@ -1,15 +1,14 @@
 """Common mock objects for testing."""
 
-from typing import Any, Generic, TypeVar
+from typing import Generic, TypeVar
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
 from tests.shared.constants import (
-    TEST_JWT_SECRET,
     TEST_ACCESS_TOKEN_EXPIRE_MINUTES,
+    TEST_JWT_SECRET,
 )
-
 
 T = TypeVar("T")
 

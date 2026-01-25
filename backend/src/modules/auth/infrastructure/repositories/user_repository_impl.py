@@ -78,9 +78,7 @@ class UserRepositoryImpl(EnhancedBaseRepository[User, UserModel, int], IUserRepo
 
     async def get_by_username(self, username: str) -> User | None:
         """Get user by username."""
-        result = await self._session.execute(
-            select(UserModel).where(UserModel.username == username)
-        )
+        result = await self._session.execute(select(UserModel).where(UserModel.username == username))
         model = result.scalar_one_or_none()
         if model is None:
             return None
@@ -88,9 +86,7 @@ class UserRepositoryImpl(EnhancedBaseRepository[User, UserModel, int], IUserRepo
 
     async def get_by_email(self, email: str) -> User | None:
         """Get user by email."""
-        result = await self._session.execute(
-            select(UserModel).where(UserModel.email == email)
-        )
+        result = await self._session.execute(select(UserModel).where(UserModel.email == email))
         model = result.scalar_one_or_none()
         if model is None:
             return None
@@ -106,9 +102,7 @@ class UserRepositoryImpl(EnhancedBaseRepository[User, UserModel, int], IUserRepo
 
     async def get_by_iam_identity_id(self, iam_identity_id: str) -> User | None:
         """Get user by IAM identity ID (for SSO users)."""
-        result = await self._session.execute(
-            select(UserModel).where(UserModel.iam_identity_id == iam_identity_id)
-        )
+        result = await self._session.execute(select(UserModel).where(UserModel.iam_identity_id == iam_identity_id))
         model = result.scalar_one_or_none()
         if model is None:
             return None

@@ -58,9 +58,7 @@ class Dataset:
     def transition_to(self, new_status: DatasetStatus) -> None:
         """转换到新状态，无效转换抛出 InvalidStateTransitionError。"""
         if not self.can_transition_to(new_status):
-            raise InvalidStateTransitionError(
-                "Dataset", self.status.value, new_status.value
-            )
+            raise InvalidStateTransitionError("Dataset", self.status.value, new_status.value)
 
         self.status = new_status
         self.updated_at = utc_now()

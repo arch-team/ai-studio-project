@@ -146,7 +146,7 @@ class CheckpointMigrationService:
             return result
 
         # 迁移所有检查点 (保留最新 3 个)
-        for checkpoint in checkpoints[CHECKPOINT_MIGRATION_CONFIG["hot_retention_count"]:]:
+        for checkpoint in checkpoints[CHECKPOINT_MIGRATION_CONFIG["hot_retention_count"] :]:
             migration_result = await self.migrate_checkpoint(checkpoint, target_tier)
             if migration_result.success:
                 result.migrated_count += 1
@@ -186,9 +186,7 @@ class CheckpointMigrationService:
                 )
 
                 # 验证迁移后的完整性
-                is_valid = await self._storage.verify_integrity(
-                    new_path, checkpoint.checksum
-                )
+                is_valid = await self._storage.verify_integrity(new_path, checkpoint.checksum)
                 if not is_valid:
                     raise CheckpointMigrationError(
                         checkpoint_id=checkpoint.id,
@@ -255,9 +253,7 @@ class CheckpointMigrationService:
         if checkpoint.checksum is None:
             return False
 
-        return await self._storage.verify_integrity(
-            checkpoint.storage_path, checkpoint.checksum
-        )
+        return await self._storage.verify_integrity(checkpoint.storage_path, checkpoint.checksum)
 
     async def get_valid_checkpoint_for_restore(
         self,
@@ -279,9 +275,7 @@ class CheckpointMigrationService:
             if checkpoint.checksum is None:
                 continue
 
-            is_valid = await self._storage.verify_integrity(
-                checkpoint.storage_path, checkpoint.checksum
-            )
+            is_valid = await self._storage.verify_integrity(checkpoint.storage_path, checkpoint.checksum)
             if is_valid:
                 return checkpoint
 
@@ -295,9 +289,7 @@ class CheckpointMigrationService:
         """从 NVMe 迁移到 FSx"""
         # 获取所有需要迁移的检查点 (排除最新 3 个)
         # 这里简化处理，实际需要按 training_job_id 分组
-        checkpoints = await self._checkpoint_repo.get_by_storage_tier(
-            StorageTier.NVME, limit=100
-        )
+        checkpoints = await self._checkpoint_repo.get_by_storage_tier(StorageTier.NVME, limit=100)
 
         # 按 training_job_id 分组
         job_checkpoints: dict[int, list[Checkpoint]] = {}
@@ -312,7 +304,7 @@ class CheckpointMigrationService:
             sorted_cps = sorted(cps, key=lambda x: x.created_at, reverse=True)
 
             # 迁移第 4 个及以后的
-            for cp in sorted_cps[CHECKPOINT_MIGRATION_CONFIG["hot_retention_count"]:]:
+            for cp in sorted_cps[CHECKPOINT_MIGRATION_CONFIG["hot_retention_count"] :]:
                 migration_result = await self.migrate_checkpoint(cp, StorageTier.FSX)
                 if migration_result.success:
                     result.migrated_count += 1
@@ -323,9 +315,7 @@ class CheckpointMigrationService:
         """从 FSx 迁移到 S3 (归档)"""
         # 获取超过 72 小时的检查点
         # 这里需要按 training_job_id 获取
-        checkpoints = await self._checkpoint_repo.get_by_storage_tier(
-            StorageTier.FSX, limit=100
-        )
+        checkpoints = await self._checkpoint_repo.get_by_storage_tier(StorageTier.FSX, limit=100)
 
         for cp in checkpoints:
             old_checkpoints = await self._checkpoint_repo.get_oldest_checkpoints(

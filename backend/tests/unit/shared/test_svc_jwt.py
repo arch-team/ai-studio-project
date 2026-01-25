@@ -92,25 +92,19 @@ class TestJWTManagerTokenCreation:
         assert isinstance(token, str)
         assert token.count(".") == 2
 
-        payload = jwt_manager.verify_token(
-            token, expected_type=TokenType.PASSWORD_RESET
-        )
+        payload = jwt_manager.verify_token(token, expected_type=TokenType.PASSWORD_RESET)
         assert payload.token_type == TokenType.PASSWORD_RESET
         assert payload.sub == "1"
         assert payload.email == "test@example.com"
 
-    def test_create_password_reset_token_15_minute_expiry(
-        self, jwt_manager: JWTManager
-    ) -> None:
+    def test_create_password_reset_token_15_minute_expiry(self, jwt_manager: JWTManager) -> None:
         """Test that password reset token has ~15 minute expiry."""
         token = jwt_manager.create_password_reset_token(
             user_id=1,
             email="test@example.com",
         )
 
-        payload = jwt_manager.verify_token(
-            token, expected_type=TokenType.PASSWORD_RESET
-        )
+        payload = jwt_manager.verify_token(token, expected_type=TokenType.PASSWORD_RESET)
         expected_exp = datetime.now(UTC) + timedelta(minutes=15)
         # Allow 5 second tolerance
         assert abs((payload.exp - expected_exp).total_seconds()) < 5
@@ -162,9 +156,7 @@ class TestJWTManagerTokenVerification:
         with pytest.raises(TokenExpiredError):
             jwt_manager.verify_token(token)
 
-    def test_verify_token_invalid_signature(
-        self, jwt_manager: JWTManager, jwt_secret_key: str
-    ) -> None:
+    def test_verify_token_invalid_signature(self, jwt_manager: JWTManager, jwt_secret_key: str) -> None:
         """Test that tokens with invalid signatures raise InvalidTokenError."""
         # Create token with different secret using authlib directly
         header = {"alg": "HS256"}
@@ -179,9 +171,7 @@ class TestJWTManagerTokenVerification:
             "jti": "test-jti",
         }
         # Use a different secret key to create the token
-        token = authlib_jwt.encode(
-            header, payload, "different-secret-key-for-testing!"
-        ).decode("utf-8")
+        token = authlib_jwt.encode(header, payload, "different-secret-key-for-testing!").decode("utf-8")
 
         with pytest.raises(InvalidTokenError):
             jwt_manager.verify_token(token)
@@ -195,9 +185,7 @@ class TestJWTManagerTokenVerification:
 
         assert "Invalid token type" in str(exc_info.value)
 
-    def test_verify_token_missing_claims(
-        self, jwt_manager: JWTManager, jwt_secret_key: str
-    ) -> None:
+    def test_verify_token_missing_claims(self, jwt_manager: JWTManager, jwt_secret_key: str) -> None:
         """Test that tokens with missing claims raise InvalidTokenError."""
         # Create a token without required claims
         header = {"alg": "HS256"}

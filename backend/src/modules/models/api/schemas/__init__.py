@@ -9,12 +9,11 @@ from .responses import (
     MetricsDiff,
     ModelDetail,
     ModelErrorResponse,
-    ModelFrameworkEnum,
     ModelListResponse,
     ModelStatusEnum,
     ModelSummary,
-    ModelVersionSummary,
     ModelVersionsResponse,
+    ModelVersionSummary,
     VersionComparison,
 )
 

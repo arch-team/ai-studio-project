@@ -360,12 +360,8 @@ class TestExceptionInheritance:
         ]
 
         for exc in exceptions:
-            assert isinstance(
-                exc, Problem
-            ), f"{type(exc).__name__} should inherit from Problem"
-            assert isinstance(
-                exc, Exception
-            ), f"{type(exc).__name__} should inherit from Exception"
+            assert isinstance(exc, Problem), f"{type(exc).__name__} should inherit from Problem"
+            assert isinstance(exc, Exception), f"{type(exc).__name__} should inherit from Exception"
 
     def test_catching_problem_catches_all(self) -> None:
         """Test that catching Problem catches all security exceptions."""

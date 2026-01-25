@@ -73,9 +73,7 @@ class TestHyperPodClusterCreation:
             cluster_arn="arn:aws:sagemaker:us-east-1:123456789012:cluster/full",
             region="us-east-1",
             vpc_id="vpc-12345678",
-            instance_groups=[
-                {"name": "gpu", "count": 4, "instance_type": "ml.p4d.24xlarge"}
-            ],
+            instance_groups=[{"name": "gpu", "count": 4, "instance_type": "ml.p4d.24xlarge"}],
             total_nodes=4,
             available_nodes=4,
             total_cpu_cores=384,
@@ -127,35 +125,25 @@ class TestHyperPodClusterStateTransitions:
             status=ClusterStatus.ACTIVE,
         )
 
-    def test_can_transition_to_active_from_creating(
-        self, creating_cluster: HyperPodCluster
-    ) -> None:
+    def test_can_transition_to_active_from_creating(self, creating_cluster: HyperPodCluster) -> None:
         """从 creating 可转换到 active."""
         assert creating_cluster.can_transition_to(ClusterStatus.ACTIVE) is True
 
-    def test_cannot_transition_to_creating_from_active(
-        self, active_cluster: HyperPodCluster
-    ) -> None:
+    def test_cannot_transition_to_creating_from_active(self, active_cluster: HyperPodCluster) -> None:
         """从 active 不能转换到 creating."""
         assert active_cluster.can_transition_to(ClusterStatus.CREATING) is False
 
-    def test_transition_to_valid_status_succeeds(
-        self, creating_cluster: HyperPodCluster
-    ) -> None:
+    def test_transition_to_valid_status_succeeds(self, creating_cluster: HyperPodCluster) -> None:
         """有效状态转换成功."""
         creating_cluster.transition_to(ClusterStatus.ACTIVE)
         assert creating_cluster.status == ClusterStatus.ACTIVE
 
-    def test_transition_to_invalid_status_raises_error(
-        self, active_cluster: HyperPodCluster
-    ) -> None:
+    def test_transition_to_invalid_status_raises_error(self, active_cluster: HyperPodCluster) -> None:
         """无效状态转换抛出异常."""
         with pytest.raises(InvalidStateTransitionError):
             active_cluster.transition_to(ClusterStatus.CREATING)
 
-    def test_transition_updates_timestamp(
-        self, creating_cluster: HyperPodCluster
-    ) -> None:
+    def test_transition_updates_timestamp(self, creating_cluster: HyperPodCluster) -> None:
         """状态转换更新 updated_at."""
         old_updated_at = creating_cluster.updated_at
         creating_cluster.transition_to(ClusterStatus.ACTIVE)

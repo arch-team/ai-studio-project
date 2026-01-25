@@ -15,7 +15,6 @@ from src.modules.models.domain.entities.model import (
     ModelStatus,
 )
 from src.shared.domain.exceptions import (
-    DuplicateEntityError,
     EntityNotFoundError,
     InvalidStateTransitionError,
 )

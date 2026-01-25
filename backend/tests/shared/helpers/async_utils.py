@@ -1,7 +1,8 @@
 """Async testing utilities."""
 
 import asyncio
-from typing import Any, Awaitable, Callable, TypeVar
+from collections.abc import Awaitable
+from typing import Any, TypeVar
 from unittest.mock import AsyncMock
 
 T = TypeVar("T")

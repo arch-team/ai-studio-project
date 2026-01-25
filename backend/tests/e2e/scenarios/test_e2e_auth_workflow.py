@@ -6,7 +6,6 @@ and role-based access control.
 Reference: specs/001-ai-training-platform/spec.md - FR-015 (User Authentication)
 """
 
-from typing import Any
 
 import pytest
 from httpx import AsyncClient

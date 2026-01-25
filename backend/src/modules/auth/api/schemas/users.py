@@ -37,13 +37,9 @@ class UserStatusEnum(str, Enum):
 class CreateUserRequest(BaseModel):
     """Create user request schema (T056)."""
 
-    username: str = Field(
-        ..., min_length=3, max_length=64, description="用户名"
-    )
+    username: str = Field(..., min_length=3, max_length=64, description="用户名")
     email: EmailStr = Field(..., description="邮箱地址")
-    display_name: str | None = Field(
-        None, max_length=128, description="显示名称"
-    )
+    display_name: str | None = Field(None, max_length=128, description="显示名称")
     role: UserRoleEnum = Field(..., description="用户角色")
     resource_quota_id: int | None = Field(None, ge=1, description="资源配额 ID")
 

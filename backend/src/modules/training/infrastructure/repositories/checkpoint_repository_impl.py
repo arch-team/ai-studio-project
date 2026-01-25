@@ -90,9 +90,7 @@ class CheckpointRepository(EnhancedBaseRepository[Checkpoint, CheckpointModel, i
         """Delete a checkpoint by ID."""
         await super().delete(checkpoint_id)
 
-    async def get_latest_by_training_job_id(
-        self, training_job_id: int
-    ) -> Checkpoint | None:
+    async def get_latest_by_training_job_id(self, training_job_id: int) -> Checkpoint | None:
         """Get the latest checkpoint for a training job."""
         result = await self._session.execute(
             select(CheckpointModel)
@@ -114,9 +112,7 @@ class CheckpointRepository(EnhancedBaseRepository[Checkpoint, CheckpointModel, i
         )
         return result.scalar_one()
 
-    async def get_by_storage_tier(
-        self, storage_tier: StorageTier, limit: int = 100
-    ) -> list[Checkpoint]:
+    async def get_by_storage_tier(self, storage_tier: StorageTier, limit: int = 100) -> list[Checkpoint]:
         """Get checkpoints by storage tier for migration."""
         result = await self._session.execute(
             select(CheckpointModel)

@@ -81,10 +81,7 @@ class TestDatasetModelColumnTypes:
 
         mapper = inspect(DatasetModel)
         name_col = mapper.columns["name"]
-        assert (
-            "VARCHAR" in str(name_col.type).upper()
-            or "STRING" in str(name_col.type).upper()
-        )
+        assert "VARCHAR" in str(name_col.type).upper() or "STRING" in str(name_col.type).upper()
 
     def test_storage_type_is_enum(self) -> None:
         """验证 storage_type 为 Enum 类型。"""

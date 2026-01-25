@@ -4,15 +4,13 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.shared.infrastructure.repository_base import EnhancedBaseRepository
+
 from ...domain.entities import LoginAttempt
 from ...domain.repositories import ILoginAttemptRepository
 from ..models import LoginAttemptModel
 
 
-class LoginAttemptRepositoryImpl(
-    EnhancedBaseRepository[LoginAttempt, LoginAttemptModel, int],
-    ILoginAttemptRepository
-):
+class LoginAttemptRepositoryImpl(EnhancedBaseRepository[LoginAttempt, LoginAttemptModel, int], ILoginAttemptRepository):
     """SQLAlchemy implementation of LoginAttempt repository."""
 
     def __init__(self, session: AsyncSession):
@@ -58,9 +56,7 @@ class LoginAttemptRepositoryImpl(
         await self._session.refresh(model)
         return self._to_entity(model)
 
-    async def get_recent_failures(
-        self, username: str, limit: int = 5
-    ) -> list[LoginAttempt]:
+    async def get_recent_failures(self, username: str, limit: int = 5) -> list[LoginAttempt]:
         """Get recent failed login attempts for a username."""
         result = await self._session.execute(
             select(LoginAttemptModel)

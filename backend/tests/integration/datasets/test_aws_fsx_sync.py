@@ -60,7 +60,10 @@ class TestFsxAvailability:
         # 验证 Lustre 配置
         assert "LustreConfiguration" in result
         lustre_config = result["LustreConfiguration"]
-        assert lustre_config.get("DataRepositoryConfiguration") is not None or lustre_config.get("DataCompressionType") is not None
+        assert (
+            lustre_config.get("DataRepositoryConfiguration") is not None
+            or lustre_config.get("DataCompressionType") is not None
+        )
 
 
 class TestS3ToFsxSync:
@@ -70,6 +73,7 @@ class TestS3ToFsxSync:
     def test_dataset_id(self) -> str:
         """测试用数据集 ID (使用唯一路径避免任务冲突)。"""
         import uuid
+
         base_id = os.environ.get("TEST_DATASET_ID", "1")
         return f"{base_id}-{uuid.uuid4().hex[:8]}"
 
@@ -133,6 +137,7 @@ class TestFsxCacheRelease:
     def test_dataset_id(self) -> str:
         """测试用数据集 ID (使用唯一路径避免任务冲突)。"""
         import uuid
+
         base_id = os.environ.get("TEST_DATASET_ID", "1")
         return f"{base_id}-release-{uuid.uuid4().hex[:8]}"
 

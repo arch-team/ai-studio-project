@@ -7,13 +7,13 @@ from sqlalchemy import BigInteger, DateTime, Enum, ForeignKey, String, Text
 from sqlalchemy.dialects.mysql import JSON
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
+from src.modules.models.domain.value_objects import ModelFramework, ModelStatus
 from src.shared.infrastructure.database import Base
 from src.shared.infrastructure.models.base import TimestampMixin
-from src.modules.models.domain.value_objects import ModelFramework, ModelStatus
 
 if TYPE_CHECKING:
-    from src.modules.training.infrastructure.models import CheckpointModel, TrainingJobModel
     from src.modules.auth.infrastructure.models import UserModel
+    from src.modules.training.infrastructure.models import CheckpointModel, TrainingJobModel
 
 
 class ModelModel(Base, TimestampMixin):

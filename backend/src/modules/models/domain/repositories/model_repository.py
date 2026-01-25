@@ -14,9 +14,7 @@ class IModelRepository(ABC):
         """Get model by ID."""
 
     @abstractmethod
-    async def get_by_name_and_version(
-        self, model_name: str, version: str
-    ) -> Model | None:
+    async def get_by_name_and_version(self, model_name: str, version: str) -> Model | None:
         """Get model by name and version."""
 
     @abstractmethod

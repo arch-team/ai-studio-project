@@ -40,14 +40,10 @@ class UploadPart:
         """验证分片参数有效性。"""
         # S3 分片编号范围: 1-10000
         if self.part_number < 1 or self.part_number > 10000:
-            raise ValueError(
-                f"part_number must be between 1 and 10000, got {self.part_number}"
-            )
+            raise ValueError(f"part_number must be between 1 and 10000, got {self.part_number}")
         # 分片大小不能为负
         if self.size_bytes < 0:
-            raise ValueError(
-                f"size_bytes must be non-negative, got {self.size_bytes}"
-            )
+            raise ValueError(f"size_bytes must be non-negative, got {self.size_bytes}")
 
 
 @dataclass

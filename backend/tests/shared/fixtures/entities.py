@@ -17,7 +17,6 @@ from src.modules.training.domain.value_objects import (
     JobStatus,
 )
 
-
 # ========== User Fixtures ==========
 
 

@@ -1,13 +1,12 @@
 """Training module test fixtures."""
 
 from datetime import UTC, datetime
-from typing import Any
 from unittest.mock import AsyncMock
 
 import pytest
 
 from src.modules.training.domain.entities.training_job import TrainingJob
-from src.modules.training.domain.value_objects import JobStatus, DistributionStrategy
+from src.modules.training.domain.value_objects import DistributionStrategy, JobStatus
 
 
 @pytest.fixture

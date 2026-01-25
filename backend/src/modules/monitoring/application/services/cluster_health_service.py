@@ -9,7 +9,6 @@ from datetime import datetime
 from src.shared.domain.exceptions import EntityNotFoundError
 from src.shared.utils import utc_now
 
-from ...domain.entities import HyperPodCluster
 from ...domain.repositories import IHyperPodClusterRepository
 from ...domain.value_objects import HealthStatus
 from .prometheus_service import PrometheusService

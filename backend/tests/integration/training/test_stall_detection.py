@@ -13,14 +13,12 @@
 
 from datetime import datetime, timedelta
 from decimal import Decimal
-from typing import Any
 from unittest.mock import AsyncMock
 
 import pytest
 
 from src.modules.training.application.interfaces import Alert, MetricPoint
 from src.modules.training.application.services.stall_detection_service import (
-    StallCheckResult,
     StallDetectionConfig,
     StallDetectionService,
 )
@@ -30,7 +28,6 @@ from src.modules.training.domain.value_objects import (
     JobPriority,
     JobStatus,
 )
-
 
 # === Fixtures ===
 
@@ -61,9 +58,7 @@ def create_test_job(
     )
 
 
-def create_stalled_metric_history(
-    now: datetime, value: float = 0.5, window_minutes: int = 30
-) -> list[MetricPoint]:
+def create_stalled_metric_history(now: datetime, value: float = 0.5, window_minutes: int = 30) -> list[MetricPoint]:
     """创建停滞指标历史（值保持不变）"""
     return [
         MetricPoint(timestamp=now - timedelta(minutes=window_minutes), value=value),
@@ -557,8 +552,8 @@ class TestStallDetectionEdgeCases:
         # job1 停滞，job2 健康，job3 无数据
         mock_metrics_service.get_metric_history.side_effect = [
             create_stalled_metric_history(now, value=0.5),  # job1
-            create_healthy_metric_history(now, 1.0, 0.5),   # job2
-            [],                                              # job3
+            create_healthy_metric_history(now, 1.0, 0.5),  # job2
+            [],  # job3
         ]
 
         service = StallDetectionService(

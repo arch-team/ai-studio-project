@@ -56,9 +56,7 @@ class CreateTrainingJobRequest(BaseModel):
 
     dataset_id: int | None = Field(None, description="Dataset ID")
     data_mount_path: str | None = Field(default="/data", description="Data mount path")
-    checkpoint_mount_path: str | None = Field(
-        default="/checkpoints", description="Checkpoint mount path"
-    )
+    checkpoint_mount_path: str | None = Field(default="/checkpoints", description="Checkpoint mount path")
     checkpoint_interval: int | None = Field(None, ge=1, description="Checkpoint interval")
 
     @field_validator("job_name")
@@ -68,8 +66,7 @@ class CreateTrainingJobRequest(BaseModel):
         pattern = r"^[a-z0-9][a-z0-9-]*[a-z0-9]$|^[a-z0-9]$"
         if not re.match(pattern, v):
             raise ValueError(
-                "Job name must be lowercase alphanumeric with hyphens, "
-                "start and end with alphanumeric characters"
+                "Job name must be lowercase alphanumeric with hyphens, " "start and end with alphanumeric characters"
             )
         return v
 
@@ -152,7 +149,6 @@ class CreateJobFromTemplateRequest(BaseModel):
         pattern = r"^[a-z0-9][a-z0-9-]*[a-z0-9]$|^[a-z0-9]$"
         if not re.match(pattern, v):
             raise ValueError(
-                "Job name must be lowercase alphanumeric with hyphens, "
-                "start and end with alphanumeric characters"
+                "Job name must be lowercase alphanumeric with hyphens, " "start and end with alphanumeric characters"
             )
         return v

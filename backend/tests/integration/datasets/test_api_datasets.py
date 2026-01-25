@@ -133,9 +133,7 @@ class TestCreateDatasetEndpoint:
         """Test create with missing required fields returns 422."""
         response = await client.post(
             "/api/v1/datasets",
-            json={
-                "name": "test-dataset"
-            },  # Missing storage_type, storage_uri, dataset_type
+            json={"name": "test-dataset"},  # Missing storage_type, storage_uri, dataset_type
             headers=engineer_auth_headers,
         )
         assert response.status_code == 422

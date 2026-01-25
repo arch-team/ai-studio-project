@@ -6,7 +6,6 @@ get_details() 自动返回所有数据字段。
 """
 
 from dataclasses import dataclass
-from typing import Union
 
 from src.shared.domain.problem import Problem, problem
 
@@ -16,7 +15,7 @@ from src.shared.domain.problem import Problem, problem
 class ModelNotFoundError(Problem):
     """模型未找到."""
 
-    model_id: Union[int, str]
+    model_id: int | str
 
 
 @problem(409, "DUPLICATE_MODEL_VERSION", "Model version already exists: {model_name} {version}")
@@ -28,9 +27,7 @@ class DuplicateModelVersionError(Problem):
     version: str
 
 
-@problem(
-    409, "INVALID_MODEL_STATE", "Cannot {operation} model {model_id} in {current_state} state"
-)
+@problem(409, "INVALID_MODEL_STATE", "Cannot {operation} model {model_id} in {current_state} state")
 @dataclass
 class InvalidModelStateError(Problem):
     """模型状态无效."""

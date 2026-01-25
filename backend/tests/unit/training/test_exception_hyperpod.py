@@ -35,10 +35,7 @@ class TestHyperPodSDKUnavailableError:
     def test_message_format_custom(self) -> None:
         """Test error message format with custom component."""
         error = HyperPodSDKUnavailableError(component="CustomJob")
-        expected = (
-            "HyperPod SDK component 'CustomJob' is not available. "
-            "Please install sagemaker-hyperpod package."
-        )
+        expected = "HyperPod SDK component 'CustomJob' is not available. " "Please install sagemaker-hyperpod package."
         assert str(error) == expected
 
     def test_inherits_from_training_error(self) -> None:

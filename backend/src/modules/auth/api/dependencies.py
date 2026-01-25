@@ -9,7 +9,6 @@ from ..application.services import (
     AccountService,
     AuthService,
     PasswordService,
-    RBACService,
     UserService,
     get_rbac_service,
 )

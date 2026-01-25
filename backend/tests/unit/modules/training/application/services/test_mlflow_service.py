@@ -23,9 +23,7 @@ from src.modules.training.application.interfaces import MetricPoint
 @pytest.fixture
 def mock_mlflow_client():
     """Mock MLflow MlflowClient"""
-    with patch(
-        "src.modules.training.application.services.mlflow_service.MlflowClient"
-    ) as mock_class:
+    with patch("src.modules.training.application.services.mlflow_service.MlflowClient") as mock_class:
         mock_instance = MagicMock()
         mock_class.return_value = mock_instance
         yield mock_instance
@@ -53,9 +51,7 @@ class TestMLflowServiceGetMetricHistory:
     """测试 get_metric_history 方法"""
 
     @pytest.mark.asyncio
-    async def test_returns_metric_points_for_valid_job(
-        self, mlflow_service, mock_mlflow_client
-    ):
+    async def test_returns_metric_points_for_valid_job(self, mlflow_service, mock_mlflow_client):
         """验证能正确返回指标数据点"""
         # Arrange: Mock MLflow run 和 metric history
         mock_run = MagicMock()
@@ -80,9 +76,7 @@ class TestMLflowServiceGetMetricHistory:
         assert result[0].value == 0.5
 
     @pytest.mark.asyncio
-    async def test_returns_empty_list_when_no_metrics(
-        self, mlflow_service, mock_mlflow_client
-    ):
+    async def test_returns_empty_list_when_no_metrics(self, mlflow_service, mock_mlflow_client):
         """验证无指标时返回空列表"""
         # Arrange: Run 存在但无指标
         mock_run = MagicMock()
@@ -101,9 +95,7 @@ class TestMLflowServiceGetMetricHistory:
         assert result == []
 
     @pytest.mark.asyncio
-    async def test_returns_empty_list_when_no_run_found(
-        self, mlflow_service, mock_mlflow_client
-    ):
+    async def test_returns_empty_list_when_no_run_found(self, mlflow_service, mock_mlflow_client):
         """验证无对应 run 时返回空列表"""
         # Arrange: 没有找到 run
         mock_mlflow_client.search_runs.return_value = []
@@ -146,9 +138,7 @@ class TestMLflowServiceGetMetricHistory:
         assert result[0].value == 0.2
 
     @pytest.mark.asyncio
-    async def test_maps_job_id_to_mlflow_run_id(
-        self, mlflow_service, mock_mlflow_client
-    ):
+    async def test_maps_job_id_to_mlflow_run_id(self, mlflow_service, mock_mlflow_client):
         """验证 job_id 到 MLflow run_id 的映射"""
         # Arrange
         mock_run = MagicMock()
@@ -159,9 +149,7 @@ class TestMLflowServiceGetMetricHistory:
         # Act
         start_time = datetime(2024, 1, 1, tzinfo=UTC)
         end_time = datetime(2024, 1, 2, tzinfo=UTC)
-        await mlflow_service.get_metric_history(
-            job_id=42, metric_name="loss", start_time=start_time, end_time=end_time
-        )
+        await mlflow_service.get_metric_history(job_id=42, metric_name="loss", start_time=start_time, end_time=end_time)
 
         # Assert: 验证 search_runs 使用了正确的过滤条件
         mock_mlflow_client.search_runs.assert_called_once()
@@ -179,9 +167,7 @@ class TestMLflowServiceExperiment:
     """测试实验相关方法"""
 
     @pytest.mark.asyncio
-    async def test_get_experiment_by_name_success(
-        self, mlflow_service, mock_mlflow_client
-    ):
+    async def test_get_experiment_by_name_success(self, mlflow_service, mock_mlflow_client):
         """验证按名称获取实验"""
         # Arrange
         mock_experiment = MagicMock()
@@ -238,16 +224,12 @@ class TestMLflowServiceErrorHandling:
     """测试错误处理"""
 
     @pytest.mark.asyncio
-    async def test_raises_service_error_when_mlflow_unavailable(
-        self, mlflow_service, mock_mlflow_client
-    ):
+    async def test_raises_service_error_when_mlflow_unavailable(self, mlflow_service, mock_mlflow_client):
         """验证 MLflow 不可用时抛出 MLflowServiceError"""
         # Arrange: 模拟 MLflow 连接失败
         from mlflow.exceptions import MlflowException
 
-        mock_mlflow_client.search_runs.side_effect = MlflowException(
-            "Connection refused"
-        )
+        mock_mlflow_client.search_runs.side_effect = MlflowException("Connection refused")
 
         # Act & Assert
         from src.modules.training.application.services.mlflow_service import (
@@ -261,10 +243,7 @@ class TestMLflowServiceErrorHandling:
                 job_id=1, metric_name="loss", start_time=start_time, end_time=end_time
             )
 
-        assert (
-            "unavailable" in str(exc_info.value).lower()
-            or "connection" in str(exc_info.value).lower()
-        )
+        assert "unavailable" in str(exc_info.value).lower() or "connection" in str(exc_info.value).lower()
 
     @pytest.mark.asyncio
     async def test_retries_on_transient_error(self, mlflow_service, mock_mlflow_client):
@@ -294,9 +273,7 @@ class TestMLflowServiceErrorHandling:
         assert mock_mlflow_client.search_runs.call_count == 3
 
     @pytest.mark.asyncio
-    async def test_health_check_returns_true_when_available(
-        self, mlflow_service, mock_mlflow_client
-    ):
+    async def test_health_check_returns_true_when_available(self, mlflow_service, mock_mlflow_client):
         """验证健康检查返回正确状态 (可用)"""
         # Arrange
         mock_mlflow_client.search_experiments.return_value = []
@@ -308,16 +285,12 @@ class TestMLflowServiceErrorHandling:
         assert result is True
 
     @pytest.mark.asyncio
-    async def test_health_check_returns_false_when_unavailable(
-        self, mlflow_service, mock_mlflow_client
-    ):
+    async def test_health_check_returns_false_when_unavailable(self, mlflow_service, mock_mlflow_client):
         """验证健康检查返回正确状态 (不可用)"""
         # Arrange
         from mlflow.exceptions import MlflowException
 
-        mock_mlflow_client.search_experiments.side_effect = MlflowException(
-            "Connection refused"
-        )
+        mock_mlflow_client.search_experiments.side_effect = MlflowException("Connection refused")
 
         # Act
         result = await mlflow_service.check_health()
@@ -335,9 +308,7 @@ class TestMLflowServiceEdgeCases:
     """测试边界情况"""
 
     @pytest.mark.asyncio
-    async def test_handles_multiple_runs_for_same_job(
-        self, mlflow_service, mock_mlflow_client
-    ):
+    async def test_handles_multiple_runs_for_same_job(self, mlflow_service, mock_mlflow_client):
         """验证同一 job_id 有多个 run 时只取最新的"""
         # Arrange: 返回多个 run，第一个应该是最新的
         mock_run_old = MagicMock()
@@ -359,17 +330,13 @@ class TestMLflowServiceEdgeCases:
         # Act
         start_time = datetime(2024, 1, 1, tzinfo=UTC)
         end_time = datetime(2024, 1, 2, tzinfo=UTC)
-        await mlflow_service.get_metric_history(
-            job_id=1, metric_name="loss", start_time=start_time, end_time=end_time
-        )
+        await mlflow_service.get_metric_history(job_id=1, metric_name="loss", start_time=start_time, end_time=end_time)
 
         # Assert: 使用最新的 run
         mock_mlflow_client.get_metric_history.assert_called_with("run-new", "loss")
 
     @pytest.mark.asyncio
-    async def test_sorts_metric_points_by_timestamp(
-        self, mlflow_service, mock_mlflow_client
-    ):
+    async def test_sorts_metric_points_by_timestamp(self, mlflow_service, mock_mlflow_client):
         """验证返回的指标点按时间升序排列"""
         # Arrange
         mock_run = MagicMock()

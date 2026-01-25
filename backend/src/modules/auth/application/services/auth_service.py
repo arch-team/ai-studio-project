@@ -97,15 +97,9 @@ class AuthService:
 
             if user.is_locked():
                 attempt.failure_reason = "account_locked"
-                raise AccountLockedError(
-                    locked_until=(
-                        user.locked_until.isoformat() if user.locked_until else None
-                    )
-                )
+                raise AccountLockedError(locked_until=(user.locked_until.isoformat() if user.locked_until else None))
 
-            if not user.password_hash or not self._hasher.verify_password(
-                password, user.password_hash
-            ):
+            if not user.password_hash or not self._hasher.verify_password(password, user.password_hash):
                 await self._handle_failed_login(user)
                 attempt.failure_reason = "invalid_password"
                 raise InvalidCredentialsError("Invalid credentials")

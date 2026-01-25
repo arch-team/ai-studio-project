@@ -7,11 +7,10 @@ from unittest.mock import MagicMock, Mock, patch
 import pytest
 
 from tests.shared.constants import (
-    TEST_JWT_SECRET,
     TEST_ACCESS_TOKEN_EXPIRE_MINUTES,
+    TEST_JWT_SECRET,
     TEST_PASSWORD_COST,
 )
-
 
 # =============================================================================
 # JWT Manager Fixtures
@@ -76,8 +75,8 @@ def mock_jwt_manager():
 @pytest.fixture
 def password_hasher():
     """Real PasswordHasher instance for testing."""
-    from src.shared.infrastructure.security.password import PasswordHasher
     from src.shared.infrastructure.security.constants import PASSWORD_BCRYPT_COST
+    from src.shared.infrastructure.security.password import PasswordHasher
 
     return PasswordHasher(cost_factor=PASSWORD_BCRYPT_COST)
 

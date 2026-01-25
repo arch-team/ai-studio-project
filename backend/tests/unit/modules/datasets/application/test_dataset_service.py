@@ -94,9 +94,7 @@ class TestCreateDataset(TestDatasetService):
 
         assert result.name == "new-dataset"
         assert result.owner_id == 100
-        mock_repository.exists_by_name_and_version.assert_called_once_with(
-            "new-dataset", "v1"
-        )
+        mock_repository.exists_by_name_and_version.assert_called_once_with("new-dataset", "v1")
         mock_repository.add.assert_called_once()
 
     async def test_create_dataset_duplicate_name_version(

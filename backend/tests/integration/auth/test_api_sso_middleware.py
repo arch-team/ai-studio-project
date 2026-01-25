@@ -14,19 +14,17 @@
 """
 
 from datetime import UTC, datetime, timedelta
-from typing import Any
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from src.modules.auth.application.services.auth_service import AuthService, AuthResult
+from src.modules.auth.application.services.auth_service import AuthResult, AuthService
 from src.modules.auth.domain.entities import User
 from src.modules.auth.domain.value_objects import AuthType, UserRole, UserStatus
 from src.shared.infrastructure.security import (
-    InvalidCredentialsError,
     AccountLockedError,
+    InvalidCredentialsError,
 )
-
 
 # =============================================================================
 # Helper Functions

@@ -74,7 +74,7 @@ async def create_dataset(
     data: CreateDatasetRequest,
     current_user: CurrentUser = Depends(require_engineer),
     service: DatasetService = Depends(get_dataset_service),
-):
+) -> DatasetDetail:
     """创建新数据集。
 
     注册一个新的数据集，包含指定的存储位置和元数据。
@@ -91,23 +91,15 @@ async def create_dataset(
 async def list_datasets(
     page: PageParam = 1,
     page_size: PageSizeParam = 20,
-    dataset_type: DatasetTypeEnum | None = Query(
-        default=None, description="按数据集类型过滤"
-    ),
-    storage_type: DatasetStorageTypeEnum | None = Query(
-        default=None, description="按存储类型过滤"
-    ),
-    visibility: DatasetVisibilityEnum | None = Query(
-        default=None, description="按可见性过滤"
-    ),
-    status_filter: DatasetStatusEnum | None = Query(
-        default=None, alias="status", description="按状态过滤"
-    ),
+    dataset_type: DatasetTypeEnum | None = Query(default=None, description="按数据集类型过滤"),
+    storage_type: DatasetStorageTypeEnum | None = Query(default=None, description="按存储类型过滤"),
+    visibility: DatasetVisibilityEnum | None = Query(default=None, description="按可见性过滤"),
+    status_filter: DatasetStatusEnum | None = Query(default=None, alias="status", description="按状态过滤"),
     sort_by: SortByParam = "created_at",
     sort_order: SortOrderParam = SortOrder.DESC,
     current_user: CurrentUser = Depends(get_current_active_user),
     service: DatasetService = Depends(get_dataset_service),
-):
+) -> DatasetListResponse:
     """列出数据集（支持分页和过滤）。
 
     返回当前用户拥有的数据集，管理员可查看所有数据集。
@@ -140,7 +132,7 @@ async def get_dataset(
     dataset_id: int,
     current_user: CurrentUser = Depends(get_current_active_user),
     service: DatasetService = Depends(get_dataset_service),
-):
+) -> DatasetDetail:
     """根据 ID 获取数据集详情。
 
     返回特定数据集的详细信息。
@@ -149,9 +141,7 @@ async def get_dataset(
 
     # 检查访问权限 - 所有者、管理员或公开数据集
     if not dataset.is_accessible_by(current_user.user_id) and not current_user.is_admin:
-        check_resource_owner_or_privileged(
-            dataset.owner_id, current_user, "dataset", "view"
-        )
+        check_resource_owner_or_privileged(dataset.owner_id, current_user, "dataset", "view")
 
     # 更新访问时间
     dataset.update_access_time()
@@ -164,7 +154,7 @@ async def update_dataset(
     data: UpdateDatasetRequest,
     dataset: Dataset = Depends(get_owned_dataset),
     service: DatasetService = Depends(get_dataset_service),
-):
+) -> DatasetDetail:
     """更新数据集元数据。"""
     updated = await service.update_dataset(
         dataset_id=dataset.id,
@@ -177,7 +167,7 @@ async def update_dataset(
 async def delete_dataset(
     dataset: Dataset = Depends(get_owned_dataset),
     service: DatasetService = Depends(get_dataset_service),
-):
+) -> None:
     """删除（归档）数据集。"""
     await service.delete_dataset(dataset.id)
     return None
@@ -188,7 +178,7 @@ async def create_dataset_version(
     data: CreateDatasetVersionRequest,
     dataset: Dataset = Depends(get_owned_dataset),
     service: DatasetService = Depends(get_dataset_service),
-):
+) -> DatasetDetail:
     """创建数据集的新版本。"""
     new_dataset = await service.create_version(
         dataset_id=dataset.id,
@@ -218,7 +208,7 @@ async def initiate_upload(
     dataset: Dataset = Depends(get_owned_dataset_for_upload),
     current_user: CurrentUser = Depends(require_engineer),
     upload_service: DatasetUploadService = Depends(get_dataset_upload_service),
-):
+) -> InitiateUploadResponse:
     """初始化分片上传。"""
     session = await upload_service.initiate_multipart_upload(
         dataset_id=dataset.id,
@@ -246,7 +236,7 @@ async def generate_presigned_urls(
     data: GeneratePresignedUrlsRequest,
     current_user: CurrentUser = Depends(require_engineer),
     upload_service: DatasetUploadService = Depends(get_dataset_upload_service),
-):
+) -> PresignedUrlsResponse:
     """生成分片上传预签名 URL。
 
     批量生成用于上传分片的预签名 URL。客户端使用这些 URL 直接上传到 S3。
@@ -271,7 +261,7 @@ async def register_part_completion(
     data: RegisterPartRequest,
     current_user: CurrentUser = Depends(require_engineer),
     upload_service: DatasetUploadService = Depends(get_dataset_upload_service),
-):
+) -> None:
     """注册分片完成。
 
     客户端上传分片到 S3 后，调用此端点注册完成。
@@ -292,7 +282,7 @@ async def get_upload_progress(
     upload_id: str,
     current_user: CurrentUser = Depends(get_current_active_user),
     upload_service: DatasetUploadService = Depends(get_dataset_upload_service),
-):
+) -> UploadProgressResponse:
     """获取上传进度。
 
     返回当前上传会话的进度信息，包括已完成和缺失的分片列表（用于断点续传）。
@@ -321,7 +311,7 @@ async def complete_upload(
     upload_id: str,
     current_user: CurrentUser = Depends(require_engineer),
     upload_service: DatasetUploadService = Depends(get_dataset_upload_service),
-):
+) -> CompleteUploadResponse:
     """完成分片上传。
 
     所有分片上传完成后调用。将触发 S3 合并分片，并更新数据集状态为 AVAILABLE。
@@ -343,7 +333,7 @@ async def abort_upload(
     upload_id: str,
     current_user: CurrentUser = Depends(require_engineer),
     upload_service: DatasetUploadService = Depends(get_dataset_upload_service),
-):
+) -> None:
     """取消分片上传。
 
     取消正在进行的上传会话，清理 S3 上已上传的分片。
@@ -359,7 +349,7 @@ async def abort_upload(
 async def initiate_fsx_sync(
     dataset: Dataset = Depends(get_owned_dataset_for_fsx),
     fsx_service: FsxSyncService = Depends(get_fsx_sync_service),
-):
+) -> FsxSyncResponse:
     """发起 S3 到 FSx 同步。"""
     result = await fsx_service.initiate_s3_to_fsx_sync(dataset_id=dataset.id)
 
@@ -378,7 +368,7 @@ async def get_fsx_sync_status(
     task_id: str,
     current_user: CurrentUser = Depends(get_current_active_user),
     fsx_service: FsxSyncService = Depends(get_fsx_sync_service),
-):
+) -> FsxSyncStatusResponse:
     """获取 FSx 同步任务状态。
 
     查询 Data Repository Task 的执行状态和进度。
@@ -399,7 +389,7 @@ async def prefetch_dataset_to_fsx(
     data: PrefetchDatasetRequest,
     dataset: Dataset = Depends(get_owned_dataset_for_fsx),
     fsx_service: FsxSyncService = Depends(get_fsx_sync_service),
-):
+) -> FsxSyncResponse:
     """预热数据集到 FSx 缓存。"""
     result = await fsx_service.prefetch_dataset(
         dataset_id=dataset.id,
@@ -419,7 +409,7 @@ async def prefetch_dataset_to_fsx(
 async def release_dataset_cache(
     dataset: Dataset = Depends(get_owned_dataset_for_fsx),
     fsx_service: FsxSyncService = Depends(get_fsx_sync_service),
-):
+) -> None:
     """释放数据集 FSx 缓存。"""
     await fsx_service.release_dataset(dataset_id=dataset.id)
     return None
@@ -431,7 +421,7 @@ async def get_dataset_fsx_path(
     current_user: CurrentUser = Depends(get_current_active_user),
     fsx_service: FsxSyncService = Depends(get_fsx_sync_service),
     dataset_service: DatasetService = Depends(get_dataset_service),
-):
+) -> FsxPathResponse:
     """获取数据集的 FSx 路径信息。
 
     返回数据集在 FSx 文件系统和 S3 上的路径映射。
@@ -439,9 +429,7 @@ async def get_dataset_fsx_path(
     dataset = await dataset_service.get_dataset(dataset_id)
 
     if not dataset.is_accessible_by(current_user.user_id) and not current_user.is_admin:
-        check_resource_owner_or_privileged(
-            dataset.owner_id, current_user, "dataset", "view FSx path"
-        )
+        check_resource_owner_or_privileged(dataset.owner_id, current_user, "dataset", "view FSx path")
 
     result = await fsx_service.get_dataset_fsx_path(dataset_id=dataset_id)
 
@@ -457,7 +445,7 @@ async def get_dataset_fsx_path(
 async def check_fsx_health(
     current_user: CurrentUser = Depends(get_current_active_user),
     fsx_service: FsxSyncService = Depends(get_fsx_sync_service),
-):
+) -> FsxAvailabilityResponse:
     """检查 FSx 文件系统可用性。
 
     返回文件系统的状态、容量和生命周期信息。

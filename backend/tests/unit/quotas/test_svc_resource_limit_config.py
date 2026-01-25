@@ -170,9 +170,7 @@ class TestCreateConfig:
 
         # Assert
         assert result.project_id == 100
-        mock_repository.exists_by_role_and_project.assert_called_once_with(
-            LimitRole.ENGINEER, 100
-        )
+        mock_repository.exists_by_role_and_project.assert_called_once_with(LimitRole.ENGINEER, 100)
 
     @pytest.mark.asyncio
     async def test_create_config_uses_defaults(
@@ -261,9 +259,7 @@ class TestGetConfigForRole:
         # Assert
         assert result is not None
         assert result.project_id == 100
-        mock_repository.get_by_role_and_project.assert_called_once_with(
-            LimitRole.ENGINEER, 100
-        )
+        mock_repository.get_by_role_and_project.assert_called_once_with(LimitRole.ENGINEER, 100)
 
     @pytest.mark.asyncio
     async def test_get_config_for_role_falls_back_to_global(

@@ -11,8 +11,7 @@
 """
 
 from datetime import datetime
-from typing import Any
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock
 
 import pytest
 
@@ -26,7 +25,6 @@ from src.modules.training.domain.value_objects import (
     JobPriority,
     JobStatus,
 )
-
 
 # === Fixtures ===
 

@@ -10,8 +10,7 @@ T037c: 训练任务停滞检测服务
 
 from datetime import datetime, timedelta
 from decimal import Decimal
-from typing import Any
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock
 
 import pytest
 
@@ -21,7 +20,6 @@ from src.modules.training.domain.value_objects import (
     JobPriority,
     JobStatus,
 )
-
 
 # === Fixtures ===
 
@@ -469,9 +467,7 @@ class TestStallDetectionServiceBatch:
         job2 = create_test_job(job_id=2, job_name="job-002", status=JobStatus.RUNNING)
 
         # 模拟 list_jobs 返回两个 RUNNING 任务
-        async def mock_list_jobs(
-            owner_id=None, status=None, priority=None, **kwargs
-        ):
+        async def mock_list_jobs(owner_id=None, status=None, priority=None, **kwargs):
             if status == JobStatus.RUNNING:
                 return ([job1, job2], 2)
             return ([], 0)
@@ -514,7 +510,6 @@ class TestStallDetectionServiceAlert:
         """检测到停滞时发送告警"""
         from src.modules.training.application.services.stall_detection_service import (
             MetricPoint,
-            StallCheckResult,
             StallDetectionService,
         )
 

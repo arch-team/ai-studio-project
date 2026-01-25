@@ -20,10 +20,7 @@ from src.shared.infrastructure.repository_base import EnhancedBaseRepository
 from src.shared.utils import utc_now
 
 
-class AuditLogRepositoryImpl(
-    EnhancedBaseRepository[AuditLog, AuditLogModel, int],
-    IAuditLogRepository
-):
+class AuditLogRepositoryImpl(EnhancedBaseRepository[AuditLog, AuditLogModel, int], IAuditLogRepository):
     """SQLAlchemy implementation of audit log repository."""
 
     def __init__(self, session: AsyncSession):
@@ -108,10 +105,7 @@ class AuditLogRepositoryImpl(
         """Get audit logs by operation type."""
         result = await self._session.execute(
             select(AuditLogModel)
-            .where(
-                AuditLogModel.operation_type
-                == ModelOperationType(operation_type.value)
-            )
+            .where(AuditLogModel.operation_type == ModelOperationType(operation_type.value))
             .order_by(AuditLogModel.created_at.desc())
             .limit(limit)
             .offset(offset)
@@ -140,16 +134,12 @@ class AuditLogRepositoryImpl(
 
     async def delete_expired(self) -> int:
         """Delete expired audit logs."""
-        result = await self._session.execute(
-            delete(AuditLogModel).where(AuditLogModel.expires_at < utc_now())
-        )
+        result = await self._session.execute(delete(AuditLogModel).where(AuditLogModel.expires_at < utc_now()))
         return result.rowcount
 
     async def count_by_user_id(self, user_id: int) -> int:
         """Count audit logs for a specific user."""
-        result = await self._session.execute(
-            select(func.count()).where(AuditLogModel.user_id == user_id)
-        )
+        result = await self._session.execute(select(func.count()).where(AuditLogModel.user_id == user_id))
         return result.scalar() or 0
 
     async def count_by_resource(
@@ -182,7 +172,5 @@ class AuditLogRepositoryImpl(
 
     async def count_total(self) -> int:
         """Count total audit logs."""
-        result = await self._session.execute(
-            select(func.count()).select_from(AuditLogModel)
-        )
+        result = await self._session.execute(select(func.count()).select_from(AuditLogModel))
         return result.scalar() or 0

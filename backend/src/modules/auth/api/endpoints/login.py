@@ -100,9 +100,7 @@ async def login(
     """
     # SSO 登录
     if login_data.id_token:
-        return await _handle_sso_login(
-            login_data.id_token, auth_service, account_service
-        )
+        return await _handle_sso_login(login_data.id_token, auth_service, account_service)
 
     # 本地登录
     return await _handle_local_login(request, login_data, auth_service)

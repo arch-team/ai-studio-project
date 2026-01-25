@@ -63,7 +63,9 @@ class ResourceLimitConfigService(BaseService[ResourceLimitConfig, int]):
             max_gpu_per_job=data.get("max_gpu_per_job", self._RESOURCE_LIMITS["max_gpu_per_job"][1]),
             max_cpu_per_job=data.get("max_cpu_per_job", self._RESOURCE_LIMITS["max_cpu_per_job"][1]),
             max_memory_gb_per_job=data.get("max_memory_gb_per_job", self._RESOURCE_LIMITS["max_memory_gb_per_job"][1]),
-            max_storage_gb_per_job=data.get("max_storage_gb_per_job", self._RESOURCE_LIMITS["max_storage_gb_per_job"][1]),
+            max_storage_gb_per_job=data.get(
+                "max_storage_gb_per_job", self._RESOURCE_LIMITS["max_storage_gb_per_job"][1]
+            ),
             max_nodes_per_job=data.get("max_nodes_per_job", self._RESOURCE_LIMITS["max_nodes_per_job"][1]),
             priority_default=PriorityDefault(data.get("priority_default", PriorityDefault.MEDIUM.value)),
         )
@@ -84,9 +86,7 @@ class ResourceLimitConfigService(BaseService[ResourceLimitConfig, int]):
         """Get config by ID."""
         return await self._get_or_raise(config_id)
 
-    async def get_config_for_role(
-        self, role: LimitRole, project_id: int | None = None
-    ) -> ResourceLimitConfig | None:
+    async def get_config_for_role(self, role: LimitRole, project_id: int | None = None) -> ResourceLimitConfig | None:
         """Get config for a specific role and project.
 
         First tries to find project-specific config, then falls back to global.
@@ -135,9 +135,7 @@ class ResourceLimitConfigService(BaseService[ResourceLimitConfig, int]):
 
             setattr(config, field, value)
 
-    async def update_config(
-        self, config_id: int, data: dict
-    ) -> ResourceLimitConfig:
+    async def update_config(self, config_id: int, data: dict) -> ResourceLimitConfig:
         """Update an existing config."""
         config = await self._get_or_raise(config_id)
 
@@ -158,15 +156,11 @@ class ResourceLimitConfigService(BaseService[ResourceLimitConfig, int]):
         await self._get_or_raise(config_id)
         await self._repository.soft_delete(config_id)
 
-    def _check_resource_limit(
-        self, requested: int, limit: int, resource_name: str, errors: list[str]
-    ) -> None:
+    def _check_resource_limit(self, requested: int, limit: int, resource_name: str, errors: list[str]) -> None:
         """检查单个资源限制."""
         if requested > limit:
             unit = "GB" if "memory" in resource_name.lower() or "storage" in resource_name.lower() else ""
-            errors.append(
-                f"{resource_name} ({requested}{unit}) exceeds limit ({limit}{unit})"
-            )
+            errors.append(f"{resource_name} ({requested}{unit}) exceeds limit ({limit}{unit})")
 
     async def validate_job_limits(
         self,

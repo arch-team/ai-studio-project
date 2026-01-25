@@ -137,9 +137,7 @@ class TestResourceLimitConfigValidation:
             max_nodes_per_job=8,
         )
 
-    def test_validate_job_resources_success(
-        self, config: ResourceLimitConfig
-    ) -> None:
+    def test_validate_job_resources_success(self, config: ResourceLimitConfig) -> None:
         """Test validate_job_resources returns True for valid resources."""
         is_valid, error = config.validate_job_resources(
             gpu_count=4,
@@ -151,9 +149,7 @@ class TestResourceLimitConfigValidation:
         assert is_valid is True
         assert error is None
 
-    def test_validate_job_resources_at_limits(
-        self, config: ResourceLimitConfig
-    ) -> None:
+    def test_validate_job_resources_at_limits(self, config: ResourceLimitConfig) -> None:
         """Test validate_job_resources passes at exact limits."""
         is_valid, error = config.validate_job_resources(
             gpu_count=8,
@@ -165,9 +161,7 @@ class TestResourceLimitConfigValidation:
         assert is_valid is True
         assert error is None
 
-    def test_validate_job_resources_gpu_exceeded(
-        self, config: ResourceLimitConfig
-    ) -> None:
+    def test_validate_job_resources_gpu_exceeded(self, config: ResourceLimitConfig) -> None:
         """Test validate_job_resources fails when GPU exceeds limit."""
         is_valid, error = config.validate_job_resources(
             gpu_count=16,
@@ -181,9 +175,7 @@ class TestResourceLimitConfigValidation:
         assert "16" in error
         assert "8" in error
 
-    def test_validate_job_resources_cpu_exceeded(
-        self, config: ResourceLimitConfig
-    ) -> None:
+    def test_validate_job_resources_cpu_exceeded(self, config: ResourceLimitConfig) -> None:
         """Test validate_job_resources fails when CPU exceeds limit."""
         is_valid, error = config.validate_job_resources(
             gpu_count=4,
@@ -195,9 +187,7 @@ class TestResourceLimitConfigValidation:
         assert is_valid is False
         assert "CPU cores" in error
 
-    def test_validate_job_resources_memory_exceeded(
-        self, config: ResourceLimitConfig
-    ) -> None:
+    def test_validate_job_resources_memory_exceeded(self, config: ResourceLimitConfig) -> None:
         """Test validate_job_resources fails when memory exceeds limit."""
         is_valid, error = config.validate_job_resources(
             gpu_count=4,
@@ -209,9 +199,7 @@ class TestResourceLimitConfigValidation:
         assert is_valid is False
         assert "Memory" in error
 
-    def test_validate_job_resources_storage_exceeded(
-        self, config: ResourceLimitConfig
-    ) -> None:
+    def test_validate_job_resources_storage_exceeded(self, config: ResourceLimitConfig) -> None:
         """Test validate_job_resources fails when storage exceeds limit."""
         is_valid, error = config.validate_job_resources(
             gpu_count=4,
@@ -223,9 +211,7 @@ class TestResourceLimitConfigValidation:
         assert is_valid is False
         assert "Storage" in error
 
-    def test_validate_job_resources_nodes_exceeded(
-        self, config: ResourceLimitConfig
-    ) -> None:
+    def test_validate_job_resources_nodes_exceeded(self, config: ResourceLimitConfig) -> None:
         """Test validate_job_resources fails when node count exceeds limit."""
         is_valid, error = config.validate_job_resources(
             gpu_count=4,

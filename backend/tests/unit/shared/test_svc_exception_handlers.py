@@ -62,9 +62,7 @@ class TestDomainExceptionHttpStatus:
         assert ValidationError.http_status == status.HTTP_422_UNPROCESSABLE_ENTITY
 
     def test_resource_quota_exceeded_has_429(self):
-        assert (
-            ResourceQuotaExceededError.http_status == status.HTTP_429_TOO_MANY_REQUESTS
-        )
+        assert ResourceQuotaExceededError.http_status == status.HTTP_429_TOO_MANY_REQUESTS
 
     def test_domain_error_is_problem_alias(self):
         """DomainError 现在是 Problem 的别名。"""
@@ -141,9 +139,7 @@ class TestDomainExceptionGetDetails:
         assert details is None
 
     def test_invalid_state_transition_details(self):
-        exc = InvalidStateTransitionError(
-            entity_type="TrainingJob", current_state="running", target_state="submitted"
-        )
+        exc = InvalidStateTransitionError(entity_type="TrainingJob", current_state="running", target_state="submitted")
         details = exc.get_details()
         assert details == {
             "entity_type": "TrainingJob",
@@ -229,9 +225,7 @@ class TestDomainExceptionHandler:
 
     @pytest.mark.asyncio
     async def test_invalid_state_transition_response(self, mock_request):
-        exc = InvalidStateTransitionError(
-            entity_type="TrainingJob", current_state="running", target_state="submitted"
-        )
+        exc = InvalidStateTransitionError(entity_type="TrainingJob", current_state="running", target_state="submitted")
         response = await domain_exception_handler(mock_request, exc)
 
         assert response.status_code == status.HTTP_409_CONFLICT
@@ -300,9 +294,7 @@ class TestSecurityExceptionHandler:
 
     @pytest.mark.asyncio
     async def test_account_locked_with_until(self, mock_request):
-        exc = AccountLockedError(
-            message="Account locked", locked_until="2024-01-01T12:00:00"
-        )
+        exc = AccountLockedError(message="Account locked", locked_until="2024-01-01T12:00:00")
         response = await security_exception_handler(mock_request, exc)
 
         assert response.status_code == status.HTTP_423_LOCKED
@@ -404,9 +396,7 @@ class TestTracingMiddleware:
         return request
 
     @pytest.mark.asyncio
-    async def test_domain_error_includes_trace_id_from_middleware(
-        self, mock_request_with_state
-    ):
+    async def test_domain_error_includes_trace_id_from_middleware(self, mock_request_with_state):
         """Test that domain exception handler uses trace_id from request state."""
         exc = EntityNotFoundError(entity_type="Model", entity_id="xyz")
         response = await domain_exception_handler(mock_request_with_state, exc)
@@ -415,9 +405,7 @@ class TestTracingMiddleware:
         assert content["error"]["trace_id"] == "abc12345"
 
     @pytest.mark.asyncio
-    async def test_security_error_includes_trace_id_from_middleware(
-        self, mock_request_with_state
-    ):
+    async def test_security_error_includes_trace_id_from_middleware(self, mock_request_with_state):
         """Test that security exception handler uses trace_id from request state."""
         exc = InvalidCredentialsError()
         response = await security_exception_handler(mock_request_with_state, exc)
@@ -426,9 +414,7 @@ class TestTracingMiddleware:
         assert content["error"]["trace_id"] == "abc12345"
 
     @pytest.mark.asyncio
-    async def test_problem_handler_includes_trace_id_from_middleware(
-        self, mock_request_with_state
-    ):
+    async def test_problem_handler_includes_trace_id_from_middleware(self, mock_request_with_state):
         """Test that problem exception handler uses trace_id from request state."""
         exc = EntityNotFoundError(entity_type="User", entity_id="123")
         response = await problem_exception_handler(mock_request_with_state, exc)

@@ -11,8 +11,7 @@ from src.shared.infrastructure.repository_base import EnhancedBaseRepository
 
 
 class ResourceLimitConfigRepository(
-    EnhancedBaseRepository[ResourceLimitConfig, ResourceLimitConfigModel, int],
-    IResourceLimitConfigRepository
+    EnhancedBaseRepository[ResourceLimitConfig, ResourceLimitConfigModel, int], IResourceLimitConfigRepository
 ):
     """SQLAlchemy implementation of ResourceLimitConfig repository."""
 
@@ -51,9 +50,7 @@ class ResourceLimitConfigRepository(
             priority_default=PriorityDefault(entity.priority_default.value),
         )
 
-    def _update_model(
-        self, model: ResourceLimitConfigModel, entity: ResourceLimitConfig
-    ) -> None:
+    def _update_model(self, model: ResourceLimitConfigModel, entity: ResourceLimitConfig) -> None:
         """Update ORM model fields from entity."""
         model.config_name = entity.config_name
         model.role = LimitRole(entity.role.value)
@@ -65,9 +62,7 @@ class ResourceLimitConfigRepository(
         model.max_nodes_per_job = entity.max_nodes_per_job
         model.priority_default = PriorityDefault(entity.priority_default.value)
 
-    async def get_by_role_and_project(
-        self, role: LimitRole, project_id: int | None
-    ) -> ResourceLimitConfig | None:
+    async def get_by_role_and_project(self, role: LimitRole, project_id: int | None) -> ResourceLimitConfig | None:
         """Get config by role and project combination."""
         if project_id is None:
             query = select(ResourceLimitConfigModel).where(
@@ -128,9 +123,7 @@ class ResourceLimitConfigRepository(
         total = total_result.scalar() or 0
 
         # Apply sorting
-        sort_column = getattr(
-            ResourceLimitConfigModel, sort_by, ResourceLimitConfigModel.created_at
-        )
+        sort_column = getattr(ResourceLimitConfigModel, sort_by, ResourceLimitConfigModel.created_at)
         if sort_order.lower() == "desc":
             query = query.order_by(sort_column.desc())
         else:
@@ -153,9 +146,7 @@ class ResourceLimitConfigRepository(
     async def soft_delete(self, config_id: int) -> bool:
         """Soft delete a config (hard delete for now, no soft delete column)."""
         result = await self._session.execute(
-            select(ResourceLimitConfigModel).where(
-                ResourceLimitConfigModel.id == config_id
-            )
+            select(ResourceLimitConfigModel).where(ResourceLimitConfigModel.id == config_id)
         )
         model = result.scalar_one_or_none()
         if model is None:
@@ -165,9 +156,7 @@ class ResourceLimitConfigRepository(
         await self._session.flush()
         return True
 
-    async def exists_by_role_and_project(
-        self, role: LimitRole, project_id: int | None
-    ) -> bool:
+    async def exists_by_role_and_project(self, role: LimitRole, project_id: int | None) -> bool:
         """Check if config with role and project combination exists."""
         if project_id is None:
             query = select(func.count(ResourceLimitConfigModel.id)).where(

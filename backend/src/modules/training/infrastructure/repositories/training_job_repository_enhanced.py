@@ -16,9 +16,7 @@ from src.modules.training.infrastructure.models import TrainingJobModel
 from src.shared.infrastructure.repository_base import EnhancedBaseRepository
 
 
-class TrainingJobRepositoryEnhanced(
-    EnhancedBaseRepository[TrainingJob, TrainingJobModel, int], ITrainingJobRepository
-):
+class TrainingJobRepositoryEnhanced(EnhancedBaseRepository[TrainingJob, TrainingJobModel, int], ITrainingJobRepository):
     """Enhanced SQLAlchemy implementation of TrainingJob repository.
 
     Demonstrates how to use the new EnhancedBaseRepository to reduce boilerplate.
@@ -179,15 +177,11 @@ class TrainingJobRepositoryEnhanced(
 
         # Add date range filters
         if submitted_after is not None:
-            builder._query = builder._query.where(
-                TrainingJobModel.submitted_at >= submitted_after
-            )
+            builder._query = builder._query.where(TrainingJobModel.submitted_at >= submitted_after)
             builder._filters.append(TrainingJobModel.submitted_at >= submitted_after)
 
         if submitted_before is not None:
-            builder._query = builder._query.where(
-                TrainingJobModel.submitted_at <= submitted_before
-            )
+            builder._query = builder._query.where(TrainingJobModel.submitted_at <= submitted_before)
             builder._filters.append(TrainingJobModel.submitted_at <= submitted_before)
 
         # Apply sorting

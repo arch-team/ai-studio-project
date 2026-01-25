@@ -5,9 +5,10 @@ to communicate through events rather than direct dependencies.
 """
 
 from abc import ABC
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, Callable, TypeVar
+from typing import Any, TypeVar
 from uuid import UUID, uuid4
 
 from src.shared.utils import utc_now
@@ -65,7 +66,7 @@ def event_handler(event_type: type[EventT]) -> Callable[[Callable[[EventT], Any]
     """Decorator to register an event handler."""
 
     def decorator(func: Callable[[EventT], Any]) -> Callable[[EventT], Any]:
-        event_bus.subscribe(event_type, func)  # type: ignore
+        event_bus.subscribe(event_type, func)
         return func
 
     return decorator

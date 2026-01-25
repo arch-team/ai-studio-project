@@ -98,18 +98,14 @@ class ModelRepository(EnhancedBaseRepository[Model, ModelModel, int], IModelRepo
     async def get_by_id(self, model_id: int) -> Model | None:
         """Get model by ID with owner preloaded."""
         result = await self._session.execute(
-            select(ModelModel)
-            .options(selectinload(ModelModel.owner))
-            .where(ModelModel.id == model_id)
+            select(ModelModel).options(selectinload(ModelModel.owner)).where(ModelModel.id == model_id)
         )
         model = result.scalar_one_or_none()
         if model is None:
             return None
         return self._to_entity(model)
 
-    async def get_by_name_and_version(
-        self, model_name: str, version: str
-    ) -> Model | None:
+    async def get_by_name_and_version(self, model_name: str, version: str) -> Model | None:
         """Get model by name and version."""
         result = await self._session.execute(
             select(ModelModel)
@@ -158,9 +154,7 @@ class ModelRepository(EnhancedBaseRepository[Model, ModelModel, int], IModelRepo
 
         if training_job_id is not None:
             query = query.where(ModelModel.training_job_id == training_job_id)
-            count_query = count_query.where(
-                ModelModel.training_job_id == training_job_id
-            )
+            count_query = count_query.where(ModelModel.training_job_id == training_job_id)
 
         if status is not None:
             # Handle both string and enum
@@ -214,9 +208,7 @@ class ModelRepository(EnhancedBaseRepository[Model, ModelModel, int], IModelRepo
 
     async def soft_delete(self, model_id: int) -> bool:
         """Soft delete a model (archive it)."""
-        result = await self._session.execute(
-            select(ModelModel).where(ModelModel.id == model_id)
-        )
+        result = await self._session.execute(select(ModelModel).where(ModelModel.id == model_id))
         model = result.scalar_one_or_none()
         if model is None:
             return False

@@ -36,9 +36,7 @@ def calculate_optimal_part_size(file_size: int) -> int:
         ValueError: 文件超过 S3 5TB 单文件限制
     """
     if file_size > MAX_SINGLE_FILE_SIZE:
-        raise ValueError(
-            f"File size {file_size} exceeds S3 maximum single file size of 5TB"
-        )
+        raise ValueError(f"File size {file_size} exceeds S3 maximum single file size of 5TB")
 
     # 如果使用默认分片大小可以满足，则使用默认值
     if file_size <= DEFAULT_PART_SIZE * MAX_PARTS:
@@ -64,7 +62,7 @@ class S3MultipartClient:
     def __init__(
         self,
         bucket_name: str,
-        region: str = "us-west-2",
+        region: str = "us-east-1",
         kms_key_id: str | None = None,
     ) -> None:
         self._bucket_name = bucket_name
@@ -139,16 +137,10 @@ class S3MultipartClient:
         Returns:
             包含 part_number 和 presigned_url 的字典列表
         """
-        tasks = [
-            self.generate_presigned_url_for_part(key, upload_id, pn, expiration)
-            for pn in part_numbers
-        ]
+        tasks = [self.generate_presigned_url_for_part(key, upload_id, pn, expiration) for pn in part_numbers]
         urls = await asyncio.gather(*tasks)
 
-        return [
-            {"part_number": pn, "presigned_url": url}
-            for pn, url in zip(part_numbers, urls)
-        ]
+        return [{"part_number": pn, "presigned_url": url} for pn, url in zip(part_numbers, urls)]
 
     async def complete_multipart_upload(
         self,

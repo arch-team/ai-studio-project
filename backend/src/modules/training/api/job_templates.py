@@ -10,11 +10,9 @@ from src.modules.training.api.schemas import (
     JobTemplateDetail,
     JobTemplateListResponse,
     JobTemplateSummary,
-    TemplateVisibilityEnum,
     UpdateJobTemplateRequest,
 )
 from src.modules.training.application.services import JobTemplateService
-from src.modules.training.domain.value_objects import TemplateVisibility
 from src.shared.api.pagination import (
     PageParam,
     PageSizeParam,
@@ -23,7 +21,6 @@ from src.shared.api.pagination import (
     SortOrderParam,
     build_paginated_response,
 )
-from src.shared.utils import EnumMapper
 
 router = APIRouter()
 
@@ -37,7 +34,7 @@ async def create_job_template(
     data: CreateJobTemplateRequest,
     current_user: CurrentUser = Depends(require_engineer),
     service: JobTemplateService = Depends(get_job_template_service),
-):
+) -> JobTemplateDetail:
     """Create a new job template."""
     template_data = data.model_dump(mode="json")
     template = await service.create_template(
@@ -59,7 +56,7 @@ async def list_job_templates(
     sort_order: SortOrderParam = SortOrder.DESC,
     current_user: CurrentUser = Depends(get_current_active_user),
     service: JobTemplateService = Depends(get_job_template_service),
-):
+) -> JobTemplateListResponse:
     """List job templates visible to current user."""
     templates, total = await service.list_visible_templates(
         user_id=current_user.user_id,
@@ -87,7 +84,7 @@ async def list_job_templates(
 async def get_popular_templates(
     limit: int = Query(default=10, ge=1, le=50, description="Number of templates to return"),
     service: JobTemplateService = Depends(get_job_template_service),
-):
+) -> list[JobTemplateSummary]:
     """Get most popular public templates."""
     templates = await service.get_popular_templates(limit)
     return [JobTemplateSummary.from_entity(t) for t in templates]
@@ -101,7 +98,7 @@ async def get_job_template(
     template_id: int,
     current_user: CurrentUser = Depends(get_current_active_user),
     service: JobTemplateService = Depends(get_job_template_service),
-):
+) -> JobTemplateDetail:
     """Get job template details by ID."""
     template = await service.get_template(template_id, current_user.user_id)
     return JobTemplateDetail.from_entity(template)
@@ -116,7 +113,7 @@ async def update_job_template(
     data: UpdateJobTemplateRequest,
     current_user: CurrentUser = Depends(require_engineer),
     service: JobTemplateService = Depends(get_job_template_service),
-):
+) -> JobTemplateDetail:
     """Update a job template (owner only)."""
     update_data = data.model_dump(mode="json", exclude_unset=True)
     template = await service.update_template(
@@ -135,7 +132,7 @@ async def delete_job_template(
     template_id: int,
     current_user: CurrentUser = Depends(require_engineer),
     service: JobTemplateService = Depends(get_job_template_service),
-):
+) -> None:
     """Soft delete a job template (owner only)."""
     await service.delete_template(template_id, current_user.user_id)
     return None

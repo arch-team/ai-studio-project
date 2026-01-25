@@ -7,7 +7,6 @@ from src.modules.models.domain.repositories import IModelRepository
 from src.modules.models.domain.value_objects import ModelFramework, ModelStatus
 from src.shared.application.enhanced_base_service import EnhancedBaseService
 from src.shared.domain.exceptions import (
-    EntityNotFoundError,
     InvalidStateTransitionError,
 )
 from src.shared.domain.interfaces import IEntityExistenceChecker
@@ -41,12 +40,8 @@ class ModelService(EnhancedBaseService[Model, int]):
         model_name = data["model_name"]
 
         # 验证关联实体
-        await self._validate_entity_exists(
-            self._training_job_checker, "TrainingJob", training_job_id
-        )
-        await self._validate_entity_exists(
-            self._checkpoint_checker, "Checkpoint", checkpoint_id
-        )
+        await self._validate_entity_exists(self._training_job_checker, "TrainingJob", training_job_id)
+        await self._validate_entity_exists(self._checkpoint_checker, "Checkpoint", checkpoint_id)
 
         # 确定版本号
         version = await self._determine_model_version(model_name)
@@ -106,9 +101,7 @@ class ModelService(EnhancedBaseService[Model, int]):
             sort_order=sort_order,
         )
 
-    async def get_model_versions(
-        self, model_id: int, compare_with: int | None = None
-    ) -> dict[str, Any]:
+    async def get_model_versions(self, model_id: int, compare_with: int | None = None) -> dict[str, Any]:
         """Get all versions of a model with optional comparison."""
         model = await self._get_or_raise(model_id)
         versions = await self._model_repository.list_versions(model.model_name)
@@ -137,9 +130,7 @@ class ModelService(EnhancedBaseService[Model, int]):
 
         return result
 
-    def _calculate_metric_diff(
-        self, metrics_1: dict, metrics_2: dict
-    ) -> dict[str, Any]:
+    def _calculate_metric_diff(self, metrics_1: dict, metrics_2: dict) -> dict[str, Any]:
         """计算指标差异."""
         metrics_diff = {}
         all_metrics = set(metrics_1.keys()) | set(metrics_2.keys())
@@ -164,40 +155,30 @@ class ModelService(EnhancedBaseService[Model, int]):
 
         return metrics_diff
 
-    def _find_changed_hyperparams(
-        self, hyperparams_1: dict, hyperparams_2: dict
-    ) -> list[str]:
+    def _find_changed_hyperparams(self, hyperparams_1: dict, hyperparams_2: dict) -> list[str]:
         """查找变更的超参数."""
         all_hp = set(hyperparams_1.keys()) | set(hyperparams_2.keys())
         return [hp for hp in all_hp if hyperparams_1.get(hp) != hyperparams_2.get(hp)]
 
-    def _analyze_tag_changes(
-        self, tags_1: list[str] | None, tags_2: list[str] | None
-    ) -> tuple[list[str], list[str]]:
+    def _analyze_tag_changes(self, tags_1: list[str] | None, tags_2: list[str] | None) -> tuple[list[str], list[str]]:
         """分析标签变化."""
         tags_set_1 = set(tags_1 or [])
         tags_set_2 = set(tags_2 or [])
         return list(tags_set_2 - tags_set_1), list(tags_set_1 - tags_set_2)
 
-    async def compare_versions(
-        self, model_id_1: int, model_id_2: int
-    ) -> dict[str, Any]:
+    async def compare_versions(self, model_id_1: int, model_id_2: int) -> dict[str, Any]:
         """Compare two model versions and return metrics/hyperparameter diff."""
         model_1 = await self._get_or_raise(model_id_1)
         model_2 = await self._get_or_raise(model_id_2)
 
         # 计算各维度差异
-        metrics_diff = self._calculate_metric_diff(
-            model_1.metrics or {}, model_2.metrics or {}
-        )
+        metrics_diff = self._calculate_metric_diff(model_1.metrics or {}, model_2.metrics or {})
 
         hyperparams_changed = self._find_changed_hyperparams(
             model_1.hyperparameters or {}, model_2.hyperparameters or {}
         )
 
-        tags_added, tags_removed = self._analyze_tag_changes(
-            model_1.tags, model_2.tags
-        )
+        tags_added, tags_removed = self._analyze_tag_changes(model_1.tags, model_2.tags)
 
         return {
             "metrics_diff": metrics_diff,
@@ -212,9 +193,7 @@ class ModelService(EnhancedBaseService[Model, int]):
         model = await self._get_or_raise(model_id)
 
         if model.status != ModelStatus.TRAINING:
-            raise InvalidStateTransitionError(
-                "Model", model.status.value, ModelStatus.REGISTERED.value
-            )
+            raise InvalidStateTransitionError("Model", model.status.value, ModelStatus.REGISTERED.value)
 
         model.register()
         return await self._model_repository.update(model)
@@ -225,9 +204,7 @@ class ModelService(EnhancedBaseService[Model, int]):
 
         # Use base class method for state transition validation
         self._validate_state_transition(
-            model,
-            ModelStatus.ARCHIVED,
-            [ModelStatus.REGISTERED, ModelStatus.TRAINING]  # Allowed from states
+            model, ModelStatus.ARCHIVED, [ModelStatus.REGISTERED, ModelStatus.TRAINING]  # Allowed from states
         )
 
         model.archive()

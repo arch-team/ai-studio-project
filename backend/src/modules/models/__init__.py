@@ -3,11 +3,11 @@
 from .api import router
 from .application import ModelService
 from .domain import (
+    MODEL_STATE_TRANSITIONS,
     DuplicateModelVersionError,
     IModelRepository,
     InvalidModelStateError,
     Model,
-    MODEL_STATE_TRANSITIONS,
     ModelError,
     ModelFramework,
     ModelNotFoundError,

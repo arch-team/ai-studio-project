@@ -26,7 +26,6 @@
 
 import asyncio
 import time
-from typing import Any
 
 import pytest
 from httpx import AsyncClient
@@ -202,9 +201,7 @@ class TestSSOFailoverE2E:
 
             # 查找登录相关的审计日志
             login_logs = [
-                log
-                for log in items
-                if log.get("operation_type") in ["login", "auth_failover", "local_login"]
+                log for log in items if log.get("operation_type") in ["login", "auth_failover", "local_login"]
             ]
 
             if login_logs:
@@ -287,7 +284,7 @@ class TestSSOHealthTrackerE2E:
 
             # 验证可选字段格式
             if "latency_ms" in data:
-                assert isinstance(data["latency_ms"], (int, float))
+                assert isinstance(data["latency_ms"], int | float)
                 assert data["latency_ms"] >= 0
 
             if "consecutive_failures" in data:

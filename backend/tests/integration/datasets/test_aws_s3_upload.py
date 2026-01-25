@@ -13,8 +13,6 @@
 
 import hashlib
 import os
-import tempfile
-from pathlib import Path
 
 import pytest
 
@@ -212,8 +210,9 @@ class TestS3PerformanceBaseline:
 
         注意: 实际速度取决于网络条件。
         """
-        import aiohttp
         import time
+
+        import aiohttp
 
         test_key = f"test-uploads/perf-test-{os.getpid()}/100mb-part.bin"
 

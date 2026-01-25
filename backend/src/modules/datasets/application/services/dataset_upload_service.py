@@ -10,7 +10,6 @@
 支持断点续传 (通过数据库持久化 UploadSession)。
 """
 
-from datetime import datetime, timedelta
 from typing import Any
 
 from src.modules.datasets.domain.exceptions import (
@@ -322,9 +321,7 @@ class DatasetUploadService:
             raise DatasetNotFoundError(dataset_id=dataset_id)
 
         # 检查是否有活跃上传会话
-        active_session = await self._upload_session_repository.get_active_by_dataset(
-            dataset_id
-        )
+        active_session = await self._upload_session_repository.get_active_by_dataset(dataset_id)
         if active_session is not None:
             raise UploadSessionActiveError(
                 dataset_id=dataset_id,

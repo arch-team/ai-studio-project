@@ -10,7 +10,7 @@
 """
 
 from datetime import datetime, timedelta
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock
 
 import pytest
 
@@ -21,7 +21,6 @@ from src.modules.training.domain.value_objects import (
     CheckpointType,
     StorageTier,
 )
-
 
 # =============================================================================
 # 测试 Fixtures
@@ -112,8 +111,7 @@ class TestHotCheckpointRetention:
         # Arrange: 5 个检查点，按时间排序 (最新在前)
         now = datetime.utcnow()
         checkpoints = [
-            _create_checkpoint(i, storage_tier=StorageTier.NVME, created_at=now - timedelta(hours=i))
-            for i in range(5)
+            _create_checkpoint(i, storage_tier=StorageTier.NVME, created_at=now - timedelta(hours=i)) for i in range(5)
         ]
         # get_by_storage_tier 返回所有 NVME 检查点
         mock_checkpoint_repository.get_by_storage_tier.return_value = checkpoints
@@ -142,13 +140,12 @@ class TestWarmCheckpointMigration:
         # Arrange: 7 个检查点 (只有 4 个需要迁移，前 3 个保留)
         now = datetime.utcnow()
         checkpoints = [
-            _create_checkpoint(i, storage_tier=StorageTier.NVME, created_at=now - timedelta(hours=i))
-            for i in range(7)
+            _create_checkpoint(i, storage_tier=StorageTier.NVME, created_at=now - timedelta(hours=i)) for i in range(7)
         ]
         mock_checkpoint_repository.get_by_storage_tier.return_value = checkpoints
 
         # Act
-        result = await migration_service.run_migration_cycle()
+        await migration_service.run_migration_cycle()
 
         # Assert: 迁移了 4 个 (第 4-7 个)
         assert mock_storage_service.migrate_checkpoint.call_count == 4
@@ -181,7 +178,7 @@ class TestColdCheckpointArchival:
         mock_checkpoint_repository.get_oldest_checkpoints.return_value = fsx_checkpoints[1:]  # 旧的 2 个
 
         # Act
-        result = await migration_service.run_migration_cycle()
+        await migration_service.run_migration_cycle()
 
         # Assert: get_oldest_checkpoints 被调用
         mock_checkpoint_repository.get_oldest_checkpoints.assert_called()
@@ -196,9 +193,7 @@ class TestMigrationTiming:
     """测试迁移执行时机"""
 
     @pytest.mark.asyncio
-    async def test_migration_runs_during_idle_period(
-        self, migration_service, mock_storage_service
-    ):
+    async def test_migration_runs_during_idle_period(self, migration_service, mock_storage_service):
         """验证迁移在空闲时段执行 (存储使用率正常)"""
         # Arrange: 存储使用率 50% (正常)
         mock_storage_service.get_storage_usage.return_value = 0.5
@@ -247,8 +242,7 @@ class TestErrorHandling:
         mock_storage_service.migrate_checkpoint.side_effect = Exception("Storage error")
         now = datetime.utcnow()
         checkpoints = [
-            _create_checkpoint(i, storage_tier=StorageTier.NVME, created_at=now - timedelta(hours=i))
-            for i in range(5)
+            _create_checkpoint(i, storage_tier=StorageTier.NVME, created_at=now - timedelta(hours=i)) for i in range(5)
         ]
         mock_checkpoint_repository.get_by_storage_tier.return_value = checkpoints
 
@@ -325,9 +319,7 @@ class TestIntegrityVerification:
 
         # Assert
         assert is_valid is True
-        mock_storage_service.verify_integrity.assert_called_with(
-            checkpoint.storage_path, checkpoint.checksum
-        )
+        mock_storage_service.verify_integrity.assert_called_with(checkpoint.storage_path, checkpoint.checksum)
 
     @pytest.mark.asyncio
     async def test_fallback_to_previous_checkpoint_on_corruption(
@@ -372,8 +364,7 @@ class TestMigrationResults:
         # Arrange
         now = datetime.utcnow()
         checkpoints = [
-            _create_checkpoint(i, storage_tier=StorageTier.NVME, created_at=now - timedelta(hours=i))
-            for i in range(5)
+            _create_checkpoint(i, storage_tier=StorageTier.NVME, created_at=now - timedelta(hours=i)) for i in range(5)
         ]
         mock_checkpoint_repository.get_by_storage_tier.return_value = checkpoints
 

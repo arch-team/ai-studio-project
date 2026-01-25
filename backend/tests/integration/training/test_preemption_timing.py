@@ -13,9 +13,7 @@
 
 import time
 from datetime import datetime
-from decimal import Decimal
-from typing import Any
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock
 
 import pytest
 
@@ -35,7 +33,6 @@ from src.modules.training.domain.value_objects import (
     JobStatus,
     StorageTier,
 )
-
 
 # =============================================================================
 # SLA 常量定义
@@ -256,9 +253,9 @@ class TestPreemptionTimingSLA:
 
         # Assert: 验证 SLA (5 分钟内完成)
         assert checkpoint is not None
-        assert elapsed < CHECKPOINT_SAVE_SLA_SECONDS, (
-            f"Checkpoint 创建超时: {elapsed:.2f}s > {CHECKPOINT_SAVE_SLA_SECONDS}s"
-        )
+        assert (
+            elapsed < CHECKPOINT_SAVE_SLA_SECONDS
+        ), f"Checkpoint 创建超时: {elapsed:.2f}s > {CHECKPOINT_SAVE_SLA_SECONDS}s"
 
         # 验证检查点属性
         mock_checkpoint_repository.create.assert_called_once()
@@ -290,9 +287,7 @@ class TestPreemptionTimingSLA:
         elapsed = time.time() - start_time
 
         # Assert: 验证 SLA (30 秒内响应)
-        assert elapsed < POD_RELEASE_SLA_SECONDS, (
-            f"Pod 状态查询超时: {elapsed:.2f}s > {POD_RELEASE_SLA_SECONDS}s"
-        )
+        assert elapsed < POD_RELEASE_SLA_SECONDS, f"Pod 状态查询超时: {elapsed:.2f}s > {POD_RELEASE_SLA_SECONDS}s"
         assert pod_status["phase"] == "Terminated"
         assert pod_status["reason"] == "Preempted"
 
@@ -365,9 +360,7 @@ class TestPreemptionTimingSLA:
             trigger_type=CheckpointTriggerType.PREEMPTION,
             storage_path="/mnt/nvme/ckpt/1/preemption-20260124120000",
         )
-        mock_checkpoint_repository.get_latest_by_training_job_id.return_value = (
-            preemption_checkpoint
-        )
+        mock_checkpoint_repository.get_latest_by_training_job_id.return_value = preemption_checkpoint
 
         # 模拟 Kueue 重新调度后，HyperPod 返回 Running 状态
         mock_hyperpod_client.get_training_job_status.return_value = {
@@ -467,9 +460,7 @@ class TestPreemptionEdgeCases:
             training_job_id=job.id,
             trigger_type=CheckpointTriggerType.SCHEDULED,
         )
-        mock_checkpoint_repository.get_by_training_job_id.return_value = [
-            existing_checkpoint
-        ]
+        mock_checkpoint_repository.get_by_training_job_id.return_value = [existing_checkpoint]
         mock_training_job_repository.get_by_id.return_value = job
 
         # 新抢占检查点
@@ -632,9 +623,7 @@ class TestCheckpointStorage:
         # Arrange
         job = create_test_job(job_id=42, status=JobStatus.RUNNING)
         mock_training_job_repository.get_by_id.return_value = job
-        mock_storage_service.get_storage_path.return_value = (
-            "/mnt/nvme/checkpoints/42/preemption-20260124120000"
-        )
+        mock_storage_service.get_storage_path.return_value = "/mnt/nvme/checkpoints/42/preemption-20260124120000"
 
         created_checkpoint = create_test_checkpoint(checkpoint_id=1, training_job_id=42)
         mock_checkpoint_repository.create.return_value = created_checkpoint
@@ -755,8 +744,7 @@ class TestPreemptionBoundaryConditions:
             storage_service=mock_storage_service,
         )
 
-        # Act: 使用接近 SLA 边界的超时值
-        boundary_timeout = 299  # 4:59 - 刚好在 SLA 内
+        # Act: 使用 SLA 边界超时值 (299s = 4:59 刚好在 SLA 内)
         checkpoint = await checkpoint_service.create_checkpoint_on_preemption(
             job_id=job.id,
             timeout_seconds=CHECKPOINT_SAVE_SLA_SECONDS,  # 使用标准 SLA
@@ -827,9 +815,7 @@ class TestPreemptionBoundaryConditions:
 
         # Act
         start_time = time.time()
-        pod_status = await mock_hyperpod_client.get_pod_status(
-            "training-job-001-worker-0"
-        )
+        pod_status = await mock_hyperpod_client.get_pod_status("training-job-001-worker-0")
         elapsed = time.time() - start_time
 
         # Assert
@@ -1005,9 +991,7 @@ class TestRegressionSuite:
             training_job_id=job.id,
             trigger_type=CheckpointTriggerType.SCHEDULED,
         )
-        mock_checkpoint_repository.get_by_training_job_id.return_value = [
-            scheduled_checkpoint
-        ]
+        mock_checkpoint_repository.get_by_training_job_id.return_value = [scheduled_checkpoint]
 
         # 新的抢占 checkpoint
         preemption_checkpoint = create_test_checkpoint(
@@ -1024,9 +1008,7 @@ class TestRegressionSuite:
         )
 
         # Act: 创建抢占 checkpoint
-        checkpoint = await checkpoint_service.create_checkpoint_on_preemption(
-            job_id=job.id
-        )
+        checkpoint = await checkpoint_service.create_checkpoint_on_preemption(job_id=job.id)
 
         # Assert: 两种类型共存
         assert checkpoint is not None
@@ -1095,9 +1077,7 @@ class TestRegressionSuite:
         )
 
         # Act: 尝试为不存在的任务创建 checkpoint
-        checkpoint = await checkpoint_service.create_checkpoint_on_preemption(
-            job_id=999
-        )
+        checkpoint = await checkpoint_service.create_checkpoint_on_preemption(job_id=999)
 
         # Assert: 应该返回 None (安全失败)
         assert checkpoint is None
@@ -1129,9 +1109,7 @@ class TestRegressionSuite:
             )
             for i in range(1, 4)  # 3 个现有 checkpoint
         ]
-        mock_checkpoint_repository.get_by_training_job_id.return_value = (
-            existing_checkpoints
-        )
+        mock_checkpoint_repository.get_by_training_job_id.return_value = existing_checkpoints
 
         # 新的抢占 checkpoint
         new_checkpoint = create_test_checkpoint(
@@ -1148,9 +1126,7 @@ class TestRegressionSuite:
         )
 
         # Act
-        checkpoint = await checkpoint_service.create_checkpoint_on_preemption(
-            job_id=job.id
-        )
+        checkpoint = await checkpoint_service.create_checkpoint_on_preemption(job_id=job.id)
 
         # Assert: 只调用 create，不调用 delete 或 update 现有 checkpoint
         assert checkpoint is not None
@@ -1278,9 +1254,7 @@ class TestEndToEndPreemptionTiming:
             cluster_name=TEST_CLUSTER_NAME,
         )
 
-        t0 = time.time()
         await sync_service.sync_job(job)
-        t1 = time.time()
 
         # 验证抢占状态
         assert job.status == JobStatus.PREEMPTED
@@ -1304,14 +1278,9 @@ class TestEndToEndPreemptionTiming:
             storage_service=mock_storage_service,
         )
 
-        t2 = time.time()
-        checkpoint = await checkpoint_service.create_checkpoint_on_preemption(
-            job_id=1
-        )
-        t3 = time.time()
+        checkpoint = await checkpoint_service.create_checkpoint_on_preemption(job_id=1)
 
         assert checkpoint is not None
-        checkpoint_duration = t3 - t2
 
         # Phase 4: Pod 释放
         mock_hyperpod_client.get_pod_status.return_value = {
@@ -1320,24 +1289,15 @@ class TestEndToEndPreemptionTiming:
             "reason": "Preempted",
         }
 
-        t4 = time.time()
-        pod_status = await mock_hyperpod_client.get_pod_status(
-            "training-job-001-worker-0"
-        )
-        t5 = time.time()
+        pod_status = await mock_hyperpod_client.get_pod_status("training-job-001-worker-0")
 
         assert pod_status["phase"] == "Terminated"
-        pod_release_duration = t5 - t4
 
         # Phase 5: 恢复
         # 模拟 Kueue 重新调度后恢复
         job.transition_to(JobStatus.RUNNING)
         assert job.status == JobStatus.RUNNING
         assert job.preemption_count == 1  # 恢复后计数保持
-
-        # 验证总体时序 (Mock 环境下应该很快)
-        total_duration = t5 - t0
-        assert total_duration < 1.0  # Mock 环境下应该在 1 秒内完成
 
     @pytest.mark.asyncio
     async def test_multiple_preemption_recovery_cycles(

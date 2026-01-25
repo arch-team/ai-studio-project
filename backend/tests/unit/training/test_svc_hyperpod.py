@@ -114,9 +114,7 @@ class TestHyperPodServiceSubmit:
     """Test HyperPodService.submit_job method."""
 
     @pytest.mark.asyncio
-    async def test_submit_job_success(
-        self, mock_hyperpod_client: AsyncMock, job_config: dict[str, Any]
-    ) -> None:
+    async def test_submit_job_success(self, mock_hyperpod_client: AsyncMock, job_config: dict[str, Any]) -> None:
         """Submit job successfully via HyperPod SDK."""
         from src.modules.training.application.services.hyperpod_service import HyperPodService
 
@@ -180,9 +178,7 @@ class TestHyperPodServiceSubmit:
             HyperPodServiceError,
         )
 
-        mock_hyperpod_client.submit_training_job.side_effect = RuntimeError(
-            "Persistent error"
-        )
+        mock_hyperpod_client.submit_training_job.side_effect = RuntimeError("Persistent error")
 
         service = HyperPodService(
             hyperpod_client=mock_hyperpod_client,
@@ -204,9 +200,7 @@ class TestHyperPodServiceGetStatus:
     """Test HyperPodService.get_job_status method."""
 
     @pytest.mark.asyncio
-    async def test_get_job_status_success(
-        self, mock_hyperpod_client: AsyncMock
-    ) -> None:
+    async def test_get_job_status_success(self, mock_hyperpod_client: AsyncMock) -> None:
         """Get job status successfully."""
         from src.modules.training.application.services.hyperpod_service import HyperPodService
 
@@ -225,15 +219,11 @@ class TestHyperPodServiceGetStatus:
         )
 
     @pytest.mark.asyncio
-    async def test_get_job_status_not_found(
-        self, mock_hyperpod_client: AsyncMock
-    ) -> None:
+    async def test_get_job_status_not_found(self, mock_hyperpod_client: AsyncMock) -> None:
         """Get status for non-existent job."""
         from src.modules.training.application.services.hyperpod_service import HyperPodService
 
-        mock_hyperpod_client.get_training_job_status.side_effect = RuntimeError(
-            "Job not found"
-        )
+        mock_hyperpod_client.get_training_job_status.side_effect = RuntimeError("Job not found")
 
         service = HyperPodService(
             hyperpod_client=mock_hyperpod_client,
@@ -266,9 +256,7 @@ class TestHyperPodServiceTerminate:
         )
 
     @pytest.mark.asyncio
-    async def test_terminate_job_with_retry(
-        self, mock_hyperpod_client: AsyncMock
-    ) -> None:
+    async def test_terminate_job_with_retry(self, mock_hyperpod_client: AsyncMock) -> None:
         """Terminate job with retry on transient errors."""
         from src.modules.training.application.services.hyperpod_service import HyperPodService
 
@@ -302,9 +290,7 @@ class TestHyperPodServicePause:
     """
 
     @pytest.mark.asyncio
-    async def test_pause_job_triggers_checkpoint_and_stop(
-        self, mock_hyperpod_client: AsyncMock
-    ) -> None:
+    async def test_pause_job_triggers_checkpoint_and_stop(self, mock_hyperpod_client: AsyncMock) -> None:
         """Pause job triggers checkpoint signal and stops job."""
         from src.modules.training.application.services.hyperpod_service import HyperPodService
 
@@ -347,9 +333,7 @@ class TestHyperPodServiceResume:
         mock_hyperpod_client.submit_training_job.assert_awaited_once()
         # Verify checkpoint path is included in config
         call_args = mock_hyperpod_client.submit_training_job.call_args
-        submitted_config = call_args.kwargs.get("job_config") or call_args[1].get(
-            "job_config"
-        )
+        submitted_config = call_args.kwargs.get("job_config") or call_args[1].get("job_config")
         assert submitted_config.get("checkpoint_path") == "/checkpoints/epoch-10.pth"
 
 
@@ -400,9 +384,7 @@ class TestHyperPodServiceStatusMapping:
             ("Unknown", "unknown"),
         ],
     )
-    def test_status_mapping(
-        self, hyperpod_status: str, expected_platform_status: str
-    ) -> None:
+    def test_status_mapping(self, hyperpod_status: str, expected_platform_status: str) -> None:
         """Map HyperPod status to platform status."""
         from src.modules.training.application.services.hyperpod_service import map_hyperpod_status
 

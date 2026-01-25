@@ -48,9 +48,7 @@ class TestS3MultipartClientCreateMultipartUpload:
         return mock_session
 
     @pytest.mark.asyncio
-    async def test_create_multipart_upload_success(
-        self, mock_session: MagicMock, mock_s3_client: AsyncMock
-    ) -> None:
+    async def test_create_multipart_upload_success(self, mock_session: MagicMock, mock_s3_client: AsyncMock) -> None:
         """验证成功创建分片上传。"""
         from src.modules.datasets.infrastructure.s3 import S3MultipartClient
 
@@ -76,9 +74,7 @@ class TestS3MultipartClientCreateMultipartUpload:
             mock_s3_client.create_multipart_upload.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_create_multipart_upload_with_kms(
-        self, mock_session: MagicMock, mock_s3_client: AsyncMock
-    ) -> None:
+    async def test_create_multipart_upload_with_kms(self, mock_session: MagicMock, mock_s3_client: AsyncMock) -> None:
         """验证使用 KMS 加密创建分片上传。"""
         from src.modules.datasets.infrastructure.s3 import S3MultipartClient
 
@@ -121,9 +117,7 @@ class TestS3MultipartClientGeneratePresignedUrl:
         return mock_session
 
     @pytest.mark.asyncio
-    async def test_generate_presigned_url_for_part(
-        self, mock_session: MagicMock, mock_s3_client: AsyncMock
-    ) -> None:
+    async def test_generate_presigned_url_for_part(self, mock_session: MagicMock, mock_s3_client: AsyncMock) -> None:
         """验证生成分片上传预签名 URL。"""
         from src.modules.datasets.infrastructure.s3 import S3MultipartClient
 
@@ -155,9 +149,7 @@ class TestS3MultipartClientGeneratePresignedUrl:
             )
 
     @pytest.mark.asyncio
-    async def test_generate_presigned_urls_batch(
-        self, mock_session: MagicMock, mock_s3_client: AsyncMock
-    ) -> None:
+    async def test_generate_presigned_urls_batch(self, mock_session: MagicMock, mock_s3_client: AsyncMock) -> None:
         """验证批量生成预签名 URL。"""
         from src.modules.datasets.infrastructure.s3 import S3MultipartClient
 
@@ -199,9 +191,7 @@ class TestS3MultipartClientCompleteUpload:
         return mock_session
 
     @pytest.mark.asyncio
-    async def test_complete_multipart_upload_success(
-        self, mock_session: MagicMock, mock_s3_client: AsyncMock
-    ) -> None:
+    async def test_complete_multipart_upload_success(self, mock_session: MagicMock, mock_s3_client: AsyncMock) -> None:
         """验证成功完成分片上传。"""
         from src.modules.datasets.infrastructure.s3 import S3MultipartClient
 
@@ -252,9 +242,7 @@ class TestS3MultipartClientAbortUpload:
         return mock_session
 
     @pytest.mark.asyncio
-    async def test_abort_multipart_upload_success(
-        self, mock_session: MagicMock, mock_s3_client: AsyncMock
-    ) -> None:
+    async def test_abort_multipart_upload_success(self, mock_session: MagicMock, mock_s3_client: AsyncMock) -> None:
         """验证成功取消分片上传。"""
         from src.modules.datasets.infrastructure.s3 import S3MultipartClient
 
@@ -297,9 +285,7 @@ class TestS3MultipartClientListParts:
         return mock_session
 
     @pytest.mark.asyncio
-    async def test_list_parts_returns_parts(
-        self, mock_session: MagicMock, mock_s3_client: AsyncMock
-    ) -> None:
+    async def test_list_parts_returns_parts(self, mock_session: MagicMock, mock_s3_client: AsyncMock) -> None:
         """验证列出已上传分片。"""
         from src.modules.datasets.infrastructure.s3 import S3MultipartClient
 
@@ -326,9 +312,7 @@ class TestS3MultipartClientListParts:
             assert parts[0]["PartNumber"] == 1
 
     @pytest.mark.asyncio
-    async def test_list_parts_handles_pagination(
-        self, mock_session: MagicMock, mock_s3_client: AsyncMock
-    ) -> None:
+    async def test_list_parts_handles_pagination(self, mock_session: MagicMock, mock_s3_client: AsyncMock) -> None:
         """验证处理分页的分片列表。"""
         from src.modules.datasets.infrastructure.s3 import S3MultipartClient
 

@@ -30,7 +30,7 @@ class FsxClient:
     def __init__(
         self,
         filesystem_id: str,
-        region: str = "us-west-2",
+        region: str = "us-east-1",
         mount_path: str = "/fsx",
         s3_bucket: str | None = None,
     ) -> None:
@@ -121,14 +121,10 @@ class FsxClient:
         """
         try:
             async with self._session.client("fsx", region_name=self._region) as fsx:
-                response = await fsx.describe_file_systems(
-                    FileSystemIds=[self._filesystem_id]
-                )
+                response = await fsx.describe_file_systems(FileSystemIds=[self._filesystem_id])
                 filesystems = response.get("FileSystems", [])
                 if not filesystems:
-                    raise FsxClientError(
-                        f"Filesystem {self._filesystem_id} not found"
-                    )
+                    raise FsxClientError(f"Filesystem {self._filesystem_id} not found")
                 return filesystems[0]
         except ClientError as e:
             raise FsxClientError(f"Failed to describe filesystem: {e}") from e
@@ -164,9 +160,7 @@ class FsxClient:
         while True:
             elapsed = time.time() - start_time
             if elapsed > max_wait_time:
-                raise FsxClientError(
-                    f"Task {task_id} timed out after {max_wait_time}s"
-                )
+                raise FsxClientError(f"Task {task_id} timed out after {max_wait_time}s")
 
             status = await self.get_task_status(task_id)
             if status is None:
@@ -176,9 +170,7 @@ class FsxClient:
             if lifecycle in terminal_states:
                 if lifecycle == FsxTaskLifecycle.FAILED.value:
                     failure_details = status.get("FailureDetails", {})
-                    raise FsxClientError(
-                        f"Task {task_id} failed: {failure_details.get('Message', 'Unknown error')}"
-                    )
+                    raise FsxClientError(f"Task {task_id} failed: {failure_details.get('Message', 'Unknown error')}")
                 return status
 
             await asyncio.sleep(poll_interval)

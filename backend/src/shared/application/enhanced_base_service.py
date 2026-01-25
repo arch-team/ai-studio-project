@@ -118,7 +118,7 @@ class EnhancedBaseService(Generic[T, ID]):
                 raise self._create_duplicate_error(field_name, str(field_value))
         # Alternative: Try exists_by if available
         elif hasattr(self._repository, "exists_by"):
-            if await self._repository.exists_by(field_name, field_value):  # type: ignore
+            if await self._repository.exists_by(field_name, field_value):
                 raise self._create_duplicate_error(field_name, str(field_value))
 
     async def _validate_entity_exists(
@@ -313,9 +313,9 @@ class EnhancedBaseService(Generic[T, ID]):
         await self._get_or_raise(entity_id)  # Verify exists
 
         if soft_delete and hasattr(self._repository, "soft_delete"):
-            await self._repository.soft_delete(entity_id)  # type: ignore
+            await self._repository.soft_delete(entity_id)
         else:
-            await self._repository.delete(entity_id)  # type: ignore
+            await self._repository.delete(entity_id)
 
     # ========== Batch Operations ==========
 

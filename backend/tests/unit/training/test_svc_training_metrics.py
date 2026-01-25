@@ -11,7 +11,6 @@ from src.modules.training.application.services.training_metrics_service import (
     TrainingMetricsService,
 )
 
-
 # === Fixtures ===
 
 
