@@ -83,32 +83,15 @@ class FsxClient:
         Raises:
             FsxClientError: 创建任务失败
         """
-        loop = asyncio.get_event_loop()
+        # 构建导入任务参数
+        params = self._build_task_params(
+            "IMPORT_METADATA_FROM_REPOSITORY",
+            paths,
+            report_enabled,
+            report_path
+        )
 
-        def _create() -> dict[str, Any]:
-            params: dict[str, Any] = {
-                "FileSystemId": self._filesystem_id,
-                "Type": "IMPORT_METADATA_FROM_REPOSITORY",
-                "Paths": paths,
-            }
-
-            if report_enabled and report_path:
-                params["Report"] = {
-                    "Enabled": True,
-                    "Path": report_path,
-                    "Format": "REPORT_CSV_20191124",
-                    "Scope": "FAILED_FILES_ONLY",
-                }
-
-            try:
-                response = self._fsx_client.create_data_repository_task(**params)
-                return response.get("DataRepositoryTask", {})
-            except ClientError as e:
-                raise FsxClientError(
-                    f"Failed to create import task: {e}"
-                ) from e
-
-        return await loop.run_in_executor(None, _create)
+        return await self._create_repository_task(params, "import")
 
     async def create_release_task(
         self,
@@ -128,22 +111,13 @@ class FsxClient:
         Raises:
             FsxClientError: 创建任务失败
         """
-        loop = asyncio.get_event_loop()
+        # 构建释放任务参数
+        params = self._build_task_params(
+            "RELEASE_DATA_FROM_FILESYSTEM",
+            paths
+        )
 
-        def _create() -> dict[str, Any]:
-            try:
-                response = self._fsx_client.create_data_repository_task(
-                    FileSystemId=self._filesystem_id,
-                    Type="RELEASE_DATA_FROM_FILESYSTEM",
-                    Paths=paths,
-                )
-                return response.get("DataRepositoryTask", {})
-            except ClientError as e:
-                raise FsxClientError(
-                    f"Failed to create release task: {e}"
-                ) from e
-
-        return await loop.run_in_executor(None, _create)
+        return await self._create_repository_task(params, "release")
 
     async def get_task_status(
         self,
@@ -249,6 +223,7 @@ class FsxClient:
         import time
 
         start_time = time.time()
+        # 定义终止状态（成功、失败、取消）
         terminal_states = {
             FsxTaskLifecycle.SUCCEEDED.value,
             FsxTaskLifecycle.FAILED.value,
@@ -276,3 +251,69 @@ class FsxClient:
                 return status
 
             await asyncio.sleep(poll_interval)
+
+    # ========== 私有辅助方法 ==========
+
+    def _build_task_params(
+        self,
+        task_type: str,
+        paths: list[str],
+        report_enabled: bool = False,
+        report_path: str | None = None,
+    ) -> dict[str, Any]:
+        """构建任务参数。
+
+        Args:
+            task_type: 任务类型
+            paths: 路径列表
+            report_enabled: 是否启用报告
+            report_path: 报告路径
+
+        Returns:
+            任务参数字典
+        """
+        params: dict[str, Any] = {
+            "FileSystemId": self._filesystem_id,
+            "Type": task_type,
+            "Paths": paths,
+        }
+
+        if report_enabled and report_path:
+            params["Report"] = {
+                "Enabled": True,
+                "Path": report_path,
+                "Format": "REPORT_CSV_20191124",
+                "Scope": "FAILED_FILES_ONLY",
+            }
+
+        return params
+
+    async def _create_repository_task(
+        self,
+        params: dict[str, Any],
+        task_name: str,
+    ) -> dict[str, Any]:
+        """创建数据仓库任务。
+
+        Args:
+            params: 任务参数
+            task_name: 任务名称（用于错误消息）
+
+        Returns:
+            任务信息字典
+
+        Raises:
+            FsxClientError: 创建失败
+        """
+        loop = asyncio.get_event_loop()
+
+        def _create() -> dict[str, Any]:
+            try:
+                response = self._fsx_client.create_data_repository_task(**params)
+                return response.get("DataRepositoryTask", {})
+            except ClientError as e:
+                raise FsxClientError(
+                    f"Failed to create {task_name} task: {e}"
+                ) from e
+
+        return await loop.run_in_executor(None, _create)

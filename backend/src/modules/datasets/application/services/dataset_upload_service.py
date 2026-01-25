@@ -39,7 +39,7 @@ from src.shared.utils import utc_now
 class DatasetUploadService:
     """数据集上传服务 - 管理 S3 分片上传生命周期。"""
 
-    # 上传会话默认过期时间
+    # 上传会话默认过期时间（7天后自动过期）
     DEFAULT_SESSION_EXPIRY_DAYS = 7
 
     def __init__(
@@ -85,50 +85,28 @@ class DatasetUploadService:
             DatasetNotFoundError: 数据集不存在
             UploadSessionActiveError: 数据集已有活跃上传会话
         """
-        # 验证数据集存在
-        dataset = await self._dataset_repository.get_by_id(dataset_id)
-        if dataset is None:
-            raise DatasetNotFoundError(dataset_id=dataset_id)
+        # 验证数据集和会话
+        await self._validate_dataset_and_session(dataset_id)
 
-        # 检查是否有活跃上传会话
-        active_session = await self._upload_session_repository.get_active_by_dataset(
-            dataset_id
-        )
-        if active_session is not None:
-            raise UploadSessionActiveError(
-                dataset_id=dataset_id,
-                upload_id=active_session.upload_id,
-            )
-
-        # 构建 S3 key
-        s3_key = f"datasets/{dataset_id}/{filename}"
-
-        # 调用 S3 创建分片上传
+        # 构建 S3 key 并创建分片上传
+        s3_key = self._build_s3_key(dataset_id, filename)
         response = await self._s3_client.create_multipart_upload(
             key=s3_key,
             content_type=content_type,
             metadata={"filename": filename, "dataset_id": str(dataset_id)},
         )
 
-        upload_id = response["UploadId"]
-
-        # 创建上传会话
-        session = UploadSession(
-            upload_id=upload_id,
+        # 创建并持久化会话
+        session = self._create_upload_session(
+            upload_id=response["UploadId"],
             dataset_id=dataset_id,
-            bucket=self._s3_client._bucket_name,
-            key=s3_key,
+            s3_key=s3_key,
             filename=filename,
             content_type=content_type,
             total_size=total_size,
             part_size=part_size,
-            status=UploadStatus.INITIATED,
             owner_id=owner_id,
-            created_at=utc_now(),
-            updated_at=utc_now(),
         )
-
-        # 持久化到数据库
         return await self._upload_session_repository.add(session)
 
     async def generate_presigned_urls(
@@ -152,7 +130,7 @@ class DatasetUploadService:
         """
         session = await self._get_session_or_raise(upload_id)
 
-        # 更新状态为 IN_PROGRESS (如果还是 INITIATED)
+        # 如果状态还是 INITIATED，更新为 IN_PROGRESS
         if session.status == UploadStatus.INITIATED:
             session.status = UploadStatus.IN_PROGRESS
             await self._upload_session_repository.update(session)
@@ -251,7 +229,7 @@ class DatasetUploadService:
         """
         session = await self._get_session_or_raise(upload_id)
 
-        # 检查是否所有分片都已上传
+        # 验证所有分片都已上传完成
         if not session.is_complete():
             raise UploadIncompleteError(
                 upload_id=upload_id,
@@ -262,7 +240,7 @@ class DatasetUploadService:
         session.status = UploadStatus.COMPLETING
         await self._upload_session_repository.update(session)
 
-        # 构建分片列表
+        # 构建分片列表（按分片编号排序）
         parts = [
             {"PartNumber": part.part_number, "ETag": part.etag}
             for part in sorted(
@@ -327,3 +305,60 @@ class DatasetUploadService:
         if session is None:
             raise UploadSessionNotFoundError(upload_id=upload_id)
         return session
+
+    async def _validate_dataset_and_session(self, dataset_id: int) -> None:
+        """验证数据集存在且没有活跃会话。
+
+        Args:
+            dataset_id: 数据集 ID
+
+        Raises:
+            DatasetNotFoundError: 数据集不存在
+            UploadSessionActiveError: 已有活跃上传会话
+        """
+        # 验证数据集存在
+        dataset = await self._dataset_repository.get_by_id(dataset_id)
+        if dataset is None:
+            raise DatasetNotFoundError(dataset_id=dataset_id)
+
+        # 检查是否有活跃上传会话
+        active_session = await self._upload_session_repository.get_active_by_dataset(
+            dataset_id
+        )
+        if active_session is not None:
+            raise UploadSessionActiveError(
+                dataset_id=dataset_id,
+                upload_id=active_session.upload_id,
+            )
+
+    def _build_s3_key(self, dataset_id: int, filename: str) -> str:
+        """构建 S3 对象键。"""
+        return f"datasets/{dataset_id}/{filename}"
+
+    def _create_upload_session(
+        self,
+        upload_id: str,
+        dataset_id: int,
+        s3_key: str,
+        filename: str,
+        content_type: str,
+        total_size: int,
+        part_size: int,
+        owner_id: int,
+    ) -> UploadSession:
+        """创建上传会话对象。"""
+        now = utc_now()
+        return UploadSession(
+            upload_id=upload_id,
+            dataset_id=dataset_id,
+            bucket=self._s3_client._bucket_name,
+            key=s3_key,
+            filename=filename,
+            content_type=content_type,
+            total_size=total_size,
+            part_size=part_size,
+            status=UploadStatus.INITIATED,
+            owner_id=owner_id,
+            created_at=now,
+            updated_at=now,
+        )

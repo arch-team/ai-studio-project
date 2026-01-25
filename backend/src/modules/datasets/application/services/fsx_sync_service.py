@@ -54,27 +54,15 @@ class FsxSyncService:
         Raises:
             DatasetNotFoundError: 数据集不存在
         """
-        # 验证数据集存在
-        dataset = await self._dataset_repository.get_by_id(dataset_id)
-        if dataset is None:
-            raise DatasetNotFoundError(dataset_id=dataset_id)
+        await self._validate_dataset_exists(dataset_id)
 
-        # 构建同步路径
-        sync_path = f"datasets/{dataset_id}/"
-
-        # 创建导入任务
+        sync_path = self._get_dataset_path(dataset_id)
         task = await self._fsx_client.create_import_task(
             paths=[sync_path],
             report_enabled=False,
         )
 
-        return {
-            "task_id": task.get("TaskId"),
-            "status": task.get("Lifecycle"),
-            "type": task.get("Type", "IMPORT"),
-            "dataset_id": dataset_id,
-            "paths": [sync_path],
-        }
+        return self._build_task_response(task, dataset_id, [sync_path], "IMPORT")
 
     async def get_sync_status(
         self,
@@ -127,30 +115,15 @@ class FsxSyncService:
         Raises:
             DatasetNotFoundError: 数据集不存在
         """
-        # 验证数据集存在
-        dataset = await self._dataset_repository.get_by_id(dataset_id)
-        if dataset is None:
-            raise DatasetNotFoundError(dataset_id=dataset_id)
+        await self._validate_dataset_exists(dataset_id)
 
-        # 构建预热路径
-        if paths:
-            sync_paths = [f"datasets/{dataset_id}/{p}" for p in paths]
-        else:
-            sync_paths = [f"datasets/{dataset_id}/"]
-
-        # 创建导入任务
+        sync_paths = self._build_sync_paths(dataset_id, paths)
         task = await self._fsx_client.create_import_task(
             paths=sync_paths,
             report_enabled=False,
         )
 
-        return {
-            "task_id": task.get("TaskId"),
-            "status": task.get("Lifecycle"),
-            "type": "PREFETCH",
-            "dataset_id": dataset_id,
-            "paths": sync_paths,
-        }
+        return self._build_task_response(task, dataset_id, sync_paths, "PREFETCH")
 
     async def release_dataset(
         self,
@@ -170,26 +143,14 @@ class FsxSyncService:
         Raises:
             DatasetNotFoundError: 数据集不存在
         """
-        # 验证数据集存在
-        dataset = await self._dataset_repository.get_by_id(dataset_id)
-        if dataset is None:
-            raise DatasetNotFoundError(dataset_id=dataset_id)
+        await self._validate_dataset_exists(dataset_id)
 
-        # 构建释放路径
-        release_path = f"datasets/{dataset_id}/"
-
-        # 创建释放任务
+        release_path = self._get_dataset_path(dataset_id)
         task = await self._fsx_client.create_release_task(
             paths=[release_path],
         )
 
-        return {
-            "task_id": task.get("TaskId"),
-            "status": task.get("Lifecycle"),
-            "type": "RELEASE",
-            "dataset_id": dataset_id,
-            "paths": [release_path],
-        }
+        return self._build_task_response(task, dataset_id, [release_path], "RELEASE")
 
     async def get_dataset_fsx_path(
         self,
@@ -237,3 +198,64 @@ class FsxSyncService:
                 "available": False,
                 "error": str(e),
             }
+
+    # ========== 私有辅助方法 ==========
+
+    async def _validate_dataset_exists(self, dataset_id: int) -> None:
+        """验证数据集存在。
+
+        Args:
+            dataset_id: 数据集 ID
+
+        Raises:
+            DatasetNotFoundError: 数据集不存在
+        """
+        dataset = await self._dataset_repository.get_by_id(dataset_id)
+        if dataset is None:
+            raise DatasetNotFoundError(dataset_id=dataset_id)
+
+    def _get_dataset_path(self, dataset_id: int) -> str:
+        """获取数据集路径。"""
+        return f"datasets/{dataset_id}/"
+
+    def _build_sync_paths(
+        self, dataset_id: int, paths: list[str] | None = None
+    ) -> list[str]:
+        """构建同步路径列表。
+
+        Args:
+            dataset_id: 数据集 ID
+            paths: 子路径列表
+
+        Returns:
+            完整路径列表
+        """
+        if paths:
+            return [f"datasets/{dataset_id}/{p}" for p in paths]
+        return [self._get_dataset_path(dataset_id)]
+
+    def _build_task_response(
+        self,
+        task: dict[str, Any],
+        dataset_id: int,
+        paths: list[str],
+        task_type: str | None = None,
+    ) -> dict[str, Any]:
+        """构建任务响应。
+
+        Args:
+            task: FSx 任务信息
+            dataset_id: 数据集 ID
+            paths: 路径列表
+            task_type: 任务类型覆盖
+
+        Returns:
+            格式化的任务响应
+        """
+        return {
+            "task_id": task.get("TaskId"),
+            "status": task.get("Lifecycle"),
+            "type": task_type or task.get("Type", "IMPORT"),
+            "dataset_id": dataset_id,
+            "paths": paths,
+        }

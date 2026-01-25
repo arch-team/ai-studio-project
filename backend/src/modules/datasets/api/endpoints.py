@@ -1,4 +1,6 @@
-"""Datasets API endpoints - CRUD operations for datasets."""
+"""数据集 API 端点 - 提供数据集的 CRUD 操作。"""
+
+from typing import Any
 
 from fastapi import APIRouter, Depends, Query, status
 
@@ -14,7 +16,7 @@ from src.modules.datasets.api.dependencies import (
     get_fsx_sync_service,
 )
 from src.modules.datasets.api.schemas import (
-    CompleteUploadResponse,
+    # 数据集基础
     CreateDatasetRequest,
     CreateDatasetVersionRequest,
     DatasetDetail,
@@ -24,20 +26,23 @@ from src.modules.datasets.api.schemas import (
     DatasetSummary,
     DatasetTypeEnum,
     DatasetVisibilityEnum,
+    UpdateDatasetRequest,
+    # 上传相关
+    CompleteUploadResponse,
+    GeneratePresignedUrlsRequest,
+    InitiateUploadRequest,
+    InitiateUploadResponse,
+    PresignedUrlItem,
+    PresignedUrlsResponse,
+    RegisterPartRequest,
+    UploadProgressResponse,
+    UploadStatusEnum,
+    # FSx 同步
     FsxAvailabilityResponse,
     FsxPathResponse,
     FsxSyncResponse,
     FsxSyncStatusResponse,
-    GeneratePresignedUrlsRequest,
-    InitiateUploadRequest,
-    InitiateUploadResponse,
     PrefetchDatasetRequest,
-    PresignedUrlItem,
-    PresignedUrlsResponse,
-    RegisterPartRequest,
-    UpdateDatasetRequest,
-    UploadProgressResponse,
-    UploadStatusEnum,
 )
 from src.modules.datasets.application.services import (
     DatasetService,
@@ -62,6 +67,34 @@ from src.shared.utils import EnumMapper
 router = APIRouter()
 
 
+async def _verify_dataset_permission(
+    dataset_id: int,
+    current_user: CurrentUser,
+    service: DatasetService,
+    action: str,
+) -> Any:
+    """验证数据集权限的辅助函数。
+
+    Args:
+        dataset_id: 数据集 ID
+        current_user: 当前用户
+        service: 数据集服务
+        action: 操作描述
+
+    Returns:
+        数据集实体
+
+    Raises:
+        DatasetNotFoundError: 数据集不存在
+        PermissionDenied: 无权限
+    """
+    dataset = await service.get_dataset(dataset_id)
+    check_resource_owner_or_privileged(
+        dataset.owner_id, current_user, "dataset", action
+    )
+    return dataset
+
+
 @router.post(
     "",
     response_model=DatasetDetail,
@@ -72,9 +105,9 @@ async def create_dataset(
     current_user: CurrentUser = Depends(require_engineer),
     service: DatasetService = Depends(get_dataset_service),
 ):
-    """Create a new dataset.
+    """创建新数据集。
 
-    Registers a new dataset with the specified storage location and metadata.
+    注册一个新的数据集，包含指定的存储位置和元数据。
     """
     dataset_data = data.model_dump(mode="json")
     dataset = await service.create_dataset(
@@ -92,25 +125,25 @@ async def list_datasets(
     page: PageParam = 1,
     page_size: PageSizeParam = 20,
     dataset_type: DatasetTypeEnum | None = Query(
-        default=None, description="Filter by dataset type"
+        default=None, description="按数据集类型过滤"
     ),
     storage_type: DatasetStorageTypeEnum | None = Query(
-        default=None, description="Filter by storage type"
+        default=None, description="按存储类型过滤"
     ),
     visibility: DatasetVisibilityEnum | None = Query(
-        default=None, description="Filter by visibility"
+        default=None, description="按可见性过滤"
     ),
     status_filter: DatasetStatusEnum | None = Query(
-        default=None, alias="status", description="Filter by status"
+        default=None, alias="status", description="按状态过滤"
     ),
     sort_by: SortByParam = "created_at",
     sort_order: SortOrderParam = SortOrder.DESC,
     current_user: CurrentUser = Depends(get_current_active_user),
     service: DatasetService = Depends(get_dataset_service),
 ):
-    """List datasets with pagination and filters.
+    """列出数据集（支持分页和过滤）。
 
-    Returns datasets owned by the current user, or all datasets if admin.
+    返回当前用户拥有的数据集，管理员可查看所有数据集。
     """
     owner_id = get_owner_filter(current_user)
 
@@ -144,19 +177,19 @@ async def get_dataset(
     current_user: CurrentUser = Depends(get_current_active_user),
     service: DatasetService = Depends(get_dataset_service),
 ):
-    """Get dataset details by ID.
+    """根据 ID 获取数据集详情。
 
-    Returns detailed information about a specific dataset.
+    返回特定数据集的详细信息。
     """
     dataset = await service.get_dataset(dataset_id)
 
-    # Check access - owner, admin, or public dataset
+    # 检查访问权限 - 所有者、管理员或公开数据集
     if not dataset.is_accessible_by(current_user.user_id) and not current_user.is_admin:
         check_resource_owner_or_privileged(
             dataset.owner_id, current_user, "dataset", "view"
         )
 
-    # Update access time
+    # 更新访问时间
     dataset.update_access_time()
 
     return DatasetDetail.from_entity(dataset)
@@ -172,14 +205,11 @@ async def update_dataset(
     current_user: CurrentUser = Depends(require_engineer),
     service: DatasetService = Depends(get_dataset_service),
 ):
-    """Update dataset metadata.
+    """更新数据集元数据。
 
-    Only description, tags, and visibility can be updated.
+    仅支持更新描述、标签和可见性。
     """
-    dataset = await service.get_dataset(dataset_id)
-    check_resource_owner_or_privileged(
-        dataset.owner_id, current_user, "dataset", "update"
-    )
+    await _verify_dataset_permission(dataset_id, current_user, service, "update")
 
     dataset = await service.update_dataset(
         dataset_id=dataset_id,
@@ -197,15 +227,11 @@ async def delete_dataset(
     current_user: CurrentUser = Depends(require_engineer),
     service: DatasetService = Depends(get_dataset_service),
 ):
-    """Delete (archive) a dataset.
+    """删除（归档）数据集。
 
-    Soft-deletes the dataset by setting its status to ARCHIVED.
+    软删除数据集，将其状态设置为 ARCHIVED。
     """
-    dataset = await service.get_dataset(dataset_id)
-    check_resource_owner_or_privileged(
-        dataset.owner_id, current_user, "dataset", "delete"
-    )
-
+    await _verify_dataset_permission(dataset_id, current_user, service, "delete")
     await service.delete_dataset(dataset_id)
     return None
 
@@ -221,14 +247,11 @@ async def create_dataset_version(
     current_user: CurrentUser = Depends(require_engineer),
     service: DatasetService = Depends(get_dataset_service),
 ):
-    """Create a new version of a dataset.
+    """创建数据集的新版本。
 
-    Creates a new dataset entry with the same name but different version.
+    创建一个具有相同名称但不同版本的新数据集条目。
     """
-    dataset = await service.get_dataset(dataset_id)
-    check_resource_owner_or_privileged(
-        dataset.owner_id, current_user, "dataset", "create version of"
-    )
+    await _verify_dataset_permission(dataset_id, current_user, service, "create version of")
 
     new_dataset = await service.create_version(
         dataset_id=dataset_id,
@@ -241,7 +264,7 @@ async def create_dataset_version(
 
 @router.get("/health")
 async def health_check() -> dict[str, str]:
-    """Health check endpoint."""
+    """健康检查端点。"""
     return {"status": "ok"}
 
 
@@ -264,11 +287,7 @@ async def initiate_upload(
 
     开始一个新的 S3 分片上传会话。返回 upload_id 供后续操作使用。
     """
-    # 检查数据集权限
-    dataset = await dataset_service.get_dataset(dataset_id)
-    check_resource_owner_or_privileged(
-        dataset.owner_id, current_user, "dataset", "upload to"
-    )
+    await _verify_dataset_permission(dataset_id, current_user, dataset_service, "upload to")
 
     session = await upload_service.initiate_multipart_upload(
         dataset_id=dataset_id,
@@ -435,11 +454,7 @@ async def initiate_fsx_sync(
 
     创建 FSx Data Repository Task 将数据集从 S3 同步到 FSx。
     """
-    dataset = await dataset_service.get_dataset(dataset_id)
-    check_resource_owner_or_privileged(
-        dataset.owner_id, current_user, "dataset", "sync to FSx"
-    )
-
+    await _verify_dataset_permission(dataset_id, current_user, dataset_service, "sync to FSx")
     result = await fsx_service.initiate_s3_to_fsx_sync(dataset_id=dataset_id)
 
     return FsxSyncResponse(
@@ -461,7 +476,10 @@ async def get_fsx_sync_status(
     current_user: CurrentUser = Depends(get_current_active_user),
     fsx_service: FsxSyncService = Depends(get_fsx_sync_service),
 ):
-    """获取 FSx 同步任务状态。"""
+    """获取 FSx 同步任务状态。
+
+    查询 Data Repository Task 的执行状态和进度。
+    """
     result = await fsx_service.get_sync_status(task_id=task_id)
 
     return FsxSyncStatusResponse(
@@ -489,10 +507,7 @@ async def prefetch_dataset_to_fsx(
 
     为训练任务预先加载数据集到 FSx，减少首次访问延迟。
     """
-    dataset = await dataset_service.get_dataset(dataset_id)
-    check_resource_owner_or_privileged(
-        dataset.owner_id, current_user, "dataset", "prefetch to FSx"
-    )
+    await _verify_dataset_permission(dataset_id, current_user, dataset_service, "prefetch to FSx")
 
     result = await fsx_service.prefetch_dataset(
         dataset_id=dataset_id,
@@ -522,11 +537,7 @@ async def release_dataset_cache(
 
     释放数据集在 FSx 上占用的存储空间，数据仍保留在 S3。
     """
-    dataset = await dataset_service.get_dataset(dataset_id)
-    check_resource_owner_or_privileged(
-        dataset.owner_id, current_user, "dataset", "release FSx cache"
-    )
-
+    await _verify_dataset_permission(dataset_id, current_user, dataset_service, "release FSx cache")
     await fsx_service.release_dataset(dataset_id=dataset_id)
     return None
 
@@ -541,7 +552,10 @@ async def get_dataset_fsx_path(
     fsx_service: FsxSyncService = Depends(get_fsx_sync_service),
     dataset_service: DatasetService = Depends(get_dataset_service),
 ):
-    """获取数据集的 FSx 路径信息。"""
+    """获取数据集的 FSx 路径信息。
+
+    返回数据集在 FSx 文件系统和 S3 上的路径映射。
+    """
     dataset = await dataset_service.get_dataset(dataset_id)
 
     if not dataset.is_accessible_by(current_user.user_id) and not current_user.is_admin:
@@ -567,7 +581,10 @@ async def check_fsx_health(
     current_user: CurrentUser = Depends(get_current_active_user),
     fsx_service: FsxSyncService = Depends(get_fsx_sync_service),
 ):
-    """检查 FSx 文件系统可用性。"""
+    """检查 FSx 文件系统可用性。
+
+    返回文件系统的状态、容量和生命周期信息。
+    """
     result = await fsx_service.check_fsx_availability()
 
     return FsxAvailabilityResponse(
