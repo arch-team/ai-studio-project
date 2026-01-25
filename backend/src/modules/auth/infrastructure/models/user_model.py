@@ -19,7 +19,7 @@ if TYPE_CHECKING:
     from src.modules.models.infrastructure.models import ModelModel
     from src.modules.spaces.infrastructure.models import DevelopmentSpaceModel
     from src.modules.quotas.infrastructure.models import ResourceQuotaModel
-    from src.modules.datasets.infrastructure.models import DatasetModel
+    from src.modules.datasets.infrastructure.models import DatasetModel, UploadSessionModel
 
 
 class TimestampMixin:
@@ -187,6 +187,11 @@ class UserModel(Base, TimestampMixin):
     )
     datasets: Mapped[list["DatasetModel"]] = relationship(
         "DatasetModel",
+        back_populates="owner",
+        cascade="all, delete-orphan",
+    )
+    upload_sessions: Mapped[list["UploadSessionModel"]] = relationship(
+        "UploadSessionModel",
         back_populates="owner",
         cascade="all, delete-orphan",
     )

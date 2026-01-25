@@ -610,8 +610,8 @@
 - [X] [T046] [US2] POST /datasets/{id}/versions 端点实现 - 创建数据集新版本,复制元数据和存储路径
 
 ### 存储集成服务
-- [ ] [T047] [US2] S3 上传集成 - `backend/src/modules/datasets/application/services/dataset_upload.py`,实现分片上传,计算 MD5 校验和,支持断点续传
-- [ ] [T048] [US2] FSx for Lustre 路径管理 - `backend/src/modules/datasets/application/services/fsx_service.py`,管理 FSx 挂载路径,自动同步 S3 到 FSx (≥5GB/s 吞吐量),数据预热逻辑
+- [X] [T047] [US2] S3 上传集成 - `backend/src/modules/datasets/application/services/dataset_upload_service.py`,实现分片上传,计算 MD5 校验和,支持断点续传 (数据库持久化)
+- [X] [T048] [US2] FSx for Lustre 路径管理 - `backend/src/modules/datasets/application/services/fsx_sync_service.py`,管理 FSx 挂载路径,自动同步 S3 到 FSx,数据预热逻辑
 
 ### 前端页面组件
 - [ ] [T049] [US2] [P] 数据集列表页面 - `frontend/src/features/datasets/pages/DatasetListPage.tsx`,使用 Cloudscape Table,支持搜索/过滤/排序,显示存储类型和大小,创建模块 API 层 `frontend/src/features/datasets/api/queries.ts`

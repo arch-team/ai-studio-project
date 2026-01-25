@@ -40,6 +40,10 @@ class Settings(BaseSettings):
     # HyperPod
     hyperpod_cluster_name: str | None = None
 
+    # FSx for Lustre
+    fsx_filesystem_id: str = "fs-placeholder"
+    fsx_mount_path: str = "/fsx"
+
     # MLflow (T037a)
     mlflow_tracking_uri: str = "http://mlflow.kubeflow.svc.cluster.local:5000"
     mlflow_experiment_prefix: str = "ai-training-platform"

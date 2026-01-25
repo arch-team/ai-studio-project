@@ -26,6 +26,9 @@ from src.shared.infrastructure.models import TimestampMixin
 
 if TYPE_CHECKING:
     from src.modules.auth.infrastructure.models import UserModel
+    from src.modules.datasets.infrastructure.models.upload_session_model import (
+        UploadSessionModel,
+    )
 
 
 class DatasetModel(Base, TimestampMixin):
@@ -139,6 +142,11 @@ class DatasetModel(Base, TimestampMixin):
     owner: Mapped["UserModel"] = relationship(
         "UserModel",
         back_populates="datasets",
+    )
+    upload_sessions: Mapped[list["UploadSessionModel"]] = relationship(
+        "UploadSessionModel",
+        back_populates="dataset",
+        cascade="all, delete-orphan",
     )
 
     __table_args__ = ({"comment": "数据集表"},)

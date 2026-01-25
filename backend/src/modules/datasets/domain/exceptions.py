@@ -67,3 +67,72 @@ class DatasetStorageError(Problem):
 
     dataset_id: int | None = None
     reason: str = "Unknown error"
+
+
+# ========== 上传相关异常 ==========
+
+
+@problem(
+    409,
+    "UPLOAD_SESSION_ACTIVE",
+    "Dataset {dataset_id} already has an active upload session: {upload_id}",
+)
+@dataclass
+class UploadSessionActiveError(Problem):
+    """数据集已有活跃上传会话."""
+
+    dataset_id: int
+    upload_id: str
+
+
+@problem(
+    404,
+    "UPLOAD_SESSION_NOT_FOUND",
+    "Upload session '{upload_id}' not found",
+)
+@dataclass
+class UploadSessionNotFoundError(Problem):
+    """上传会话未找到."""
+
+    upload_id: str
+
+
+@problem(
+    409,
+    "UPLOAD_INCOMPLETE",
+    "Upload {upload_id} is incomplete: missing parts {missing_parts}",
+)
+@dataclass
+class UploadIncompleteError(Problem):
+    """上传未完成."""
+
+    upload_id: str
+    missing_parts: list[int]
+
+
+# ========== FSx 相关异常 ==========
+
+
+@problem(
+    404,
+    "FSX_SYNC_TASK_NOT_FOUND",
+    "FSx sync task '{task_id}' not found",
+)
+@dataclass
+class FsxSyncTaskNotFoundError(Problem):
+    """FSx 同步任务未找到."""
+
+    task_id: str
+
+
+@problem(
+    500,
+    "FSX_SYNC_FAILED",
+    "FSx sync failed for dataset {dataset_id}: {reason}",
+)
+@dataclass
+class FsxSyncFailedError(Problem):
+    """FSx 同步失败."""
+
+    dataset_id: int | None = None
+    reason: str = "Unknown error"

@@ -7,11 +7,17 @@ from .dataset_enums import (
     DatasetType,
     DatasetVisibility,
 )
+from .upload_state import UploadPart, UploadSession, UploadStatus
 
 __all__ = [
+    # 数据集枚举
     "DatasetStorageType",
     "DatasetType",
     "DatasetVisibility",
     "DatasetStatus",
     "DATASET_STATUS_TRANSITIONS",
+    # 上传状态
+    "UploadStatus",
+    "UploadPart",
+    "UploadSession",
 ]
