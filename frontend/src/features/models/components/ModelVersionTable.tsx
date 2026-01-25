@@ -20,6 +20,8 @@ interface ModelVersionTableProps {
   selectedVersions: string[];
   onSelectionChange: (versions: string[]) => void;
   onCompare: () => void;
+  onRollback?: (version: string) => void;
+  currentVersion?: string;
   maxSelections?: number;
 }
 
@@ -47,6 +49,8 @@ export function ModelVersionTable({
   selectedVersions,
   onSelectionChange,
   onCompare,
+  onRollback,
+  currentVersion,
   maxSelections = 2,
 }: ModelVersionTableProps) {
   const handleCheckboxChange = (version: string, checked: boolean) => {
@@ -119,6 +123,22 @@ export function ModelVersionTable({
       id: 'created_at',
       header: '创建时间',
       cell: (item: ModelVersionSummary) => formatDateTime(item.created_at),
+    },
+    {
+      id: 'actions',
+      header: '操作',
+      cell: (item: ModelVersionSummary) => {
+        const isCurrentVersion = item.version === currentVersion;
+        return (
+          <Button
+            variant="inline-link"
+            onClick={() => onRollback?.(item.version)}
+            disabled={isCurrentVersion || !onRollback}
+          >
+            {isCurrentVersion ? '当前版本' : '回滚到此版本'}
+          </Button>
+        );
+      },
     },
   ];
 

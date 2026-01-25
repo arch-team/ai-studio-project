@@ -8,15 +8,17 @@ import {
   Box,
   Button,
   Container,
+  FormField,
   Header,
+  Input,
   Select,
   SpaceBetween,
 } from '@cloudscape-design/components';
 import { useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useModels } from '../api';
+import { useModels, useBatchArchiveModels } from '../api';
 import { ModelTable } from '../components';
-import type { ModelStatus, ModelFramework, ModelFilters } from '../types';
+import type { ModelStatus, ModelFramework, ModelFilters, ModelSummary } from '../types';
 import { MODEL_STATUS_LABELS, MODEL_FRAMEWORK_LABELS } from '../types';
 
 // 状态过滤选项
@@ -51,12 +53,18 @@ export function ModelListPage() {
   const [filters, setFilters] = useState<ModelFilters>(defaultFilters);
   const [selectedStatus, setSelectedStatus] = useState<string>('');
   const [selectedFramework, setSelectedFramework] = useState<string>('');
+  const [trainingJobIdFilter, setTrainingJobIdFilter] = useState<string>('');
+  const [selectedItems, setSelectedItems] = useState<ModelSummary[]>([]);
+
+  // 批量归档 mutation
+  const batchArchiveMutation = useBatchArchiveModels();
 
   // 构建查询参数
   const queryFilters: ModelFilters = {
     ...filters,
     status: selectedStatus ? (selectedStatus as ModelStatus) : undefined,
     framework: selectedFramework ? (selectedFramework as ModelFramework) : undefined,
+    training_job_id: trainingJobIdFilter ? parseInt(trainingJobIdFilter, 10) : undefined,
   };
 
   // 获取模型列表
@@ -79,6 +87,15 @@ export function ModelListPage() {
     setFilters((prev) => ({ ...prev, page: 1 }));
   }, []);
 
+  // 处理训练任务 ID 过滤变化
+  const handleTrainingJobIdChange = useCallback((value: string) => {
+    // 只允许数字输入
+    if (value === '' || /^\d+$/.test(value)) {
+      setTrainingJobIdFilter(value);
+      setFilters((prev) => ({ ...prev, page: 1 }));
+    }
+  }, []);
+
   // 跳转到模型详情
   const handleModelClick = useCallback(
     (modelId: number) => {
@@ -86,6 +103,15 @@ export function ModelListPage() {
     },
     [navigate]
   );
+
+  // 批量归档
+  const handleBatchArchive = useCallback(async () => {
+    if (selectedItems.length === 0) return;
+    const ids = selectedItems.map((item) => item.id);
+    await batchArchiveMutation.mutateAsync(ids);
+    setSelectedItems([]);
+    refetch();
+  }, [selectedItems, batchArchiveMutation, refetch]);
 
   // 错误状态
   if (error) {
@@ -104,9 +130,19 @@ export function ModelListPage() {
       <Header
         variant="h1"
         actions={
-          <Button iconName="refresh" onClick={() => refetch()}>
-            刷新
-          </Button>
+          <SpaceBetween direction="horizontal" size="xs">
+            {selectedItems.length > 0 && (
+              <Button
+                onClick={handleBatchArchive}
+                loading={batchArchiveMutation.isPending}
+              >
+                批量归档 ({selectedItems.length})
+              </Button>
+            )}
+            <Button iconName="refresh" onClick={() => refetch()}>
+              刷新
+            </Button>
+          </SpaceBetween>
         }
       >
         模型管理
@@ -137,6 +173,14 @@ export function ModelListPage() {
             options={frameworkOptions}
             placeholder="选择框架"
           />
+          <FormField label="训练任务 ID">
+            <Input
+              value={trainingJobIdFilter}
+              onChange={({ detail }) => handleTrainingJobIdChange(detail.value)}
+              placeholder="输入任务 ID"
+              type="number"
+            />
+          </FormField>
         </SpaceBetween>
       </Container>
 
@@ -149,6 +193,9 @@ export function ModelListPage() {
         totalPages={data?.total_pages || 1}
         onPageChange={handlePageChange}
         onModelClick={handleModelClick}
+        selectable
+        selectedItems={selectedItems}
+        onSelectionChange={setSelectedItems}
       />
     </SpaceBetween>
   );
