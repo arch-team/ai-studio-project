@@ -1,21 +1,25 @@
 """Auth Service Unit Tests."""
 
 from datetime import UTC, datetime, timedelta
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from src.modules.auth.application.services.auth_service import AuthResult, AuthService, TokenPair
-from src.shared.infrastructure.security import (
+from src.modules.auth.application.services.auth_service import (
+    AuthResult,
+    AuthService,
+    TokenPair,
+)
+from src.modules.auth.domain.entities.user import User
+from src.modules.auth.domain.exceptions import (
     AccountLockedError,
     InvalidCredentialsError,
     InvalidTokenError,
     PasswordExpiredError,
     TokenExpiredError,
 )
-from src.shared.infrastructure.security.constants import MAX_FAILED_LOGIN_ATTEMPTS
-from src.modules.auth.domain.entities.user import User
 from src.modules.auth.domain.value_objects import AuthType, UserRole, UserStatus
+from src.shared.infrastructure.security.constants import MAX_FAILED_LOGIN_ATTEMPTS
 
 # =============================================================================
 # Fixtures

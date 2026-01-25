@@ -6,12 +6,12 @@ from unittest.mock import AsyncMock
 import pytest
 
 from src.modules.auth.application.services.account_service import AccountService
-from src.shared.infrastructure.security import (
+from src.modules.auth.domain.entities.user import User
+from src.modules.auth.domain.exceptions import (
     InvalidCredentialsError,
     PasswordTooWeakError,
     UserNotFoundError,
 )
-from src.modules.auth.domain.entities.user import User
 from src.modules.auth.domain.value_objects import AuthType, UserRole, UserStatus
 
 

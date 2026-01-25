@@ -6,13 +6,13 @@ from unittest.mock import AsyncMock, patch
 import pytest
 
 from src.modules.auth.application.services.password_service import PasswordService
-from src.shared.infrastructure.security import (
+from src.modules.auth.domain.entities.user import User
+from src.modules.auth.domain.exceptions import (
     InvalidCredentialsError,
     InvalidTokenError,
     PasswordTooWeakError,
     TokenExpiredError,
 )
-from src.modules.auth.domain.entities.user import User
 from src.modules.auth.domain.value_objects import AuthType, UserRole, UserStatus
 
 
