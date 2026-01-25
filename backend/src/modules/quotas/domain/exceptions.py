@@ -41,6 +41,18 @@ class DuplicateConfigError(Problem):
     scope: str
 
 
+@problem(
+    409,
+    "DUPLICATE_QUOTA_NAME",
+    "ResourceQuota with name='{name}' already exists",
+)
+@dataclass
+class DuplicateQuotaNameError(Problem):
+    """配额名称重复."""
+
+    name: str
+
+
 # =============================================================================
 # 向后兼容别名 (deprecated)
 # =============================================================================

@@ -645,20 +645,20 @@
 - [X] [T054] 创建 HyperPodCluster 模型 - 领域实体 `backend/src/modules/monitoring/domain/entities/hyperpod_cluster.py` + ORM 模型 `backend/src/modules/monitoring/infrastructure/models/hyperpod_cluster_model.py`,包含状态转换逻辑、集群容量计算、健康检查方法,TDD 测试覆盖 41 个测试用例
 
 ### 后端 API 端点 (基于 contracts/users-api.yaml, resource-quotas-api.yaml, monitoring-api.yaml)
-- [ ] [T055] [US3] GET /users 端点实现 - `backend/src/modules/auth/api/endpoints.py`,支持分页、过滤 (role, status)、排序 (created_at)
-- [ ] [T056] [US3] POST /users 端点实现 - 验证用户信息,创建 IAM Identity Center 用户,分配默认配额
-- [ ] [T057] [US3] PUT /users/{id} 端点实现 - 更新用户角色、状态、配额关联
-- [ ] [T058] [US3] GET /resource-quotas 端点实现 - `backend/src/modules/quotas/api/endpoints.py`,返回所有配额模板
-- [ ] [T059] [US3] POST /resource-quotas 端点实现 - 创建配额模板,验证配额限制 (CPU, GPU, Memory, Storage)
-- [ ] [T060] [US3] PUT /resource-quotas/{id} 端点实现 - 更新配额限制,触发用户通知
-- [ ] [T061] [US3] GET /monitoring/metrics 端点实现 - `backend/src/modules/monitoring/api/endpoints.py`,查询 Prometheus 指标 (GPU 利用率,集群容量,任务队列长度),支持时间范围过滤
-- [ ] [T061a] [US3] GET /audit-logs 端点实现 - `backend/src/modules/audit/api/endpoints.py`,支持分页、过滤 (user_id, operation_type, resource_type, time_range)、排序 (created_at),返回审计日志列表,管理员权限
-- [ ] [T061b] [US3] DELETE /audit-logs/cleanup 端点实现 - 清理过期审计日志 (expires_at < now),管理员权限,定时任务调用,记录清理统计
+- [X] [T055] [US3] GET /users 端点实现 - `backend/src/modules/auth/api/endpoints.py`,支持分页、过滤 (role, status)、排序 (created_at)
+- [X] [T056] [US3] POST /users 端点实现 - 验证用户信息,创建 IAM Identity Center 用户,分配默认配额
+- [X] [T057] [US3] PUT /users/{id} 端点实现 - 更新用户角色、状态、配额关联
+- [X] [T058] [US3] GET /resource-quotas 端点实现 - `backend/src/modules/quotas/api/resource_quota_endpoints.py`,返回所有配额模板
+- [X] [T059] [US3] POST /resource-quotas 端点实现 - 创建配额模板,验证配额限制 (CPU, GPU, Memory, Storage)
+- [X] [T060] [US3] PUT /resource-quotas/{id} 端点实现 - 更新配额限制,触发用户通知
+- [X] [T061] [US3] GET /monitoring/metrics 端点实现 - `backend/src/modules/monitoring/api/endpoints.py`,查询 Prometheus 指标 (GPU 利用率,集群容量,任务队列长度),支持时间范围过滤
+- [X] [T061a] [US3] GET /audit-logs 端点实现 - `backend/src/modules/audit/api/endpoints.py`,支持分页、过滤 (user_id, operation_type, resource_type, time_range)、排序 (created_at),返回审计日志列表,管理员权限
+- [X] [T061b] [US3] DELETE /audit-logs/cleanup 端点实现 - 清理过期审计日志 (expires_at < now),管理员权限,定时任务调用,记录清理统计
   - **职责**: 提供 API 接口供自动清理服务 (T102a) 或管理员手动调用
   - **输出**: 返回清理统计 (清理条数、执行耗时、失败记录数)
 
 ### 监控集成服务
-- [ ] [T062] [US3] Prometheus 指标采集集成 - `backend/src/modules/monitoring/application/services/prometheus_service.py`,封装 Prometheus HTTP API,查询 HyperPod Observability Add-on 指标,实现 ≤30秒刷新频率:
+- [X] [T062] [US3] Prometheus 指标采集集成 - `backend/src/modules/monitoring/application/services/prometheus_service.py`,封装 Prometheus HTTP API,查询 HyperPod Observability Add-on 指标,实现 ≤30秒刷新频率:
   - **存储容量监控 (FR-020)**: 采集 NVMe 和 FSx for Lustre 二层存储使用率指标,配置三级阈值告警:
     - **警告级别 (80%)**: 发送邮件通知管理员,触发加速检查点迁移到下一层
     - **严重级别 (90%)**: 触发紧急迁移 (参见 FR-011),暂停新检查点创建 (保留最近 1 个)
@@ -667,11 +667,11 @@
   - **网络性能监控 (FR-021)**: 采集 EFA 网络吞吐量、延迟指标 (node_network_receive/transmit_bytes_total),监控 Pod 间网络延迟 P99,配置告警 (延迟 >10ms 或带宽利用率 <80% 触发)
   - **告警规则配置**: 创建 Prometheus AlertManager 规则 (`infrastructure/prometheus/alerts/storage-alerts.yaml`, `infrastructure/prometheus/alerts/network-alerts.yaml`),定义存储三级告警和网络告警条件
   - **参考**: spec.md FR-020 存储容量监控 (三级阈值), FR-021 网络带宽管理和 QoS 策略
-- [ ] [T063] [US3] Grafana 仪表盘配置 - 创建 Grafana dashboard JSON 配置 (`infrastructure/grafana/dashboards/hyperpod-overview.json`),展示集群健康、资源利用率、训练任务分布
-- [ ] [T068] [US3] 集群健康检查服务 - `backend/src/modules/monitoring/application/services/cluster_health_service.py`,定时任务 (1分钟) 检查 HyperPod 集群状态,更新 hyperpod_clusters 表,触发告警
+- [X] [T063] [US3] Grafana 仪表盘配置 - 创建 Grafana dashboard JSON 配置 (`infrastructure/grafana/dashboards/hyperpod-overview.json`),展示集群健康、资源利用率、训练任务分布
+- [X] [T068] [US3] 集群健康检查服务 - `backend/src/modules/monitoring/application/services/cluster_health_service.py`,定时任务 (1分钟) 检查 HyperPod 集群状态,更新 hyperpod_clusters 表,触发告警
 
 ### 训练指标服务 (FR-026)
-- [ ] [T220] [US1] 训练指标查询服务 - `backend/src/modules/training/application/services/training_metrics_service.py`,扩展 Prometheus API 封装,专门查询训练相关指标 (Loss, Accuracy, Learning Rate, Throughput),支持时间范围过滤和多任务对比:
+- [X] [T220] [US1] 训练指标查询服务 - `backend/src/modules/training/application/services/training_metrics_service.py`,扩展 Prometheus API 封装,专门查询训练相关指标 (Loss, Accuracy, Learning Rate, Throughput),支持时间范围过滤和多任务对比:
   - **训练曲线数据**: 查询 Prometheus `/api/v1/query_range` 获取时序数据,支持 step 参数调整精度
   - **指标聚合**: 支持 avg/max/min/last 聚合函数
   - **缓存策略**: 已完成任务的指标数据缓存 1 小时,减少 Prometheus 查询压力

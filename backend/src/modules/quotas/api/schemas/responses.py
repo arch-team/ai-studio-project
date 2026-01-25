@@ -60,3 +60,64 @@ class ResourceLimitConfigListResponse(BaseModel):
     page: int
     page_size: int
     total_pages: int
+
+
+# =============================================================================
+# ResourceQuota Schemas (T058-T060)
+# =============================================================================
+
+
+class QuotaTypeEnum(str, Enum):
+    """Quota type enumeration."""
+
+    USER = "user"
+    TEAM = "team"
+    PROJECT = "project"
+
+
+class QuotaStatusEnum(str, Enum):
+    """Quota status enumeration."""
+
+    ACTIVE = "active"
+    SUSPENDED = "suspended"
+    EXPIRED = "expired"
+
+
+class ResourceQuotaResponse(AutoMappingEntitySchema["ResourceQuota"]):
+    """Resource quota response schema."""
+
+    id: int
+    name: str
+    description: str | None = None
+    quota_type: QuotaTypeEnum
+    max_cpu_cores: int
+    reserved_cpu_cores: int
+    max_gpu_count: int
+    reserved_gpu_count: int
+    gpu_types: list[str] | None = None
+    max_memory_gb: int
+    reserved_memory_gb: int
+    max_storage_gb: int | None = None
+    max_concurrent_jobs: int
+    max_total_jobs: int | None = None
+    max_spot_instances: int
+    status: QuotaStatusEnum
+    valid_from: datetime
+    valid_until: datetime | None = None
+    created_at: datetime
+    updated_at: datetime
+
+    _enum_mappings: ClassVar[dict[str, type[Enum]]] = {
+        "quota_type": QuotaTypeEnum,
+        "status": QuotaStatusEnum,
+    }
+
+
+class ResourceQuotaListResponse(BaseModel):
+    """Paginated list of resource quotas."""
+
+    items: list[ResourceQuotaResponse]
+    total: int
+    page: int
+    page_size: int
+    total_pages: int

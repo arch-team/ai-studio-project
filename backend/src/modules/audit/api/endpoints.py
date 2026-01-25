@@ -1,4 +1,4 @@
-"""Audit API endpoints."""
+"""Audit API endpoints (T061a, T061b)."""
 
 from datetime import datetime
 
@@ -7,8 +7,10 @@ from fastapi import APIRouter, Depends, Query
 from src.modules.audit.application import AuditService
 from src.modules.audit.domain.entities import AuditLog
 from src.modules.audit.domain.value_objects import ResourceType
+from src.modules.auth.api.current_user import CurrentUser
 from src.modules.auth.api.dependencies import require_admin
 from src.shared.api import PageParam, PageSizeParam, build_paginated_response
+from src.shared.api.pagination import SortOrder, SortOrderParam
 from src.shared.domain import EntityNotFoundError
 from src.shared.utils import calculate_offset
 
@@ -101,13 +103,20 @@ async def get_audit_logs(
     page: PageParam = 1,
     page_size: PageSizeParam = 20,
     user_id: int | None = Query(default=None, description="用户ID过滤"),
+    operation_type: str | None = Query(default=None, description="操作类型过滤"),
     resource_type: str | None = Query(default=None, description="资源类型过滤"),
     resource_id: str | None = Query(default=None, description="资源ID过滤"),
     start_date: datetime | None = Query(default=None, description="开始日期"),
     end_date: datetime | None = Query(default=None, description="结束日期"),
+    sort_order: SortOrderParam = SortOrder.DESC,
+    current_user: CurrentUser = Depends(require_admin),
     service: AuditService = Depends(get_audit_service),
 ) -> AuditLogListResponse:
-    """获取审计日志（支持过滤）."""
+    """获取审计日志 (T061a).
+
+    支持分页、多条件过滤 (user_id, operation_type, resource_type, time_range)、排序。
+    仅管理员权限。
+    """
     offset = calculate_offset(page, page_size)
 
     # 根据过滤条件选择查询策略
@@ -123,6 +132,10 @@ async def get_audit_logs(
         )
     else:
         logs, total = await _get_all_logs(service, page_size, offset)
+
+    # 客户端排序 (按 created_at)
+    reverse = sort_order == SortOrder.DESC
+    logs = sorted(logs, key=lambda x: x.created_at, reverse=reverse)
 
     return AuditLogListResponse(
         **build_paginated_response(
@@ -156,12 +169,16 @@ async def get_audit_log_count(
     return AuditLogCountResponse(count=count)
 
 
-@router.delete("/expired", response_model=CleanupResultResponse)
+@router.delete("/cleanup", response_model=CleanupResultResponse)
 async def cleanup_expired_logs(
+    current_user: CurrentUser = Depends(require_admin),
     service: AuditService = Depends(get_audit_service),
-    _: None = Depends(require_admin),  # 管理员权限检查
 ) -> CleanupResultResponse:
-    """删除过期的审计日志（仅管理员）."""
+    """清理过期的审计日志 (T061b).
+
+    删除 expires_at < now 的审计日志记录。
+    仅管理员权限。返回清理统计信息。
+    """
     deleted_count = await service.cleanup_expired_logs()
     return CleanupResultResponse(
         deleted_count=deleted_count,

@@ -12,7 +12,7 @@ from src.shared.infrastructure import Base
 from src.shared.utils import utc_now
 
 if TYPE_CHECKING:
-    from src.modules.auth.infrastructure.models import UserModel
+    pass
 
 
 class OperationType(enum.Enum):

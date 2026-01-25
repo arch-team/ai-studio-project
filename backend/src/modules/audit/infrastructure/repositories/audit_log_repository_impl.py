@@ -1,12 +1,10 @@
 """Audit log repository implementation."""
 
 from datetime import datetime
-from uuid import UUID
 
 from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.shared.infrastructure.repository_base import EnhancedBaseRepository
 from src.modules.audit.domain.entities import AuditLog
 from src.modules.audit.domain.repositories import IAuditLogRepository
 from src.modules.audit.domain.value_objects import (
@@ -18,6 +16,7 @@ from src.modules.audit.infrastructure.models import AuditLogModel
 from src.modules.audit.infrastructure.models import AuditStatus as ModelAuditStatus
 from src.modules.audit.infrastructure.models import OperationType as ModelOperationType
 from src.modules.audit.infrastructure.models import ResourceType as ModelResourceType
+from src.shared.infrastructure.repository_base import EnhancedBaseRepository
 from src.shared.utils import utc_now
 
 

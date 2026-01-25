@@ -13,6 +13,7 @@ from src.modules.training.api.endpoints import router as training_router
 from src.modules.training.api.job_templates import router as job_templates_router
 from src.modules.models.api.endpoints import router as models_router
 from src.modules.quotas.api.endpoints import router as quotas_router
+from src.modules.quotas.api.resource_quota_endpoints import router as resource_quotas_router
 from src.modules.datasets.api.endpoints import router as datasets_router
 from src.modules.spaces.api.endpoints import router as spaces_router
 from src.modules.audit.api.endpoints import router as audit_router
@@ -28,6 +29,7 @@ api_router.include_router(training_router, prefix="/training-jobs", tags=["训�
 api_router.include_router(job_templates_router, prefix="/job-templates", tags=["任务模板"])
 api_router.include_router(models_router, prefix="/models", tags=["模型"])
 api_router.include_router(quotas_router, prefix="/resource-limit-configs", tags=["资源限制配置"])
+api_router.include_router(resource_quotas_router, prefix="/resource-quotas", tags=["资源配额"])
 api_router.include_router(datasets_router, prefix="/datasets", tags=["数据集"])
 api_router.include_router(spaces_router, prefix="/spaces", tags=["开发空间"])
 api_router.include_router(audit_router, prefix="/audit-logs", tags=["审计日志"])

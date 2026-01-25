@@ -1,21 +1,38 @@
 """Quotas API schemas - Pydantic request/response models."""
 
-from .requests import CreateResourceLimitConfigRequest, UpdateResourceLimitConfigRequest
+from .requests import (
+    CreateResourceLimitConfigRequest,
+    CreateResourceQuotaRequest,
+    UpdateResourceLimitConfigRequest,
+    UpdateResourceQuotaRequest,
+)
 from .responses import (
     LimitRoleEnum,
     PriorityDefaultEnum,
+    QuotaStatusEnum,
+    QuotaTypeEnum,
     ResourceLimitConfigListResponse,
     ResourceLimitConfigResponse,
+    ResourceQuotaListResponse,
+    ResourceQuotaResponse,
 )
 
 __all__ = [
     # Enums
     "LimitRoleEnum",
     "PriorityDefaultEnum",
-    # Requests
+    "QuotaTypeEnum",
+    "QuotaStatusEnum",
+    # ResourceLimitConfig Requests
     "CreateResourceLimitConfigRequest",
     "UpdateResourceLimitConfigRequest",
-    # Responses
+    # ResourceLimitConfig Responses
     "ResourceLimitConfigResponse",
     "ResourceLimitConfigListResponse",
+    # ResourceQuota Requests (T058-T060)
+    "CreateResourceQuotaRequest",
+    "UpdateResourceQuotaRequest",
+    # ResourceQuota Responses (T058-T060)
+    "ResourceQuotaResponse",
+    "ResourceQuotaListResponse",
 ]
