@@ -639,10 +639,10 @@
 **用户故事**: 平台管理员配置资源配额、监控集群和查询审计日志
 
 ### 数据表迁移
-- [ ] [T053] 创建 hyperpod_clusters 表迁移 - `backend/alembic/versions/006_create_hyperpod_clusters.py`,字段: id, cluster_name, cluster_arn, region, status (enum: active/inactive/error), instance_types (JSON), capacity (JSON), created_at, updated_at
+- [X] [T053] 创建 hyperpod_clusters 表迁移 - `backend/alembic/versions/20260126_100000_create_hyperpod_clusters.py`,字段: id, cluster_name, cluster_arn, region, vpc_id, instance_groups (JSON), total_nodes, available_nodes, total_cpu_cores, total_gpu_count, total_memory_gb, status (enum: creating/active/updating/deleting/failed), health_status (enum: healthy/degraded/unhealthy), fsx_filesystem_id, fsx_mount_point, prometheus_endpoint, grafana_workspace_id, created_at, updated_at, last_sync_at
 
 ### SQLAlchemy 模型
-- [ ] [T054] 创建 HyperPodCluster 模型 - 领域实体 `backend/src/modules/monitoring/domain/entities/hyperpod_cluster.py` + ORM 模型 `backend/src/modules/monitoring/infrastructure/models/hyperpod_cluster_model.py`,包含集群容量计算逻辑,关联 TrainingJob
+- [X] [T054] 创建 HyperPodCluster 模型 - 领域实体 `backend/src/modules/monitoring/domain/entities/hyperpod_cluster.py` + ORM 模型 `backend/src/modules/monitoring/infrastructure/models/hyperpod_cluster_model.py`,包含状态转换逻辑、集群容量计算、健康检查方法,TDD 测试覆盖 41 个测试用例
 
 ### 后端 API 端点 (基于 contracts/users-api.yaml, resource-quotas-api.yaml, monitoring-api.yaml)
 - [ ] [T055] [US3] GET /users 端点实现 - `backend/src/modules/auth/api/endpoints.py`,支持分页、过滤 (role, status)、排序 (created_at)

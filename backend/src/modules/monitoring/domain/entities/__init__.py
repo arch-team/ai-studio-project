@@ -1,3 +1,7 @@
-"""Monitoring domain entities (skeleton)."""
+"""Monitoring domain entities."""
 
-__all__ = []
+from .hyperpod_cluster import HyperPodCluster
+
+__all__ = [
+    "HyperPodCluster",
+]

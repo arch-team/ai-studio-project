@@ -1,3 +1,7 @@
-"""Monitoring infrastructure ORM models (skeleton)."""
+"""Monitoring infrastructure models."""
 
-__all__ = []
+from .hyperpod_cluster_model import HyperPodClusterModel
+
+__all__ = [
+    "HyperPodClusterModel",
+]
