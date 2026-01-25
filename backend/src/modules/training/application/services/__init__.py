@@ -11,6 +11,13 @@ from .hyperpod_service import (
     build_job_config,
 )
 from .mlflow_service import MLflowService, MLflowServiceError
+from .training_metrics_service import (
+    TrainingMetricsService,
+    TrainingMetricsResult,
+    JobMetricsComparison,
+    JobMetricsData,
+    MetricPoint,
+)
 
 __all__ = [
     "TrainingJobService",
@@ -23,4 +30,10 @@ __all__ = [
     "build_job_config",
     "MLflowService",
     "MLflowServiceError",
+    # T220: 训练指标服务
+    "TrainingMetricsService",
+    "TrainingMetricsResult",
+    "JobMetricsComparison",
+    "JobMetricsData",
+    "MetricPoint",
 ]

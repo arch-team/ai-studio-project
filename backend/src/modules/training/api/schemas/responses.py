@@ -76,6 +76,7 @@ class TrainingJobSummary(AutoMappingEntitySchema["TrainingJob"]):
     node_count: int
     current_epoch: int | None = None
     latest_loss: Decimal | None = None
+    preemption_count: int = 0
     created_at: datetime
     started_at: datetime | None = None
 
@@ -99,6 +100,8 @@ class TrainingJobDetail(TrainingJobSummary):
     latest_accuracy: Decimal | None = None
     total_gpu_hours: Decimal | None = None
     estimated_cost_usd: Decimal | None = None
+    kueue_status: str | None = None
+    kueue_workload_name: str | None = None
     error_message: str | None = None
     completed_at: datetime | None = None
 
