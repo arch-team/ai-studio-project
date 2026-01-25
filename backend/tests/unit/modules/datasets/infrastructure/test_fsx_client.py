@@ -1,8 +1,31 @@
-"""测试 FSx for Lustre 客户端。"""
+"""测试 FSx for Lustre 客户端。
 
-from unittest.mock import MagicMock, patch
+使用 aioboto3 原生异步模式进行测试。
+"""
+
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+
+
+class AsyncContextManagerMock:
+    """异步上下文管理器 Mock，用于模拟 aioboto3 客户端。"""
+
+    def __init__(self, mock_client: MagicMock) -> None:
+        self.mock_client = mock_client
+
+    async def __aenter__(self) -> MagicMock:
+        return self.mock_client
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb) -> None:
+        pass
+
+
+def create_mock_session(mock_fsx_client: MagicMock) -> MagicMock:
+    """创建 mock aioboto3.Session，返回异步上下文管理器客户端。"""
+    mock_session = MagicMock()
+    mock_session.client.return_value = AsyncContextManagerMock(mock_fsx_client)
+    return mock_session
 
 
 class TestFsxClientInit:
@@ -12,7 +35,9 @@ class TestFsxClientInit:
         """验证使用 filesystem_id 初始化。"""
         from src.modules.datasets.infrastructure.fsx import FsxClient
 
-        with patch("boto3.client") as mock_boto:
+        with patch("aioboto3.Session") as mock_session_class:
+            mock_session_class.return_value = MagicMock()
+
             client = FsxClient(
                 filesystem_id="fs-123456789",
                 region="us-west-2",
@@ -20,13 +45,13 @@ class TestFsxClientInit:
 
             assert client._filesystem_id == "fs-123456789"
             assert client._region == "us-west-2"
-            mock_boto.assert_called_once_with("fsx", region_name="us-west-2")
+            mock_session_class.assert_called_once()
 
     def test_init_with_mount_path(self) -> None:
         """验证设置挂载路径。"""
         from src.modules.datasets.infrastructure.fsx import FsxClient
 
-        with patch("boto3.client"):
+        with patch("aioboto3.Session"):
             client = FsxClient(
                 filesystem_id="fs-123456789",
                 region="us-west-2",
@@ -44,9 +69,9 @@ class TestFsxClientCreateImportTask:
         """验证成功创建导入任务。"""
         from src.modules.datasets.infrastructure.fsx import FsxClient
 
-        with patch("boto3.client") as mock_boto:
-            mock_fsx = MagicMock()
-            mock_fsx.create_data_repository_task.return_value = {
+        mock_fsx = MagicMock()
+        mock_fsx.create_data_repository_task = AsyncMock(
+            return_value={
                 "DataRepositoryTask": {
                     "TaskId": "task-123",
                     "Lifecycle": "PENDING",
@@ -55,7 +80,10 @@ class TestFsxClientCreateImportTask:
                     "FileSystemId": "fs-123456789",
                 }
             }
-            mock_boto.return_value = mock_fsx
+        )
+
+        with patch("aioboto3.Session") as mock_session_class:
+            mock_session_class.return_value = create_mock_session(mock_fsx)
 
             client = FsxClient(
                 filesystem_id="fs-123456789",
@@ -76,15 +104,18 @@ class TestFsxClientCreateImportTask:
         """验证创建带报告的导入任务。"""
         from src.modules.datasets.infrastructure.fsx import FsxClient
 
-        with patch("boto3.client") as mock_boto:
-            mock_fsx = MagicMock()
-            mock_fsx.create_data_repository_task.return_value = {
+        mock_fsx = MagicMock()
+        mock_fsx.create_data_repository_task = AsyncMock(
+            return_value={
                 "DataRepositoryTask": {
                     "TaskId": "task-456",
                     "Lifecycle": "PENDING",
                 }
             }
-            mock_boto.return_value = mock_fsx
+        )
+
+        with patch("aioboto3.Session") as mock_session_class:
+            mock_session_class.return_value = create_mock_session(mock_fsx)
 
             client = FsxClient(
                 filesystem_id="fs-123456789",
@@ -109,16 +140,19 @@ class TestFsxClientCreateReleaseTask:
         """验证成功创建释放任务。"""
         from src.modules.datasets.infrastructure.fsx import FsxClient
 
-        with patch("boto3.client") as mock_boto:
-            mock_fsx = MagicMock()
-            mock_fsx.create_data_repository_task.return_value = {
+        mock_fsx = MagicMock()
+        mock_fsx.create_data_repository_task = AsyncMock(
+            return_value={
                 "DataRepositoryTask": {
                     "TaskId": "task-789",
                     "Lifecycle": "PENDING",
                     "Type": "RELEASE_DATA_FROM_FILESYSTEM",
                 }
             }
-            mock_boto.return_value = mock_fsx
+        )
+
+        with patch("aioboto3.Session") as mock_session_class:
+            mock_session_class.return_value = create_mock_session(mock_fsx)
 
             client = FsxClient(
                 filesystem_id="fs-123456789",
@@ -140,9 +174,9 @@ class TestFsxClientGetTaskStatus:
         """验证获取任务状态。"""
         from src.modules.datasets.infrastructure.fsx import FsxClient
 
-        with patch("boto3.client") as mock_boto:
-            mock_fsx = MagicMock()
-            mock_fsx.describe_data_repository_tasks.return_value = {
+        mock_fsx = MagicMock()
+        mock_fsx.describe_data_repository_tasks = AsyncMock(
+            return_value={
                 "DataRepositoryTasks": [
                     {
                         "TaskId": "task-123",
@@ -156,7 +190,10 @@ class TestFsxClientGetTaskStatus:
                     }
                 ]
             }
-            mock_boto.return_value = mock_fsx
+        )
+
+        with patch("aioboto3.Session") as mock_session_class:
+            mock_session_class.return_value = create_mock_session(mock_fsx)
 
             client = FsxClient(
                 filesystem_id="fs-123456789",
@@ -173,12 +210,13 @@ class TestFsxClientGetTaskStatus:
         """验证任务不存在时返回 None。"""
         from src.modules.datasets.infrastructure.fsx import FsxClient
 
-        with patch("boto3.client") as mock_boto:
-            mock_fsx = MagicMock()
-            mock_fsx.describe_data_repository_tasks.return_value = {
-                "DataRepositoryTasks": []
-            }
-            mock_boto.return_value = mock_fsx
+        mock_fsx = MagicMock()
+        mock_fsx.describe_data_repository_tasks = AsyncMock(
+            return_value={"DataRepositoryTasks": []}
+        )
+
+        with patch("aioboto3.Session") as mock_session_class:
+            mock_session_class.return_value = create_mock_session(mock_fsx)
 
             client = FsxClient(
                 filesystem_id="fs-123456789",
@@ -197,7 +235,7 @@ class TestFsxClientPathMapping:
         """验证获取数据集的 FSx 路径。"""
         from src.modules.datasets.infrastructure.fsx import FsxClient
 
-        with patch("boto3.client"):
+        with patch("aioboto3.Session"):
             client = FsxClient(
                 filesystem_id="fs-123456789",
                 region="us-west-2",
@@ -212,7 +250,7 @@ class TestFsxClientPathMapping:
         """验证获取数据集的 S3 路径。"""
         from src.modules.datasets.infrastructure.fsx import FsxClient
 
-        with patch("boto3.client"):
+        with patch("aioboto3.Session"):
             client = FsxClient(
                 filesystem_id="fs-123456789",
                 region="us-west-2",
@@ -232,9 +270,9 @@ class TestFsxClientDescribeFilesystem:
         """验证获取文件系统信息。"""
         from src.modules.datasets.infrastructure.fsx import FsxClient
 
-        with patch("boto3.client") as mock_boto:
-            mock_fsx = MagicMock()
-            mock_fsx.describe_file_systems.return_value = {
+        mock_fsx = MagicMock()
+        mock_fsx.describe_file_systems = AsyncMock(
+            return_value={
                 "FileSystems": [
                     {
                         "FileSystemId": "fs-123456789",
@@ -248,7 +286,10 @@ class TestFsxClientDescribeFilesystem:
                     }
                 ]
             }
-            mock_boto.return_value = mock_fsx
+        )
+
+        with patch("aioboto3.Session") as mock_session_class:
+            mock_session_class.return_value = create_mock_session(mock_fsx)
 
             client = FsxClient(
                 filesystem_id="fs-123456789",

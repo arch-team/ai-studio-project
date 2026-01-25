@@ -14,16 +14,10 @@ def check_resource_owner_or_privileged(
     resource_type: str = "resource",
     action: str = "access",
 ) -> None:
-    """Check if user owns the resource or has privileged access.
-
-    Args:
-        resource_owner_id: The owner ID of the resource
-        current_user: The authenticated user
-        resource_type: Human-readable resource name for error messages
-        action: Action being performed (e.g., "view", "edit", "delete")
+    """检查用户是否拥有资源或具有特权访问权限。
 
     Raises:
-        HTTPException: 403 if user lacks permission
+        HTTPException: 403 如果用户无权限
     """
     if is_privileged_user(current_user):
         return
@@ -36,14 +30,14 @@ def check_resource_owner_or_privileged(
 
 
 def is_privileged_user(current_user: CurrentUser) -> bool:
-    """Check if user has privileged (admin/manager) access."""
+    """检查用户是否具有特权角色（admin/project_manager）。"""
     return current_user.role in PRIVILEGED_ROLES
 
 
 def get_owner_filter(current_user: CurrentUser) -> int | None:
-    """Get owner_id filter for list queries.
+    """获取列表查询的 owner_id 过滤条件。
 
-    Returns None for privileged users (no filter), or user_id for regular users.
+    特权用户返回 None（不过滤），普通用户返回自己的 user_id。
     """
     if is_privileged_user(current_user):
         return None

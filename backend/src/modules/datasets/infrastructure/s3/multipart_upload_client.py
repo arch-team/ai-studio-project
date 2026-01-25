@@ -20,7 +20,36 @@ from botocore.exceptions import ClientError
 # 分片大小常量（用于优化上传性能）
 DEFAULT_PART_SIZE = 100 * 1024 * 1024  # 100MB (满足 FR-006：≥100MB/s 上传速度)
 MIN_PART_SIZE = 5 * 1024 * 1024  # 5MB (S3 最小分片大小限制)
-MAX_PARTS = 10000  # S3 最大分片数限制 → 支持最大 1PB 文件 (100MB × 10000)
+MAX_PART_SIZE = 5 * 1024 * 1024 * 1024  # 5GB (S3 最大分片大小限制)
+MAX_PARTS = 10000  # S3 最大分片数限制
+MAX_SINGLE_FILE_SIZE = 5 * 1024 * 1024 * 1024 * 1024  # 5TB (S3 单文件最大限制)
+
+
+def calculate_optimal_part_size(file_size: int) -> int:
+    """根据文件大小计算最优分片大小。
+
+    策略:
+    - 文件 ≤1TB: 使用 100MB 分片 (≤10000 parts)
+    - 文件 1-5TB: 动态调整分片大小确保 parts ≤10000
+
+    Raises:
+        ValueError: 文件超过 S3 5TB 单文件限制
+    """
+    if file_size > MAX_SINGLE_FILE_SIZE:
+        raise ValueError(
+            f"File size {file_size} exceeds S3 maximum single file size of 5TB"
+        )
+
+    # 如果使用默认分片大小可以满足，则使用默认值
+    if file_size <= DEFAULT_PART_SIZE * MAX_PARTS:
+        return DEFAULT_PART_SIZE
+
+    # 计算所需的最小分片大小 (向上取整到 1MB 边界)
+    min_required = (file_size + MAX_PARTS - 1) // MAX_PARTS
+    # 对齐到 1MB 边界以优化传输
+    aligned_size = ((min_required + 1024 * 1024 - 1) // (1024 * 1024)) * (1024 * 1024)
+
+    return min(aligned_size, MAX_PART_SIZE)
 
 
 class S3MultipartUploadError(Exception):
@@ -30,11 +59,7 @@ class S3MultipartUploadError(Exception):
 
 
 class S3MultipartClient:
-    """S3 分片上传客户端。
-
-    封装 aioboto3 S3 客户端，提供原生异步分片上传操作。
-    每个操作使用 async with 创建临时客户端 (aioboto3 推荐模式)。
-    """
+    """S3 分片上传客户端。"""
 
     def __init__(
         self,
@@ -42,13 +67,6 @@ class S3MultipartClient:
         region: str = "us-west-2",
         kms_key_id: str | None = None,
     ) -> None:
-        """初始化 S3 分片上传客户端。
-
-        Args:
-            bucket_name: S3 桶名
-            region: AWS 区域
-            kms_key_id: 可选的 KMS 密钥 ID (用于 SSE-KMS 加密)
-        """
         self._bucket_name = bucket_name
         self._region = region
         self._kms_key_id = kms_key_id
@@ -61,14 +79,6 @@ class S3MultipartClient:
         metadata: dict[str, str] | None = None,
     ) -> dict[str, Any]:
         """初始化分片上传。
-
-        Args:
-            key: S3 对象键
-            content_type: MIME 类型
-            metadata: 可选的用户元数据
-
-        Returns:
-            包含 UploadId 的响应字典
 
         Raises:
             S3MultipartUploadError: 创建失败时

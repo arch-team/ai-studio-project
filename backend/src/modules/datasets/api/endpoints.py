@@ -1,7 +1,5 @@
 """数据集 API 端点 - 提供数据集的 CRUD 操作。"""
 
-from typing import Any
-
 from fastapi import APIRouter, Depends, Query, status
 
 from src.modules.auth.api.current_user import CurrentUser
@@ -14,8 +12,13 @@ from src.modules.datasets.api.dependencies import (
     get_dataset_service,
     get_dataset_upload_service,
     get_fsx_sync_service,
+    get_owned_dataset,
+    get_owned_dataset_for_fsx,
+    get_owned_dataset_for_upload,
 )
 from src.modules.datasets.api.schemas import (
+    # 上传相关
+    CompleteUploadResponse,
     # 数据集基础
     CreateDatasetRequest,
     CreateDatasetVersionRequest,
@@ -26,29 +29,28 @@ from src.modules.datasets.api.schemas import (
     DatasetSummary,
     DatasetTypeEnum,
     DatasetVisibilityEnum,
-    UpdateDatasetRequest,
-    # 上传相关
-    CompleteUploadResponse,
-    GeneratePresignedUrlsRequest,
-    InitiateUploadRequest,
-    InitiateUploadResponse,
-    PresignedUrlItem,
-    PresignedUrlsResponse,
-    RegisterPartRequest,
-    UploadProgressResponse,
-    UploadStatusEnum,
     # FSx 同步
     FsxAvailabilityResponse,
     FsxPathResponse,
     FsxSyncResponse,
     FsxSyncStatusResponse,
+    GeneratePresignedUrlsRequest,
+    InitiateUploadRequest,
+    InitiateUploadResponse,
     PrefetchDatasetRequest,
+    PresignedUrlItem,
+    PresignedUrlsResponse,
+    RegisterPartRequest,
+    UpdateDatasetRequest,
+    UploadProgressResponse,
+    UploadStatusEnum,
 )
 from src.modules.datasets.application.services import (
     DatasetService,
     DatasetUploadService,
     FsxSyncService,
 )
+from src.modules.datasets.domain.entities import Dataset
 from src.modules.datasets.domain.value_objects import (
     DatasetStatus,
     DatasetType,
@@ -65,34 +67,6 @@ from src.shared.api.pagination import (
 from src.shared.utils import EnumMapper
 
 router = APIRouter()
-
-
-async def _verify_dataset_permission(
-    dataset_id: int,
-    current_user: CurrentUser,
-    service: DatasetService,
-    action: str,
-) -> Any:
-    """验证数据集权限的辅助函数。
-
-    Args:
-        dataset_id: 数据集 ID
-        current_user: 当前用户
-        service: 数据集服务
-        action: 操作描述
-
-    Returns:
-        数据集实体
-
-    Raises:
-        DatasetNotFoundError: 数据集不存在
-        PermissionDenied: 无权限
-    """
-    dataset = await service.get_dataset(dataset_id)
-    check_resource_owner_or_privileged(
-        dataset.owner_id, current_user, "dataset", action
-    )
-    return dataset
 
 
 @router.post(
@@ -200,22 +174,16 @@ async def get_dataset(
     response_model=DatasetDetail,
 )
 async def update_dataset(
-    dataset_id: int,
     data: UpdateDatasetRequest,
-    current_user: CurrentUser = Depends(require_engineer),
+    dataset: Dataset = Depends(get_owned_dataset),
     service: DatasetService = Depends(get_dataset_service),
 ):
-    """更新数据集元数据。
-
-    仅支持更新描述、标签和可见性。
-    """
-    await _verify_dataset_permission(dataset_id, current_user, service, "update")
-
-    dataset = await service.update_dataset(
-        dataset_id=dataset_id,
+    """更新数据集元数据。"""
+    updated = await service.update_dataset(
+        dataset_id=dataset.id,
         data=data.model_dump(exclude_unset=True, mode="json"),
     )
-    return DatasetDetail.from_entity(dataset)
+    return DatasetDetail.from_entity(updated)
 
 
 @router.delete(
@@ -223,16 +191,11 @@ async def update_dataset(
     status_code=status.HTTP_204_NO_CONTENT,
 )
 async def delete_dataset(
-    dataset_id: int,
-    current_user: CurrentUser = Depends(require_engineer),
+    dataset: Dataset = Depends(get_owned_dataset),
     service: DatasetService = Depends(get_dataset_service),
 ):
-    """删除（归档）数据集。
-
-    软删除数据集，将其状态设置为 ARCHIVED。
-    """
-    await _verify_dataset_permission(dataset_id, current_user, service, "delete")
-    await service.delete_dataset(dataset_id)
+    """删除（归档）数据集。"""
+    await service.delete_dataset(dataset.id)
     return None
 
 
@@ -242,19 +205,13 @@ async def delete_dataset(
     status_code=status.HTTP_201_CREATED,
 )
 async def create_dataset_version(
-    dataset_id: int,
     data: CreateDatasetVersionRequest,
-    current_user: CurrentUser = Depends(require_engineer),
+    dataset: Dataset = Depends(get_owned_dataset),
     service: DatasetService = Depends(get_dataset_service),
 ):
-    """创建数据集的新版本。
-
-    创建一个具有相同名称但不同版本的新数据集条目。
-    """
-    await _verify_dataset_permission(dataset_id, current_user, service, "create version of")
-
+    """创建数据集的新版本。"""
     new_dataset = await service.create_version(
-        dataset_id=dataset_id,
+        dataset_id=dataset.id,
         version=data.version,
         storage_uri=data.storage_uri,
         description=data.description,
@@ -277,20 +234,14 @@ async def health_check() -> dict[str, str]:
     status_code=status.HTTP_201_CREATED,
 )
 async def initiate_upload(
-    dataset_id: int,
     data: InitiateUploadRequest,
+    dataset: Dataset = Depends(get_owned_dataset_for_upload),
     current_user: CurrentUser = Depends(require_engineer),
     upload_service: DatasetUploadService = Depends(get_dataset_upload_service),
-    dataset_service: DatasetService = Depends(get_dataset_service),
 ):
-    """初始化分片上传。
-
-    开始一个新的 S3 分片上传会话。返回 upload_id 供后续操作使用。
-    """
-    await _verify_dataset_permission(dataset_id, current_user, dataset_service, "upload to")
-
+    """初始化分片上传。"""
     session = await upload_service.initiate_multipart_upload(
-        dataset_id=dataset_id,
+        dataset_id=dataset.id,
         filename=data.filename,
         content_type=data.content_type,
         total_size=data.total_size,
@@ -445,17 +396,11 @@ async def abort_upload(
     status_code=status.HTTP_201_CREATED,
 )
 async def initiate_fsx_sync(
-    dataset_id: int,
-    current_user: CurrentUser = Depends(require_engineer),
+    dataset: Dataset = Depends(get_owned_dataset_for_fsx),
     fsx_service: FsxSyncService = Depends(get_fsx_sync_service),
-    dataset_service: DatasetService = Depends(get_dataset_service),
 ):
-    """发起 S3 → FSx 同步。
-
-    创建 FSx Data Repository Task 将数据集从 S3 同步到 FSx。
-    """
-    await _verify_dataset_permission(dataset_id, current_user, dataset_service, "sync to FSx")
-    result = await fsx_service.initiate_s3_to_fsx_sync(dataset_id=dataset_id)
+    """发起 S3 到 FSx 同步。"""
+    result = await fsx_service.initiate_s3_to_fsx_sync(dataset_id=dataset.id)
 
     return FsxSyncResponse(
         task_id=result["task_id"],
@@ -497,20 +442,13 @@ async def get_fsx_sync_status(
     status_code=status.HTTP_201_CREATED,
 )
 async def prefetch_dataset_to_fsx(
-    dataset_id: int,
     data: PrefetchDatasetRequest,
-    current_user: CurrentUser = Depends(require_engineer),
+    dataset: Dataset = Depends(get_owned_dataset_for_fsx),
     fsx_service: FsxSyncService = Depends(get_fsx_sync_service),
-    dataset_service: DatasetService = Depends(get_dataset_service),
 ):
-    """预热数据集到 FSx 缓存。
-
-    为训练任务预先加载数据集到 FSx，减少首次访问延迟。
-    """
-    await _verify_dataset_permission(dataset_id, current_user, dataset_service, "prefetch to FSx")
-
+    """预热数据集到 FSx 缓存。"""
     result = await fsx_service.prefetch_dataset(
-        dataset_id=dataset_id,
+        dataset_id=dataset.id,
         paths=data.paths,
     )
 
@@ -528,17 +466,11 @@ async def prefetch_dataset_to_fsx(
     status_code=status.HTTP_204_NO_CONTENT,
 )
 async def release_dataset_cache(
-    dataset_id: int,
-    current_user: CurrentUser = Depends(require_engineer),
+    dataset: Dataset = Depends(get_owned_dataset_for_fsx),
     fsx_service: FsxSyncService = Depends(get_fsx_sync_service),
-    dataset_service: DatasetService = Depends(get_dataset_service),
 ):
-    """释放数据集 FSx 缓存。
-
-    释放数据集在 FSx 上占用的存储空间，数据仍保留在 S3。
-    """
-    await _verify_dataset_permission(dataset_id, current_user, dataset_service, "release FSx cache")
-    await fsx_service.release_dataset(dataset_id=dataset_id)
+    """释放数据集 FSx 缓存。"""
+    await fsx_service.release_dataset(dataset_id=dataset.id)
     return None
 
 

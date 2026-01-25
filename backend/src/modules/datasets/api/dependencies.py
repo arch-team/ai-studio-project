@@ -5,17 +5,21 @@ from functools import lru_cache
 from fastapi import Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.modules.auth.api.current_user import CurrentUser
+from src.modules.auth.api.dependencies import require_engineer
+from src.modules.auth.api.permissions import check_resource_owner_or_privileged
 from src.modules.datasets.application.services import (
     DatasetService,
     DatasetUploadService,
     FsxSyncService,
 )
+from src.modules.datasets.domain.entities import Dataset
 from src.modules.datasets.domain.repositories import IDatasetRepository
+from src.modules.datasets.infrastructure.fsx import FsxClient
 from src.modules.datasets.infrastructure.repositories import (
     DatasetRepositoryImpl,
     UploadSessionRepositoryImpl,
 )
-from src.modules.datasets.infrastructure.fsx import FsxClient
 from src.modules.datasets.infrastructure.s3 import S3MultipartClient
 from src.shared.infrastructure import get_db, get_settings
 
@@ -81,3 +85,53 @@ async def get_fsx_sync_service(
         dataset_repository=dataset_repository,
         fsx_client=fsx_client,
     )
+
+
+# ========== 资源所有权验证依赖 ==========
+
+
+async def get_owned_dataset(
+    dataset_id: int,
+    current_user: CurrentUser = Depends(require_engineer),
+    service: DatasetService = Depends(get_dataset_service),
+) -> Dataset:
+    """获取数据集并验证所有权。
+
+    组合 RBAC 权限检查 + 资源所有权验证。
+    仅所有者或特权用户（admin/project_manager）可访问。
+
+    Raises:
+        DatasetNotFoundError: 数据集不存在
+        HTTPException 403: 用户无权限
+    """
+    dataset = await service.get_dataset(dataset_id)
+    check_resource_owner_or_privileged(
+        dataset.owner_id, current_user, "dataset", "access"
+    )
+    return dataset
+
+
+async def get_owned_dataset_for_upload(
+    dataset_id: int,
+    current_user: CurrentUser = Depends(require_engineer),
+    service: DatasetService = Depends(get_dataset_service),
+) -> Dataset:
+    """获取数据集并验证上传权限。"""
+    dataset = await service.get_dataset(dataset_id)
+    check_resource_owner_or_privileged(
+        dataset.owner_id, current_user, "dataset", "upload to"
+    )
+    return dataset
+
+
+async def get_owned_dataset_for_fsx(
+    dataset_id: int,
+    current_user: CurrentUser = Depends(require_engineer),
+    service: DatasetService = Depends(get_dataset_service),
+) -> Dataset:
+    """获取数据集并验证 FSx 操作权限。"""
+    dataset = await service.get_dataset(dataset_id)
+    check_resource_owner_or_privileged(
+        dataset.owner_id, current_user, "dataset", "manage FSx"
+    )
+    return dataset

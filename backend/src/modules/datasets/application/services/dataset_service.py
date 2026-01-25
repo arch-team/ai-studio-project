@@ -1,4 +1,4 @@
-"""Dataset Service - Business logic for dataset management."""
+"""数据集服务 - 管理数据集的业务逻辑。"""
 
 from src.modules.datasets.domain.entities import Dataset
 from src.modules.datasets.domain.exceptions import DatasetNotFoundError
@@ -15,7 +15,7 @@ from src.shared.utils import EnumMapper, utc_now
 
 
 class DatasetService(EnhancedBaseService[Dataset, int]):
-    """Service for managing datasets."""
+    """数据集管理服务。"""
 
     def __init__(self, repository: IDatasetRepository):
         super().__init__(repository, "Dataset")
@@ -30,47 +30,57 @@ class DatasetService(EnhancedBaseService[Dataset, int]):
         name = data["name"]
         version = data.get("version", "v1")
 
-        # Validate unique name+version
+        await self._ensure_unique_dataset(name, version)
+
+        dataset = self._build_dataset_entity(owner_id, data, name, version)
+        return await self._repository.add(dataset)
+
+    async def _ensure_unique_dataset(self, name: str, version: str) -> None:
+        """确保数据集名称和版本唯一。"""
         if await self._repository.exists_by_name_and_version(name, version):
             raise DuplicateEntityError("Dataset", f"{name}/{version}")
 
-        # Convert enums from string
-        storage_type = EnumMapper.from_string(
+    def _build_dataset_entity(
+        self, owner_id: int, data: dict, name: str, version: str
+    ) -> Dataset:
+        """构建数据集实体。"""
+        return Dataset(
+            id=0,  # 数据库分配
+            name=name,
+            version=version,
+            description=data.get("description"),
+            storage_type=self._parse_storage_type(data),
+            storage_uri=data["storage_uri"],
+            dataset_type=self._parse_dataset_type(data),
+            data_format=data.get("data_format"),
+            tags=data.get("tags"),
+            visibility=self._parse_visibility(data),
+            status=DatasetStatus.PREPARING,
+            owner_id=owner_id,
+        )
+
+    def _parse_storage_type(self, data: dict) -> DatasetStorageType:
+        """解析存储类型。"""
+        return EnumMapper.from_string(
             data["storage_type"], DatasetStorageType, DatasetStorageType.S3
         )
-        dataset_type = EnumMapper.from_string(
+
+    def _parse_dataset_type(self, data: dict) -> DatasetType:
+        """解析数据集类型。"""
+        return EnumMapper.from_string(
             data["dataset_type"], DatasetType, DatasetType.CUSTOM
         )
-        visibility = EnumMapper.from_string(
+
+    def _parse_visibility(self, data: dict) -> DatasetVisibility:
+        """解析可见性设置。"""
+        return EnumMapper.from_string(
             data.get("visibility", "PRIVATE"),
             DatasetVisibility,
             DatasetVisibility.PRIVATE,
         )
 
-        # Create dataset entity
-        dataset = Dataset(
-            id=0,  # Will be assigned by database
-            name=name,
-            version=version,
-            description=data.get("description"),
-            storage_type=storage_type,
-            storage_uri=data["storage_uri"],
-            dataset_type=dataset_type,
-            data_format=data.get("data_format"),
-            tags=data.get("tags"),
-            visibility=visibility,
-            status=DatasetStatus.PREPARING,
-            owner_id=owner_id,
-        )
-
-        return await self._repository.add(dataset)
-
     async def get_dataset(self, dataset_id: int) -> Dataset:
-        """根据 ID 获取数据集。
-
-        Raises:
-            DatasetNotFoundError: 如果数据集不存在
-        """
+        """根据 ID 获取数据集。"""
         return await self._get_or_raise(dataset_id)
 
     async def list_datasets(
@@ -97,14 +107,20 @@ class DatasetService(EnhancedBaseService[Dataset, int]):
         )
 
     async def update_dataset(self, dataset_id: int, data: dict) -> Dataset:
-        """更新数据集元数据 (description, tags, visibility)。
+        """更新数据集元数据。
 
         Raises:
             DatasetNotFoundError: 如果数据集不存在
         """
         dataset = await self._get_or_raise(dataset_id)
 
-        # Update allowed fields
+        self._apply_updates(dataset, data)
+        dataset.updated_at = utc_now()
+
+        return await self._repository.update(dataset)
+
+    def _apply_updates(self, dataset: Dataset, data: dict) -> None:
+        """应用更新到数据集实体。"""
         if "description" in data:
             dataset.description = data["description"]
 
@@ -115,10 +131,6 @@ class DatasetService(EnhancedBaseService[Dataset, int]):
             dataset.visibility = EnumMapper.from_string(
                 data["visibility"], DatasetVisibility, dataset.visibility
             )
-
-        dataset.updated_at = utc_now()
-
-        return await self._repository.update(dataset)
 
     async def delete_dataset(self, dataset_id: int) -> None:
         """删除（归档）数据集。
