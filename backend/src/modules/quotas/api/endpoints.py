@@ -27,10 +27,7 @@ from src.shared.utils import EnumMapper
 router = APIRouter()
 
 
-@router.get(
-    "",
-    response_model=ResourceLimitConfigListResponse,
-)
+@router.get("", response_model=ResourceLimitConfigListResponse)
 async def list_resource_limit_configs(
     page: PageParam,
     page_size: PageSizeParam,
@@ -65,11 +62,7 @@ async def list_resource_limit_configs(
     )
 
 
-@router.post(
-    "",
-    response_model=ResourceLimitConfigResponse,
-    status_code=status.HTTP_201_CREATED,
-)
+@router.post("", response_model=ResourceLimitConfigResponse, status_code=status.HTTP_201_CREATED)
 async def create_resource_limit_config(
     data: CreateResourceLimitConfigRequest,
     current_user: CurrentUser = Depends(require_admin),
@@ -96,10 +89,7 @@ async def create_resource_limit_config(
     return ResourceLimitConfigResponse.from_entity(config)
 
 
-@router.get(
-    "/{config_id}",
-    response_model=ResourceLimitConfigResponse,
-)
+@router.get("/{config_id}", response_model=ResourceLimitConfigResponse)
 async def get_resource_limit_config(
     config_id: int,
     current_user: CurrentUser = Depends(require_admin),
@@ -113,10 +103,7 @@ async def get_resource_limit_config(
     return ResourceLimitConfigResponse.from_entity(config)
 
 
-@router.put(
-    "/{config_id}",
-    response_model=ResourceLimitConfigResponse,
-)
+@router.put("/{config_id}", response_model=ResourceLimitConfigResponse)
 async def update_resource_limit_config(
     config_id: int,
     data: UpdateResourceLimitConfigRequest,
@@ -153,10 +140,7 @@ async def update_resource_limit_config(
     return ResourceLimitConfigResponse.from_entity(config)
 
 
-@router.delete(
-    "/{config_id}",
-    status_code=status.HTTP_204_NO_CONTENT,
-)
+@router.delete("/{config_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_resource_limit_config(
     config_id: int,
     current_user: CurrentUser = Depends(require_admin),

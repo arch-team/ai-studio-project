@@ -28,10 +28,7 @@ from .schemas import (
 router = APIRouter()
 
 
-@router.get(
-    "/clusters/{cluster_name}/metrics",
-    response_model=ClusterMetricsResponse,
-)
+@router.get("/clusters/{cluster_name}/metrics", response_model=ClusterMetricsResponse)
 async def get_cluster_metrics(
     cluster_name: str,
     metric_names: str | None = Query(None, description="逗号分隔的指标名称"),
@@ -88,10 +85,7 @@ async def get_cluster_metrics(
         return ClusterMetricsResponse(cluster_name=cluster_name, metrics=[])
 
 
-@router.get(
-    "/jobs/{job_id}/gpu-utilization",
-    response_model=GPUUtilizationResponse,
-)
+@router.get("/jobs/{job_id}/gpu-utilization", response_model=GPUUtilizationResponse)
 async def get_job_gpu_utilization(
     job_id: int,
     start_time: datetime | None = Query(None, description="开始时间"),
@@ -127,10 +121,7 @@ async def get_job_gpu_utilization(
         return GPUUtilizationResponse(job_id=job_id, data_points=[])
 
 
-@router.get(
-    "/grafana/dashboards",
-    response_model=GrafanaDashboardsResponse,
-)
+@router.get("/grafana/dashboards", response_model=GrafanaDashboardsResponse)
 async def get_grafana_dashboards(
     _: None = Depends(get_current_active_user),
 ) -> GrafanaDashboardsResponse:
@@ -166,10 +157,7 @@ async def get_grafana_dashboards(
     return GrafanaDashboardsResponse(dashboards=dashboards)
 
 
-@router.get(
-    "/storage",
-    response_model=StorageMetricsResponse,
-)
+@router.get("/storage", response_model=StorageMetricsResponse)
 async def get_storage_metrics(
     _: None = Depends(get_current_active_user),
     prometheus_service: PrometheusService = Depends(get_prometheus_service),
@@ -195,10 +183,7 @@ async def get_storage_metrics(
         )
 
 
-@router.get(
-    "/network",
-    response_model=NetworkMetricsResponse,
-)
+@router.get("/network", response_model=NetworkMetricsResponse)
 async def get_network_metrics(
     _: None = Depends(get_current_active_user),
     prometheus_service: PrometheusService = Depends(get_prometheus_service),
@@ -222,10 +207,7 @@ async def get_network_metrics(
         )
 
 
-@router.get(
-    "/clusters/{cluster_name}/health",
-    response_model=ClusterHealthResponse,
-)
+@router.get("/clusters/{cluster_name}/health", response_model=ClusterHealthResponse)
 async def get_cluster_health(
     cluster_name: str,
     _: None = Depends(get_current_active_user),

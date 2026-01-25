@@ -69,11 +69,7 @@ from src.shared.utils import EnumMapper
 router = APIRouter()
 
 
-@router.post(
-    "",
-    response_model=DatasetDetail,
-    status_code=status.HTTP_201_CREATED,
-)
+@router.post("", response_model=DatasetDetail, status_code=status.HTTP_201_CREATED)
 async def create_dataset(
     data: CreateDatasetRequest,
     current_user: CurrentUser = Depends(require_engineer),
@@ -91,10 +87,7 @@ async def create_dataset(
     return DatasetDetail.from_entity(dataset)
 
 
-@router.get(
-    "",
-    response_model=DatasetListResponse,
-)
+@router.get("", response_model=DatasetListResponse)
 async def list_datasets(
     page: PageParam = 1,
     page_size: PageSizeParam = 20,
@@ -142,10 +135,7 @@ async def list_datasets(
     )
 
 
-@router.get(
-    "/{dataset_id}",
-    response_model=DatasetDetail,
-)
+@router.get("/{dataset_id}", response_model=DatasetDetail)
 async def get_dataset(
     dataset_id: int,
     current_user: CurrentUser = Depends(get_current_active_user),
@@ -169,10 +159,7 @@ async def get_dataset(
     return DatasetDetail.from_entity(dataset)
 
 
-@router.patch(
-    "/{dataset_id}",
-    response_model=DatasetDetail,
-)
+@router.patch("/{dataset_id}", response_model=DatasetDetail)
 async def update_dataset(
     data: UpdateDatasetRequest,
     dataset: Dataset = Depends(get_owned_dataset),
@@ -186,10 +173,7 @@ async def update_dataset(
     return DatasetDetail.from_entity(updated)
 
 
-@router.delete(
-    "/{dataset_id}",
-    status_code=status.HTTP_204_NO_CONTENT,
-)
+@router.delete("/{dataset_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_dataset(
     dataset: Dataset = Depends(get_owned_dataset),
     service: DatasetService = Depends(get_dataset_service),
@@ -199,11 +183,7 @@ async def delete_dataset(
     return None
 
 
-@router.post(
-    "/{dataset_id}/versions",
-    response_model=DatasetDetail,
-    status_code=status.HTTP_201_CREATED,
-)
+@router.post("/{dataset_id}/versions", response_model=DatasetDetail, status_code=status.HTTP_201_CREATED)
 async def create_dataset_version(
     data: CreateDatasetVersionRequest,
     dataset: Dataset = Depends(get_owned_dataset),
@@ -259,10 +239,7 @@ async def initiate_upload(
     )
 
 
-@router.post(
-    "/{dataset_id}/upload/{upload_id}/presigned-urls",
-    response_model=PresignedUrlsResponse,
-)
+@router.post("/{dataset_id}/upload/{upload_id}/presigned-urls", response_model=PresignedUrlsResponse)
 async def generate_presigned_urls(
     dataset_id: int,
     upload_id: str,
@@ -287,10 +264,7 @@ async def generate_presigned_urls(
     )
 
 
-@router.post(
-    "/{dataset_id}/upload/{upload_id}/parts",
-    status_code=status.HTTP_204_NO_CONTENT,
-)
+@router.post("/{dataset_id}/upload/{upload_id}/parts", status_code=status.HTTP_204_NO_CONTENT)
 async def register_part_completion(
     dataset_id: int,
     upload_id: str,
@@ -312,10 +286,7 @@ async def register_part_completion(
     return None
 
 
-@router.get(
-    "/{dataset_id}/upload/{upload_id}/progress",
-    response_model=UploadProgressResponse,
-)
+@router.get("/{dataset_id}/upload/{upload_id}/progress", response_model=UploadProgressResponse)
 async def get_upload_progress(
     dataset_id: int,
     upload_id: str,
@@ -344,10 +315,7 @@ async def get_upload_progress(
     )
 
 
-@router.post(
-    "/{dataset_id}/upload/{upload_id}/complete",
-    response_model=CompleteUploadResponse,
-)
+@router.post("/{dataset_id}/upload/{upload_id}/complete", response_model=CompleteUploadResponse)
 async def complete_upload(
     dataset_id: int,
     upload_id: str,
@@ -369,10 +337,7 @@ async def complete_upload(
     )
 
 
-@router.delete(
-    "/{dataset_id}/upload/{upload_id}",
-    status_code=status.HTTP_204_NO_CONTENT,
-)
+@router.delete("/{dataset_id}/upload/{upload_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def abort_upload(
     dataset_id: int,
     upload_id: str,
@@ -390,11 +355,7 @@ async def abort_upload(
 # ========== FSx 端点 ==========
 
 
-@router.post(
-    "/{dataset_id}/fsx/sync",
-    response_model=FsxSyncResponse,
-    status_code=status.HTTP_201_CREATED,
-)
+@router.post("/{dataset_id}/fsx/sync", response_model=FsxSyncResponse, status_code=status.HTTP_201_CREATED)
 async def initiate_fsx_sync(
     dataset: Dataset = Depends(get_owned_dataset_for_fsx),
     fsx_service: FsxSyncService = Depends(get_fsx_sync_service),
@@ -411,10 +372,7 @@ async def initiate_fsx_sync(
     )
 
 
-@router.get(
-    "/{dataset_id}/fsx/sync/{task_id}",
-    response_model=FsxSyncStatusResponse,
-)
+@router.get("/{dataset_id}/fsx/sync/{task_id}", response_model=FsxSyncStatusResponse)
 async def get_fsx_sync_status(
     dataset_id: int,
     task_id: str,
@@ -436,11 +394,7 @@ async def get_fsx_sync_status(
     )
 
 
-@router.post(
-    "/{dataset_id}/fsx/prefetch",
-    response_model=FsxSyncResponse,
-    status_code=status.HTTP_201_CREATED,
-)
+@router.post("/{dataset_id}/fsx/prefetch", response_model=FsxSyncResponse, status_code=status.HTTP_201_CREATED)
 async def prefetch_dataset_to_fsx(
     data: PrefetchDatasetRequest,
     dataset: Dataset = Depends(get_owned_dataset_for_fsx),
@@ -461,10 +415,7 @@ async def prefetch_dataset_to_fsx(
     )
 
 
-@router.delete(
-    "/{dataset_id}/fsx/cache",
-    status_code=status.HTTP_204_NO_CONTENT,
-)
+@router.delete("/{dataset_id}/fsx/cache", status_code=status.HTTP_204_NO_CONTENT)
 async def release_dataset_cache(
     dataset: Dataset = Depends(get_owned_dataset_for_fsx),
     fsx_service: FsxSyncService = Depends(get_fsx_sync_service),
@@ -474,10 +425,7 @@ async def release_dataset_cache(
     return None
 
 
-@router.get(
-    "/{dataset_id}/fsx/path",
-    response_model=FsxPathResponse,
-)
+@router.get("/{dataset_id}/fsx/path", response_model=FsxPathResponse)
 async def get_dataset_fsx_path(
     dataset_id: int,
     current_user: CurrentUser = Depends(get_current_active_user),
@@ -505,10 +453,7 @@ async def get_dataset_fsx_path(
     )
 
 
-@router.get(
-    "/fsx/health",
-    response_model=FsxAvailabilityResponse,
-)
+@router.get("/fsx/health", response_model=FsxAvailabilityResponse)
 async def check_fsx_health(
     current_user: CurrentUser = Depends(get_current_active_user),
     fsx_service: FsxSyncService = Depends(get_fsx_sync_service),

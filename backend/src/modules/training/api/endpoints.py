@@ -49,11 +49,7 @@ from src.shared.utils import EnumMapper, utc_now
 router = APIRouter()
 
 
-@router.post(
-    "",
-    response_model=TrainingJobDetail,
-    status_code=status.HTTP_201_CREATED,
-)
+@router.post("", response_model=TrainingJobDetail, status_code=status.HTTP_201_CREATED)
 async def create_training_job(
     data: CreateTrainingJobRequest,
     current_user: CurrentUser = Depends(require_engineer),
@@ -65,10 +61,7 @@ async def create_training_job(
     return TrainingJobDetail.from_entity(job)
 
 
-@router.get(
-    "",
-    response_model=TrainingJobListResponse,
-)
+@router.get("", response_model=TrainingJobListResponse)
 async def list_training_jobs(
     page: PageParam,
     page_size: PageSizeParam,
@@ -104,10 +97,7 @@ async def list_training_jobs(
     )
 
 
-@router.get(
-    "/{job_id}",
-    response_model=TrainingJobDetail,
-)
+@router.get("/{job_id}", response_model=TrainingJobDetail)
 async def get_training_job(
     job_id: int,
     current_user: CurrentUser = Depends(get_current_active_user),
@@ -123,10 +113,7 @@ async def get_training_job(
     return response
 
 
-@router.put(
-    "/{job_id}",
-    response_model=TrainingJobDetail,
-)
+@router.put("/{job_id}", response_model=TrainingJobDetail)
 async def update_training_job(
     job_id: int,
     data: UpdateTrainingJobRequest,
@@ -147,10 +134,7 @@ async def update_training_job(
     return TrainingJobDetail.from_entity(job)
 
 
-@router.post(
-    "/{job_id}/pause",
-    response_model=TrainingJobDetail,
-)
+@router.post("/{job_id}/pause", response_model=TrainingJobDetail)
 async def pause_training_job(
     job_id: int,
     current_user: CurrentUser = Depends(require_engineer),
@@ -163,10 +147,7 @@ async def pause_training_job(
     return TrainingJobDetail.from_entity(job)
 
 
-@router.post(
-    "/{job_id}/resume",
-    response_model=TrainingJobDetail,
-)
+@router.post("/{job_id}/resume", response_model=TrainingJobDetail)
 async def resume_training_job(
     job_id: int,
     current_user: CurrentUser = Depends(require_engineer),
@@ -179,10 +160,7 @@ async def resume_training_job(
     return TrainingJobDetail.from_entity(job)
 
 
-@router.post(
-    "/{job_id}/cancel",
-    response_model=TrainingJobDetail,
-)
+@router.post("/{job_id}/cancel", response_model=TrainingJobDetail)
 async def cancel_training_job(
     job_id: int,
     current_user: CurrentUser = Depends(require_engineer),
@@ -195,10 +173,7 @@ async def cancel_training_job(
     return TrainingJobDetail.from_entity(job)
 
 
-@router.delete(
-    "/{job_id}",
-    status_code=status.HTTP_204_NO_CONTENT,
-)
+@router.delete("/{job_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_training_job(
     job_id: int,
     current_user: CurrentUser = Depends(require_engineer),
@@ -214,11 +189,7 @@ async def delete_training_job(
 # === Checkpoint Endpoints ===
 
 
-@router.post(
-    "/{job_id}/checkpoints",
-    response_model=CheckpointResponse,
-    status_code=status.HTTP_201_CREATED,
-)
+@router.post("/{job_id}/checkpoints", response_model=CheckpointResponse, status_code=status.HTTP_201_CREATED)
 async def create_manual_checkpoint(
     job_id: int,
     data: CreateCheckpointRequest | None = None,
@@ -274,11 +245,7 @@ async def create_manual_checkpoint(
 # === Create Job from Template ===
 
 
-@router.post(
-    "/from-template/{template_id}",
-    response_model=TrainingJobDetail,
-    status_code=status.HTTP_201_CREATED,
-)
+@router.post("/from-template/{template_id}", response_model=TrainingJobDetail, status_code=status.HTTP_201_CREATED)
 async def create_job_from_template(
     template_id: int,
     data: CreateJobFromTemplateRequest,
@@ -327,9 +294,7 @@ async def create_job_from_template(
 # === Logs Endpoint ===
 
 
-@router.get(
-    "/{job_id}/logs",
-)
+@router.get("/{job_id}/logs")
 async def get_training_job_logs(
     job_id: int,
     tail: int = Query(default=100, ge=1, le=10000, description="Number of log lines to return"),
@@ -366,9 +331,7 @@ async def get_training_job_logs(
 # === Kueue Debug Endpoint ===
 
 
-@router.get(
-    "/{job_id}/debug/kueue",
-)
+@router.get("/{job_id}/debug/kueue")
 async def get_kueue_debug_info(
     job_id: int,
     current_user: CurrentUser = Depends(get_current_active_user),

@@ -31,10 +31,7 @@ from .dependencies import get_resource_quota_service
 router = APIRouter()
 
 
-@router.get(
-    "",
-    response_model=ResourceQuotaListResponse,
-)
+@router.get("", response_model=ResourceQuotaListResponse)
 async def list_resource_quotas(
     page: PageParam,
     page_size: PageSizeParam,
@@ -71,11 +68,7 @@ async def list_resource_quotas(
     )
 
 
-@router.post(
-    "",
-    response_model=ResourceQuotaResponse,
-    status_code=status.HTTP_201_CREATED,
-)
+@router.post("", response_model=ResourceQuotaResponse, status_code=status.HTTP_201_CREATED)
 async def create_resource_quota(
     data: CreateResourceQuotaRequest,
     current_user: CurrentUser = Depends(require_admin),
@@ -108,10 +101,7 @@ async def create_resource_quota(
     return ResourceQuotaResponse.from_entity(quota)
 
 
-@router.get(
-    "/{quota_id}",
-    response_model=ResourceQuotaResponse,
-)
+@router.get("/{quota_id}", response_model=ResourceQuotaResponse)
 async def get_resource_quota(
     quota_id: int,
     current_user: CurrentUser = Depends(require_admin),
@@ -125,10 +115,7 @@ async def get_resource_quota(
     return ResourceQuotaResponse.from_entity(quota)
 
 
-@router.put(
-    "/{quota_id}",
-    response_model=ResourceQuotaResponse,
-)
+@router.put("/{quota_id}", response_model=ResourceQuotaResponse)
 async def update_resource_quota(
     quota_id: int,
     data: UpdateResourceQuotaRequest,
@@ -169,10 +156,7 @@ async def update_resource_quota(
     return ResourceQuotaResponse.from_entity(quota)
 
 
-@router.delete(
-    "/{quota_id}",
-    status_code=status.HTTP_204_NO_CONTENT,
-)
+@router.delete("/{quota_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_resource_quota(
     quota_id: int,
     current_user: CurrentUser = Depends(require_admin),
