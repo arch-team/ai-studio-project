@@ -1,71 +1,67 @@
 """Space module domain exceptions.
 
-设计说明:
----------
-每个异常类包含以下类属性：
-- http_status: 对应的 HTTP 状态码
-- error_code: 错误代码，供前端程序化处理
-
-异常处理器会自动读取这些属性，无需维护映射表。
+使用 @problem 装饰器和 @dataclass 简化异常定义。
+每个异常类通过装饰器注入 http_status 和 error_code。
+get_details() 自动返回所有数据字段。
 """
 
-from src.shared.domain.exceptions import DomainError
+from dataclasses import dataclass
+
+from src.shared.domain.problem import Problem, problem
 
 
-class SpaceError(DomainError):
-    """Base exception for space-related errors."""
+@problem(404, "SPACE_NOT_FOUND", "Space not found: {space_id}")
+@dataclass
+class SpaceNotFoundError(Problem):
+    """开发空间未找到."""
 
-    error_code = "SPACE_ERROR"
-
-
-class SpaceNotFoundError(SpaceError):
-    """Space not found exception."""
-
-    http_status = 404
-    error_code = "SPACE_NOT_FOUND"
-
-    def __init__(self, space_id: str):
-        super().__init__(f"Space not found: {space_id}")
-        self.space_id = space_id
+    space_id: str
 
 
-class DuplicateSpaceNameError(SpaceError):
-    """Space name already exists for owner exception."""
+@problem(
+    409,
+    "DUPLICATE_SPACE_NAME",
+    "Space name already exists: {space_name} for owner {owner_id}",
+)
+@dataclass
+class DuplicateSpaceNameError(Problem):
+    """空间名称重复."""
 
-    http_status = 409
-    error_code = "DUPLICATE_SPACE_NAME"
-
-    def __init__(self, space_name: str, owner_id: int):
-        super().__init__(f"Space name already exists: {space_name} for owner {owner_id}")
-        self.space_name = space_name
-        self.owner_id = owner_id
-
-
-class InvalidSpaceStateError(SpaceError):
-    """Invalid space state for operation exception."""
-
-    http_status = 409
-    error_code = "INVALID_SPACE_STATE"
-
-    def __init__(self, space_id: str, current_state: str, operation: str):
-        super().__init__(
-            f"Cannot {operation} space {space_id} in {current_state} state"
-        )
-        self.space_id = space_id
-        self.current_state = current_state
-        self.operation = operation
+    space_name: str
+    owner_id: int
 
 
-class SpaceQuotaExceededError(SpaceError):
-    """Space resource quota exceeded exception."""
+@problem(
+    409,
+    "INVALID_SPACE_STATE",
+    "Cannot {operation} space {space_id} in {current_state} state",
+)
+@dataclass
+class InvalidSpaceStateError(Problem):
+    """空间状态无效."""
 
-    http_status = 429
-    error_code = "SPACE_QUOTA_EXCEEDED"
+    space_id: str
+    current_state: str
+    operation: str
 
-    def __init__(self, resource: str, required: int, available: int):
-        super().__init__(
-            f"Insufficient {resource}: need {required}, have {available}"
-        )
-        self.resource = resource
-        self.required = required
-        self.available = available
+
+@problem(
+    429,
+    "SPACE_QUOTA_EXCEEDED",
+    "Insufficient {resource}: need {required}, have {available}",
+)
+@dataclass
+class SpaceQuotaExceededError(Problem):
+    """空间资源配额超限."""
+
+    resource: str
+    required: int
+    available: int
+
+
+# =============================================================================
+# 向后兼容别名 (deprecated)
+# =============================================================================
+
+SpaceError = Problem
+"""[DEPRECATED] 使用 Problem 替代."""

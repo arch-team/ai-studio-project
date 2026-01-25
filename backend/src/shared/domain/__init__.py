@@ -12,6 +12,7 @@ from .exceptions import (
     ValidationError,
 )
 from .interfaces import IEntityExistenceChecker, IQuotaChecker
+from .problem import Problem, problem
 
 __all__ = [
     # Base classes
@@ -25,7 +26,10 @@ __all__ = [
     "EventT",
     "event_bus",
     "event_handler",
-    # Exceptions
+    # Exceptions (new Problem-based)
+    "Problem",
+    "problem",
+    # Exceptions (legacy - will be removed after migration)
     "DomainError",
     "EntityNotFoundError",
     "ValidationError",

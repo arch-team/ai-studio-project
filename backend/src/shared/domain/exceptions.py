@@ -9,127 +9,94 @@ Domain exceptions represent violations of business rules:
 
 设计说明:
 ---------
-每个异常类包含以下类属性：
-- http_status: 对应的 HTTP 状态码
-- error_code: 错误代码，供前端程序化处理
+使用 @problem 装饰器和 @dataclass 简化异常定义。
+每个异常类通过装饰器注入 http_status 和 error_code。
+get_details() 自动返回所有数据字段，无需手动维护。
 
-异常处理器会自动读取这些属性，无需维护映射表。
-新增异常只需定义这两个属性即可。
-
-异常还可以实现 get_details() 方法返回结构化详情:
-- 返回 dict 包含与错误相关的上下文信息
-- 用于前端显示更详细的错误信息
+迁移说明:
+---------
+本模块已从 DomainError 基类迁移到 Problem 基类。
+保留 DomainError 作为别名用于向后兼容，新代码应使用 Problem。
 """
 
+from dataclasses import dataclass, field
 from typing import Any
 
+from src.shared.domain.problem import Problem, problem
 
-class DomainError(Exception):
-    """Base exception for all domain errors.
 
-    Attributes:
-        http_status: HTTP 状态码，默认 400
-        error_code: 错误代码，默认 DOMAIN_ERROR
-        message: 错误消息
-    """
+# =============================================================================
+# 通用领域异常
+# =============================================================================
 
-    http_status: int = 400
-    error_code: str = "DOMAIN_ERROR"
 
-    def __init__(self, message: str):
-        self.message = message
-        super().__init__(self.message)
+@problem(404, "ENTITY_NOT_FOUND", "{entity_type} with id '{entity_id}' not found")
+@dataclass
+class EntityNotFoundError(Problem):
+    """实体未找到 - HTTP 404."""
+
+    entity_type: str
+    entity_id: str
+
+
+@problem(422, "VALIDATION_ERROR")
+@dataclass
+class ValidationError(Problem):
+    """业务验证失败 - HTTP 422."""
+
+    message: str = field(default="Validation failed")
+    field_name: str | None = None
 
     def get_details(self) -> dict[str, Any] | None:
-        """返回结构化错误详情。子类可重写以提供更多上下文。"""
+        """仅当 field_name 存在时返回详情."""
+        if self.field_name:
+            return {"field": self.field_name}
         return None
 
 
-class EntityNotFoundError(DomainError):
-    """Raised when a requested entity is not found."""
+@problem(409, "DUPLICATE_ENTITY", "{entity_type} with identifier '{identifier}' already exists")
+@dataclass
+class DuplicateEntityError(Problem):
+    """重复实体 - HTTP 409."""
 
-    http_status = 404
-    error_code = "ENTITY_NOT_FOUND"
-
-    def __init__(self, entity_type: str, entity_id: str):
-        super().__init__(f"{entity_type} with id '{entity_id}' not found")
-        self.entity_type = entity_type
-        self.entity_id = entity_id
-
-    def get_details(self) -> dict[str, Any]:
-        return {"entity_type": self.entity_type, "entity_id": self.entity_id}
+    entity_type: str
+    identifier: str
 
 
-class ValidationError(DomainError):
-    """Raised when business validation fails."""
+@problem(
+    409,
+    "INVALID_STATE_TRANSITION",
+    "Cannot transition {entity_type} from '{current_state}' to '{target_state}'",
+)
+@dataclass
+class InvalidStateTransitionError(Problem):
+    """无效状态转换 - HTTP 409."""
 
-    http_status = 422
-    error_code = "VALIDATION_ERROR"
-
-    def __init__(self, message: str, field: str | None = None):
-        super().__init__(message)
-        self.field = field
-
-    def get_details(self) -> dict[str, Any] | None:
-        if self.field:
-            return {"field": self.field}
-        return None
+    entity_type: str
+    current_state: str
+    target_state: str
 
 
-class DuplicateEntityError(DomainError):
-    """Raised when attempting to create a duplicate entity."""
+@problem(
+    429,
+    "RESOURCE_QUOTA_EXCEEDED",
+    "{resource_type} quota exceeded: limit={limit}, requested={requested}",
+)
+@dataclass
+class ResourceQuotaExceededError(Problem):
+    """资源配额超限 - HTTP 429."""
 
-    http_status = 409
-    error_code = "DUPLICATE_ENTITY"
-
-    def __init__(self, entity_type: str, identifier: str):
-        super().__init__(f"{entity_type} with identifier '{identifier}' already exists")
-        self.entity_type = entity_type
-        self.identifier = identifier
-
-    def get_details(self) -> dict[str, Any]:
-        return {"entity_type": self.entity_type, "identifier": self.identifier}
-
-
-class InvalidStateTransitionError(DomainError):
-    """Raised when an invalid state transition is attempted."""
-
-    http_status = 409
-    error_code = "INVALID_STATE_TRANSITION"
-
-    def __init__(self, entity_type: str, current_state: str, target_state: str):
-        super().__init__(
-            f"Cannot transition {entity_type} from '{current_state}' to '{target_state}'"
-        )
-        self.entity_type = entity_type
-        self.current_state = current_state
-        self.target_state = target_state
-
-    def get_details(self) -> dict[str, Any]:
-        return {
-            "entity_type": self.entity_type,
-            "current_state": self.current_state,
-            "target_state": self.target_state,
-        }
+    resource_type: str
+    limit: int
+    requested: int
 
 
-class ResourceQuotaExceededError(DomainError):
-    """Raised when resource quota is exceeded."""
+# =============================================================================
+# 向后兼容别名 (deprecated)
+# =============================================================================
 
-    http_status = 429
-    error_code = "RESOURCE_QUOTA_EXCEEDED"
 
-    def __init__(self, resource_type: str, limit: int, requested: int):
-        super().__init__(
-            f"{resource_type} quota exceeded: limit={limit}, requested={requested}"
-        )
-        self.resource_type = resource_type
-        self.limit = limit
-        self.requested = requested
-
-    def get_details(self) -> dict[str, Any]:
-        return {
-            "resource_type": self.resource_type,
-            "limit": self.limit,
-            "requested": self.requested,
-        }
+# DomainError 作为 Problem 的别名，用于向后兼容
+# 新代码应直接继承 Problem
+DomainError = Problem
+"""[DEPRECATED] 使用 Problem 替代. 将在下个版本移除."""

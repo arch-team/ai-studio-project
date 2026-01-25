@@ -2,17 +2,15 @@
 
 测试说明:
 ---------
-测试 auth 模块异常的:
-1. 继承关系
-   - 重导出异常 -> SecurityError (直接继承)
-   - Auth 独有异常 -> AuthError -> SecurityError
-2. 属性正确性 (message, code, http_status)
-3. 捕获机制 (SecurityError 统一捕获)
+所有 auth 异常现在都继承自 Problem 基类。
+SecurityError 是 Problem 的别名，用于向后兼容。
+异常使用 error_code 类属性（而非旧的 code 实例属性）。
 """
 
 import pytest
 from fastapi import status
 
+from src.shared.domain.problem import Problem
 from src.modules.auth.domain.exceptions import (
     AccountInactiveError,
     AccountLockedError,
@@ -23,91 +21,78 @@ from src.modules.auth.domain.exceptions import (
     PasswordExpiredError,
     PasswordHistoryViolationError,
     PasswordTooWeakError,
+    SecurityError,
     SSODegradedModeError,
     SSOError,
     TokenError,
     TokenExpiredError,
     UserNotFoundError,
 )
-from src.shared.infrastructure.security.exceptions import SecurityError
 
 
 class TestAuthErrorInheritance:
-    """验证 AuthError 继承自 SecurityError (auth 模块独有基类)"""
+    """验证 AuthError 继承自 Problem"""
 
-    def test_auth_error_inherits_security_error(self):
-        exc = AuthError("test error")
-        assert isinstance(exc, SecurityError)
+    def test_auth_error_inherits_problem(self):
+        exc = AuthError()
+        assert isinstance(exc, Problem)
 
     def test_auth_error_has_message_attribute(self):
-        exc = AuthError("test message")
+        exc = AuthError(message="test message")
         assert exc.message == "test message"
 
-    def test_auth_error_has_code_attribute(self):
-        exc = AuthError("test", code="TEST_CODE")
-        assert exc.code == "TEST_CODE"
-
-    def test_auth_error_default_code(self):
-        exc = AuthError("test")
-        assert exc.code == "AUTH_ERROR"
+    def test_auth_error_has_error_code(self):
+        assert AuthError.error_code == "AUTH_ERROR"
 
 
 class TestUserNotFoundError:
     """UserNotFoundError 测试 (重导出自 shared/security)"""
 
-    def test_inherits_security_error(self):
-        """重导出异常继承自 SecurityError"""
-        exc = UserNotFoundError("user123")
-        assert isinstance(exc, SecurityError)
+    def test_inherits_problem(self):
+        exc = UserNotFoundError(user_id="user123")
+        assert isinstance(exc, Problem)
 
     def test_stores_user_id(self):
-        """验证 user_id 属性存储 (shared/security 使用 user_id)"""
-        exc = UserNotFoundError("user123")
+        exc = UserNotFoundError(user_id="user123")
         assert exc.user_id == "user123"
 
     def test_integer_user_id(self):
-        """支持 int 类型的 user_id"""
-        exc = UserNotFoundError(123)
+        exc = UserNotFoundError(user_id=123)
         assert exc.user_id == 123
 
     def test_error_code(self):
-        exc = UserNotFoundError("user123")
-        assert exc.code == "USER_NOT_FOUND"
+        assert UserNotFoundError.error_code == "USER_NOT_FOUND"
 
     def test_message_format(self):
-        exc = UserNotFoundError("user123")
+        exc = UserNotFoundError(user_id="user123")
         assert "user123" in exc.message
 
 
 class TestInvalidCredentialsError:
     """InvalidCredentialsError 测试 (重导出自 shared/security)"""
 
-    def test_inherits_security_error(self):
-        """重导出异常继承自 SecurityError"""
+    def test_inherits_problem(self):
         exc = InvalidCredentialsError()
-        assert isinstance(exc, SecurityError)
+        assert isinstance(exc, Problem)
 
     def test_default_message(self):
         exc = InvalidCredentialsError()
-        # shared/security 默认消息
         assert exc.message == "Invalid username or password"
 
     def test_custom_message(self):
-        exc = InvalidCredentialsError("Wrong password")
+        exc = InvalidCredentialsError(message="Wrong password")
         assert exc.message == "Wrong password"
 
     def test_error_code(self):
-        exc = InvalidCredentialsError()
-        assert exc.code == "INVALID_CREDENTIALS"
+        assert InvalidCredentialsError.error_code == "INVALID_CREDENTIALS"
 
 
 class TestAccountLockedError:
     """AccountLockedError 测试 (重导出自 shared/security)"""
 
-    def test_inherits_security_error(self):
-        """重导出异常继承自 SecurityError"""
+    def test_inherits_problem(self):
         exc = AccountLockedError()
-        assert isinstance(exc, SecurityError)
+        assert isinstance(exc, Problem)
 
     def test_locked_until_attribute(self):
         exc = AccountLockedError(locked_until="2025-01-26T12:00:00Z")
@@ -117,62 +102,50 @@ class TestAccountLockedError:
         exc = AccountLockedError()
         assert exc.locked_until is None
 
-    def test_message_with_locked_until(self):
-        """shared/security 版本不包含 locked_until 在消息中"""
-        exc = AccountLockedError(locked_until="2025-01-26T12:00:00Z")
-        assert exc.message == "Account is locked"
-
     def test_message_without_locked_until(self):
         exc = AccountLockedError()
         assert exc.message == "Account is locked"
 
     def test_error_code(self):
-        exc = AccountLockedError()
-        assert exc.code == "ACCOUNT_LOCKED"
+        assert AccountLockedError.error_code == "ACCOUNT_LOCKED"
 
 
 class TestAccountInactiveError:
     """AccountInactiveError 测试 (auth 模块独有)"""
 
-    def test_inherits_auth_error(self):
-        """auth 独有异常继承自 AuthError"""
+    def test_inherits_problem(self):
         exc = AccountInactiveError()
-        assert isinstance(exc, AuthError)
-        assert isinstance(exc, SecurityError)
+        assert isinstance(exc, Problem)
 
     def test_default_message(self):
         exc = AccountInactiveError()
         assert exc.message == "Account is not active"
 
     def test_error_code(self):
-        exc = AccountInactiveError()
-        assert exc.code == "ACCOUNT_INACTIVE"
+        assert AccountInactiveError.error_code == "ACCOUNT_INACTIVE"
 
 
 class TestPasswordExpiredError:
     """PasswordExpiredError 测试 (重导出自 shared/security)"""
 
-    def test_inherits_security_error(self):
-        """重导出异常继承自 SecurityError"""
+    def test_inherits_problem(self):
         exc = PasswordExpiredError()
-        assert isinstance(exc, SecurityError)
+        assert isinstance(exc, Problem)
 
     def test_default_message(self):
         exc = PasswordExpiredError()
         assert exc.message == "Password has expired"
 
     def test_error_code(self):
-        exc = PasswordExpiredError()
-        assert exc.code == "PASSWORD_EXPIRED"
+        assert PasswordExpiredError.error_code == "PASSWORD_EXPIRED"
 
 
 class TestPasswordTooWeakError:
     """PasswordTooWeakError 测试 (重导出自 shared/security)"""
 
-    def test_inherits_security_error(self):
-        """重导出异常继承自 SecurityError"""
+    def test_inherits_problem(self):
         exc = PasswordTooWeakError(violations=["too short"])
-        assert isinstance(exc, SecurityError)
+        assert isinstance(exc, Problem)
 
     def test_violations_attribute(self):
         violations = ["too short", "no uppercase"]
@@ -185,128 +158,108 @@ class TestPasswordTooWeakError:
         assert "no number" in exc.message
 
     def test_error_code(self):
-        exc = PasswordTooWeakError(violations=[])
-        assert exc.code == "PASSWORD_TOO_WEAK"
+        assert PasswordTooWeakError.error_code == "PASSWORD_TOO_WEAK"
 
 
 class TestPasswordHistoryViolationError:
     """PasswordHistoryViolationError 测试 (重导出自 shared/security)"""
 
-    def test_inherits_security_error(self):
-        """重导出异常继承自 SecurityError"""
+    def test_inherits_problem(self):
         exc = PasswordHistoryViolationError()
-        assert isinstance(exc, SecurityError)
+        assert isinstance(exc, Problem)
 
     def test_default_message(self):
         exc = PasswordHistoryViolationError()
         assert exc.message == "Cannot reuse recent passwords"
 
     def test_error_code(self):
-        exc = PasswordHistoryViolationError()
-        assert exc.code == "PASSWORD_HISTORY_VIOLATION"
+        assert PasswordHistoryViolationError.error_code == "PASSWORD_HISTORY_VIOLATION"
 
 
 class TestTokenError:
     """TokenError 测试 (auth 模块独有基类)"""
 
-    def test_inherits_auth_error(self):
-        """auth 独有异常继承自 AuthError"""
+    def test_inherits_problem(self):
         exc = TokenError()
-        assert isinstance(exc, AuthError)
-        assert isinstance(exc, SecurityError)
+        assert isinstance(exc, Problem)
 
-    def test_default_code(self):
-        exc = TokenError()
-        assert exc.code == "TOKEN_ERROR"
+    def test_error_code(self):
+        assert TokenError.error_code == "TOKEN_ERROR"
 
 
 class TestInvalidTokenError:
     """InvalidTokenError 测试 (重导出自 shared/security)"""
 
-    def test_inherits_security_error(self):
-        """重导出异常继承自 SecurityError"""
+    def test_inherits_problem(self):
         exc = InvalidTokenError()
-        assert isinstance(exc, SecurityError)
+        assert isinstance(exc, Problem)
 
     def test_default_message(self):
         exc = InvalidTokenError()
         assert exc.message == "Invalid token"
 
     def test_error_code(self):
-        exc = InvalidTokenError()
-        assert exc.code == "INVALID_TOKEN"
+        assert InvalidTokenError.error_code == "INVALID_TOKEN"
 
 
 class TestTokenExpiredError:
     """TokenExpiredError 测试 (重导出自 shared/security)"""
 
-    def test_inherits_security_error(self):
-        """重导出异常继承自 SecurityError"""
+    def test_inherits_problem(self):
         exc = TokenExpiredError()
-        assert isinstance(exc, SecurityError)
+        assert isinstance(exc, Problem)
 
     def test_default_message(self):
         exc = TokenExpiredError()
         assert exc.message == "Token has expired"
 
     def test_error_code(self):
-        exc = TokenExpiredError()
-        assert exc.code == "TOKEN_EXPIRED"
+        assert TokenExpiredError.error_code == "TOKEN_EXPIRED"
 
 
 class TestInsufficientPermissionsError:
     """InsufficientPermissionsError 测试 (重导出自 shared/security)"""
 
-    def test_inherits_security_error(self):
-        """重导出异常继承自 SecurityError"""
-        exc = InsufficientPermissionsError("admin")
-        assert isinstance(exc, SecurityError)
+    def test_inherits_problem(self):
+        exc = InsufficientPermissionsError(required_permission="admin")
+        assert isinstance(exc, Problem)
 
     def test_required_permission_attribute(self):
-        exc = InsufficientPermissionsError("admin")
+        exc = InsufficientPermissionsError(required_permission="admin")
         assert exc.required_permission == "admin"
 
     def test_message_contains_permission(self):
-        exc = InsufficientPermissionsError("admin")
+        exc = InsufficientPermissionsError(required_permission="admin")
         assert "admin" in exc.message
 
     def test_error_code(self):
-        exc = InsufficientPermissionsError("admin")
-        assert exc.code == "INSUFFICIENT_PERMISSIONS"
+        assert InsufficientPermissionsError.error_code == "INSUFFICIENT_PERMISSIONS"
 
 
 class TestSSOError:
     """SSOError 测试 (重导出自 shared/security)"""
 
-    def test_inherits_security_error(self):
-        """重导出异常继承自 SecurityError"""
+    def test_inherits_problem(self):
         exc = SSOError()
-        assert isinstance(exc, SecurityError)
+        assert isinstance(exc, Problem)
 
-    def test_default_code(self):
-        exc = SSOError()
-        assert exc.code == "SSO_ERROR"
+    def test_error_code(self):
+        assert SSOError.error_code == "SSO_ERROR"
 
 
 class TestSSODegradedModeError:
     """SSODegradedModeError 测试 (重导出自 shared/security)"""
 
-    def test_inherits_sso_error(self):
-        """继承自 SSOError"""
+    def test_inherits_problem(self):
         exc = SSODegradedModeError()
-        assert isinstance(exc, SSOError)
-        assert isinstance(exc, SecurityError)
+        assert isinstance(exc, Problem)
 
     def test_default_message(self):
         exc = SSODegradedModeError()
         assert exc.message == "SSO service is temporarily unavailable"
 
     def test_error_code(self):
-        """shared/security 版本使用 SSO_ERROR (因为调用 super().__init__)"""
-        exc = SSODegradedModeError()
-        # SSODegradedModeError 调用 super().__init__(message, degraded=True)
-        # 继承自 SSOError，code 默认为 SSO_ERROR
-        assert exc.code == "SSO_ERROR"
+        assert SSODegradedModeError.error_code == "SSO_DEGRADED_MODE"
 
 
 class TestAuthExceptionsHttpStatus:
@@ -339,19 +292,19 @@ class TestAuthExceptionsHttpStatus:
 
 
 class TestCatchingAuthExceptions:
-    """验证可以用 SecurityError 统一捕获"""
+    """验证可以用 Problem 统一捕获"""
 
-    def test_catch_all_with_security_error(self):
-        """所有 auth 异常都能被 SecurityError 捕获"""
+    def test_catch_all_with_problem(self):
+        """所有 auth 异常都能被 Problem 捕获"""
         exceptions = [
             InvalidCredentialsError(),
-            UserNotFoundError("test"),
+            UserNotFoundError(user_id="test"),
             AccountLockedError(),
             TokenExpiredError(),
-            InsufficientPermissionsError("admin"),
+            InsufficientPermissionsError(required_permission="admin"),
             SSODegradedModeError(),
             # Auth 独有异常
-            AuthError("test"),
+            AuthError(),
             AccountInactiveError(),
             TokenError(),
         ]
@@ -359,46 +312,11 @@ class TestCatchingAuthExceptions:
         for exc in exceptions:
             try:
                 raise exc
-            except SecurityError as caught:
+            except Problem as caught:
                 assert caught is exc
             else:
-                pytest.fail(f"{type(exc).__name__} was not caught by SecurityError")
+                pytest.fail(f"{type(exc).__name__} was not caught by Problem")
 
-    def test_catch_auth_specific_with_auth_error(self):
-        """Auth 独有异常可以被 AuthError 捕获"""
-        exceptions = [
-            AuthError("test"),
-            AccountInactiveError(),
-            TokenError(),
-        ]
-
-        for exc in exceptions:
-            try:
-                raise exc
-            except AuthError as caught:
-                assert caught is exc
-            else:
-                pytest.fail(f"{type(exc).__name__} was not caught by AuthError")
-
-    def test_reexported_exceptions_not_caught_by_auth_error(self):
-        """重导出异常不能被 AuthError 捕获 (因为它们直接继承 SecurityError)"""
-        reexported_exceptions = [
-            InvalidCredentialsError(),
-            UserNotFoundError("test"),
-            AccountLockedError(),
-            TokenExpiredError(),
-        ]
-
-        for exc in reexported_exceptions:
-            caught_by_auth_error = False
-            try:
-                raise exc
-            except AuthError:
-                caught_by_auth_error = True
-            except SecurityError:
-                pass  # 预期被这里捕获
-
-            assert not caught_by_auth_error, (
-                f"{type(exc).__name__} should not be caught by AuthError "
-                f"(it's a re-exported exception)"
-            )
+    def test_security_error_is_problem_alias(self):
+        """SecurityError 是 Problem 的别名"""
+        assert SecurityError is Problem

@@ -1,56 +1,48 @@
 """Model module domain exceptions.
 
-设计说明:
----------
-每个异常类包含以下类属性：
-- http_status: 对应的 HTTP 状态码
-- error_code: 错误代码，供前端程序化处理
-
-异常处理器会自动读取这些属性，无需维护映射表。
+使用 @problem 装饰器和 @dataclass 简化异常定义。
+每个异常类通过装饰器注入 http_status 和 error_code。
+get_details() 自动返回所有数据字段。
 """
 
-from src.shared.domain.exceptions import DomainError
+from dataclasses import dataclass
+from typing import Union
+
+from src.shared.domain.problem import Problem, problem
 
 
-class ModelError(DomainError):
-    """Base exception for model-related errors."""
+@problem(404, "MODEL_NOT_FOUND", "Model not found: {model_id}")
+@dataclass
+class ModelNotFoundError(Problem):
+    """模型未找到."""
 
-    error_code = "MODEL_ERROR"
-
-
-class ModelNotFoundError(ModelError):
-    """Model not found exception."""
-
-    http_status = 404
-    error_code = "MODEL_NOT_FOUND"
-
-    def __init__(self, model_id: int | str):
-        super().__init__(f"Model not found: {model_id}")
-        self.model_id = model_id
+    model_id: Union[int, str]
 
 
-class DuplicateModelVersionError(ModelError):
-    """Model version already exists exception."""
+@problem(409, "DUPLICATE_MODEL_VERSION", "Model version already exists: {model_name} {version}")
+@dataclass
+class DuplicateModelVersionError(Problem):
+    """模型版本重复."""
 
-    http_status = 409
-    error_code = "DUPLICATE_MODEL_VERSION"
-
-    def __init__(self, model_name: str, version: str):
-        super().__init__(f"Model version already exists: {model_name} {version}")
-        self.model_name = model_name
-        self.version = version
+    model_name: str
+    version: str
 
 
-class InvalidModelStateError(ModelError):
-    """Invalid model state for operation exception."""
+@problem(
+    409, "INVALID_MODEL_STATE", "Cannot {operation} model {model_id} in {current_state} state"
+)
+@dataclass
+class InvalidModelStateError(Problem):
+    """模型状态无效."""
 
-    http_status = 409
-    error_code = "INVALID_MODEL_STATE"
+    model_id: int
+    current_state: str
+    operation: str
 
-    def __init__(self, model_id: int, current_state: str, operation: str):
-        super().__init__(
-            f"Cannot {operation} model {model_id} in {current_state} state"
-        )
-        self.model_id = model_id
-        self.current_state = current_state
-        self.operation = operation
+
+# =============================================================================
+# 向后兼容别名 (deprecated)
+# =============================================================================
+
+ModelError = Problem
+"""[DEPRECATED] 使用 Problem 替代."""

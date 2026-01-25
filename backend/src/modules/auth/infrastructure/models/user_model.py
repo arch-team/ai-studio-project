@@ -19,6 +19,7 @@ if TYPE_CHECKING:
     from src.modules.models.infrastructure.models import ModelModel
     from src.modules.spaces.infrastructure.models import DevelopmentSpaceModel
     from src.modules.quotas.infrastructure.models import ResourceQuotaModel
+    from src.modules.datasets.infrastructure.models import DatasetModel
 
 
 class TimestampMixin:
@@ -183,6 +184,11 @@ class UserModel(Base, TimestampMixin):
         "ResourceQuotaModel",
         back_populates="users",
         foreign_keys=[resource_quota_id],
+    )
+    datasets: Mapped[list["DatasetModel"]] = relationship(
+        "DatasetModel",
+        back_populates="owner",
+        cascade="all, delete-orphan",
     )
 
     __table_args__ = ({"comment": "用户表"},)

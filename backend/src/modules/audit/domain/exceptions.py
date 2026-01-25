@@ -1,29 +1,26 @@
-"""Audit module specific exceptions.
+"""Audit module domain exceptions.
 
-设计说明:
----------
-每个异常类包含以下类属性：
-- http_status: 对应的 HTTP 状态码
-- error_code: 错误代码，供前端程序化处理
-
-异常处理器会自动读取这些属性，无需维护映射表。
+使用 @problem 装饰器和 @dataclass 简化异常定义。
+每个异常类通过装饰器注入 http_status 和 error_code。
+get_details() 自动返回所有数据字段。
 """
 
-from src.shared.domain import DomainError
+from dataclasses import dataclass
+
+from src.shared.domain.problem import Problem, problem
 
 
-class AuditLogError(DomainError):
-    """Base exception for audit log errors."""
+@problem(404, "AUDIT_LOG_NOT_FOUND", "Audit log with id '{audit_log_id}' not found")
+@dataclass
+class AuditLogNotFoundError(Problem):
+    """审计日志未找到."""
 
-    error_code = "AUDIT_LOG_ERROR"
+    audit_log_id: int
 
 
-class AuditLogNotFoundError(AuditLogError):
-    """Raised when an audit log is not found."""
+# =============================================================================
+# 向后兼容别名 (deprecated)
+# =============================================================================
 
-    http_status = 404
-    error_code = "AUDIT_LOG_NOT_FOUND"
-
-    def __init__(self, audit_log_id: int):
-        super().__init__(f"Audit log with id '{audit_log_id}' not found")
-        self.audit_log_id = audit_log_id
+AuditLogError = Problem
+"""[DEPRECATED] 使用 Problem 替代."""

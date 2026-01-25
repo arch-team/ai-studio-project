@@ -12,10 +12,12 @@ from src.modules.audit.api.middleware import AuditMiddleware
 from src.router import api_router
 from src.shared.api import (
     domain_exception_handler,
+    problem_exception_handler,
     security_exception_handler,
 )
 from src.shared.api.middleware import AuthenticationMiddleware, TracingMiddleware
 from src.shared.domain.exceptions import DomainError
+from src.shared.domain.problem import Problem
 from src.shared.infrastructure import get_settings
 from src.shared.infrastructure.security.exceptions import SecurityError
 
@@ -80,6 +82,9 @@ def create_app() -> FastAPI:
     app.include_router(api_router)
 
     # Register exception handlers (more specific first)
+    # Problem 处理器用于新的 dataclass 异常体系
+    app.add_exception_handler(Problem, problem_exception_handler)
+    # 旧的处理器用于向后兼容（迁移完成后移除）
     app.add_exception_handler(DomainError, domain_exception_handler)
     app.add_exception_handler(SecurityError, security_exception_handler)
 

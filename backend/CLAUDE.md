@@ -80,8 +80,71 @@ src/
 
 - **黄金法则 R1-R4**: 模块间依赖规则
 - **模块间通信**: 事件驱动 + 共享接口
-- **异常处理**: 全局异常处理器自动映射 HTTP 状态码
+- **异常处理**: 基于 Problem 基类的统一异常体系
 - **依赖注入**: 5 层依赖注入链
+
+## 异常处理框架
+
+基于 `@problem` 装饰器 + `@dataclass` 的简化异常定义方式。
+
+### 定义异常
+
+```python
+from dataclasses import dataclass
+from src.shared.domain.problem import Problem, problem
+
+@problem(404, "TRAINING_JOB_NOT_FOUND", "TrainingJob '{job_id}' not found")
+@dataclass
+class TrainingJobNotFoundError(Problem):
+    """训练任务未找到."""
+    job_id: str
+```
+
+### 使用方式
+
+```python
+# 抛出异常
+raise TrainingJobNotFoundError(job_id="job-123")
+
+# 自动生成:
+# - message: "TrainingJob 'job-123' not found"
+# - http_status: 404
+# - error_code: "TRAINING_JOB_NOT_FOUND"
+# - get_details(): {"job_id": "job-123"}
+```
+
+### 装饰器参数
+
+| 参数 | 说明 | 示例 |
+|------|------|------|
+| `status` | HTTP 状态码 | `404`, `409`, `422`, `500` |
+| `code` | 错误代码 | `"ENTITY_NOT_FOUND"` |
+| `message_template` | 消息模板（可选）| `"User '{user_id}' not found"` |
+
+### 常用异常基类
+
+| 异常 | HTTP | 用途 |
+|------|------|------|
+| `EntityNotFoundError` | 404 | 资源不存在 |
+| `ValidationError` | 422 | 参数验证失败 |
+| `DuplicateEntityError` | 409 | 资源已存在 |
+| `InvalidStateTransitionError` | 409 | 状态转换非法 |
+| `ResourceQuotaExceededError` | 429 | 配额不足 |
+| `AuthenticationError` | 401 | 认证失败 |
+| `InsufficientPermissionsError` | 403 | 权限不足 |
+
+### 响应格式
+
+```json
+{
+  "error": {
+    "code": "TRAINING_JOB_NOT_FOUND",
+    "message": "TrainingJob 'job-123' not found",
+    "details": {"job_id": "job-123"},
+    "trace_id": "req-xxx"
+  }
+}
+```
 
 ## Environment Variables
 

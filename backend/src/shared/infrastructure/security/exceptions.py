@@ -1,5 +1,9 @@
 """Security Exceptions - Authentication and authorization errors.
 
+使用 @problem 装饰器和 @dataclass 简化异常定义。
+每个异常类通过装饰器注入 http_status 和 error_code。
+get_details() 自动返回所有数据字段。
+
 职责说明:
 ---------
 本模块定义了基础设施层的安全异常，供以下场景使用：
@@ -8,170 +12,164 @@
 - 安全装饰器
 
 业务层（如 auth 模块）应使用 modules/auth/domain/exceptions.py 中的异常，
-这些异常继承自本模块的 SecurityError，以便获得统一的 HTTP 状态码映射。
-
-异常继承关系:
------------
-SecurityError (本模块)
-└── AuthError (auth/domain/exceptions.py)
-    └── InvalidCredentialsError, TokenExpiredError, ...
-
-设计说明:
----------
-每个异常类包含以下类属性：
-- http_status: 对应的 HTTP 状态码
-- 实例属性 code: 错误代码，供前端程序化处理
-
-异常处理器会自动读取这些属性，无需维护映射表。
-新增异常只需定义 http_status 类属性即可。
-
-使用指南:
---------
-- 基础设施代码 → 使用本模块异常
-- 业务逻辑代码 → 使用 auth/domain/exceptions.py
+这些异常从本模块重导出，以便获得统一的 HTTP 状态码映射。
 """
 
+from dataclasses import dataclass, field
+from typing import Any
 
-class SecurityError(Exception):
-    """Base class for security-related errors.
-
-    Attributes:
-        http_status: HTTP 状态码，默认 401
-        message: 错误消息
-        code: 错误代码
-    """
-
-    http_status: int = 401
-
-    def __init__(self, message: str, code: str | None = None):
-        self.message = message
-        self.code = code or "SECURITY_ERROR"
-        super().__init__(self.message)
+from src.shared.domain.problem import Problem, problem
 
 
-class AuthenticationError(SecurityError):
-    """Raised when authentication fails."""
-
-    http_status = 401
-
-    def __init__(self, message: str = "Authentication failed"):
-        super().__init__(message, code="AUTHENTICATION_FAILED")
+# =============================================================================
+# 认证异常
+# =============================================================================
 
 
-class UserNotFoundError(SecurityError):
-    """Raised when user is not found (for enable/disable account)."""
+@problem(401, "AUTHENTICATION_FAILED")
+@dataclass
+class AuthenticationError(Problem):
+    """认证失败."""
 
-    http_status = 404
-
-    def __init__(self, user_id: str | int):
-        self.user_id = user_id
-        super().__init__(f"User with id '{user_id}' not found", code="USER_NOT_FOUND")
+    message: str = field(default="Authentication failed")
 
 
-class InvalidCredentialsError(SecurityError):
-    """Raised when login credentials are invalid."""
+@problem(401, "INVALID_CREDENTIALS")
+@dataclass
+class InvalidCredentialsError(Problem):
+    """凭证无效."""
 
-    http_status = 401
-
-    def __init__(self, message: str = "Invalid username or password"):
-        super().__init__(message, code="INVALID_CREDENTIALS")
-
-
-class AccountValidationError(SecurityError):
-    """Raised when account validation fails (for create account)."""
-
-    http_status = 400
-
-    def __init__(self, message: str):
-        super().__init__(message, code="ACCOUNT_VALIDATION_FAILED")
+    message: str = field(default="Invalid username or password")
 
 
-class TokenExpiredError(SecurityError):
-    """Raised when a token has expired."""
+@problem(401, "TOKEN_EXPIRED")
+@dataclass
+class TokenExpiredError(Problem):
+    """令牌过期."""
 
-    http_status = 401
-
-    def __init__(self, message: str = "Token has expired"):
-        super().__init__(message, code="TOKEN_EXPIRED")
-
-
-class InvalidTokenError(SecurityError):
-    """Raised when a token is invalid."""
-
-    http_status = 401
-
-    def __init__(self, message: str = "Invalid token"):
-        super().__init__(message, code="INVALID_TOKEN")
+    message: str = field(default="Token has expired")
 
 
-class AccountLockedError(SecurityError):
-    """Raised when an account is locked due to too many failed login attempts."""
+@problem(401, "INVALID_TOKEN")
+@dataclass
+class InvalidTokenError(Problem):
+    """令牌无效."""
 
-    http_status = 423
-
-    def __init__(
-        self, message: str = "Account is locked", locked_until: str | None = None
-    ):
-        self.locked_until = locked_until
-        super().__init__(message, code="ACCOUNT_LOCKED")
+    message: str = field(default="Invalid token")
 
 
-class PasswordTooWeakError(SecurityError):
-    """Raised when a password does not meet strength requirements."""
+@problem(401, "PASSWORD_EXPIRED")
+@dataclass
+class PasswordExpiredError(Problem):
+    """密码已过期."""
 
-    http_status = 400
-
-    def __init__(self, violations: list[str]):
-        self.violations = violations
-        message = "Password does not meet requirements: " + "; ".join(violations)
-        super().__init__(message, code="PASSWORD_TOO_WEAK")
+    message: str = field(default="Password has expired")
 
 
-class PasswordHistoryViolationError(SecurityError):
-    """Raised when a password was recently used."""
-
-    http_status = 400
-
-    def __init__(self, message: str = "Cannot reuse recent passwords"):
-        super().__init__(message, code="PASSWORD_HISTORY_VIOLATION")
+# =============================================================================
+# 账户异常
+# =============================================================================
 
 
-class PasswordExpiredError(SecurityError):
-    """Raised when a password has expired."""
+@problem(404, "USER_NOT_FOUND", "User with id '{user_id}' not found")
+@dataclass
+class UserNotFoundError(Problem):
+    """用户未找到."""
 
-    http_status = 401
-
-    def __init__(self, message: str = "Password has expired"):
-        super().__init__(message, code="PASSWORD_EXPIRED")
-
-
-class InsufficientPermissionsError(SecurityError):
-    """Raised when a user lacks required permissions."""
-
-    http_status = 403
-
-    def __init__(self, required_permission: str):
-        self.required_permission = required_permission
-        message = f"Insufficient permissions: requires {required_permission}"
-        super().__init__(message, code="INSUFFICIENT_PERMISSIONS")
+    user_id: str | int
 
 
-class SSOError(SecurityError):
-    """Raised when SSO authentication fails."""
+@problem(400, "ACCOUNT_VALIDATION_FAILED")
+@dataclass
+class AccountValidationError(Problem):
+    """账户验证失败."""
 
-    http_status = 401
-
-    def __init__(
-        self, message: str = "SSO authentication failed", degraded: bool = False
-    ):
-        self.degraded = degraded
-        super().__init__(message, code="SSO_ERROR")
+    message: str
 
 
-class SSODegradedModeError(SSOError):
-    """Raised when SSO is in degraded mode."""
+@problem(423, "ACCOUNT_LOCKED")
+@dataclass
+class AccountLockedError(Problem):
+    """账户被锁定."""
 
-    http_status = 503
+    message: str = field(default="Account is locked")
+    locked_until: str | None = None
 
-    def __init__(self, message: str = "SSO service is temporarily unavailable"):
-        super().__init__(message, degraded=True)
+    def get_details(self) -> dict[str, Any] | None:
+        """仅当 locked_until 存在时返回详情."""
+        if self.locked_until:
+            return {"locked_until": self.locked_until}
+        return None
+
+
+# =============================================================================
+# 密码异常
+# =============================================================================
+
+
+@problem(400, "PASSWORD_TOO_WEAK")
+@dataclass
+class PasswordTooWeakError(Problem):
+    """密码强度不足."""
+
+    violations: list[str] = field(default_factory=list)
+
+    def __post_init__(self) -> None:
+        """根据 violations 生成消息."""
+        self.message = "Password does not meet requirements: " + "; ".join(self.violations)
+        super().__post_init__()
+
+    def get_details(self) -> dict[str, Any]:
+        """返回违规列表."""
+        return {"violations": self.violations}
+
+
+@problem(400, "PASSWORD_HISTORY_VIOLATION")
+@dataclass
+class PasswordHistoryViolationError(Problem):
+    """密码历史违规."""
+
+    message: str = field(default="Cannot reuse recent passwords")
+
+
+# =============================================================================
+# 授权异常
+# =============================================================================
+
+
+@problem(403, "INSUFFICIENT_PERMISSIONS", "Insufficient permissions: requires {required_permission}")
+@dataclass
+class InsufficientPermissionsError(Problem):
+    """权限不足."""
+
+    required_permission: str
+
+
+# =============================================================================
+# SSO 异常
+# =============================================================================
+
+
+@problem(401, "SSO_ERROR")
+@dataclass
+class SSOError(Problem):
+    """SSO 认证失败."""
+
+    message: str = field(default="SSO authentication failed")
+    degraded: bool = False
+
+
+@problem(503, "SSO_DEGRADED_MODE")
+@dataclass
+class SSODegradedModeError(Problem):
+    """SSO 降级模式."""
+
+    message: str = field(default="SSO service is temporarily unavailable")
+
+
+# =============================================================================
+# 向后兼容别名 (deprecated)
+# =============================================================================
+
+SecurityError = Problem
+"""[DEPRECATED] 使用 Problem 替代. 将在下个版本移除."""

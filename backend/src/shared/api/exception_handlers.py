@@ -2,8 +2,8 @@
 
 设计说明:
 ---------
-异常处理器直接从异常类读取 http_status 和 error_code 属性，
-无需维护映射表。新增异常只需在异常类中定义这两个属性即可。
+所有异常现在都继承自 Problem 基类，通过 @problem 装饰器注入 http_status 和 error_code，
+get_details() 自动返回所有数据字段。
 
 响应格式 (统一):
 --------------
@@ -29,36 +29,13 @@ from fastapi import Request
 from fastapi.responses import JSONResponse
 
 from src.shared.domain.exceptions import DomainError
+from src.shared.domain.problem import Problem
 from src.shared.infrastructure.security.exceptions import SecurityError
 
 
 def _get_trace_id(request: Request) -> str | None:
     """从请求中提取 trace_id。"""
     return getattr(request.state, "trace_id", None)
-
-
-def _get_domain_error_details(exc: DomainError) -> dict[str, Any] | None:
-    """提取 Domain 异常的结构化详情。"""
-    # 调用异常的 get_details() 方法（如果存在）
-    if hasattr(exc, "get_details") and callable(exc.get_details):
-        return exc.get_details()
-    return None
-
-
-def _get_security_error_details(exc: SecurityError) -> dict[str, Any] | None:
-    """提取 Security 异常的结构化详情。"""
-    details: dict[str, Any] = {}
-
-    if hasattr(exc, "locked_until") and exc.locked_until:
-        details["locked_until"] = exc.locked_until
-    if hasattr(exc, "violations"):
-        details["violations"] = exc.violations
-    if hasattr(exc, "required_permission"):
-        details["required_permission"] = exc.required_permission
-    if hasattr(exc, "user_id"):
-        details["user_id"] = exc.user_id
-
-    return details if details else None
 
 
 def _build_error_response(
@@ -83,14 +60,14 @@ def _build_error_response(
 async def domain_exception_handler(request: Request, exc: DomainError) -> JSONResponse:
     """Handle all Domain layer exceptions.
 
-    直接从异常类读取 http_status 和 error_code 属性。
+    所有 Domain 异常现在继承自 Problem，使用 error_code 和 get_details()。
     """
     return JSONResponse(
         status_code=exc.http_status,
         content=_build_error_response(
             code=exc.error_code,
             message=exc.message,
-            details=_get_domain_error_details(exc),
+            details=exc.get_details(),
             trace_id=_get_trace_id(request),
         ),
     )
@@ -101,14 +78,33 @@ async def security_exception_handler(
 ) -> JSONResponse:
     """Handle all Security layer exceptions.
 
-    直接从异常类读取 http_status 属性。
+    所有 Security 异常现在继承自 Problem，使用 error_code 和 get_details()。
     """
     return JSONResponse(
         status_code=exc.http_status,
         content=_build_error_response(
-            code=exc.code,
+            code=exc.error_code,
             message=exc.message,
-            details=_get_security_error_details(exc),
+            details=exc.get_details(),
+            trace_id=_get_trace_id(request),
+        ),
+    )
+
+
+async def problem_exception_handler(request: Request, exc: Problem) -> JSONResponse:
+    """Handle all Problem-based exceptions.
+
+    Problem 基类使用装饰器注入 http_status 和 error_code，
+    get_details() 自动返回所有数据字段。
+
+    响应格式与 DomainError/SecurityError 保持一致，前端无需修改。
+    """
+    return JSONResponse(
+        status_code=exc.http_status,
+        content=_build_error_response(
+            code=exc.error_code,
+            message=exc.message,
+            details=exc.get_details(),
             trace_id=_get_trace_id(request),
         ),
     )

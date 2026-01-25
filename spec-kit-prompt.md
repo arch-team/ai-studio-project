@@ -6,7 +6,11 @@
 
 /speckit.implement ## Phase 3: US1 (P1) - 训练任务管理 (33 tasks) 中的### 集成测试这个子阶段, 每个任务按照TDD（测试驱动开发的流程进行），完成后将tasks.md中已经明确完成的任务标记为完成状态
 
-/speckit.implement ## Phase 3: US1 (P1) - 训练任务管理 (33 tasks) 中的### 任务模板管理 (FR-023 扩展)这个子阶段, 每个任务按照TDD（测试驱动开发的流程进行），完成后将tasks.md中已经明确完成的任务标记为完成状态
+/speckit.implement ## Phase 4: US2 (P1) - 数据集管理 (14 tasks) 中的### QLAlchemy 模型这个子阶段, 每个任务按照TDD（测试驱动开发的流程进行），完成后将tasks.md中已经明确完成的任务标记为完成状态
+
+
+
+/speckit.implement ## Phase 5: US3 (P1) - 资源配额和集群监控 (21 tasks) 的### 这个子阶段, 每个任务按照TDD（测试驱动开发的流程进行），完成后将tasks.md中已经明确完成的任务标记为完成状态
 
 
 

@@ -2,6 +2,7 @@
 
 from .exception_handlers import (
     domain_exception_handler,
+    problem_exception_handler,
     security_exception_handler,
 )
 from .pagination import (
@@ -19,6 +20,7 @@ from .schemas import EntitySchema
 
 __all__ = [
     "domain_exception_handler",
+    "problem_exception_handler",
     "security_exception_handler",
     "EntitySchema",
     # 分页
