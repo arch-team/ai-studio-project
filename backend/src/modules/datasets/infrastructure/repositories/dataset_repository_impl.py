@@ -81,6 +81,12 @@ class DatasetRepositoryImpl(
         model.status = entity.status
         model.last_accessed_at = entity.last_accessed_at
 
+    # ========== IDatasetRepository 接口方法 ==========
+
+    async def add(self, dataset: Dataset) -> Dataset:
+        """添加新数据集（委托给 EnhancedBaseRepository.create）。"""
+        return await self.create(dataset)
+
     # ========== 领域特定查询方法 ==========
 
     async def get_by_name_and_version(self, name: str, version: str) -> Dataset | None:

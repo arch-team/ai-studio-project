@@ -67,8 +67,8 @@ async def create_dataset(
     response_model=DatasetListResponse,
 )
 async def list_datasets(
-    page: PageParam,
-    page_size: PageSizeParam,
+    page: PageParam = 1,
+    page_size: PageSizeParam = 20,
     dataset_type: DatasetTypeEnum | None = Query(
         default=None, description="Filter by dataset type"
     ),
