@@ -2,10 +2,9 @@
 
 from functools import lru_cache
 
-from src.shared.infrastructure.security import (
-    ROLE_HIERARCHY,
-    InsufficientPermissionsError,
-)
+from src.shared.infrastructure.security import ROLE_HIERARCHY
+
+from ...domain.exceptions import InsufficientPermissionsError
 from ...domain.value_objects import Permission
 
 

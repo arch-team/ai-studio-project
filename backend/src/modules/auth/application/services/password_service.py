@@ -5,14 +5,10 @@ from datetime import timedelta
 from src.shared.infrastructure.security import (
     PASSWORD_EXPIRY_DAYS,
     PASSWORD_HISTORY_COUNT,
-    InvalidCredentialsError,
     JWTManager,
     PasswordHasher,
-    PasswordHistoryViolationError,
-    PasswordTooWeakError,
     PasswordValidator,
     TokenType,
-    UserNotFoundError,
     get_jwt_manager,
     get_password_hasher,
     get_password_validator,
@@ -20,6 +16,12 @@ from src.shared.infrastructure.security import (
 from src.shared.utils import utc_now
 
 from ...domain.entities import PasswordHistory, User
+from ...domain.exceptions import (
+    InvalidCredentialsError,
+    PasswordHistoryViolationError,
+    PasswordTooWeakError,
+    UserNotFoundError,
+)
 from ...domain.repositories import IPasswordHistoryRepository, IUserRepository
 from ...domain.value_objects import UserStatus
 

@@ -7,10 +7,7 @@ from src.shared.infrastructure.security import (
     ACCESS_TOKEN_EXPIRE_MINUTES,
     LOCKOUT_DURATION_MINUTES,
     MAX_FAILED_LOGIN_ATTEMPTS,
-    AccountLockedError,
-    InvalidCredentialsError,
     JWTManager,
-    PasswordExpiredError,
     PasswordHasher,
     TokenType,
     get_jwt_manager,
@@ -19,6 +16,11 @@ from src.shared.infrastructure.security import (
 from src.shared.utils import utc_now
 
 from ...domain.entities import LoginAttempt, User
+from ...domain.exceptions import (
+    AccountLockedError,
+    InvalidCredentialsError,
+    PasswordExpiredError,
+)
 from ...domain.repositories import ILoginAttemptRepository, IUserRepository
 from ...domain.value_objects import AuthType, UserStatus
 

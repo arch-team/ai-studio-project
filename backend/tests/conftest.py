@@ -68,5 +68,9 @@ def pytest_collection_modifyitems(config, items):
             item.add_marker(pytest.mark.performance)
 
         # Add AWS marker for AWS-related tests
-        if "/aws/" in test_path or "hyperpod" in test_path.lower():
+        # Only mark tests in /aws/ or /e2e/ directories that involve real AWS calls
+        # Unit tests for HyperPod exceptions (test_exception_*) don't need AWS
+        if "/aws/" in test_path:
+            item.add_marker(pytest.mark.aws_integration)
+        elif "/e2e/" in test_path and "hyperpod" in test_path.lower():
             item.add_marker(pytest.mark.aws_integration)

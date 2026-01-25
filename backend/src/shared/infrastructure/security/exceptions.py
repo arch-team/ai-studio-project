@@ -1,4 +1,26 @@
-"""Security Exceptions - Authentication and authorization errors."""
+"""Security Exceptions - Authentication and authorization errors.
+
+职责说明:
+---------
+本模块定义了基础设施层的安全异常，供以下场景使用：
+- JWT 中间件 (middleware/auth.py)
+- Token 验证 (jwt.py)
+- 安全装饰器
+
+业务层（如 auth 模块）应使用 modules/auth/domain/exceptions.py 中的异常，
+这些异常继承自本模块的 SecurityError，以便获得统一的 HTTP 状态码映射。
+
+异常继承关系:
+-----------
+SecurityError (本模块)
+└── AuthError (auth/domain/exceptions.py)
+    └── InvalidCredentialsError, TokenExpiredError, ...
+
+使用指南:
+--------
+- 基础设施代码 → 使用本模块异常
+- 业务逻辑代码 → 使用 auth/domain/exceptions.py
+"""
 
 
 class SecurityError(Exception):

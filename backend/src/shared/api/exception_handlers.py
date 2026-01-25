@@ -11,6 +11,12 @@ from src.shared.domain.exceptions import (
     ResourceQuotaExceededError,
     ValidationError,
 )
+
+# Training 模块 HyperPod 异常
+from src.modules.training.domain.exceptions import (
+    HyperPodPodNotFoundError,
+    HyperPodSDKUnavailableError,
+)
 from src.shared.infrastructure.security.exceptions import (
     AccountLockedError,
     AccountValidationError,
@@ -28,6 +34,22 @@ from src.shared.infrastructure.security.exceptions import (
     UserNotFoundError,
 )
 
+# Auth 模块异常（继承 SecurityError，需要单独映射）
+from src.modules.auth.domain.exceptions import (
+    AccountInactiveError as AuthAccountInactiveError,
+    AccountLockedError as AuthAccountLockedError,
+    InsufficientPermissionsError as AuthInsufficientPermissionsError,
+    InvalidCredentialsError as AuthInvalidCredentialsError,
+    InvalidTokenError as AuthInvalidTokenError,
+    PasswordExpiredError as AuthPasswordExpiredError,
+    PasswordHistoryViolationError as AuthPasswordHistoryViolationError,
+    PasswordTooWeakError as AuthPasswordTooWeakError,
+    SSODegradedModeError as AuthSSODegradedModeError,
+    SSOError as AuthSSOError,
+    TokenExpiredError as AuthTokenExpiredError,
+    UserNotFoundError as AuthUserNotFoundError,
+)
+
 # Domain exception → HTTP status code mapping
 DOMAIN_EXCEPTION_MAP: dict[type[DomainError], int] = {
     EntityNotFoundError: status.HTTP_404_NOT_FOUND,
@@ -35,10 +57,14 @@ DOMAIN_EXCEPTION_MAP: dict[type[DomainError], int] = {
     InvalidStateTransitionError: status.HTTP_409_CONFLICT,
     ValidationError: status.HTTP_422_UNPROCESSABLE_ENTITY,
     ResourceQuotaExceededError: status.HTTP_429_TOO_MANY_REQUESTS,
+    # HyperPod 异常
+    HyperPodSDKUnavailableError: status.HTTP_503_SERVICE_UNAVAILABLE,
+    HyperPodPodNotFoundError: status.HTTP_404_NOT_FOUND,
 }
 
 # Security exception → HTTP status code mapping
 SECURITY_EXCEPTION_MAP: dict[type[SecurityError], int] = {
+    # Shared Security 模块异常
     AuthenticationError: status.HTTP_401_UNAUTHORIZED,
     InvalidCredentialsError: status.HTTP_401_UNAUTHORIZED,
     UserNotFoundError: status.HTTP_404_NOT_FOUND,
@@ -52,6 +78,19 @@ SECURITY_EXCEPTION_MAP: dict[type[SecurityError], int] = {
     InsufficientPermissionsError: status.HTTP_403_FORBIDDEN,
     SSOError: status.HTTP_401_UNAUTHORIZED,
     SSODegradedModeError: status.HTTP_503_SERVICE_UNAVAILABLE,
+    # Auth 模块异常（继承 SecurityError）
+    AuthInvalidCredentialsError: status.HTTP_401_UNAUTHORIZED,
+    AuthUserNotFoundError: status.HTTP_404_NOT_FOUND,
+    AuthTokenExpiredError: status.HTTP_401_UNAUTHORIZED,
+    AuthInvalidTokenError: status.HTTP_401_UNAUTHORIZED,
+    AuthAccountLockedError: status.HTTP_423_LOCKED,
+    AuthAccountInactiveError: status.HTTP_401_UNAUTHORIZED,
+    AuthPasswordExpiredError: status.HTTP_401_UNAUTHORIZED,
+    AuthPasswordTooWeakError: status.HTTP_400_BAD_REQUEST,
+    AuthPasswordHistoryViolationError: status.HTTP_400_BAD_REQUEST,
+    AuthInsufficientPermissionsError: status.HTTP_403_FORBIDDEN,
+    AuthSSOError: status.HTTP_401_UNAUTHORIZED,
+    AuthSSODegradedModeError: status.HTTP_503_SERVICE_UNAVAILABLE,
 }
 
 
@@ -92,9 +131,11 @@ async def security_exception_handler(
     }
 
     # Include additional context for specific exceptions
-    if isinstance(exc, AccountLockedError) and exc.locked_until:
+    # 支持 security 模块和 auth 模块的 AccountLockedError
+    if isinstance(exc, (AccountLockedError, AuthAccountLockedError)) and hasattr(exc, "locked_until") and exc.locked_until:
         content["locked_until"] = exc.locked_until
-    elif isinstance(exc, PasswordTooWeakError):
+    # 支持 security 模块和 auth 模块的 PasswordTooWeakError
+    elif isinstance(exc, (PasswordTooWeakError, AuthPasswordTooWeakError)) and hasattr(exc, "violations"):
         content["violations"] = exc.violations
 
     return JSONResponse(status_code=status_code, content=content)
