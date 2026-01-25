@@ -214,6 +214,43 @@ class TrainingJobService(EnhancedBaseService[TrainingJob, int]):
         )
         return await self._repository.update(job)
 
+    async def update_job(self, job_id: int, data: dict) -> TrainingJob:
+        """Update a training job.
+
+        Only certain fields can be updated:
+        - priority: Can be updated for non-terminal jobs
+        - description: Can always be updated
+        - max_epochs: Can be updated for running jobs
+        - checkpoint_interval: Can be updated for running jobs
+        """
+        job = await self._get_or_raise(job_id)
+
+        if job.is_terminal():
+            raise InvalidStateTransitionError(
+                "TrainingJob",
+                job.status.value,
+                "update",
+                "Cannot update a completed or failed job",
+            )
+
+        # Update allowed fields
+        if "priority" in data and data["priority"] is not None:
+            from src.shared.utils import EnumMapper
+            job.priority = EnumMapper.from_string(
+                data["priority"], JobPriority, job.priority
+            )
+
+        if "description" in data:
+            job.description = data["description"]
+
+        if "max_epochs" in data and data["max_epochs"] is not None:
+            job.max_epochs = data["max_epochs"]
+
+        if "checkpoint_interval" in data and data["checkpoint_interval"] is not None:
+            job.checkpoint_interval = data["checkpoint_interval"]
+
+        return await self._repository.update(job)
+
     async def delete_job(self, job_id: int) -> None:
         """Delete a training job (soft delete)."""
         job = await self._get_or_raise(job_id)

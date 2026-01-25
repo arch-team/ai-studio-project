@@ -64,8 +64,8 @@ async def create_model(
     responses={401: {"model": ModelErrorResponse, "description": "Unauthorized"}},
 )
 async def list_models(
-    page: PageParam,
-    page_size: PageSizeParam,
+    page: PageParam = 1,
+    page_size: PageSizeParam = 20,
     training_job_id: int | None = Query(default=None, description="Filter by training job"),
     status_filter: ModelStatusEnum | None = Query(default=None, alias="status", description="Filter by status"),
     framework: ModelFrameworkEnum | None = Query(default=None, description="Filter by framework"),

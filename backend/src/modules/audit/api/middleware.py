@@ -39,6 +39,13 @@ class AuditMiddleware(BaseHTTPMiddleware):
         "OPTIONS": None,
     }
 
+    # Special path patterns for state transition operations
+    STATE_OPERATION_MAP: dict[str, OperationType] = {
+        "/pause": OperationType.PAUSE,
+        "/resume": OperationType.RESUME,
+        "/cancel": OperationType.CANCEL,
+    }
+
     # Path keywords to resource type mapping
     PATH_RESOURCE_MAP: dict[str, ResourceType] = {
         "training-jobs": ResourceType.TRAINING_JOB,
@@ -99,8 +106,8 @@ class AuditMiddleware(BaseHTTPMiddleware):
         if self._should_skip(request):
             return await self._safe_call_next(request, call_next)
 
-        # Get operation type from HTTP method
-        operation_type = self.METHOD_OPERATION_MAP.get(request.method)
+        # Get operation type - check for state transitions first
+        operation_type = self._get_operation_type(request)
         if operation_type is None:
             return await self._safe_call_next(request, call_next)
 
@@ -126,6 +133,23 @@ class AuditMiddleware(BaseHTTPMiddleware):
         """Check if request should skip audit logging."""
         path = request.url.path
         return path in AUDIT_EXEMPT_PATHS or path.startswith(AUDIT_EXEMPT_PREFIXES)
+
+    def _get_operation_type(self, request: Request) -> OperationType | None:
+        """Get operation type based on request method and path.
+
+        State transition operations (pause/resume/cancel) are identified
+        by path suffix even though they use POST method.
+        """
+        path = request.url.path
+
+        # Check for state transition operations first (POST to specific paths)
+        if request.method == "POST":
+            for suffix, op_type in self.STATE_OPERATION_MAP.items():
+                if path.endswith(suffix):
+                    return op_type
+
+        # Fall back to HTTP method mapping
+        return self.METHOD_OPERATION_MAP.get(request.method)
 
     async def _capture_request_data(self, request: Request) -> dict[str, Any] | None:
         """Capture and sanitize request body."""

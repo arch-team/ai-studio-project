@@ -189,3 +189,105 @@ class JobTemplateListResponse(BaseModel):
     page: int
     page_size: int
     total_pages: int
+
+
+# === Log Schemas ===
+
+
+class LogEntry(BaseModel):
+    """Single log entry."""
+
+    timestamp: datetime
+    pod_name: str | None = None
+    message: str
+
+
+class TrainingLogsResponse(BaseModel):
+    """Training job logs response."""
+
+    logs: list[LogEntry]
+    next_token: str | None = None
+
+
+# === Kueue Debug Schemas ===
+
+
+class KueueCondition(BaseModel):
+    """Kueue Workload condition."""
+
+    type: str
+    status: str
+    last_transition_time: datetime | None = None
+    reason: str | None = None
+    message: str | None = None
+
+
+class PodSetAssignment(BaseModel):
+    """Pod set resource assignment."""
+
+    name: str
+    flavors: dict[str, str] | None = None
+    resource_usage: dict[str, str] | None = None
+    count: int | None = None
+
+
+class KueueAdmission(BaseModel):
+    """Kueue admission info."""
+
+    cluster_queue: str
+    pod_set_assignments: list[PodSetAssignment] | None = None
+
+
+class KueueWorkloadStatus(BaseModel):
+    """Kueue workload status."""
+
+    admitted: bool = False
+    quota_reserved: bool = False
+    pods_ready: bool = False
+    evicted: bool = False
+    finished: bool = False
+
+
+class ResourceUsage(BaseModel):
+    """Resource usage info."""
+
+    used: str
+    total: str
+
+
+class KueueQuotaUsage(BaseModel):
+    """Kueue quota usage info."""
+
+    cpu: ResourceUsage | None = None
+    memory: ResourceUsage | None = None
+    gpu: ResourceUsage | None = None
+
+
+class QueueInfo(BaseModel):
+    """Queue information."""
+
+    local_queue: str | None = None
+    cluster_queue: str | None = None
+    queue_position: int | None = None
+
+
+class PreemptionEvent(BaseModel):
+    """Preemption history event."""
+
+    preempted_at: datetime
+    preempting_workload: str | None = None
+    reason: str | None = None
+
+
+class KueueDebugResponse(BaseModel):
+    """Kueue Workload debug information."""
+
+    workload_name: str
+    namespace: str
+    status: KueueWorkloadStatus
+    admission: KueueAdmission | None = None
+    conditions: list[KueueCondition] | None = None
+    queue_info: QueueInfo | None = None
+    quota_usage: KueueQuotaUsage | None = None
+    preemption_history: list[PreemptionEvent] | None = None
+    raw_yaml: str | None = None  # Only visible to admin

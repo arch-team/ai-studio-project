@@ -2,6 +2,7 @@
 
 from .requests import (
     CreateTrainingJobRequest,
+    UpdateTrainingJobRequest,
     CreateCheckpointRequest,
     CreateJobTemplateRequest,
     UpdateJobTemplateRequest,
@@ -23,6 +24,17 @@ from .responses import (
     JobTemplateListResponse,
     JobTemplateSummary,
     TemplateVisibilityEnum,
+    # Log responses
+    LogEntry,
+    TrainingLogsResponse,
+    # Kueue debug responses
+    KueueDebugResponse,
+    KueueWorkloadStatus,
+    KueueCondition,
+    KueueAdmission,
+    KueueQuotaUsage,
+    QueueInfo,
+    PreemptionEvent,
 )
 
 __all__ = [
@@ -35,6 +47,7 @@ __all__ = [
     "TemplateVisibilityEnum",
     # Requests
     "CreateTrainingJobRequest",
+    "UpdateTrainingJobRequest",
     "CreateCheckpointRequest",
     "CreateJobTemplateRequest",
     "UpdateJobTemplateRequest",
@@ -48,4 +61,15 @@ __all__ = [
     "JobTemplateSummary",
     "JobTemplateDetail",
     "JobTemplateListResponse",
+    # Log responses
+    "LogEntry",
+    "TrainingLogsResponse",
+    # Kueue debug responses
+    "KueueDebugResponse",
+    "KueueWorkloadStatus",
+    "KueueCondition",
+    "KueueAdmission",
+    "KueueQuotaUsage",
+    "QueueInfo",
+    "PreemptionEvent",
 ]

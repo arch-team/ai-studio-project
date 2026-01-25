@@ -80,6 +80,18 @@ class CreateCheckpointRequest(BaseModel):
     checkpoint_name: str | None = Field(None, max_length=256, description="Checkpoint name")
 
 
+class UpdateTrainingJobRequest(BaseModel):
+    """Request body for updating a training job.
+
+    Only certain fields can be updated after job creation.
+    """
+
+    priority: JobPriorityEnum | None = Field(None, description="Job priority")
+    description: str | None = Field(None, description="Job description")
+    max_epochs: int | None = Field(None, ge=1, description="Max training epochs")
+    checkpoint_interval: int | None = Field(None, ge=1, description="Checkpoint interval")
+
+
 class TemplateVisibilityEnum(str, Enum):
     """Template visibility scope."""
 

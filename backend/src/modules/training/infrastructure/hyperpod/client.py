@@ -441,9 +441,15 @@ class HyperPodClient(IHyperPodClient):
         return await self._run_in_executor(_stop)
 
     async def list_training_job_pods(
-        self, cluster_name: str, job_name: str
+        self, cluster_name: str, job_name: str, namespace: str = "default"
     ) -> list[dict[str, Any]]:
-        """List pods for a training job using HyperPod SDK."""
+        """List pods for a training job using HyperPod SDK.
+
+        Args:
+            cluster_name: HyperPod 集群名称
+            job_name: 任务名称
+            namespace: Kubernetes namespace (Task Governance)
+        """
 
         def _list_pods() -> list[dict[str, Any]]:
             if HyperPodPytorchJob is None:
@@ -452,7 +458,7 @@ class HyperPodClient(IHyperPodClient):
             # 确保集群上下文已设置
             self._ensure_cluster_context(cluster_name)
 
-            job = HyperPodPytorchJob.get(name=job_name)
+            job = HyperPodPytorchJob.get(name=job_name, namespace=namespace)
             return job.list_pods()
 
         return await self._run_in_executor(_list_pods)
@@ -474,14 +480,34 @@ class HyperPodClient(IHyperPodClient):
             cluster_name="", job_name=job_id, namespace=namespace
         )
 
-    async def get_job_pods(self, job_id: str) -> list[dict[str, Any]]:
-        """获取任务 Pod 列表 (list_training_job_pods 的别名)"""
-        return await self.list_training_job_pods(cluster_name="", job_name=job_id)
+    async def get_job_pods(
+        self, job_id: str, namespace: str = "default"
+    ) -> list[dict[str, Any]]:
+        """获取任务 Pod 列表 (list_training_job_pods 的别名)
+
+        Args:
+            job_id: 任务 ID/名称
+            namespace: Kubernetes namespace (Task Governance)
+        """
+        return await self.list_training_job_pods(
+            cluster_name="", job_name=job_id, namespace=namespace
+        )
 
     async def get_pod_status(
-        self, cluster_name: str, job_name: str, pod_name: str
+        self,
+        cluster_name: str,
+        job_name: str,
+        pod_name: str,
+        namespace: str = "default",
     ) -> dict[str, Any]:
-        """获取单个 Pod 状态"""
+        """获取单个 Pod 状态
+
+        Args:
+            cluster_name: HyperPod 集群名称
+            job_name: 任务名称
+            pod_name: Pod 名称
+            namespace: Kubernetes namespace (Task Governance)
+        """
 
         def _get_status() -> dict[str, Any]:
             if HyperPodPytorchJob is None:
@@ -490,7 +516,7 @@ class HyperPodClient(IHyperPodClient):
             # 确保集群上下文已设置
             self._ensure_cluster_context(cluster_name)
 
-            job = HyperPodPytorchJob.get(name=job_name)
+            job = HyperPodPytorchJob.get(name=job_name, namespace=namespace)
             pods = job.list_pods()
 
             for pod in pods:

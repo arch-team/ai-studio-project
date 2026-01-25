@@ -22,6 +22,7 @@ from src.modules.training.api.schemas import (
     CreateCheckpointRequest,
     CreateJobFromTemplateRequest,
     CreateTrainingJobRequest,
+    UpdateTrainingJobRequest,
     JobPriorityEnum,
     JobStatusEnum,
     StorageTierEnum,
@@ -115,6 +116,30 @@ async def get_training_job(
     """Get training job details by ID."""
     job = await service.get_job(job_id)
     check_resource_owner_or_privileged(job.owner_id, current_user, "training job", "view")
+    return TrainingJobDetail.from_entity(job)
+
+
+@router.put(
+    "/{job_id}",
+    response_model=TrainingJobDetail,
+)
+async def update_training_job(
+    job_id: int,
+    data: UpdateTrainingJobRequest,
+    current_user: CurrentUser = Depends(require_engineer),
+    service: TrainingJobService = Depends(get_training_job_service),
+):
+    """Update a training job.
+
+    Only certain fields can be updated:
+    - priority: Job scheduling priority
+    - description: Job description
+    - max_epochs: Maximum training epochs
+    - checkpoint_interval: Checkpoint save interval
+    """
+    job = await service.get_job(job_id)
+    check_resource_owner_or_privileged(job.owner_id, current_user, "training job", "update")
+    job = await service.update_job(job_id, data.model_dump(exclude_unset=True))
     return TrainingJobDetail.from_entity(job)
 
 
@@ -293,3 +318,101 @@ async def create_job_from_template(
     await template_service.increment_usage(template_id)
 
     return TrainingJobDetail.from_entity(job)
+
+
+# === Logs Endpoint ===
+
+
+@router.get(
+    "/{job_id}/logs",
+)
+async def get_training_job_logs(
+    job_id: int,
+    tail: int = Query(default=100, ge=1, le=10000, description="Number of log lines to return"),
+    start_time: datetime | None = Query(default=None, description="Log start time"),
+    end_time: datetime | None = Query(default=None, description="Log end time"),
+    filter_pattern: str | None = Query(default=None, description="Filter pattern (e.g., 'ERROR')"),
+    pod_name: str | None = Query(default=None, description="Filter by specific pod"),
+    current_user: CurrentUser = Depends(get_current_active_user),
+    service: TrainingJobService = Depends(get_training_job_service),
+):
+    """Get training job logs.
+
+    Retrieves logs from the training containers (stdout/stderr).
+    Supports filtering by time range, pattern, and specific pod.
+    """
+    from src.modules.training.api.schemas import LogEntry, TrainingLogsResponse
+
+    job = await service.get_job(job_id)
+    check_resource_owner_or_privileged(job.owner_id, current_user, "training job", "view logs of")
+
+    # TODO: Integrate with CloudWatch Logs or HyperPod log API
+    # For now, return a placeholder response
+    logs = [
+        LogEntry(
+            timestamp=utc_now(),
+            pod_name=f"{job.job_name}-worker-0",
+            message=f"Training job {job.job_name} is in {job.status.value} state",
+        )
+    ]
+
+    return TrainingLogsResponse(logs=logs, next_token=None)
+
+
+# === Kueue Debug Endpoint ===
+
+
+@router.get(
+    "/{job_id}/debug/kueue",
+)
+async def get_kueue_debug_info(
+    job_id: int,
+    current_user: CurrentUser = Depends(get_current_active_user),
+    service: TrainingJobService = Depends(get_training_job_service),
+):
+    """Get Kueue Workload debug information.
+
+    Returns detailed Kueue scheduling status for troubleshooting.
+    Only accessible by job owner or admin.
+    """
+    from src.modules.training.api.schemas import (
+        KueueDebugResponse,
+        KueueWorkloadStatus,
+        QueueInfo,
+    )
+
+    job = await service.get_job(job_id)
+    check_resource_owner_or_privileged(job.owner_id, current_user, "training job", "view debug info of")
+
+    # Build Kueue workload name
+    workload_name = job.kueue_workload_name or f"job-{job_id}-workload"
+
+    # TODO: Integrate with Kueue API to get real status
+    # For now, return a placeholder based on job status
+    is_admitted = job.status in (JobStatus.RUNNING, JobStatus.PAUSED)
+    is_finished = job.status in (JobStatus.COMPLETED, JobStatus.FAILED)
+
+    response = KueueDebugResponse(
+        workload_name=workload_name,
+        namespace="training-jobs",
+        status=KueueWorkloadStatus(
+            admitted=is_admitted,
+            quota_reserved=is_admitted,
+            pods_ready=job.status == JobStatus.RUNNING,
+            evicted=job.status == JobStatus.PREEMPTED,
+            finished=is_finished,
+        ),
+        queue_info=QueueInfo(
+            local_queue=f"user-{job.owner_id}-queue",
+            cluster_queue="default-cluster-queue",
+            queue_position=None if is_admitted else 1,
+        ),
+        preemption_history=None,
+        raw_yaml=None,  # Only for admin
+    )
+
+    # Include raw YAML only for admin
+    if current_user.is_admin:
+        response.raw_yaml = f"# Workload YAML for {workload_name}\n# (placeholder)"
+
+    return response

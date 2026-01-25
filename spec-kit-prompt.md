@@ -22,3 +22,8 @@
 - SC-002: 检查点保存成功率 >99%
 这两个集成测试是否完成
 每个任务按照TDD（测试驱动开发的流程进行），完成后将tasks.md中已经明确完成的任务标记为完成状态
+
+
+
+/everything-claude-code:eval 对这个文件中的 'US1 (P1) - 训练任务管理 (37 tasks)'下的 ‘### 后端 API 端点 (基于 contracts/training-jobs-api.yaml)
+’ 制定评估/Users/jinhuasu/Project_Workspace/Anker-Projects/ml-platform-research/llm-platform-solution/ai-studio-project/specs/001-ai-training-platform/tasks.md  

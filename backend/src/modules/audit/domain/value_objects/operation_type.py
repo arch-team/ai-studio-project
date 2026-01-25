@@ -11,3 +11,6 @@ class OperationType(Enum):
     DELETE = "delete"
     LOGIN = "login"
     LOGOUT = "logout"
+    PAUSE = "pause"
+    RESUME = "resume"
+    CANCEL = "cancel"
