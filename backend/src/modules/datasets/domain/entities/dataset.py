@@ -56,11 +56,7 @@ class Dataset:
         return new_status in valid_transitions
 
     def transition_to(self, new_status: DatasetStatus) -> None:
-        """转换到新状态。
-
-        Raises:
-            InvalidStateTransitionError: 如果状态转换无效
-        """
+        """转换到新状态，无效转换抛出 InvalidStateTransitionError。"""
         if not self.can_transition_to(new_status):
             raise InvalidStateTransitionError(
                 "Dataset", self.status.value, new_status.value
@@ -108,14 +104,7 @@ class Dataset:
         return self.visibility == DatasetVisibility.PUBLIC
 
     def is_accessible_by(self, user_id: int) -> bool:
-        """检查用户是否可以访问此数据集。
-
-        Args:
-            user_id: 要检查的用户 ID
-
-        Returns:
-            如果用户可以访问则返回 True
-        """
+        """检查指定用户是否可以访问此数据集。"""
         # 所有者始终可以访问
         if user_id == self.owner_id:
             return True

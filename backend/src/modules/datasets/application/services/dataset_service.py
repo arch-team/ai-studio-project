@@ -18,26 +18,14 @@ class DatasetService(EnhancedBaseService[Dataset, int]):
     """Service for managing datasets."""
 
     def __init__(self, repository: IDatasetRepository):
-        """Initialize dataset service.
-
-        Args:
-            repository: Dataset repository instance
-        """
         super().__init__(repository, "Dataset")
         self._not_found_error_factory = lambda id_: DatasetNotFoundError(dataset_id=id_)
 
     async def create_dataset(self, owner_id: int, data: dict) -> Dataset:
-        """Create a new dataset.
-
-        Args:
-            owner_id: Owner user ID
-            data: Dataset configuration data
-
-        Returns:
-            Created dataset entity
+        """创建新数据集。
 
         Raises:
-            DuplicateEntityError: If name+version already exists
+            DuplicateEntityError: 如果 name+version 已存在
         """
         name = data["name"]
         version = data.get("version", "v1")
@@ -78,16 +66,10 @@ class DatasetService(EnhancedBaseService[Dataset, int]):
         return await self._repository.add(dataset)
 
     async def get_dataset(self, dataset_id: int) -> Dataset:
-        """Get dataset by ID.
-
-        Args:
-            dataset_id: Dataset ID
-
-        Returns:
-            Dataset entity
+        """根据 ID 获取数据集。
 
         Raises:
-            DatasetNotFoundError: If dataset not found
+            DatasetNotFoundError: 如果数据集不存在
         """
         return await self._get_or_raise(dataset_id)
 
@@ -102,21 +84,7 @@ class DatasetService(EnhancedBaseService[Dataset, int]):
         sort_by: str = "created_at",
         sort_order: str = "desc",
     ) -> tuple[list[Dataset], int]:
-        """List datasets with filters and pagination.
-
-        Args:
-            owner_id: Owner user ID
-            status: Filter by status
-            dataset_type: Filter by dataset type
-            visibility: Filter by visibility
-            page: Page number (1-based)
-            page_size: Items per page
-            sort_by: Sort column
-            sort_order: Sort direction
-
-        Returns:
-            Tuple of (datasets, total_count)
-        """
+        """列出用户数据集，支持过滤和分页。"""
         return await self._repository.list_by_owner(
             owner_id=owner_id,
             status=status,
@@ -129,17 +97,10 @@ class DatasetService(EnhancedBaseService[Dataset, int]):
         )
 
     async def update_dataset(self, dataset_id: int, data: dict) -> Dataset:
-        """Update dataset metadata.
-
-        Args:
-            dataset_id: Dataset ID
-            data: Update data (description, tags, visibility)
-
-        Returns:
-            Updated dataset entity
+        """更新数据集元数据 (description, tags, visibility)。
 
         Raises:
-            DatasetNotFoundError: If dataset not found
+            DatasetNotFoundError: 如果数据集不存在
         """
         dataset = await self._get_or_raise(dataset_id)
 
@@ -160,13 +121,10 @@ class DatasetService(EnhancedBaseService[Dataset, int]):
         return await self._repository.update(dataset)
 
     async def delete_dataset(self, dataset_id: int) -> None:
-        """Delete (archive) a dataset.
-
-        Args:
-            dataset_id: Dataset ID
+        """删除（归档）数据集。
 
         Raises:
-            DatasetNotFoundError: If dataset not found
+            DatasetNotFoundError: 如果数据集不存在
         """
         dataset = await self._get_or_raise(dataset_id)
 
@@ -186,20 +144,11 @@ class DatasetService(EnhancedBaseService[Dataset, int]):
         storage_uri: str | None = None,
         description: str | None = None,
     ) -> Dataset:
-        """Create a new version of a dataset.
-
-        Args:
-            dataset_id: Source dataset ID
-            version: New version identifier
-            storage_uri: Storage URI for new version (optional)
-            description: Version description
-
-        Returns:
-            New dataset version entity
+        """基于现有数据集创建新版本。
 
         Raises:
-            DatasetNotFoundError: If source dataset not found
-            DuplicateEntityError: If version already exists
+            DatasetNotFoundError: 如果源数据集不存在
+            DuplicateEntityError: 如果版本号已存在
         """
         # Get source dataset
         source = await self._get_or_raise(dataset_id)
@@ -227,34 +176,22 @@ class DatasetService(EnhancedBaseService[Dataset, int]):
         return await self._repository.add(new_dataset)
 
     async def mark_available(self, dataset_id: int) -> Dataset:
-        """Mark dataset as available.
-
-        Args:
-            dataset_id: Dataset ID
-
-        Returns:
-            Updated dataset entity
+        """标记数据集为可用状态。
 
         Raises:
-            DatasetNotFoundError: If dataset not found
-            InvalidStateTransitionError: If transition not allowed
+            DatasetNotFoundError: 如果数据集不存在
+            InvalidStateTransitionError: 如果状态转换无效
         """
         dataset = await self._get_or_raise(dataset_id)
         dataset.mark_available()
         return await self._repository.update(dataset)
 
     async def mark_error(self, dataset_id: int) -> Dataset:
-        """Mark dataset as error.
-
-        Args:
-            dataset_id: Dataset ID
-
-        Returns:
-            Updated dataset entity
+        """标记数据集为错误状态。
 
         Raises:
-            DatasetNotFoundError: If dataset not found
-            InvalidStateTransitionError: If transition not allowed
+            DatasetNotFoundError: 如果数据集不存在
+            InvalidStateTransitionError: 如果状态转换无效
         """
         dataset = await self._get_or_raise(dataset_id)
         dataset.mark_error()

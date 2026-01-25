@@ -15,6 +15,7 @@ pydantic-settings>=2.5.0
 # AWS SDK
 boto3>=1.35.3
 botocore>=1.35.3
+aioboto3>=13.0.0  # 原生异步 S3 客户端
 
 # HyperPod SDK (optional - install separately for AWS integration)
 # sagemaker-hyperpod>=3.0.0

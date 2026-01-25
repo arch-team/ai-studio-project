@@ -29,21 +29,7 @@ class IDatasetRepository(ABC):
         sort_by: str = "created_at",
         sort_order: str = "desc",
     ) -> tuple[list[Dataset], int]:
-        """列出用户的数据集。
-
-        Args:
-            owner_id: 所有者 ID
-            status: 状态过滤
-            dataset_type: 类型过滤
-            visibility: 可见性过滤
-            page: 页码
-            page_size: 每页大小
-            sort_by: 排序字段
-            sort_order: 排序方向 (asc/desc)
-
-        Returns:
-            (数据集列表, 总数)
-        """
+        """按所有者分页查询数据集。"""
 
     @abstractmethod
     async def list_public(
@@ -52,35 +38,19 @@ class IDatasetRepository(ABC):
         page: int = 1,
         page_size: int = 20,
     ) -> tuple[list[Dataset], int]:
-        """列出公开数据集。
-
-        Returns:
-            (数据集列表, 总数)
-        """
+        """分页查询公开数据集。"""
 
     @abstractmethod
     async def add(self, dataset: Dataset) -> Dataset:
-        """添加新数据集。
-
-        Returns:
-            添加后的数据集（含生成的 ID）
-        """
+        """添加新数据集，返回含生成 ID 的实体。"""
 
     @abstractmethod
     async def update(self, dataset: Dataset) -> Dataset:
-        """更新数据集。
-
-        Returns:
-            更新后的数据集
-        """
+        """更新数据集。"""
 
     @abstractmethod
     async def delete(self, dataset_id: int) -> bool:
-        """删除数据集。
-
-        Returns:
-            是否删除成功
-        """
+        """删除数据集。"""
 
     @abstractmethod
     async def exists(self, dataset_id: int) -> bool:

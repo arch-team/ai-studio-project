@@ -1,7 +1,9 @@
-"""测试 S3 Multipart Upload 客户端。"""
+"""测试 S3 Multipart Upload 客户端。
 
-from datetime import datetime
-from unittest.mock import MagicMock, patch
+使用 aioboto3 async mock 模式。
+"""
+
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -13,7 +15,10 @@ class TestS3MultipartClientInit:
         """验证使用 bucket 和 region 初始化。"""
         from src.modules.datasets.infrastructure.s3 import S3MultipartClient
 
-        with patch("boto3.client") as mock_boto:
+        with patch("aioboto3.Session") as mock_session_class:
+            mock_session = MagicMock()
+            mock_session_class.return_value = mock_session
+
             client = S3MultipartClient(
                 bucket_name="test-bucket",
                 region="us-west-2",
@@ -21,26 +26,41 @@ class TestS3MultipartClientInit:
 
             assert client._bucket_name == "test-bucket"
             assert client._region == "us-west-2"
-            mock_boto.assert_called_once_with("s3", region_name="us-west-2")
+            assert client._session == mock_session
 
 
 class TestS3MultipartClientCreateMultipartUpload:
     """测试 create_multipart_upload 方法。"""
 
+    @pytest.fixture
+    def mock_s3_client(self) -> AsyncMock:
+        """创建 mock S3 客户端。"""
+        return AsyncMock()
+
+    @pytest.fixture
+    def mock_session(self, mock_s3_client: AsyncMock) -> MagicMock:
+        """创建 mock aioboto3 Session。"""
+        mock_session = MagicMock()
+        context_manager = AsyncMock()
+        context_manager.__aenter__.return_value = mock_s3_client
+        context_manager.__aexit__.return_value = None
+        mock_session.client.return_value = context_manager
+        return mock_session
+
     @pytest.mark.asyncio
-    async def test_create_multipart_upload_success(self) -> None:
+    async def test_create_multipart_upload_success(
+        self, mock_session: MagicMock, mock_s3_client: AsyncMock
+    ) -> None:
         """验证成功创建分片上传。"""
         from src.modules.datasets.infrastructure.s3 import S3MultipartClient
 
-        with patch("boto3.client") as mock_boto:
-            mock_s3 = MagicMock()
-            mock_s3.create_multipart_upload.return_value = {
-                "UploadId": "upload-123",
-                "Bucket": "test-bucket",
-                "Key": "datasets/1/data.tar",
-            }
-            mock_boto.return_value = mock_s3
+        mock_s3_client.create_multipart_upload.return_value = {
+            "UploadId": "upload-123",
+            "Bucket": "test-bucket",
+            "Key": "datasets/1/data.tar",
+        }
 
+        with patch("aioboto3.Session", return_value=mock_session):
             client = S3MultipartClient(
                 bucket_name="test-bucket",
                 region="us-west-2",
@@ -53,20 +73,20 @@ class TestS3MultipartClientCreateMultipartUpload:
             )
 
             assert result["UploadId"] == "upload-123"
-            mock_s3.create_multipart_upload.assert_called_once()
+            mock_s3_client.create_multipart_upload.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_create_multipart_upload_with_kms(self) -> None:
+    async def test_create_multipart_upload_with_kms(
+        self, mock_session: MagicMock, mock_s3_client: AsyncMock
+    ) -> None:
         """验证使用 KMS 加密创建分片上传。"""
         from src.modules.datasets.infrastructure.s3 import S3MultipartClient
 
-        with patch("boto3.client") as mock_boto:
-            mock_s3 = MagicMock()
-            mock_s3.create_multipart_upload.return_value = {
-                "UploadId": "upload-456",
-            }
-            mock_boto.return_value = mock_s3
+        mock_s3_client.create_multipart_upload.return_value = {
+            "UploadId": "upload-456",
+        }
 
+        with patch("aioboto3.Session", return_value=mock_session):
             client = S3MultipartClient(
                 bucket_name="test-bucket",
                 region="us-west-2",
@@ -78,23 +98,38 @@ class TestS3MultipartClientCreateMultipartUpload:
                 content_type="application/x-tar",
             )
 
-            call_args = mock_s3.create_multipart_upload.call_args
+            call_args = mock_s3_client.create_multipart_upload.call_args
             assert call_args.kwargs.get("ServerSideEncryption") == "aws:kms"
 
 
 class TestS3MultipartClientGeneratePresignedUrl:
     """测试 generate_presigned_url_for_part 方法。"""
 
+    @pytest.fixture
+    def mock_s3_client(self) -> AsyncMock:
+        """创建 mock S3 客户端。"""
+        return AsyncMock()
+
+    @pytest.fixture
+    def mock_session(self, mock_s3_client: AsyncMock) -> MagicMock:
+        """创建 mock aioboto3 Session。"""
+        mock_session = MagicMock()
+        context_manager = AsyncMock()
+        context_manager.__aenter__.return_value = mock_s3_client
+        context_manager.__aexit__.return_value = None
+        mock_session.client.return_value = context_manager
+        return mock_session
+
     @pytest.mark.asyncio
-    async def test_generate_presigned_url_for_part(self) -> None:
+    async def test_generate_presigned_url_for_part(
+        self, mock_session: MagicMock, mock_s3_client: AsyncMock
+    ) -> None:
         """验证生成分片上传预签名 URL。"""
         from src.modules.datasets.infrastructure.s3 import S3MultipartClient
 
-        with patch("boto3.client") as mock_boto:
-            mock_s3 = MagicMock()
-            mock_s3.generate_presigned_url.return_value = "https://s3.example.com/presigned"
-            mock_boto.return_value = mock_s3
+        mock_s3_client.generate_presigned_url.return_value = "https://s3.example.com/presigned"
 
+        with patch("aioboto3.Session", return_value=mock_session):
             client = S3MultipartClient(
                 bucket_name="test-bucket",
                 region="us-west-2",
@@ -108,7 +143,7 @@ class TestS3MultipartClientGeneratePresignedUrl:
             )
 
             assert url == "https://s3.example.com/presigned"
-            mock_s3.generate_presigned_url.assert_called_once_with(
+            mock_s3_client.generate_presigned_url.assert_called_once_with(
                 "upload_part",
                 Params={
                     "Bucket": "test-bucket",
@@ -120,15 +155,15 @@ class TestS3MultipartClientGeneratePresignedUrl:
             )
 
     @pytest.mark.asyncio
-    async def test_generate_presigned_urls_batch(self) -> None:
+    async def test_generate_presigned_urls_batch(
+        self, mock_session: MagicMock, mock_s3_client: AsyncMock
+    ) -> None:
         """验证批量生成预签名 URL。"""
         from src.modules.datasets.infrastructure.s3 import S3MultipartClient
 
-        with patch("boto3.client") as mock_boto:
-            mock_s3 = MagicMock()
-            mock_s3.generate_presigned_url.return_value = "https://s3.example.com/presigned"
-            mock_boto.return_value = mock_s3
+        mock_s3_client.generate_presigned_url.return_value = "https://s3.example.com/presigned"
 
+        with patch("aioboto3.Session", return_value=mock_session):
             client = S3MultipartClient(
                 bucket_name="test-bucket",
                 region="us-west-2",
@@ -142,27 +177,42 @@ class TestS3MultipartClientGeneratePresignedUrl:
             )
 
             assert len(urls) == 3
-            assert mock_s3.generate_presigned_url.call_count == 3
+            assert mock_s3_client.generate_presigned_url.call_count == 3
 
 
 class TestS3MultipartClientCompleteUpload:
     """测试 complete_multipart_upload 方法。"""
 
+    @pytest.fixture
+    def mock_s3_client(self) -> AsyncMock:
+        """创建 mock S3 客户端。"""
+        return AsyncMock()
+
+    @pytest.fixture
+    def mock_session(self, mock_s3_client: AsyncMock) -> MagicMock:
+        """创建 mock aioboto3 Session。"""
+        mock_session = MagicMock()
+        context_manager = AsyncMock()
+        context_manager.__aenter__.return_value = mock_s3_client
+        context_manager.__aexit__.return_value = None
+        mock_session.client.return_value = context_manager
+        return mock_session
+
     @pytest.mark.asyncio
-    async def test_complete_multipart_upload_success(self) -> None:
+    async def test_complete_multipart_upload_success(
+        self, mock_session: MagicMock, mock_s3_client: AsyncMock
+    ) -> None:
         """验证成功完成分片上传。"""
         from src.modules.datasets.infrastructure.s3 import S3MultipartClient
 
-        with patch("boto3.client") as mock_boto:
-            mock_s3 = MagicMock()
-            mock_s3.complete_multipart_upload.return_value = {
-                "Location": "https://test-bucket.s3.amazonaws.com/datasets/1/data.tar",
-                "Bucket": "test-bucket",
-                "Key": "datasets/1/data.tar",
-                "ETag": '"abc123-5"',
-            }
-            mock_boto.return_value = mock_s3
+        mock_s3_client.complete_multipart_upload.return_value = {
+            "Location": "https://test-bucket.s3.amazonaws.com/datasets/1/data.tar",
+            "Bucket": "test-bucket",
+            "Key": "datasets/1/data.tar",
+            "ETag": '"abc123-5"',
+        }
 
+        with patch("aioboto3.Session", return_value=mock_session):
             client = S3MultipartClient(
                 bucket_name="test-bucket",
                 region="us-west-2",
@@ -180,22 +230,37 @@ class TestS3MultipartClientCompleteUpload:
             )
 
             assert result["ETag"] == '"abc123-5"'
-            mock_s3.complete_multipart_upload.assert_called_once()
+            mock_s3_client.complete_multipart_upload.assert_called_once()
 
 
 class TestS3MultipartClientAbortUpload:
     """测试 abort_multipart_upload 方法。"""
 
+    @pytest.fixture
+    def mock_s3_client(self) -> AsyncMock:
+        """创建 mock S3 客户端。"""
+        return AsyncMock()
+
+    @pytest.fixture
+    def mock_session(self, mock_s3_client: AsyncMock) -> MagicMock:
+        """创建 mock aioboto3 Session。"""
+        mock_session = MagicMock()
+        context_manager = AsyncMock()
+        context_manager.__aenter__.return_value = mock_s3_client
+        context_manager.__aexit__.return_value = None
+        mock_session.client.return_value = context_manager
+        return mock_session
+
     @pytest.mark.asyncio
-    async def test_abort_multipart_upload_success(self) -> None:
+    async def test_abort_multipart_upload_success(
+        self, mock_session: MagicMock, mock_s3_client: AsyncMock
+    ) -> None:
         """验证成功取消分片上传。"""
         from src.modules.datasets.infrastructure.s3 import S3MultipartClient
 
-        with patch("boto3.client") as mock_boto:
-            mock_s3 = MagicMock()
-            mock_s3.abort_multipart_upload.return_value = {}
-            mock_boto.return_value = mock_s3
+        mock_s3_client.abort_multipart_upload.return_value = {}
 
+        with patch("aioboto3.Session", return_value=mock_session):
             client = S3MultipartClient(
                 bucket_name="test-bucket",
                 region="us-west-2",
@@ -206,7 +271,7 @@ class TestS3MultipartClientAbortUpload:
                 upload_id="upload-123",
             )
 
-            mock_s3.abort_multipart_upload.assert_called_once_with(
+            mock_s3_client.abort_multipart_upload.assert_called_once_with(
                 Bucket="test-bucket",
                 Key="datasets/1/data.tar",
                 UploadId="upload-123",
@@ -216,22 +281,37 @@ class TestS3MultipartClientAbortUpload:
 class TestS3MultipartClientListParts:
     """测试 list_parts 方法。"""
 
+    @pytest.fixture
+    def mock_s3_client(self) -> AsyncMock:
+        """创建 mock S3 客户端。"""
+        return AsyncMock()
+
+    @pytest.fixture
+    def mock_session(self, mock_s3_client: AsyncMock) -> MagicMock:
+        """创建 mock aioboto3 Session。"""
+        mock_session = MagicMock()
+        context_manager = AsyncMock()
+        context_manager.__aenter__.return_value = mock_s3_client
+        context_manager.__aexit__.return_value = None
+        mock_session.client.return_value = context_manager
+        return mock_session
+
     @pytest.mark.asyncio
-    async def test_list_parts_returns_parts(self) -> None:
+    async def test_list_parts_returns_parts(
+        self, mock_session: MagicMock, mock_s3_client: AsyncMock
+    ) -> None:
         """验证列出已上传分片。"""
         from src.modules.datasets.infrastructure.s3 import S3MultipartClient
 
-        with patch("boto3.client") as mock_boto:
-            mock_s3 = MagicMock()
-            mock_s3.list_parts.return_value = {
-                "Parts": [
-                    {"PartNumber": 1, "ETag": '"etag1"', "Size": 100000000},
-                    {"PartNumber": 2, "ETag": '"etag2"', "Size": 100000000},
-                ],
-                "IsTruncated": False,
-            }
-            mock_boto.return_value = mock_s3
+        mock_s3_client.list_parts.return_value = {
+            "Parts": [
+                {"PartNumber": 1, "ETag": '"etag1"', "Size": 100000000},
+                {"PartNumber": 2, "ETag": '"etag2"', "Size": 100000000},
+            ],
+            "IsTruncated": False,
+        }
 
+        with patch("aioboto3.Session", return_value=mock_session):
             client = S3MultipartClient(
                 bucket_name="test-bucket",
                 region="us-west-2",
@@ -246,26 +326,26 @@ class TestS3MultipartClientListParts:
             assert parts[0]["PartNumber"] == 1
 
     @pytest.mark.asyncio
-    async def test_list_parts_handles_pagination(self) -> None:
+    async def test_list_parts_handles_pagination(
+        self, mock_session: MagicMock, mock_s3_client: AsyncMock
+    ) -> None:
         """验证处理分页的分片列表。"""
         from src.modules.datasets.infrastructure.s3 import S3MultipartClient
 
-        with patch("boto3.client") as mock_boto:
-            mock_s3 = MagicMock()
-            # 模拟两次调用（分页）
-            mock_s3.list_parts.side_effect = [
-                {
-                    "Parts": [{"PartNumber": 1, "ETag": '"etag1"', "Size": 100000000}],
-                    "IsTruncated": True,
-                    "NextPartNumberMarker": 1,
-                },
-                {
-                    "Parts": [{"PartNumber": 2, "ETag": '"etag2"', "Size": 100000000}],
-                    "IsTruncated": False,
-                },
-            ]
-            mock_boto.return_value = mock_s3
+        # 模拟两次调用（分页）
+        mock_s3_client.list_parts.side_effect = [
+            {
+                "Parts": [{"PartNumber": 1, "ETag": '"etag1"', "Size": 100000000}],
+                "IsTruncated": True,
+                "NextPartNumberMarker": 1,
+            },
+            {
+                "Parts": [{"PartNumber": 2, "ETag": '"etag2"', "Size": 100000000}],
+                "IsTruncated": False,
+            },
+        ]
 
+        with patch("aioboto3.Session", return_value=mock_session):
             client = S3MultipartClient(
                 bucket_name="test-bucket",
                 region="us-west-2",

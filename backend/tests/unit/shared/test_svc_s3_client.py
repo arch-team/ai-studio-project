@@ -1,9 +1,10 @@
 """S3 Client Tests - Unit tests for S3 storage client implementation.
 
 Tests follow TDD Red-Green-Refactor cycle.
+Uses aioboto3 async mock pattern.
 """
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -14,17 +15,27 @@ class TestS3StorageClient:
     """Test suite for S3StorageClient implementation."""
 
     @pytest.fixture
-    def mock_boto3_client(self) -> MagicMock:
-        """Mock boto3 S3 client."""
-        mock_client = MagicMock()
-        with patch("boto3.client", return_value=mock_client):
-            yield mock_client
+    def mock_s3_client(self) -> AsyncMock:
+        """Mock aioboto3 S3 client with async context manager support."""
+        mock_client = AsyncMock()
+        return mock_client
 
     @pytest.fixture
-    def s3_client(self, mock_boto3_client: MagicMock) -> S3StorageClient:
+    def mock_session(self, mock_s3_client: AsyncMock) -> MagicMock:
+        """Mock aioboto3.Session that returns mock client."""
+        mock_session = MagicMock()
+        # 创建支持 async with 的上下文管理器
+        context_manager = AsyncMock()
+        context_manager.__aenter__.return_value = mock_s3_client
+        context_manager.__aexit__.return_value = None
+        mock_session.client.return_value = context_manager
+        return mock_session
+
+    @pytest.fixture
+    def s3_client(self, mock_session: MagicMock) -> S3StorageClient:
         """Create S3StorageClient instance with mocked dependencies."""
-        client = S3StorageClient(bucket_name="test-bucket", region="us-west-2")
-        client._s3_client = mock_boto3_client
+        with patch("aioboto3.Session", return_value=mock_session):
+            client = S3StorageClient(bucket_name="test-bucket", region="us-west-2")
         return client
 
     # ==================== Upload Operations ====================
@@ -33,10 +44,10 @@ class TestS3StorageClient:
     async def test_upload_file_success(
         self,
         s3_client: S3StorageClient,
-        mock_boto3_client: MagicMock,
+        mock_s3_client: AsyncMock,
     ) -> None:
         """Test successful file upload."""
-        mock_boto3_client.upload_file.return_value = None
+        mock_s3_client.upload_file.return_value = None
 
         result = await s3_client.upload_file(
             local_path="/tmp/test.txt",
@@ -45,16 +56,16 @@ class TestS3StorageClient:
         )
 
         assert result == "data/test.txt"
-        mock_boto3_client.upload_file.assert_called_once()
+        mock_s3_client.upload_file.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_upload_file_with_encryption(
         self,
         s3_client: S3StorageClient,
-        mock_boto3_client: MagicMock,
+        mock_s3_client: AsyncMock,
     ) -> None:
         """Test file upload with SSE-KMS encryption."""
-        mock_boto3_client.upload_file.return_value = None
+        mock_s3_client.upload_file.return_value = None
 
         result = await s3_client.upload_file(
             local_path="/tmp/sensitive.txt",
@@ -62,8 +73,8 @@ class TestS3StorageClient:
         )
 
         assert result == "secure/sensitive.txt"
-        # Verify SSE-KMS encryption is used
-        call_args = mock_boto3_client.upload_file.call_args
+        # Verify upload was called
+        call_args = mock_s3_client.upload_file.call_args
         assert call_args is not None
 
     # ==================== Download Operations ====================
@@ -72,10 +83,10 @@ class TestS3StorageClient:
     async def test_download_file_success(
         self,
         s3_client: S3StorageClient,
-        mock_boto3_client: MagicMock,
+        mock_s3_client: AsyncMock,
     ) -> None:
         """Test successful file download."""
-        mock_boto3_client.download_file.return_value = None
+        mock_s3_client.download_file.return_value = None
 
         result = await s3_client.download_file(
             remote_path="data/test.txt",
@@ -83,7 +94,7 @@ class TestS3StorageClient:
         )
 
         assert result == "/tmp/downloaded.txt"
-        mock_boto3_client.download_file.assert_called_once_with(
+        mock_s3_client.download_file.assert_called_once_with(
             "test-bucket", "data/test.txt", "/tmp/downloaded.txt"
         )
 
@@ -93,15 +104,15 @@ class TestS3StorageClient:
     async def test_delete_file_success(
         self,
         s3_client: S3StorageClient,
-        mock_boto3_client: MagicMock,
+        mock_s3_client: AsyncMock,
     ) -> None:
         """Test successful file deletion."""
-        mock_boto3_client.delete_object.return_value = {"DeleteMarker": True}
+        mock_s3_client.delete_object.return_value = {"DeleteMarker": True}
 
         result = await s3_client.delete_file(remote_path="data/test.txt")
 
         assert result is True
-        mock_boto3_client.delete_object.assert_called_once_with(
+        mock_s3_client.delete_object.assert_called_once_with(
             Bucket="test-bucket", Key="data/test.txt"
         )
 
@@ -111,10 +122,10 @@ class TestS3StorageClient:
     async def test_list_files_success(
         self,
         s3_client: S3StorageClient,
-        mock_boto3_client: MagicMock,
+        mock_s3_client: AsyncMock,
     ) -> None:
         """Test successful file listing."""
-        mock_boto3_client.list_objects_v2.return_value = {
+        mock_s3_client.list_objects_v2.return_value = {
             "Contents": [
                 {
                     "Key": "data/file1.txt",
@@ -134,7 +145,7 @@ class TestS3StorageClient:
 
         assert len(result) == 2
         assert result[0]["Key"] == "data/file1.txt"
-        mock_boto3_client.list_objects_v2.assert_called_once_with(
+        mock_s3_client.list_objects_v2.assert_called_once_with(
             Bucket="test-bucket", Prefix="data/", MaxKeys=100
         )
 
@@ -142,10 +153,10 @@ class TestS3StorageClient:
     async def test_list_files_empty(
         self,
         s3_client: S3StorageClient,
-        mock_boto3_client: MagicMock,
+        mock_s3_client: AsyncMock,
     ) -> None:
         """Test listing with no results."""
-        mock_boto3_client.list_objects_v2.return_value = {"IsTruncated": False}
+        mock_s3_client.list_objects_v2.return_value = {"IsTruncated": False}
 
         result = await s3_client.list_files(prefix="empty/")
 
@@ -157,10 +168,10 @@ class TestS3StorageClient:
     async def test_get_file_metadata_success(
         self,
         s3_client: S3StorageClient,
-        mock_boto3_client: MagicMock,
+        mock_s3_client: AsyncMock,
     ) -> None:
         """Test successful metadata retrieval."""
-        mock_boto3_client.head_object.return_value = {
+        mock_s3_client.head_object.return_value = {
             "ContentLength": 1024,
             "ContentType": "text/plain",
             "LastModified": "2026-01-15T10:00:00Z",
@@ -172,7 +183,7 @@ class TestS3StorageClient:
 
         assert result["ContentLength"] == 1024
         assert result["ContentType"] == "text/plain"
-        mock_boto3_client.head_object.assert_called_once_with(
+        mock_s3_client.head_object.assert_called_once_with(
             Bucket="test-bucket", Key="data/test.txt"
         )
 
@@ -182,15 +193,15 @@ class TestS3StorageClient:
     async def test_file_exists_returns_true(
         self,
         s3_client: S3StorageClient,
-        mock_boto3_client: MagicMock,
+        mock_s3_client: AsyncMock,
     ) -> None:
         """Test file existence check returns true."""
-        mock_boto3_client.head_object.return_value = {"ContentLength": 1024}
+        mock_s3_client.head_object.return_value = {"ContentLength": 1024}
 
         result = await s3_client.file_exists(remote_path="data/exists.txt")
 
         assert result is True
-        mock_boto3_client.head_object.assert_called_once_with(
+        mock_s3_client.head_object.assert_called_once_with(
             Bucket="test-bucket", Key="data/exists.txt"
         )
 
@@ -198,12 +209,12 @@ class TestS3StorageClient:
     async def test_file_exists_returns_false(
         self,
         s3_client: S3StorageClient,
-        mock_boto3_client: MagicMock,
+        mock_s3_client: AsyncMock,
     ) -> None:
         """Test file existence check returns false for non-existent file."""
         from botocore.exceptions import ClientError
 
-        mock_boto3_client.head_object.side_effect = ClientError(
+        mock_s3_client.head_object.side_effect = ClientError(
             {"Error": {"Code": "404", "Message": "Not Found"}},
             "HeadObject",
         )
@@ -218,10 +229,10 @@ class TestS3StorageClient:
     async def test_generate_presigned_url_for_get(
         self,
         s3_client: S3StorageClient,
-        mock_boto3_client: MagicMock,
+        mock_s3_client: AsyncMock,
     ) -> None:
         """Test presigned URL generation for download."""
-        mock_boto3_client.generate_presigned_url.return_value = (
+        mock_s3_client.generate_presigned_url.return_value = (
             "https://test-bucket.s3.amazonaws.com/data/test.txt?signature=xxx"
         )
 
@@ -233,16 +244,16 @@ class TestS3StorageClient:
 
         assert "test-bucket" in result
         assert "data/test.txt" in result
-        mock_boto3_client.generate_presigned_url.assert_called_once()
+        mock_s3_client.generate_presigned_url.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_generate_presigned_url_for_put(
         self,
         s3_client: S3StorageClient,
-        mock_boto3_client: MagicMock,
+        mock_s3_client: AsyncMock,
     ) -> None:
         """Test presigned URL generation for upload."""
-        mock_boto3_client.generate_presigned_url.return_value = (
+        mock_s3_client.generate_presigned_url.return_value = (
             "https://test-bucket.s3.amazonaws.com/data/upload.txt?signature=xxx"
         )
 
@@ -253,7 +264,7 @@ class TestS3StorageClient:
         )
 
         assert "test-bucket" in result
-        mock_boto3_client.generate_presigned_url.assert_called_once_with(
+        mock_s3_client.generate_presigned_url.assert_called_once_with(
             "put_object",
             Params={"Bucket": "test-bucket", "Key": "data/upload.txt"},
             ExpiresIn=3600,
@@ -265,10 +276,10 @@ class TestS3StorageClient:
     async def test_copy_file_success(
         self,
         s3_client: S3StorageClient,
-        mock_boto3_client: MagicMock,
+        mock_s3_client: AsyncMock,
     ) -> None:
         """Test successful file copy."""
-        mock_boto3_client.copy_object.return_value = {
+        mock_s3_client.copy_object.return_value = {
             "CopyObjectResult": {"ETag": '"abc123"'}
         }
 
@@ -278,7 +289,7 @@ class TestS3StorageClient:
         )
 
         assert result == "backup/dest.txt"
-        mock_boto3_client.copy_object.assert_called_once_with(
+        mock_s3_client.copy_object.assert_called_once_with(
             Bucket="test-bucket",
             CopySource={"Bucket": "test-bucket", "Key": "data/source.txt"},
             Key="backup/dest.txt",
@@ -290,12 +301,17 @@ class TestS3StorageClient:
     async def test_stream_file_yields_chunks(
         self,
         s3_client: S3StorageClient,
-        mock_boto3_client: MagicMock,
+        mock_s3_client: AsyncMock,
     ) -> None:
         """Test file streaming yields chunks."""
+        # 创建异步迭代器 mock
+        async def mock_iter_chunks(chunk_size: int):
+            yield b"chunk1"
+            yield b"chunk2"
+
         mock_body = MagicMock()
-        mock_body.read.side_effect = [b"chunk1", b"chunk2", b""]
-        mock_boto3_client.get_object.return_value = {"Body": mock_body}
+        mock_body.iter_chunks = mock_iter_chunks
+        mock_s3_client.get_object.return_value = {"Body": mock_body}
 
         chunks = []
         async for chunk in s3_client.stream_file(
@@ -306,7 +322,7 @@ class TestS3StorageClient:
         assert len(chunks) == 2
         assert chunks[0] == b"chunk1"
         assert chunks[1] == b"chunk2"
-        mock_boto3_client.get_object.assert_called_once_with(
+        mock_s3_client.get_object.assert_called_once_with(
             Bucket="test-bucket", Key="data/large.bin"
         )
 
@@ -316,12 +332,12 @@ class TestS3StorageClient:
     async def test_client_handles_access_denied(
         self,
         s3_client: S3StorageClient,
-        mock_boto3_client: MagicMock,
+        mock_s3_client: AsyncMock,
     ) -> None:
         """Test error handling for access denied."""
         from botocore.exceptions import ClientError
 
-        mock_boto3_client.head_object.side_effect = ClientError(
+        mock_s3_client.head_object.side_effect = ClientError(
             {"Error": {"Code": "403", "Message": "Access Denied"}},
             "HeadObject",
         )
@@ -335,12 +351,12 @@ class TestS3StorageClient:
     async def test_client_handles_bucket_not_found(
         self,
         s3_client: S3StorageClient,
-        mock_boto3_client: MagicMock,
+        mock_s3_client: AsyncMock,
     ) -> None:
         """Test error handling when bucket doesn't exist."""
         from botocore.exceptions import ClientError
 
-        mock_boto3_client.list_objects_v2.side_effect = ClientError(
+        mock_s3_client.list_objects_v2.side_effect = ClientError(
             {"Error": {"Code": "NoSuchBucket", "Message": "Bucket not found"}},
             "ListObjectsV2",
         )

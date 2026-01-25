@@ -8,12 +8,13 @@
 - 列出已上传分片
 
 支持 FR-006 (≥100MB/s 上传速度) 和 FR-007 (≥10TB 数据集)。
+使用 aioboto3 原生异步，与 S3StorageClient 保持一致。
 """
 
 import asyncio
 from typing import Any
 
-import boto3
+import aioboto3
 from botocore.exceptions import ClientError
 
 # 分片大小常量（用于优化上传性能）
@@ -31,8 +32,8 @@ class S3MultipartUploadError(Exception):
 class S3MultipartClient:
     """S3 分片上传客户端。
 
-    封装 boto3 S3 客户端，提供异步分片上传操作。
-    所有操作使用 run_in_executor 实现异步。
+    封装 aioboto3 S3 客户端，提供原生异步分片上传操作。
+    每个操作使用 async with 创建临时客户端 (aioboto3 推荐模式)。
     """
 
     def __init__(
@@ -51,7 +52,7 @@ class S3MultipartClient:
         self._bucket_name = bucket_name
         self._region = region
         self._kms_key_id = kms_key_id
-        self._s3_client = boto3.client("s3", region_name=region)
+        self._session = aioboto3.Session()
 
     async def create_multipart_upload(
         self,
@@ -72,13 +73,13 @@ class S3MultipartClient:
         Raises:
             S3MultipartUploadError: 创建失败时
         """
-        # 构建上传参数（包含可选的 KMS 加密配置）
         params = self._build_upload_params(key, content_type, metadata)
 
-        return await self._execute_s3_operation(
-            lambda: self._s3_client.create_multipart_upload(**params),
-            "Failed to create multipart upload"
-        )
+        try:
+            async with self._session.client("s3", region_name=self._region) as s3:
+                return await s3.create_multipart_upload(**params)
+        except ClientError as e:
+            raise S3MultipartUploadError(f"Failed to create multipart upload: {e}") from e
 
     async def generate_presigned_url_for_part(
         self,
@@ -98,10 +99,8 @@ class S3MultipartClient:
         Returns:
             预签名 URL
         """
-        loop = asyncio.get_event_loop()
-
-        def _generate() -> str:
-            return self._s3_client.generate_presigned_url(
+        async with self._session.client("s3", region_name=self._region) as s3:
+            return await s3.generate_presigned_url(
                 "upload_part",
                 Params={
                     "Bucket": self._bucket_name,
@@ -111,8 +110,6 @@ class S3MultipartClient:
                 },
                 ExpiresIn=expiration,
             )
-
-        return await loop.run_in_executor(None, _generate)
 
     async def generate_presigned_urls_batch(
         self,
@@ -165,15 +162,16 @@ class S3MultipartClient:
         # 按分片编号排序（S3 API 要求分片必须按顺序提交）
         sorted_parts = sorted(parts, key=lambda x: x["PartNumber"])
 
-        return await self._execute_s3_operation(
-            lambda: self._s3_client.complete_multipart_upload(
-                Bucket=self._bucket_name,
-                Key=key,
-                UploadId=upload_id,
-                MultipartUpload={"Parts": sorted_parts},
-            ),
-            "Failed to complete multipart upload"
-        )
+        try:
+            async with self._session.client("s3", region_name=self._region) as s3:
+                return await s3.complete_multipart_upload(
+                    Bucket=self._bucket_name,
+                    Key=key,
+                    UploadId=upload_id,
+                    MultipartUpload={"Parts": sorted_parts},
+                )
+        except ClientError as e:
+            raise S3MultipartUploadError(f"Failed to complete multipart upload: {e}") from e
 
     async def abort_multipart_upload(
         self,
@@ -189,14 +187,15 @@ class S3MultipartClient:
         Raises:
             S3MultipartUploadError: 取消失败时
         """
-        await self._execute_s3_operation(
-            lambda: self._s3_client.abort_multipart_upload(
-                Bucket=self._bucket_name,
-                Key=key,
-                UploadId=upload_id,
-            ),
-            "Failed to abort multipart upload"
-        )
+        try:
+            async with self._session.client("s3", region_name=self._region) as s3:
+                await s3.abort_multipart_upload(
+                    Bucket=self._bucket_name,
+                    Key=key,
+                    UploadId=upload_id,
+                )
+        except ClientError as e:
+            raise S3MultipartUploadError(f"Failed to abort multipart upload: {e}") from e
 
     async def list_parts(
         self,
@@ -219,41 +218,35 @@ class S3MultipartClient:
         Raises:
             S3MultipartUploadError: 列表失败时
         """
-        loop = asyncio.get_event_loop()
+        all_parts: list[dict[str, Any]] = []
+        part_number_marker: int | None = None
 
-        def _list_all_parts() -> list[dict[str, Any]]:
-            all_parts: list[dict[str, Any]] = []
-            part_number_marker: int | None = None
+        try:
+            async with self._session.client("s3", region_name=self._region) as s3:
+                # 循环获取所有分页结果
+                while True:
+                    params: dict[str, Any] = {
+                        "Bucket": self._bucket_name,
+                        "Key": key,
+                        "UploadId": upload_id,
+                        "MaxParts": max_parts,
+                    }
 
-            # 循环获取所有分页结果
-            while True:
-                params: dict[str, Any] = {
-                    "Bucket": self._bucket_name,
-                    "Key": key,
-                    "UploadId": upload_id,
-                    "MaxParts": max_parts,
-                }
+                    if part_number_marker is not None:
+                        params["PartNumberMarker"] = part_number_marker
 
-                if part_number_marker is not None:
-                    params["PartNumberMarker"] = part_number_marker
+                    response = await s3.list_parts(**params)
+                    all_parts.extend(response.get("Parts", []))
 
-                try:
-                    response = self._s3_client.list_parts(**params)
-                except ClientError as e:
-                    raise S3MultipartUploadError(
-                        f"Failed to list parts: {e}"
-                    ) from e
+                    if not response.get("IsTruncated", False):
+                        break
 
-                all_parts.extend(response.get("Parts", []))
+                    part_number_marker = response.get("NextPartNumberMarker")
 
-                if not response.get("IsTruncated", False):
-                    break
+        except ClientError as e:
+            raise S3MultipartUploadError(f"Failed to list parts: {e}") from e
 
-                part_number_marker = response.get("NextPartNumberMarker")
-
-            return all_parts
-
-        return await loop.run_in_executor(None, _list_all_parts)
+        return all_parts
 
     async def head_object(self, key: str) -> dict[str, Any]:
         """获取对象元数据 (用于验证上传完成)。
@@ -267,20 +260,14 @@ class S3MultipartClient:
         Raises:
             S3MultipartUploadError: 对象不存在或请求失败时
         """
-        loop = asyncio.get_event_loop()
-
-        def _head() -> dict[str, Any]:
-            try:
-                return self._s3_client.head_object(
+        try:
+            async with self._session.client("s3", region_name=self._region) as s3:
+                return await s3.head_object(
                     Bucket=self._bucket_name,
                     Key=key,
                 )
-            except ClientError as e:
-                raise S3MultipartUploadError(
-                    f"Failed to get object metadata: {e}"
-                ) from e
-
-        return await loop.run_in_executor(None, _head)
+        except ClientError as e:
+            raise S3MultipartUploadError(f"Failed to get object metadata: {e}") from e
 
     # ========== 私有辅助方法 ==========
 
@@ -305,30 +292,3 @@ class S3MultipartClient:
             params["SSEKMSKeyId"] = self._kms_key_id
 
         return params
-
-    async def _execute_s3_operation(
-        self,
-        operation: Any,
-        error_message: str,
-    ) -> Any:
-        """执行 S3 操作并处理错误。
-
-        Args:
-            operation: 要执行的操作
-            error_message: 错误消息前缀
-
-        Returns:
-            操作结果
-
-        Raises:
-            S3MultipartUploadError: 操作失败时
-        """
-        loop = asyncio.get_event_loop()
-
-        def _execute() -> Any:
-            try:
-                return operation()
-            except ClientError as e:
-                raise S3MultipartUploadError(f"{error_message}: {e}") from e
-
-        return await loop.run_in_executor(None, _execute)

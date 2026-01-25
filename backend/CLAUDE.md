@@ -15,7 +15,7 @@ AI Training Platform 后端服务 - 基于 AWS SageMaker HyperPod 的企业级 A
 - **ORM**: SQLAlchemy 2.0.25 (async) + Alembic 1.13.1
 - **Database**: MySQL 8.0 (aiomysql 异步驱动)
 - **Validation**: Pydantic 2.5.3 + pydantic-settings
-- **AWS**: boto3 1.34.14, sagemaker-hyperpod 1.0.0
+- **AWS**: boto3 1.34.14, aioboto3 (异步必须), sagemaker-hyperpod 1.0.0
 - **Auth**: python-jose (JWT), passlib (bcrypt)
 
 ## Common Commands
@@ -130,32 +130,37 @@ pytest --cov=src              # 带覆盖率
 
 ### Docstring 规范
 
-**原则**: 类型签名即文档，注释解释"为什么"而非"做什么"。
+**原则**: 类型签名即文档，Docstring 只补充签名无法表达的信息。
 
-| 场景 | 规则 | 示例行数 |
-|------|------|---------|
-| Module docstring | 单行，说明模块职责 | 1 行 |
-| Class docstring | 1-2 行，不重复模块信息 | 1-2 行 |
-| Method docstring | 1 行 + 类型签名 | 1 行 |
-| Args/Returns | 仅当类型签名不够清晰时 | 按需 |
-
-**示例**:
+| 规则 | 说明 |
+|------|------|
+| **1 行 docstring** | Module/Class/Method 均为单行中文描述 |
+| **禁止 Args/Returns** | 类型签名已说明，删除冗余描述 |
+| **保留 Raises** | 异常信息无法从签名推断 |
+| **无需 `__init__` docstring** | 构造函数无需文档 |
 
 ```python
 # ❌ 冗余
-async def get_by_id(self, id: UUID) -> Optional[T]:
-    """Retrieve an entity by its unique identifier.
+async def get_by_id(self, id: int) -> Dataset | None:
+    """Get dataset by ID.
 
     Args:
-        id: The unique identifier of the entity.
-
+        id: Dataset ID
     Returns:
-        The entity if found, None otherwise.
+        Dataset if found
     """
 
 # ✅ 简洁
-async def get_by_id(self, id: UUID) -> Optional[T]:
-    """Get entity by ID."""
+async def get_by_id(self, id: int) -> Dataset | None:
+    """根据 ID 获取数据集。"""
+
+# ✅ 保留 Raises
+async def create(self, data: dict) -> Dataset:
+    """创建数据集。
+
+    Raises:
+        DuplicateEntityError: 如果 name+version 已存在
+    """
 ```
 
 ### 行内注释规范
@@ -217,10 +222,50 @@ class PasswordService:      # 密码处理
 
 | 领域 | 推荐方案 | 替代 | 原因 |
 |------|---------|------|------|
+| **AWS 异步操作** | aioboto3 | boto3 + run_in_executor | 原生异步 I/O，无线程池开销 |
 | **后台任务** | K8s CronJob + Watch API | Celery + Redis | 利用现有 EKS，无需额外组件 |
 | **认证** | Authlib | python-jose 手写 | 完整 OAuth2/OIDC，支持 AWS IAM |
 | **日志** | structlog | 标准 logging | 结构化 JSON，上下文绑定 |
 | **监控** | OpenTelemetry | 厂商特定 SDK | CNCF 标准，可切换后端 |
+
+### AWS 异步操作规范 (强制)
+
+**规则**: 所有 AWS S3/FSx 等需要异步的操作，**必须**使用 `aioboto3`，**禁止**自己封装 `run_in_executor`。
+
+```python
+# ❌ 禁止: 手动封装同步 boto3
+import boto3
+import asyncio
+
+class S3Client:
+    def __init__(self):
+        self._client = boto3.client("s3")
+
+    async def upload_file(self, ...):
+        loop = asyncio.get_event_loop()
+        return await loop.run_in_executor(None, self._sync_upload)
+
+# ✅ 正确: 使用 aioboto3 原生异步
+import aioboto3
+
+class S3Client:
+    def __init__(self):
+        self._session = aioboto3.Session()
+
+    async def upload_file(self, local_path: str, remote_path: str) -> str:
+        async with self._session.client("s3", region_name=self._region) as s3:
+            await s3.upload_file(local_path, self._bucket, remote_path)
+        return remote_path
+```
+
+**原因**:
+- `run_in_executor` 使用线程池，有额外开销
+- aioboto3 提供真正的异步 I/O，性能更好
+- 代码更简洁，减少重复的包装模式
+
+**参考实现**:
+- `shared/infrastructure/storage/s3_client.py` - S3 基础操作
+- `modules/datasets/infrastructure/s3/multipart_upload_client.py` - 分片上传
 
 ### 后台任务实现指南
 

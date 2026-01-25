@@ -1,22 +1,21 @@
 """S3 Storage Client - Amazon S3 storage integration.
 
-Implements IStorageService interface using boto3 for object storage operations.
+Implements IStorageService interface using aioboto3 for native async operations.
 """
 
-import asyncio
 from typing import Any, AsyncIterator
 
-import boto3
+import aioboto3
 from botocore.exceptions import ClientError
 
 from src.shared.infrastructure.storage.interface import IStorageService
 
 
 class S3StorageClient(IStorageService):
-    """S3 storage client implementation.
+    """S3 storage client implementation using aioboto3.
 
-    Wraps boto3 S3 client for object storage operations.
-    All operations are async for FastAPI compatibility.
+    Uses aioboto3 for native async operations without thread pool overhead.
+    Each operation creates a short-lived client (aioboto3 recommended pattern).
     """
 
     def __init__(
@@ -35,7 +34,7 @@ class S3StorageClient(IStorageService):
         self._bucket_name = bucket_name
         self._region = region
         self._kms_key_id = kms_key_id
-        self._s3_client = boto3.client("s3", region_name=region)
+        self._session = aioboto3.Session()
 
     async def upload_file(
         self,
@@ -44,87 +43,61 @@ class S3StorageClient(IStorageService):
         metadata: dict[str, str] | None = None,
     ) -> str:
         """Upload a file to S3."""
-        loop = asyncio.get_event_loop()
+        extra_args: dict[str, Any] = {}
 
-        def _upload() -> str:
-            extra_args: dict[str, Any] = {}
+        if metadata:
+            extra_args["Metadata"] = metadata
 
-            if metadata:
-                extra_args["Metadata"] = metadata
+        if self._kms_key_id:
+            extra_args["ServerSideEncryption"] = "aws:kms"
+            extra_args["SSEKMSKeyId"] = self._kms_key_id
 
-            if self._kms_key_id:
-                extra_args["ServerSideEncryption"] = "aws:kms"
-                extra_args["SSEKMSKeyId"] = self._kms_key_id
-
-            self._s3_client.upload_file(
+        async with self._session.client("s3", region_name=self._region) as s3:
+            await s3.upload_file(
                 local_path,
                 self._bucket_name,
                 remote_path,
                 ExtraArgs=extra_args if extra_args else None,
             )
-            return remote_path
-
-        return await loop.run_in_executor(None, _upload)
+        return remote_path
 
     async def download_file(self, remote_path: str, local_path: str) -> str:
         """Download a file from S3."""
-        loop = asyncio.get_event_loop()
-
-        def _download() -> str:
-            self._s3_client.download_file(self._bucket_name, remote_path, local_path)
-            return local_path
-
-        return await loop.run_in_executor(None, _download)
+        async with self._session.client("s3", region_name=self._region) as s3:
+            await s3.download_file(self._bucket_name, remote_path, local_path)
+        return local_path
 
     async def delete_file(self, remote_path: str) -> bool:
         """Delete a file from S3."""
-        loop = asyncio.get_event_loop()
-
-        def _delete() -> bool:
-            self._s3_client.delete_object(Bucket=self._bucket_name, Key=remote_path)
-            return True
-
-        return await loop.run_in_executor(None, _delete)
+        async with self._session.client("s3", region_name=self._region) as s3:
+            await s3.delete_object(Bucket=self._bucket_name, Key=remote_path)
+        return True
 
     async def list_files(
         self, prefix: str, max_results: int = 1000
     ) -> list[dict[str, Any]]:
         """List files with a given prefix in S3."""
-        loop = asyncio.get_event_loop()
-
-        def _list() -> list[dict[str, Any]]:
-            response = self._s3_client.list_objects_v2(
+        async with self._session.client("s3", region_name=self._region) as s3:
+            response = await s3.list_objects_v2(
                 Bucket=self._bucket_name, Prefix=prefix, MaxKeys=max_results
             )
-            return response.get("Contents", [])
-
-        return await loop.run_in_executor(None, _list)
+        return response.get("Contents", [])
 
     async def get_file_metadata(self, remote_path: str) -> dict[str, Any]:
         """Get metadata for a file in S3."""
-        loop = asyncio.get_event_loop()
-
-        def _get_metadata() -> dict[str, Any]:
-            return self._s3_client.head_object(
-                Bucket=self._bucket_name, Key=remote_path
-            )
-
-        return await loop.run_in_executor(None, _get_metadata)
+        async with self._session.client("s3", region_name=self._region) as s3:
+            return await s3.head_object(Bucket=self._bucket_name, Key=remote_path)
 
     async def file_exists(self, remote_path: str) -> bool:
         """Check if a file exists in S3."""
-        loop = asyncio.get_event_loop()
-
-        def _exists() -> bool:
-            try:
-                self._s3_client.head_object(Bucket=self._bucket_name, Key=remote_path)
-                return True
-            except ClientError as e:
-                if e.response["Error"]["Code"] in ("404", "NoSuchKey"):
-                    return False
-                raise
-
-        return await loop.run_in_executor(None, _exists)
+        try:
+            async with self._session.client("s3", region_name=self._region) as s3:
+                await s3.head_object(Bucket=self._bucket_name, Key=remote_path)
+            return True
+        except ClientError as e:
+            if e.response["Error"]["Code"] in ("404", "NoSuchKey"):
+                return False
+            raise
 
     async def generate_presigned_url(
         self,
@@ -133,51 +106,30 @@ class S3StorageClient(IStorageService):
         operation: str = "get",
     ) -> str:
         """Generate a presigned URL for direct access."""
-        loop = asyncio.get_event_loop()
-
-        def _generate_url() -> str:
-            client_method = "get_object" if operation == "get" else "put_object"
-            return self._s3_client.generate_presigned_url(
+        client_method = "get_object" if operation == "get" else "put_object"
+        async with self._session.client("s3", region_name=self._region) as s3:
+            return await s3.generate_presigned_url(
                 client_method,
                 Params={"Bucket": self._bucket_name, "Key": remote_path},
                 ExpiresIn=expiration,
             )
 
-        return await loop.run_in_executor(None, _generate_url)
-
     async def copy_file(self, source_path: str, dest_path: str) -> str:
         """Copy a file within S3."""
-        loop = asyncio.get_event_loop()
-
-        def _copy() -> str:
-            self._s3_client.copy_object(
+        async with self._session.client("s3", region_name=self._region) as s3:
+            await s3.copy_object(
                 Bucket=self._bucket_name,
                 CopySource={"Bucket": self._bucket_name, "Key": source_path},
                 Key=dest_path,
             )
-            return dest_path
-
-        return await loop.run_in_executor(None, _copy)
+        return dest_path
 
     async def stream_file(
         self, remote_path: str, chunk_size: int = 8192
     ) -> AsyncIterator[bytes]:
         """Stream file contents from S3."""
-        loop = asyncio.get_event_loop()
-
-        def _get_body() -> Any:
-            response = self._s3_client.get_object(
-                Bucket=self._bucket_name, Key=remote_path
-            )
-            return response["Body"]
-
-        body = await loop.run_in_executor(None, _get_body)
-
-        def _read_chunk() -> bytes:
-            return body.read(chunk_size)
-
-        while True:
-            chunk = await loop.run_in_executor(None, _read_chunk)
-            if not chunk:
-                break
-            yield chunk
+        async with self._session.client("s3", region_name=self._region) as s3:
+            response = await s3.get_object(Bucket=self._bucket_name, Key=remote_path)
+            stream = response["Body"]
+            async for chunk in stream.iter_chunks(chunk_size):
+                yield chunk
