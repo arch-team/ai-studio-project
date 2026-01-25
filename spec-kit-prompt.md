@@ -6,6 +6,9 @@
 
 /speckit.implement ## Phase 3: US1 (P1) - 训练任务管理 (33 tasks) 中的### 集成测试这个子阶段, 每个任务按照TDD（测试驱动开发的流程进行），完成后将tasks.md中已经明确完成的任务标记为完成状态
 
+/speckit.implement ## Phase 3: US1 (P1) - 训练任务管理 (33 tasks) 中的### 任务模板管理 (FR-023 扩展)这个子阶段, 每个任务按照TDD（测试驱动开发的流程进行），完成后将tasks.md中已经明确完成的任务标记为完成状态
+
+
 
  本次会话生成了 2 个文档：                                                                              
   文档路径: claudedocs/spec-gap-analysis.md                                                              
