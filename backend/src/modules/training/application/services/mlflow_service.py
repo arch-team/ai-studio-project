@@ -32,6 +32,12 @@ class MLflowService(IMetricsService):
 
     实现 IMetricsService 接口，从 MLflow Tracking Server 查询训练指标。
     支持 job_id 到 MLflow run_id 的映射查询。
+
+    注意: 本类使用 run_in_executor 包装同步 MLflow SDK 调用。
+    这是可接受的例外情况，因为 mlflow.tracking.MlflowClient 没有官方异步版本。
+    参见 backend/CLAUDE.md "AWS 异步操作规范" 中的例外说明。
+
+    TODO: 监控第三方异步 MLflow 客户端 (如 aiomlflow) 的发布，适时迁移。
     """
 
     def __init__(
@@ -84,9 +90,7 @@ class MLflowService(IMetricsService):
         try:
             metrics = await self._get_metric_history_with_retry(run_id, metric_name)
         except MlflowException as e:
-            raise MLflowServiceError(
-                f"MLflow unavailable: Failed to get metrics for run {run_id}: {e}"
-            ) from e
+            raise MLflowServiceError(f"MLflow unavailable: Failed to get metrics for run {run_id}: {e}") from e
 
         # 3. 转换时间戳并过滤
         start_ts = start_time.timestamp() * 1000
@@ -236,13 +240,9 @@ class MLflowService(IMetricsService):
                     logger.debug(f"重试 MLflow 搜索 (attempt {attempt + 1})")
                 continue
 
-        raise MLflowServiceError(
-            f"MLflow unavailable after {self._max_retries} retries: {last_error}"
-        )
+        raise MLflowServiceError(f"MLflow unavailable after {self._max_retries} retries: {last_error}")
 
-    async def _get_metric_history_with_retry(
-        self, run_id: str, metric_name: str
-    ) -> list[Any]:
+    async def _get_metric_history_with_retry(self, run_id: str, metric_name: str) -> list[Any]:
         """带重试的指标历史查询
 
         Args:

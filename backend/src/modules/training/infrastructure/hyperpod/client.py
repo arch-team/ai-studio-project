@@ -5,7 +5,8 @@ import logging
 from collections.abc import Callable
 from typing import Any, TypeVar
 
-import boto3
+import aioboto3
+from botocore.exceptions import ClientError
 
 from src.modules.training.application.interfaces import IHyperPodClient
 from src.modules.training.domain.exceptions import (
@@ -77,7 +78,8 @@ class HyperPodClient(IHyperPodClient):
         """
         self._region = region
         self._default_cluster_name = default_cluster_name
-        self._sagemaker_client = boto3.client("sagemaker", region_name=region)
+        # 使用 aioboto3 原生异步，遵循 backend/CLAUDE.md AWS 异步操作规范
+        self._session = aioboto3.Session()
 
     def _ensure_cluster_context(self, cluster_name: str | None = None) -> None:
         """确保集群上下文已设置 (同步方法，在 executor 中调用)。
@@ -99,9 +101,7 @@ class HyperPodClient(IHyperPodClient):
             return
 
         if set_cluster_context is None:
-            logger.warning(
-                "set_cluster_context not available, SDK status operations may fail"
-            )
+            logger.warning("set_cluster_context not available, SDK status operations may fail")
             return
 
         try:
@@ -117,7 +117,16 @@ class HyperPodClient(IHyperPodClient):
             # 不抛出异常，让操作继续尝试 (可能已经配置了 kubeconfig)
 
     async def _run_in_executor(self, func: Callable[[], T]) -> T:
-        """Run a blocking function in executor."""
+        """在线程池中运行同步函数 (仅用于 HyperPod SDK 操作)。
+
+        注意: 此方法仅用于 HyperPodPytorchJob 等 HyperPod SDK 操作，
+        因为 sagemaker-hyperpod SDK 没有异步版本。
+
+        对于 SageMaker API (boto3) 和 S3 操作，应使用 aioboto3 原生异步，
+        遵循 backend/CLAUDE.md AWS 异步操作规范。
+
+        TODO: 当 sagemaker-hyperpod 提供 async API 时迁移
+        """
         loop = asyncio.get_running_loop()
         return await loop.run_in_executor(None, func)
 
@@ -164,9 +173,7 @@ class HyperPodClient(IHyperPodClient):
             resources=resources,
         )
 
-    def _build_kueue_labels(
-        self, queue_name: str | None, priority_class: str | None
-    ) -> dict[str, str]:
+    def _build_kueue_labels(self, queue_name: str | None, priority_class: str | None) -> dict[str, str]:
         """构建 Kueue 调度标签。"""
         labels: dict[str, str] = {}
         if queue_name:
@@ -198,48 +205,39 @@ class HyperPodClient(IHyperPodClient):
         vpc_config: dict[str, Any],
     ) -> dict[str, Any]:
         """Create a new HyperPod cluster."""
-        return await self._run_in_executor(
-            lambda: self._sagemaker_client.create_cluster(
+        async with self._session.client("sagemaker", region_name=self._region) as sagemaker:
+            return await sagemaker.create_cluster(
                 ClusterName=cluster_name,
                 InstanceGroups=instance_groups,
                 VpcConfig=vpc_config,
             )
-        )
 
     async def describe_cluster(self, cluster_name: str) -> dict[str, Any]:
-        """Get cluster details using boto3 SageMaker API."""
-        return await self._run_in_executor(
-            lambda: self._sagemaker_client.describe_cluster(ClusterName=cluster_name)
-        )
+        """Get cluster details using aioboto3 SageMaker API."""
+        async with self._session.client("sagemaker", region_name=self._region) as sagemaker:
+            return await sagemaker.describe_cluster(ClusterName=cluster_name)
 
-    async def list_clusters(
-        self, max_results: int = 100, next_token: str | None = None
-    ) -> dict[str, Any]:
+    async def list_clusters(self, max_results: int = 100, next_token: str | None = None) -> dict[str, Any]:
         """List all HyperPod clusters."""
         params: dict[str, Any] = {"MaxResults": max_results}
         if next_token:
             params["NextToken"] = next_token
 
-        return await self._run_in_executor(
-            lambda: self._sagemaker_client.list_clusters(**params)
-        )
+        async with self._session.client("sagemaker", region_name=self._region) as sagemaker:
+            return await sagemaker.list_clusters(**params)
 
     async def delete_cluster(self, cluster_name: str) -> dict[str, Any]:
         """Delete a HyperPod cluster."""
-        return await self._run_in_executor(
-            lambda: self._sagemaker_client.delete_cluster(ClusterName=cluster_name)
-        )
+        async with self._session.client("sagemaker", region_name=self._region) as sagemaker:
+            return await sagemaker.delete_cluster(ClusterName=cluster_name)
 
-    async def update_cluster(
-        self, cluster_name: str, instance_groups: list[dict[str, Any]]
-    ) -> dict[str, Any]:
+    async def update_cluster(self, cluster_name: str, instance_groups: list[dict[str, Any]]) -> dict[str, Any]:
         """Update cluster instance groups."""
-        return await self._run_in_executor(
-            lambda: self._sagemaker_client.update_cluster(
+        async with self._session.client("sagemaker", region_name=self._region) as sagemaker:
+            return await sagemaker.update_cluster(
                 ClusterName=cluster_name,
                 InstanceGroups=instance_groups,
             )
-        )
 
     async def submit_training_job(
         self,
@@ -248,6 +246,9 @@ class HyperPodClient(IHyperPodClient):
         job_config: dict[str, Any],
     ) -> dict[str, Any]:
         """Submit a training job to the cluster using HyperPod SDK.
+
+        注意: 使用 run_in_executor 包装，因为 sagemaker-hyperpod SDK 无异步版本。
+        参见 _run_in_executor 方法的注释说明。
 
         Args:
             cluster_name: 集群名称
@@ -328,6 +329,8 @@ class HyperPodClient(IHyperPodClient):
         self, cluster_name: str, job_name: str, namespace: str = "default"
     ) -> dict[str, Any]:
         """Get training job status using HyperPod SDK.
+
+        注意: 使用 run_in_executor 包装，因为 sagemaker-hyperpod SDK 无异步版本。
 
         Args:
             cluster_name: 集群名称
@@ -410,10 +413,10 @@ class HyperPodClient(IHyperPodClient):
 
         return await self._run_in_executor(_get_status)
 
-    async def stop_training_job(
-        self, cluster_name: str, job_name: str, namespace: str = "default"
-    ) -> dict[str, Any]:
+    async def stop_training_job(self, cluster_name: str, job_name: str, namespace: str = "default") -> dict[str, Any]:
         """Stop a running training job using HyperPod SDK.
+
+        注意: 使用 run_in_executor 包装，因为 sagemaker-hyperpod SDK 无异步版本。
 
         Args:
             cluster_name: HyperPod 集群名称
@@ -445,6 +448,8 @@ class HyperPodClient(IHyperPodClient):
     ) -> list[dict[str, Any]]:
         """List pods for a training job using HyperPod SDK.
 
+        注意: 使用 run_in_executor 包装，因为 sagemaker-hyperpod SDK 无异步版本。
+
         Args:
             cluster_name: HyperPod 集群名称
             job_name: 任务名称
@@ -467,31 +472,23 @@ class HyperPodClient(IHyperPodClient):
     # E2E 测试支持方法 (抢占 SLA 测试)
     # ==========================================================================
 
-    async def cancel_training_job(
-        self, job_id: str, namespace: str = "default"
-    ) -> dict[str, Any]:
+    async def cancel_training_job(self, job_id: str, namespace: str = "default") -> dict[str, Any]:
         """取消训练任务 (stop_training_job 的别名)
 
         Args:
             job_id: 任务 ID/名称
             namespace: Kubernetes namespace (Task Governance)
         """
-        return await self.stop_training_job(
-            cluster_name="", job_name=job_id, namespace=namespace
-        )
+        return await self.stop_training_job(cluster_name="", job_name=job_id, namespace=namespace)
 
-    async def get_job_pods(
-        self, job_id: str, namespace: str = "default"
-    ) -> list[dict[str, Any]]:
+    async def get_job_pods(self, job_id: str, namespace: str = "default") -> list[dict[str, Any]]:
         """获取任务 Pod 列表 (list_training_job_pods 的别名)
 
         Args:
             job_id: 任务 ID/名称
             namespace: Kubernetes namespace (Task Governance)
         """
-        return await self.list_training_job_pods(
-            cluster_name="", job_name=job_id, namespace=namespace
-        )
+        return await self.list_training_job_pods(cluster_name="", job_name=job_id, namespace=namespace)
 
     async def get_pod_status(
         self,
@@ -501,6 +498,8 @@ class HyperPodClient(IHyperPodClient):
         namespace: str = "default",
     ) -> dict[str, Any]:
         """获取单个 Pod 状态
+
+        注意: 使用 run_in_executor 包装，因为 sagemaker-hyperpod SDK 无异步版本。
 
         Args:
             cluster_name: HyperPod 集群名称
@@ -539,29 +538,20 @@ class HyperPodClient(IHyperPodClient):
         """
         import re
 
-        from botocore.exceptions import ClientError
+        match = re.match(r"s3://([^/]+)/(.+)", s3_path)
+        if not match:
+            raise HyperPodOperationError("verify_checkpoint", f"Invalid S3 path format: {s3_path}")
 
-        def _check_exists() -> bool:
-            match = re.match(r"s3://([^/]+)/(.+)", s3_path)
-            if not match:
-                raise HyperPodOperationError(
-                    "verify_checkpoint", f"Invalid S3 path format: {s3_path}"
-                )
+        bucket, key = match.groups()
 
-            bucket, key = match.groups()
-            s3_client = boto3.client("s3", region_name=self._region)
-
+        async with self._session.client("s3", region_name=self._region) as s3:
             try:
-                s3_client.head_object(Bucket=bucket, Key=key)
+                await s3.head_object(Bucket=bucket, Key=key)
                 return True
             except ClientError:
                 return False
 
-        return await self._run_in_executor(_check_exists)
-
-    async def list_checkpoints(
-        self, job_id: str, checkpoint_base_path: str
-    ) -> list[dict[str, Any]]:
+    async def list_checkpoints(self, job_id: str, checkpoint_base_path: str) -> list[dict[str, Any]]:
         """列出任务的所有检查点
 
         Args:
@@ -570,34 +560,33 @@ class HyperPodClient(IHyperPodClient):
         """
         import re
 
-        def _list() -> list[dict[str, Any]]:
-            match = re.match(r"s3://([^/]+)/(.+)", checkpoint_base_path)
-            if not match:
-                return []
+        match = re.match(r"s3://([^/]+)/(.+)", checkpoint_base_path)
+        if not match:
+            return []
 
-            bucket, prefix = match.groups()
-            s3_client = boto3.client("s3", region_name=self._region)
+        bucket, prefix = match.groups()
 
-            # 构造检查点目录前缀
-            checkpoint_prefix = f"{prefix.rstrip('/')}/{job_id}/"
+        # 构造检查点目录前缀
+        checkpoint_prefix = f"{prefix.rstrip('/')}/{job_id}/"
 
-            response = s3_client.list_objects_v2(
+        async with self._session.client("s3", region_name=self._region) as s3:
+            response = await s3.list_objects_v2(
                 Bucket=bucket,
                 Prefix=checkpoint_prefix,
             )
 
-            checkpoints = []
-            for obj in response.get("Contents", []):
-                checkpoints.append({
+        checkpoints = []
+        for obj in response.get("Contents", []):
+            checkpoints.append(
+                {
                     "key": obj["Key"],
                     "size": obj["Size"],
                     "last_modified": obj["LastModified"].isoformat(),
                     "etag": obj["ETag"],
-                })
+                }
+            )
 
-            return checkpoints
-
-        return await self._run_in_executor(_list)
+        return checkpoints
 
     async def resume_training_job(
         self,
@@ -607,6 +596,8 @@ class HyperPodClient(IHyperPodClient):
         job_config: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         """从检查点恢复训练任务
+
+        注意: 使用 run_in_executor 包装，因为 sagemaker-hyperpod SDK 无异步版本。
 
         Args:
             cluster_name: 集群名称
@@ -620,9 +611,7 @@ class HyperPodClient(IHyperPodClient):
                 raise HyperPodSDKUnavailableError()
 
             if job_config is None:
-                raise HyperPodOperationError(
-                    "resume", "job_config is required", job_name
-                )
+                raise HyperPodOperationError("resume", "job_config is required", job_name)
 
             # 确保集群上下文已设置
             self._ensure_cluster_context(cluster_name)
@@ -700,6 +689,8 @@ class HyperPodClient(IHyperPodClient):
     ) -> dict[str, Any]:
         """通过提交高优先级任务触发抢占
 
+        注意: 使用 run_in_executor 包装，因为 sagemaker-hyperpod SDK 无异步版本。
+
         工作原理:
         1. 获取目标任务的资源占用信息
         2. 提交一个 critical 优先级的任务抢占资源
@@ -734,9 +725,7 @@ class HyperPodClient(IHyperPodClient):
             # 验证目标任务存在
             target_job = HyperPodPytorchJob.get(name=target_job_name)
             if target_job.status != "Running":
-                raise HyperPodOperationError(
-                    "trigger_preemption", "Target job is not running", target_job_name
-                )
+                raise HyperPodOperationError("trigger_preemption", "Target job is not running", target_job_name)
 
             # 生成高优先级任务名称
             preemption_job_name = f"preempt-{target_job_name}-{int(time.time())}"

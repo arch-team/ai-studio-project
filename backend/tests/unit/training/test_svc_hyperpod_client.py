@@ -3,8 +3,9 @@
 Tests follow TDD Red-Green-Refactor cycle.
 """
 
+from contextlib import asynccontextmanager
 from typing import TYPE_CHECKING
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -22,32 +23,61 @@ class TestHyperPodClient:
     """Test suite for HyperPodClient implementation."""
 
     @pytest.fixture
-    def mock_boto3_client(self) -> MagicMock:
-        """Mock boto3 SageMaker client."""
+    def mock_sagemaker_client(self) -> MagicMock:
+        """Mock aioboto3 SageMaker client (async methods)."""
         mock_client = MagicMock()
-        with patch("boto3.client", return_value=mock_client):
-            yield mock_client
+        # 设置所有方法返回 AsyncMock
+        mock_client.create_cluster = AsyncMock()
+        mock_client.describe_cluster = AsyncMock()
+        mock_client.list_clusters = AsyncMock()
+        mock_client.delete_cluster = AsyncMock()
+        mock_client.update_cluster = AsyncMock()
+        return mock_client
+
+    @pytest.fixture
+    def mock_s3_client(self) -> MagicMock:
+        """Mock aioboto3 S3 client (async methods)."""
+        mock_client = MagicMock()
+        mock_client.head_object = AsyncMock()
+        mock_client.list_objects_v2 = AsyncMock()
+        return mock_client
+
+    @pytest.fixture
+    def mock_aioboto3_session(self, mock_sagemaker_client: MagicMock, mock_s3_client: MagicMock) -> MagicMock:
+        """Mock aioboto3.Session with async context manager support."""
+        mock_session = MagicMock()
+
+        @asynccontextmanager
+        async def mock_client(service_name: str, **kwargs):
+            """Return appropriate mock client based on service name."""
+            if service_name == "sagemaker":
+                yield mock_sagemaker_client
+            elif service_name == "s3":
+                yield mock_s3_client
+            else:
+                yield MagicMock()
+
+        mock_session.client = mock_client
+        return mock_session
 
     @pytest.fixture
     def mock_hyperpod_pytorch_job(self) -> MagicMock:
         """Mock HyperPodPytorchJob class."""
-        with patch(
-            "src.modules.training.infrastructure.hyperpod.client.HyperPodPytorchJob"
-        ) as mock:
+        with patch("src.modules.training.infrastructure.hyperpod.client.HyperPodPytorchJob") as mock:
             yield mock
 
     @pytest.fixture
     def hyperpod_client(
         self,
-        mock_boto3_client: MagicMock,
+        mock_aioboto3_session: MagicMock,
         mock_hyperpod_pytorch_job: MagicMock,
     ) -> "HyperPodClient":
         """Create HyperPodClient instance with mocked dependencies."""
         from src.modules.training.infrastructure.hyperpod.client import HyperPodClient
 
         client = HyperPodClient(region="us-west-2")
-        # Replace the internal boto3 client with the mock
-        client._sagemaker_client = mock_boto3_client
+        # Replace the internal aioboto3 session with the mock
+        client._session = mock_aioboto3_session
         return client
 
     # ==================== Cluster Operations ====================
@@ -56,10 +86,10 @@ class TestHyperPodClient:
     async def test_create_cluster_success(
         self,
         hyperpod_client: "HyperPodClient",
-        mock_boto3_client: MagicMock,
+        mock_sagemaker_client: MagicMock,
     ) -> None:
         """Test successful cluster creation."""
-        mock_boto3_client.create_cluster.return_value = {
+        mock_sagemaker_client.create_cluster.return_value = {
             "ClusterArn": "arn:aws:sagemaker:us-west-2:123456:cluster/test-cluster",
             "ClusterStatus": "Creating",
         }
@@ -82,16 +112,16 @@ class TestHyperPodClient:
 
         assert "ClusterArn" in result
         assert result["ClusterStatus"] == "Creating"
-        mock_boto3_client.create_cluster.assert_called_once()
+        mock_sagemaker_client.create_cluster.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_describe_cluster_success(
         self,
         hyperpod_client: "HyperPodClient",
-        mock_boto3_client: MagicMock,
+        mock_sagemaker_client: MagicMock,
     ) -> None:
         """Test successful cluster description."""
-        mock_boto3_client.describe_cluster.return_value = {
+        mock_sagemaker_client.describe_cluster.return_value = {
             "ClusterName": "test-cluster",
             "ClusterArn": "arn:aws:sagemaker:us-west-2:123456:cluster/test-cluster",
             "ClusterStatus": "InService",
@@ -108,18 +138,16 @@ class TestHyperPodClient:
 
         assert result["ClusterName"] == "test-cluster"
         assert result["ClusterStatus"] == "InService"
-        mock_boto3_client.describe_cluster.assert_called_once_with(
-            ClusterName="test-cluster"
-        )
+        mock_sagemaker_client.describe_cluster.assert_called_once_with(ClusterName="test-cluster")
 
     @pytest.mark.asyncio
     async def test_list_clusters_success(
         self,
         hyperpod_client: "HyperPodClient",
-        mock_boto3_client: MagicMock,
+        mock_sagemaker_client: MagicMock,
     ) -> None:
         """Test successful cluster listing."""
-        mock_boto3_client.list_clusters.return_value = {
+        mock_sagemaker_client.list_clusters.return_value = {
             "ClusterSummaries": [
                 {"ClusterName": "cluster-1", "ClusterStatus": "InService"},
                 {"ClusterName": "cluster-2", "ClusterStatus": "Creating"},
@@ -131,34 +159,32 @@ class TestHyperPodClient:
 
         assert len(result["ClusterSummaries"]) == 2
         assert result["ClusterSummaries"][0]["ClusterName"] == "cluster-1"
-        mock_boto3_client.list_clusters.assert_called_once_with(MaxResults=10)
+        mock_sagemaker_client.list_clusters.assert_called_once_with(MaxResults=10)
 
     @pytest.mark.asyncio
     async def test_delete_cluster_success(
         self,
         hyperpod_client: "HyperPodClient",
-        mock_boto3_client: MagicMock,
+        mock_sagemaker_client: MagicMock,
     ) -> None:
         """Test successful cluster deletion."""
-        mock_boto3_client.delete_cluster.return_value = {
+        mock_sagemaker_client.delete_cluster.return_value = {
             "ClusterArn": "arn:aws:sagemaker:us-west-2:123456:cluster/test-cluster"
         }
 
         result = await hyperpod_client.delete_cluster(cluster_name="test-cluster")
 
         assert "ClusterArn" in result
-        mock_boto3_client.delete_cluster.assert_called_once_with(
-            ClusterName="test-cluster"
-        )
+        mock_sagemaker_client.delete_cluster.assert_called_once_with(ClusterName="test-cluster")
 
     @pytest.mark.asyncio
     async def test_update_cluster_success(
         self,
         hyperpod_client: "HyperPodClient",
-        mock_boto3_client: MagicMock,
+        mock_sagemaker_client: MagicMock,
     ) -> None:
         """Test successful cluster update."""
-        mock_boto3_client.update_cluster.return_value = {
+        mock_sagemaker_client.update_cluster.return_value = {
             "ClusterArn": "arn:aws:sagemaker:us-west-2:123456:cluster/test-cluster",
             "ClusterStatus": "Updating",
         }
@@ -175,7 +201,7 @@ class TestHyperPodClient:
         )
 
         assert result["ClusterStatus"] == "Updating"
-        mock_boto3_client.update_cluster.assert_called_once()
+        mock_sagemaker_client.update_cluster.assert_called_once()
 
     # ==================== Training Job Operations ====================
 
@@ -242,9 +268,7 @@ class TestHyperPodClient:
         assert result["job_name"] == "test-training-job"
         assert result["status"] == "running"  # Mapped from "Running"
         assert result["start_time"] == "2026-01-15T10:00:00Z"
-        mock_hyperpod_pytorch_job.get.assert_called_once_with(
-            name="test-training-job", namespace="default"
-        )
+        mock_hyperpod_pytorch_job.get.assert_called_once_with(name="test-training-job", namespace="default")
 
     @pytest.mark.asyncio
     async def test_stop_training_job_success(
@@ -258,9 +282,7 @@ class TestHyperPodClient:
         mock_job.delete.return_value = None
         mock_hyperpod_pytorch_job.get.return_value = mock_job
 
-        result = await hyperpod_client.stop_training_job(
-            cluster_name="test-cluster", job_name="test-training-job"
-        )
+        result = await hyperpod_client.stop_training_job(cluster_name="test-cluster", job_name="test-training-job")
 
         assert result["job_name"] == "test-training-job"
         assert result["status"] == "stopped"
@@ -303,9 +325,7 @@ class TestHyperPodClient:
         mock_job = self._create_mock_job_with_status("test-job", "Pending")
         mock_hyperpod_pytorch_job.get.return_value = mock_job
 
-        result = await hyperpod_client.get_training_job_status(
-            cluster_name="test-cluster", job_name="test-job"
-        )
+        result = await hyperpod_client.get_training_job_status(cluster_name="test-cluster", job_name="test-job")
 
         assert result["status"] == "submitted"
 
@@ -321,9 +341,7 @@ class TestHyperPodClient:
         )
         mock_hyperpod_pytorch_job.get.return_value = mock_job
 
-        result = await hyperpod_client.get_training_job_status(
-            cluster_name="test-cluster", job_name="test-job"
-        )
+        result = await hyperpod_client.get_training_job_status(cluster_name="test-cluster", job_name="test-job")
 
         assert result["status"] == "completed"
 
@@ -339,9 +357,7 @@ class TestHyperPodClient:
         )
         mock_hyperpod_pytorch_job.get.return_value = mock_job
 
-        result = await hyperpod_client.get_training_job_status(
-            cluster_name="test-cluster", job_name="test-job"
-        )
+        result = await hyperpod_client.get_training_job_status(cluster_name="test-cluster", job_name="test-job")
 
         assert result["status"] == "failed"
 
@@ -351,12 +367,12 @@ class TestHyperPodClient:
     async def test_client_handles_cluster_not_found(
         self,
         hyperpod_client: "HyperPodClient",
-        mock_boto3_client: MagicMock,
+        mock_sagemaker_client: MagicMock,
     ) -> None:
         """Test error handling when cluster is not found."""
         from botocore.exceptions import ClientError
 
-        mock_boto3_client.describe_cluster.side_effect = ClientError(
+        mock_sagemaker_client.describe_cluster.side_effect = ClientError(
             {"Error": {"Code": "ResourceNotFound", "Message": "Cluster not found"}},
             "DescribeCluster",
         )
@@ -374,9 +390,7 @@ class TestHyperPodClient:
         mock_hyperpod_pytorch_job.get.side_effect = Exception("Job not found")
 
         with pytest.raises(Exception) as exc_info:
-            await hyperpod_client.get_training_job_status(
-                cluster_name="test-cluster", job_name="non-existent"
-            )
+            await hyperpod_client.get_training_job_status(cluster_name="test-cluster", job_name="non-existent")
 
         assert "Job not found" in str(exc_info.value)
 
@@ -384,12 +398,12 @@ class TestHyperPodClient:
     async def test_client_handles_api_throttling(
         self,
         hyperpod_client: "HyperPodClient",
-        mock_boto3_client: MagicMock,
+        mock_sagemaker_client: MagicMock,
     ) -> None:
         """Test error handling for API throttling."""
         from botocore.exceptions import ClientError
 
-        mock_boto3_client.list_clusters.side_effect = ClientError(
+        mock_sagemaker_client.list_clusters.side_effect = ClientError(
             {"Error": {"Code": "ThrottlingException", "Message": "Rate exceeded"}},
             "ListClusters",
         )
@@ -523,45 +537,36 @@ class TestHyperPodClient:
     async def test_verify_checkpoint_exists_returns_true(
         self,
         hyperpod_client: "HyperPodClient",
+        mock_s3_client: MagicMock,
     ) -> None:
         """Test verify_checkpoint_exists returns True when file exists."""
-        with patch("boto3.client") as mock_boto3:
-            mock_s3 = MagicMock()
-            mock_boto3.return_value = mock_s3
-            hyperpod_client._sagemaker_client = MagicMock()
+        mock_s3_client.head_object.return_value = {"ContentLength": 1024}
 
-            result = await hyperpod_client.verify_checkpoint_exists(
-                s3_path="s3://my-bucket/checkpoints/job-123/model.pt"
-            )
+        result = await hyperpod_client.verify_checkpoint_exists(s3_path="s3://my-bucket/checkpoints/job-123/model.pt")
 
-            assert result is True
-            mock_s3.head_object.assert_called_once_with(
-                Bucket="my-bucket",
-                Key="checkpoints/job-123/model.pt",
-            )
+        assert result is True
+        mock_s3_client.head_object.assert_called_once_with(
+            Bucket="my-bucket",
+            Key="checkpoints/job-123/model.pt",
+        )
 
     @pytest.mark.asyncio
     async def test_verify_checkpoint_exists_returns_false(
         self,
         hyperpod_client: "HyperPodClient",
+        mock_s3_client: MagicMock,
     ) -> None:
         """Test verify_checkpoint_exists returns False when file does not exist."""
         from botocore.exceptions import ClientError
 
-        with patch("boto3.client") as mock_boto3:
-            mock_s3 = MagicMock()
-            mock_s3.head_object.side_effect = ClientError(
-                {"Error": {"Code": "404", "Message": "Not Found"}},
-                "HeadObject",
-            )
-            mock_boto3.return_value = mock_s3
-            hyperpod_client._sagemaker_client = MagicMock()
+        mock_s3_client.head_object.side_effect = ClientError(
+            {"Error": {"Code": "404", "Message": "Not Found"}},
+            "HeadObject",
+        )
 
-            result = await hyperpod_client.verify_checkpoint_exists(
-                s3_path="s3://my-bucket/checkpoints/job-123/model.pt"
-            )
+        result = await hyperpod_client.verify_checkpoint_exists(s3_path="s3://my-bucket/checkpoints/job-123/model.pt")
 
-            assert result is False
+        assert result is False
 
     @pytest.mark.asyncio
     async def test_verify_checkpoint_exists_invalid_path(
@@ -578,59 +583,53 @@ class TestHyperPodClient:
     async def test_list_checkpoints_success(
         self,
         hyperpod_client: "HyperPodClient",
+        mock_s3_client: MagicMock,
     ) -> None:
         """Test successful checkpoint listing."""
         from datetime import datetime
 
-        with patch("boto3.client") as mock_boto3:
-            mock_s3 = MagicMock()
-            mock_s3.list_objects_v2.return_value = {
-                "Contents": [
-                    {
-                        "Key": "checkpoints/job-123/epoch_1.pt",
-                        "Size": 1024,
-                        "LastModified": datetime(2026, 1, 15, 10, 0, 0),
-                        "ETag": '"abc123"',
-                    },
-                    {
-                        "Key": "checkpoints/job-123/epoch_2.pt",
-                        "Size": 2048,
-                        "LastModified": datetime(2026, 1, 15, 12, 0, 0),
-                        "ETag": '"def456"',
-                    },
-                ]
-            }
-            mock_boto3.return_value = mock_s3
-            hyperpod_client._sagemaker_client = MagicMock()
+        mock_s3_client.list_objects_v2.return_value = {
+            "Contents": [
+                {
+                    "Key": "checkpoints/job-123/epoch_1.pt",
+                    "Size": 1024,
+                    "LastModified": datetime(2026, 1, 15, 10, 0, 0),
+                    "ETag": '"abc123"',
+                },
+                {
+                    "Key": "checkpoints/job-123/epoch_2.pt",
+                    "Size": 2048,
+                    "LastModified": datetime(2026, 1, 15, 12, 0, 0),
+                    "ETag": '"def456"',
+                },
+            ]
+        }
 
-            result = await hyperpod_client.list_checkpoints(
-                job_id="job-123",
-                checkpoint_base_path="s3://my-bucket/checkpoints",
-            )
+        result = await hyperpod_client.list_checkpoints(
+            job_id="job-123",
+            checkpoint_base_path="s3://my-bucket/checkpoints",
+        )
 
-            assert len(result) == 2
-            assert result[0]["key"] == "checkpoints/job-123/epoch_1.pt"
-            assert result[0]["size"] == 1024
-            assert result[1]["key"] == "checkpoints/job-123/epoch_2.pt"
+        assert len(result) == 2
+        assert result[0]["key"] == "checkpoints/job-123/epoch_1.pt"
+        assert result[0]["size"] == 1024
+        assert result[1]["key"] == "checkpoints/job-123/epoch_2.pt"
 
     @pytest.mark.asyncio
     async def test_list_checkpoints_empty(
         self,
         hyperpod_client: "HyperPodClient",
+        mock_s3_client: MagicMock,
     ) -> None:
         """Test list_checkpoints returns empty list when no checkpoints."""
-        with patch("boto3.client") as mock_boto3:
-            mock_s3 = MagicMock()
-            mock_s3.list_objects_v2.return_value = {}
-            mock_boto3.return_value = mock_s3
-            hyperpod_client._sagemaker_client = MagicMock()
+        mock_s3_client.list_objects_v2.return_value = {}
 
-            result = await hyperpod_client.list_checkpoints(
-                job_id="job-123",
-                checkpoint_base_path="s3://my-bucket/checkpoints",
-            )
+        result = await hyperpod_client.list_checkpoints(
+            job_id="job-123",
+            checkpoint_base_path="s3://my-bucket/checkpoints",
+        )
 
-            assert result == []
+        assert result == []
 
     @pytest.mark.asyncio
     async def test_list_checkpoints_invalid_path(
@@ -778,27 +777,19 @@ class TestHyperPodClient:
 
     def test_client_accepts_default_cluster_name(self) -> None:
         """Test that HyperPodClient accepts default_cluster_name parameter."""
-        with patch("boto3.client"):
-            from src.modules.training.infrastructure.hyperpod.client import (
-                HyperPodClient,
-            )
+        from src.modules.training.infrastructure.hyperpod.client import HyperPodClient
 
-            client = HyperPodClient(default_cluster_name="my-cluster")
-            assert client._default_cluster_name == "my-cluster"
+        client = HyperPodClient(default_cluster_name="my-cluster")
+        assert client._default_cluster_name == "my-cluster"
 
     @pytest.mark.asyncio
     async def test_ensure_cluster_context_called_on_submit(
         self,
-        mock_boto3_client: MagicMock,
+        mock_aioboto3_session: MagicMock,
         mock_hyperpod_pytorch_job: MagicMock,
     ) -> None:
         """Test that _ensure_cluster_context is called when submitting job."""
-        with (
-            patch("boto3.client", return_value=mock_boto3_client),
-            patch(
-                "src.modules.training.infrastructure.hyperpod.client.set_cluster_context"
-            ) as mock_set_context,
-        ):
+        with patch("src.modules.training.infrastructure.hyperpod.client.set_cluster_context") as mock_set_context:
             from src.modules.training.infrastructure.hyperpod.client import (
                 HyperPodClient,
             )
@@ -807,7 +798,7 @@ class TestHyperPodClient:
             HyperPodClient._cluster_contexts.clear()
 
             client = HyperPodClient()
-            client._sagemaker_client = mock_boto3_client
+            client._session = mock_aioboto3_session
 
             # Setup mock job
             mock_job = MagicMock()
@@ -825,16 +816,11 @@ class TestHyperPodClient:
     @pytest.mark.asyncio
     async def test_ensure_cluster_context_called_on_get_status(
         self,
-        mock_boto3_client: MagicMock,
+        mock_aioboto3_session: MagicMock,
         mock_hyperpod_pytorch_job: MagicMock,
     ) -> None:
         """Test that _ensure_cluster_context is called when getting job status."""
-        with (
-            patch("boto3.client", return_value=mock_boto3_client),
-            patch(
-                "src.modules.training.infrastructure.hyperpod.client.set_cluster_context"
-            ) as mock_set_context,
-        ):
+        with patch("src.modules.training.infrastructure.hyperpod.client.set_cluster_context") as mock_set_context:
             from src.modules.training.infrastructure.hyperpod.client import (
                 HyperPodClient,
             )
@@ -843,7 +829,7 @@ class TestHyperPodClient:
             HyperPodClient._cluster_contexts.clear()
 
             client = HyperPodClient()
-            client._sagemaker_client = mock_boto3_client
+            client._session = mock_aioboto3_session
 
             # Setup mock job with proper structure
             mock_job = self._create_mock_job_with_status("test-job", "Running")
@@ -859,16 +845,11 @@ class TestHyperPodClient:
     @pytest.mark.asyncio
     async def test_cluster_context_cached_across_calls(
         self,
-        mock_boto3_client: MagicMock,
+        mock_aioboto3_session: MagicMock,
         mock_hyperpod_pytorch_job: MagicMock,
     ) -> None:
         """Test that cluster context is only set once per cluster."""
-        with (
-            patch("boto3.client", return_value=mock_boto3_client),
-            patch(
-                "src.modules.training.infrastructure.hyperpod.client.set_cluster_context"
-            ) as mock_set_context,
-        ):
+        with patch("src.modules.training.infrastructure.hyperpod.client.set_cluster_context") as mock_set_context:
             from src.modules.training.infrastructure.hyperpod.client import (
                 HyperPodClient,
             )
@@ -877,7 +858,7 @@ class TestHyperPodClient:
             HyperPodClient._cluster_contexts.clear()
 
             client = HyperPodClient()
-            client._sagemaker_client = mock_boto3_client
+            client._session = mock_aioboto3_session
 
             # Setup mock job
             mock_job = self._create_mock_job_with_status("test-job", "Running")
@@ -894,16 +875,11 @@ class TestHyperPodClient:
     @pytest.mark.asyncio
     async def test_cluster_context_set_for_each_cluster(
         self,
-        mock_boto3_client: MagicMock,
+        mock_aioboto3_session: MagicMock,
         mock_hyperpod_pytorch_job: MagicMock,
     ) -> None:
         """Test that cluster context is set separately for different clusters."""
-        with (
-            patch("boto3.client", return_value=mock_boto3_client),
-            patch(
-                "src.modules.training.infrastructure.hyperpod.client.set_cluster_context"
-            ) as mock_set_context,
-        ):
+        with patch("src.modules.training.infrastructure.hyperpod.client.set_cluster_context") as mock_set_context:
             from src.modules.training.infrastructure.hyperpod.client import (
                 HyperPodClient,
             )
@@ -912,7 +888,7 @@ class TestHyperPodClient:
             HyperPodClient._cluster_contexts.clear()
 
             client = HyperPodClient()
-            client._sagemaker_client = mock_boto3_client
+            client._session = mock_aioboto3_session
 
             # Setup mock job
             mock_job = self._create_mock_job_with_status("test-job", "Running")
@@ -927,12 +903,7 @@ class TestHyperPodClient:
 
     def test_ensure_cluster_context_uses_default_if_no_cluster_provided(self) -> None:
         """Test that default cluster is used if no cluster_name provided."""
-        with (
-            patch("boto3.client"),
-            patch(
-                "src.modules.training.infrastructure.hyperpod.client.set_cluster_context"
-            ) as mock_set_context,
-        ):
+        with patch("src.modules.training.infrastructure.hyperpod.client.set_cluster_context") as mock_set_context:
             from src.modules.training.infrastructure.hyperpod.client import (
                 HyperPodClient,
             )
