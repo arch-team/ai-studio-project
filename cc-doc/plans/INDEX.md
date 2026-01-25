@@ -71,3 +71,4 @@ Claude Code 生成的计划文件索引。
 | 2026-01-25 | `2026-01-25-phase-4-us2-数据集管理-api-评估计划.md` | Phase 4 US2 数据集管理 API 评估计划 | ⏳ 进行中 |
 | 2026-01-25 | `2026-01-25-shared-模块代码审查报告-重复造轮子分析.md` | Shared 模块代码审查报告 - 重复造轮子分析 | ⏳ 进行中 |
 | 2026-01-25 | `2026-01-25-datasets-模块-docstring-精简计划.md` | Datasets 模块 Docstring 精简计划 | ⏳ 进行中 |
+| 2026-01-25 | `2026-01-25-代码审查报告-endpoints-py-文件-router-装饰器格式.md` | 代码审查报告: endpoints.py 文件 Router 装饰器格式 | ⏳ 进行中 |

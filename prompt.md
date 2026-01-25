@@ -414,3 +414,15 @@ check hyperpod-integration-service 检查各评估项状态
           Returns:                                                                                                                                                                                                         
               包含 part_number 和 presigned_url 的字典列表                                                                                                                                                                 
           """ 这样的多行注释，且方法的参数是否可以考虑放在一行避免真个文件的行数过多   
+
+
+backend下的shared模块，作为共享模块，涉及到对存储、数据的通用操作，应该在这个模块提供，由其他业务模块来使用，而不应该各个业务模块都自己去实现相应服务的client操作
+比如：src/shared/infrastructure/storage/s3_client.py
+请分析当前backend是否存在这样的问题，并进行优化
+
+所以的endpoints.py中的router注释都写在一行中
+@router.post(
+    "",
+    response_model=DatasetDetail,
+    status_code=status.HTTP_201_CREATED,
+)
