@@ -2,6 +2,7 @@
  * E2E 测试 API Mock 工具
  *
  * 使用 Playwright 的 Route Interception 进行 API Mock
+ * 注意：使用 route.fallback() 传递给下一个处理器，而不是 route.continue() 发送到原始服务器
  */
 
 import { Page } from '@playwright/test';
@@ -28,6 +29,7 @@ export class MockApi {
     await this.mockTrainingJobOperations();
     await this.mockCreateTrainingJob();
     await this.mockDeleteTrainingJob();
+    await this.mockCheckpoints();
   }
 
   /**
@@ -41,7 +43,7 @@ export class MockApi {
     await this.page.route(/\/api\/v1\/training-jobs(\?.*)?$/, async (route) => {
       const request = route.request();
       if (request.method() !== 'GET') {
-        await route.continue();
+        await route.fallback();
         return;
       }
 
@@ -83,25 +85,19 @@ export class MockApi {
 
   /**
    * Mock 训练任务详情 API
+   * 使用正则表达式精确匹配详情 API (排除列表、操作等其他端点)
    */
   async mockTrainingJobDetail(overrides?: Record<string, unknown>) {
-    await this.page.route('**/api/v1/training-jobs/*', async (route, request) => {
-      const url = new URL(request.url());
-      const pathParts = url.pathname.split('/');
-      const lastPart = pathParts[pathParts.length - 1];
-
-      // 跳过操作端点 (pause, resume, cancel, checkpoints)
-      if (['pause', 'resume', 'cancel', 'checkpoints'].includes(lastPart)) {
-        await route.continue();
-        return;
-      }
-
+    // 匹配 /api/v1/training-jobs/{id} 但不匹配 /api/v1/training-jobs/{id}/pause 等
+    await this.page.route(/\/api\/v1\/training-jobs\/(\d+)$/, async (route, request) => {
       if (request.method() !== 'GET') {
-        await route.continue();
+        await route.fallback();
         return;
       }
 
-      const id = parseInt(lastPart);
+      const url = new URL(request.url());
+      const match = url.pathname.match(/\/training-jobs\/(\d+)$/);
+      const id = match ? parseInt(match[1]) : 1;
       const job = getMockTrainingJobDetail(id);
 
       if (!job) {
@@ -123,26 +119,21 @@ export class MockApi {
 
   /**
    * Mock 指定状态的任务详情
+   * 使用正则表达式精确匹配详情 API (排除列表、操作等其他端点)
    */
   async mockTrainingJobWithStatus(
     status: 'running' | 'completed' | 'failed' | 'paused' | 'preempted' | 'submitted',
   ) {
-    await this.page.route('**/api/v1/training-jobs/*', async (route, request) => {
-      const url = new URL(request.url());
-      const pathParts = url.pathname.split('/');
-      const lastPart = pathParts[pathParts.length - 1];
-
-      if (['pause', 'resume', 'cancel', 'checkpoints'].includes(lastPart)) {
-        await route.continue();
-        return;
-      }
-
+    // 匹配 /api/v1/training-jobs/{id} 但不匹配 /api/v1/training-jobs/{id}/pause 等
+    await this.page.route(/\/api\/v1\/training-jobs\/(\d+)$/, async (route, request) => {
       if (request.method() !== 'GET') {
-        await route.continue();
+        await route.fallback();
         return;
       }
 
-      const id = parseInt(lastPart);
+      const url = new URL(request.url());
+      const match = url.pathname.match(/\/training-jobs\/(\d+)$/);
+      const id = match ? parseInt(match[1]) : 1;
       const baseJob = getMockTrainingJobDetail(id) || getMockTrainingJobDetail(1);
 
       if (!baseJob) {
@@ -172,6 +163,23 @@ export class MockApi {
         contentType: 'application/json',
         body: JSON.stringify(jobWithStatus),
       });
+    });
+  }
+
+  /**
+   * Mock 检查点 API
+   */
+  async mockCheckpoints() {
+    await this.page.route(/\/api\/v1\/training-jobs\/\d+\/checkpoints/, async (route, request) => {
+      if (request.method() === 'GET') {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ items: [], total: 0, page: 1, page_size: 20 }),
+        });
+        return;
+      }
+      await route.fallback();
     });
   }
 
@@ -259,7 +267,7 @@ export class MockApi {
   }) {
     await this.page.route('**/api/v1/training-jobs', async (route, request) => {
       if (request.method() !== 'POST') {
-        await route.continue();
+        await route.fallback();
         return;
       }
 
@@ -297,14 +305,16 @@ export class MockApi {
 
   /**
    * Mock 删除训练任务 API
+   * 使用正则表达式精确匹配删除 API
    */
   async mockDeleteTrainingJob(options?: {
     success?: boolean;
     error?: { status: number; message: string };
   }) {
-    await this.page.route('**/api/v1/training-jobs/*', async (route, request) => {
+    // 匹配 /api/v1/training-jobs/{id} 的 DELETE 请求
+    await this.page.route(/\/api\/v1\/training-jobs\/(\d+)$/, async (route, request) => {
       if (request.method() !== 'DELETE') {
-        await route.continue();
+        await route.fallback();
         return;
       }
 
