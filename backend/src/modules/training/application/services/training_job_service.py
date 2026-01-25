@@ -2,6 +2,7 @@
 
 from datetime import datetime
 
+from src.modules.training.application.helpers.job_builder import TrainingJobBuilder
 from src.modules.training.application.interfaces import IHyperPodClient
 from src.modules.training.domain.entities import TrainingJob
 from src.modules.training.domain.exceptions import (
@@ -12,11 +13,8 @@ from src.modules.training.domain.repositories import (
     ICheckpointRepository,
     ITrainingJobRepository,
 )
-from src.modules.training.domain.value_objects import (
-    DistributionStrategy,
-    JobPriority,
-    JobStatus,
-)
+from src.modules.training.domain.value_objects import JobPriority, JobStatus
+from src.modules.training.domain.value_objects.constants import RESOURCE_TYPE_GPU
 from src.shared.application.enhanced_base_service import EnhancedBaseService
 from src.shared.domain.exceptions import (
     InvalidStateTransitionError,
@@ -50,29 +48,11 @@ class TrainingJobService(EnhancedBaseService[TrainingJob, int]):
         # Use base class method for unique field validation
         await self._validate_unique_field("name", job_name)
 
-        # CE-01-05: Check resource quota before creating job
-        if self._quota_checker is not None:
-            node_count = data.get("node_count", 1)
-            instance_type = data["instance_type"]
-            # Estimate GPU count based on instance type
-            gpu_per_node = self._estimate_gpu_count(instance_type)
-            total_gpus = gpu_per_node * node_count
+        # Check resource quota if checker is available
+        await self._check_resource_quota(owner_id, data)
 
-            has_quota = await self._quota_checker.check_quota(
-                user_id=owner_id,
-                resource_type="gpu",
-                amount=total_gpus,
-            )
-            if not has_quota:
-                available = await self._quota_checker.get_available_quota(user_id=owner_id, resource_type="gpu")
-                raise ResourceQuotaExceededError(
-                    resource_type="gpu",
-                    limit=available,
-                    requested=total_gpus,
-                )
-
-        # Create domain entity
-        job = self._build_training_job(owner_id, data)
+        # Create domain entity using builder
+        job = TrainingJobBuilder.build_from_dict(owner_id, data)
 
         # Submit to HyperPod
         await self._submit_to_hyperpod(job)
@@ -80,82 +60,41 @@ class TrainingJobService(EnhancedBaseService[TrainingJob, int]):
         # Save to database
         return await self._repository.create(job)
 
-    def _estimate_gpu_count(self, instance_type: str) -> int:
-        """Estimate GPU count based on instance type."""
-        # Common GPU instance type mappings
-        gpu_counts = {
-            "ml.p4d.24xlarge": 8,
-            "ml.p4de.24xlarge": 8,
-            "ml.p3.2xlarge": 1,
-            "ml.p3.8xlarge": 4,
-            "ml.p3.16xlarge": 8,
-            "ml.g4dn.xlarge": 1,
-            "ml.g4dn.2xlarge": 1,
-            "ml.g4dn.4xlarge": 1,
-            "ml.g4dn.8xlarge": 1,
-            "ml.g4dn.12xlarge": 4,
-            "ml.g4dn.16xlarge": 1,
-            "ml.g5.xlarge": 1,
-            "ml.g5.2xlarge": 1,
-            "ml.g5.4xlarge": 1,
-            "ml.g5.8xlarge": 1,
-            "ml.g5.12xlarge": 4,
-            "ml.g5.16xlarge": 1,
-            "ml.g5.24xlarge": 4,
-            "ml.g5.48xlarge": 8,
-        }
-        return gpu_counts.get(instance_type, 1)
-
-    def _build_training_job(self, owner_id: int, data: dict) -> TrainingJob:
-        """构建训练任务实体
+    async def _check_resource_quota(self, owner_id: int, data: dict) -> None:
+        """检查资源配额
 
         Args:
-            owner_id: 任务所有者 ID
+            owner_id: 用户 ID
             data: 任务配置数据
 
-        Returns:
-            TrainingJob: 训练任务实体
+        Raises:
+            ResourceQuotaExceededError: 配额不足时抛出
         """
-        # 使用 EnumMapper 统一处理枚举转换
-        from src.shared.utils import EnumMapper
+        if self._quota_checker is None:
+            return
 
-        distribution_strategy = EnumMapper.from_string(
-            data.get("distribution_strategy", "DDP"), DistributionStrategy, DistributionStrategy.DDP
+        node_count = data.get("node_count", 1)
+        instance_type = data["instance_type"]
+        gpu_per_node = TrainingJobBuilder.estimate_gpu_count(instance_type)
+        total_gpus = gpu_per_node * node_count
+
+        has_quota = await self._quota_checker.check_quota(
+            user_id=owner_id,
+            resource_type=RESOURCE_TYPE_GPU,
+            amount=total_gpus,
         )
-        priority = EnumMapper.from_string(data.get("priority", "MEDIUM"), JobPriority, JobPriority.MEDIUM)
 
-        # 提取默认值常量
-        DEFAULT_NODE_COUNT = 1
-        DEFAULT_TASKS_PER_NODE = 1
-        DEFAULT_DATA_MOUNT = "/data"
-        DEFAULT_CHECKPOINT_MOUNT = "/checkpoints"
+        if not has_quota:
+            available = await self._quota_checker.get_available_quota(
+                user_id=owner_id,
+                resource_type=RESOURCE_TYPE_GPU,
+            )
+            raise ResourceQuotaExceededError(
+                resource_type=RESOURCE_TYPE_GPU,
+                limit=available,
+                requested=total_gpus,
+            )
 
-        return TrainingJob(
-            id=0,
-            job_name=data["job_name"],
-            owner_id=owner_id,
-            image_uri=data["image_uri"],
-            instance_type=data["instance_type"],
-            entrypoint_command=data["entrypoint_command"],
-            display_name=data.get("display_name"),
-            description=data.get("description"),
-            node_count=data.get("node_count", DEFAULT_NODE_COUNT),
-            tasks_per_node=data.get("tasks_per_node", DEFAULT_TASKS_PER_NODE),
-            environment_variables=data.get("environment_variables"),
-            dataset_id=data.get("dataset_id"),
-            data_mount_path=data.get("data_mount_path", DEFAULT_DATA_MOUNT),
-            checkpoint_mount_path=data.get("checkpoint_mount_path", DEFAULT_CHECKPOINT_MOUNT),
-            checkpoint_interval=data.get("checkpoint_interval"),
-            hyperparameters=data.get("hyperparameters"),
-            max_epochs=data.get("max_epochs"),
-            batch_size=data.get("batch_size"),
-            learning_rate=data.get("learning_rate"),
-            distribution_strategy=distribution_strategy,
-            priority=priority,
-            mixed_precision=data.get("mixed_precision", False),
-            use_spot_instances=data.get("use_spot_instances", False),
-            status=JobStatus.SUBMITTED,
-        )
 
     async def _submit_to_hyperpod(self, job: TrainingJob) -> None:
         """提交任务到 HyperPod
@@ -163,23 +102,12 @@ class TrainingJobService(EnhancedBaseService[TrainingJob, int]):
         Args:
             job: 训练任务实体
         """
-        job_config = self._build_job_config(job)
+        job_config = TrainingJobBuilder.build_job_config(job)
         await self._hyperpod_client.submit_training_job(
             cluster_name=self._cluster_name,
             job_name=job.job_name,
             job_config=job_config,
         )
-
-    def _build_job_config(self, job: TrainingJob) -> dict:
-        """构建 HyperPod 任务配置"""
-        return {
-            "image_uri": job.image_uri,
-            "instance_type": job.instance_type,
-            "node_count": job.node_count,
-            "tasks_per_node": job.tasks_per_node,
-            "command": job.entrypoint_command,
-            "environment": job.environment_variables,
-        }
 
     async def get_job(self, job_id: int) -> TrainingJob:
         """Get training job by ID."""
@@ -239,7 +167,7 @@ class TrainingJobService(EnhancedBaseService[TrainingJob, int]):
                 # Job has progress but no checkpoint - cannot resume safely
                 raise NoValidCheckpointError(job_id=job_id)
 
-        job_config = self._build_job_config(job)
+        job_config = TrainingJobBuilder.build_job_config(job)
         await self._hyperpod_client.submit_training_job(
             cluster_name=self._cluster_name,
             job_name=job.job_name,
