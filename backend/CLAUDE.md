@@ -128,6 +128,21 @@ pytest --cov=src              # 带覆盖率
 
 ## Code Style
 
+### 行长度规范
+
+**规则**: 单行不超过 120 字符才换行。
+
+```python
+# ✅ 120 字符内保持单行
+response = await client.post("/api/v1/training-jobs", json={"name": "test", "config": config, "owner_id": user.id})
+
+# ✅ 超过 120 字符时换行
+response = await client.post(
+    "/api/v1/training-jobs",
+    json={"name": "very-long-training-job-name", "description": "A detailed description", "config": complex_config},
+)
+```
+
 ### Docstring 规范
 
 **原则**: 类型签名即文档，Docstring 只补充签名无法表达的信息。

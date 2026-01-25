@@ -104,8 +104,7 @@ class JWTManager:
         }
 
         delta = expires_delta or timedelta(
-            minutes=self.settings.access_token_expire_minutes
-            or ACCESS_TOKEN_EXPIRE_MINUTES
+            minutes=self.settings.access_token_expire_minutes or ACCESS_TOKEN_EXPIRE_MINUTES
         )
 
         return self._create_token(payload, delta, TokenType.ACCESS)
@@ -150,9 +149,7 @@ class JWTManager:
             # Validate token type if specified
             token_type = claims.get("type")
             if expected_type and token_type != expected_type.value:
-                raise InvalidTokenError(
-                    f"Invalid token type: expected {expected_type.value}, got {token_type}"
-                )
+                raise InvalidTokenError(f"Invalid token type: expected {expected_type.value}, got {token_type}")
 
             return TokenPayload.from_dict(claims)
 

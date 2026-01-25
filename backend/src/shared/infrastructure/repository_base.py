@@ -91,9 +91,7 @@ class EnhancedBaseRepository(ABC, Generic[EntityT, ModelT, IdT]):
             Entity if found, None otherwise
         """
         id_column = self._get_id_column()
-        result = await self._session.execute(
-            select(self._model_class).where(id_column == id)
-        )
+        result = await self._session.execute(select(self._model_class).where(id_column == id))
         model = result.scalar_one_or_none()
         if model is None:
             return None
@@ -146,9 +144,7 @@ class EnhancedBaseRepository(ABC, Generic[EntityT, ModelT, IdT]):
         id_value = getattr(entity, "id")
         id_column = self._get_id_column()
 
-        result = await self._session.execute(
-            select(self._model_class).where(id_column == id_value)
-        )
+        result = await self._session.execute(select(self._model_class).where(id_column == id_value))
         model = result.scalar_one_or_none()
 
         if model is None:
@@ -174,9 +170,7 @@ class EnhancedBaseRepository(ABC, Generic[EntityT, ModelT, IdT]):
             True if deleted, False if not found
         """
         id_column = self._get_id_column()
-        result = await self._session.execute(
-            select(self._model_class).where(id_column == id)
-        )
+        result = await self._session.execute(select(self._model_class).where(id_column == id))
         model = result.scalar_one_or_none()
 
         if model is None:
@@ -202,9 +196,7 @@ class EnhancedBaseRepository(ABC, Generic[EntityT, ModelT, IdT]):
             return await self.delete(id)
 
         id_column = self._get_id_column()
-        result = await self._session.execute(
-            select(self._model_class).where(id_column == id)
-        )
+        result = await self._session.execute(select(self._model_class).where(id_column == id))
         model = result.scalar_one_or_none()
 
         if model is None:
@@ -230,9 +222,7 @@ class EnhancedBaseRepository(ABC, Generic[EntityT, ModelT, IdT]):
             True if exists, False otherwise
         """
         id_column = self._get_id_column()
-        result = await self._session.execute(
-            select(func.count(id_column)).where(id_column == id)
-        )
+        result = await self._session.execute(select(func.count(id_column)).where(id_column == id))
         count = result.scalar() or 0
         return count > 0
 
@@ -356,9 +346,7 @@ class EnhancedBaseRepository(ABC, Generic[EntityT, ModelT, IdT]):
             return []
 
         id_column = self._get_id_column()
-        result = await self._session.execute(
-            select(self._model_class).where(id_column.in_(ids))
-        )
+        result = await self._session.execute(select(self._model_class).where(id_column.in_(ids)))
         models = result.scalars().all()
 
         return [self._to_entity(model) for model in models]

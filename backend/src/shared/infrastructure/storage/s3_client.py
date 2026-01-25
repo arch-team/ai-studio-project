@@ -73,14 +73,10 @@ class S3StorageClient(IStorageService):
             await s3.delete_object(Bucket=self._bucket_name, Key=remote_path)
         return True
 
-    async def list_files(
-        self, prefix: str, max_results: int = 1000
-    ) -> list[dict[str, Any]]:
+    async def list_files(self, prefix: str, max_results: int = 1000) -> list[dict[str, Any]]:
         """List files with a given prefix in S3."""
         async with self._session.client("s3", region_name=self._region) as s3:
-            response = await s3.list_objects_v2(
-                Bucket=self._bucket_name, Prefix=prefix, MaxKeys=max_results
-            )
+            response = await s3.list_objects_v2(Bucket=self._bucket_name, Prefix=prefix, MaxKeys=max_results)
         return response.get("Contents", [])
 
     async def get_file_metadata(self, remote_path: str) -> dict[str, Any]:
@@ -124,9 +120,7 @@ class S3StorageClient(IStorageService):
             )
         return dest_path
 
-    async def stream_file(
-        self, remote_path: str, chunk_size: int = 8192
-    ) -> AsyncIterator[bytes]:
+    async def stream_file(self, remote_path: str, chunk_size: int = 8192) -> AsyncIterator[bytes]:
         """Stream file contents from S3."""
         async with self._session.client("s3", region_name=self._region) as s3:
             response = await s3.get_object(Bucket=self._bucket_name, Key=remote_path)

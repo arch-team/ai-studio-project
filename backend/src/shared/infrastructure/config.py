@@ -22,9 +22,7 @@ class Settings(BaseSettings):
     environment: str = "development"
 
     # Database
-    database_url: str = (
-        "mysql+aiomysql://ai_training:ai_training_pass@localhost:3306/ai_training"
-    )
+    database_url: str = "mysql+aiomysql://ai_training:ai_training_pass@localhost:3306/ai_training"
     database_pool_size: int = 5
     database_max_overflow: int = 10
 

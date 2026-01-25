@@ -61,9 +61,7 @@ class IStorageService(ABC):
         pass
 
     @abstractmethod
-    async def list_files(
-        self, prefix: str, max_results: int = 1000
-    ) -> list[dict[str, Any]]:
+    async def list_files(self, prefix: str, max_results: int = 1000) -> list[dict[str, Any]]:
         """List files with a given prefix.
 
         Args:
@@ -132,9 +130,7 @@ class IStorageService(ABC):
         pass
 
     @abstractmethod
-    async def stream_file(
-        self, remote_path: str, chunk_size: int = 8192
-    ) -> AsyncIterator[bytes]:
+    async def stream_file(self, remote_path: str, chunk_size: int = 8192) -> AsyncIterator[bytes]:
         """Stream file contents.
 
         Args:

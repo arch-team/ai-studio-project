@@ -43,9 +43,7 @@ class PasswordValidator:
         violations = []
 
         if len(password) < PASSWORD_MIN_LENGTH:
-            violations.append(
-                f"Password must be at least {PASSWORD_MIN_LENGTH} characters"
-            )
+            violations.append(f"Password must be at least {PASSWORD_MIN_LENGTH} characters")
 
         if not re.search(r"[a-z]", password):
             violations.append("Password must contain at least one lowercase letter")
@@ -69,10 +67,7 @@ class PasswordValidator:
     ) -> bool:
         """Check if password was recently used (True if OK, False if reused)."""
         recent_history = password_history[:PASSWORD_HISTORY_COUNT]
-        return not any(
-            hasher.verify_password(new_password, old_hash)
-            for old_hash in recent_history
-        )
+        return not any(hasher.verify_password(new_password, old_hash) for old_hash in recent_history)
 
 
 # Singleton instance for convenience

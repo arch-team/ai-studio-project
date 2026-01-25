@@ -74,9 +74,7 @@ class QueryBuilder(Generic[ModelT]):
             self._filters.append(filter_clause)
         return self
 
-    def with_order_by(
-        self, sort_by: str = "created_at", sort_order: str = "desc"
-    ) -> "QueryBuilder[ModelT]":
+    def with_order_by(self, sort_by: str = "created_at", sort_order: str = "desc") -> "QueryBuilder[ModelT]":
         """Add ordering clause."""
         if hasattr(self._model_class, sort_by):
             column = getattr(self._model_class, sort_by)
@@ -84,9 +82,7 @@ class QueryBuilder(Generic[ModelT]):
             self._query = self._query.order_by(order_func(column))
         return self
 
-    def with_pagination(
-        self, page: int = 1, page_size: int = 20
-    ) -> "QueryBuilder[ModelT]":
+    def with_pagination(self, page: int = 1, page_size: int = 20) -> "QueryBuilder[ModelT]":
         """Add pagination (offset + limit)."""
         offset = (page - 1) * page_size
         self._query = self._query.offset(offset).limit(page_size)
@@ -112,9 +108,7 @@ class QueryBuilder(Generic[ModelT]):
         result = await session.execute(self._query)
         return list(result.scalars().all())
 
-    async def execute_with_count(
-        self, session: AsyncSession
-    ) -> tuple[list[ModelT], int]:
+    async def execute_with_count(self, session: AsyncSession) -> tuple[list[ModelT], int]:
         """Execute query and return results with total count."""
         total = await self.count(session)
         items = await self.execute(session)

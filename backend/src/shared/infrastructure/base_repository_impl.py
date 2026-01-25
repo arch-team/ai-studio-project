@@ -44,9 +44,7 @@ class BaseRepositoryImpl(ABC, Generic[EntityT, ModelT, IdT]):
     async def get_by_id(self, id: IdT) -> EntityT | None:
         """Get entity by primary key."""
         id_column = self._get_id_column()
-        result = await self._session.execute(
-            select(self._model_class).where(id_column == id)
-        )
+        result = await self._session.execute(select(self._model_class).where(id_column == id))
         model = result.scalar_one_or_none()
         if model is None:
             return None
@@ -63,9 +61,7 @@ class BaseRepositoryImpl(ABC, Generic[EntityT, ModelT, IdT]):
     async def exists(self, id: IdT) -> bool:
         """Check if entity exists by primary key."""
         id_column = self._get_id_column()
-        result = await self._session.execute(
-            select(func.count(id_column)).where(id_column == id)
-        )
+        result = await self._session.execute(select(func.count(id_column)).where(id_column == id))
         count = result.scalar() or 0
         return count > 0
 
@@ -74,8 +70,6 @@ class BaseRepositoryImpl(ABC, Generic[EntityT, ModelT, IdT]):
         column = getattr(self._model_class, column_name, None)
         if column is None:
             return False
-        result = await self._session.execute(
-            select(func.count(self._get_id_column())).where(column == value)
-        )
+        result = await self._session.execute(select(func.count(self._get_id_column())).where(column == value))
         count = result.scalar() or 0
         return count > 0

@@ -53,6 +53,4 @@ class EntitySchema(BaseModel, Generic[Entity]):
         Subclasses must override this method to define field mappings.
         Use EnumMapper for enum conversions.
         """
-        raise NotImplementedError(
-            f"{cls.__name__} must implement _map_entity_fields()"
-        )
+        raise NotImplementedError(f"{cls.__name__} must implement _map_entity_fields()")

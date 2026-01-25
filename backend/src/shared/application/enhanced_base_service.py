@@ -58,17 +58,11 @@ class EnhancedBaseService(Generic[T, ID]):
 
     def _create_duplicate_error(self, field: str, value: str) -> Exception:
         """Create duplicate entity error."""
-        return DuplicateEntityError(
-            self._entity_type, f"{field}={value}"
-        )
+        return DuplicateEntityError(self._entity_type, f"{field}={value}")
 
-    def _create_invalid_transition_error(
-        self, current_state: str, target_state: str
-    ) -> Exception:
+    def _create_invalid_transition_error(self, current_state: str, target_state: str) -> Exception:
         """Create invalid state transition error."""
-        return InvalidStateTransitionError(
-            self._entity_type, current_state, target_state
-        )
+        return InvalidStateTransitionError(self._entity_type, current_state, target_state)
 
     # ========== Entity Retrieval ==========
 
@@ -89,9 +83,7 @@ class EnhancedBaseService(Generic[T, ID]):
             raise self._create_not_found_error(str(entity_id))
         return entity  # type: ignore
 
-    async def _get_by_field_or_none(
-        self, field_name: str, field_value: Any
-    ) -> T | None:
+    async def _get_by_field_or_none(self, field_name: str, field_value: Any) -> T | None:
         """Get entity by arbitrary field.
 
         Args:
@@ -109,9 +101,7 @@ class EnhancedBaseService(Generic[T, ID]):
 
     # ========== Validation Utilities ==========
 
-    async def _validate_unique_field(
-        self, field_name: str, field_value: Any
-    ) -> None:
+    async def _validate_unique_field(self, field_name: str, field_value: Any) -> None:
         """Validate that a field value is unique.
 
         Args:
@@ -191,14 +181,10 @@ class EnhancedBaseService(Generic[T, ID]):
         # Check if entity has can_transition_to method
         if hasattr(entity, "can_transition_to"):
             if not entity.can_transition_to(target_state):
-                raise self._create_invalid_transition_error(
-                    str(current_state), str(target_state)
-                )
+                raise self._create_invalid_transition_error(str(current_state), str(target_state))
         # Otherwise check allowed_from_states
         elif allowed_from_states and current_state not in allowed_from_states:
-            raise self._create_invalid_transition_error(
-                str(current_state), str(target_state)
-            )
+            raise self._create_invalid_transition_error(str(current_state), str(target_state))
 
     # ========== CRUD Operations ==========
 

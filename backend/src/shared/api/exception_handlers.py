@@ -73,9 +73,7 @@ async def domain_exception_handler(request: Request, exc: DomainError) -> JSONRe
     )
 
 
-async def security_exception_handler(
-    request: Request, exc: SecurityError
-) -> JSONResponse:
+async def security_exception_handler(request: Request, exc: SecurityError) -> JSONResponse:
     """Handle all Security layer exceptions.
 
     所有 Security 异常现在继承自 Problem，使用 error_code 和 get_details()。
