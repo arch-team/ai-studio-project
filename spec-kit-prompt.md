@@ -27,3 +27,7 @@
 
 /everything-claude-code:eval 对这个文件中的 'US1 (P1) - 训练任务管理 (37 tasks)'下的 ‘### 后端 API 端点 (基于 contracts/training-jobs-api.yaml)
 ’ 制定评估/Users/jinhuasu/Project_Workspace/Anker-Projects/ml-platform-research/llm-platform-solution/ai-studio-project/specs/001-ai-training-platform/tasks.md  
+
+
+/everything-claude-code:eval 对这个文件中的 'US1 (P1) - 训练任务管理 (37 tasks)'下的 ‘### 前端页面组件
+’ 制定评估/Users/jinhuasu/Project_Workspace/Anker-Projects/ml-platform-research/llm-platform-solution/ai-studio-project/specs/001-ai-training-platform/tasks.md  

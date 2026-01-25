@@ -167,3 +167,34 @@ export async function restoreModel(id: number): Promise<ModelDetail> {
 
   return handleResponse<ModelDetail>(response);
 }
+
+/**
+ * Rollback model to a specific version.
+ */
+export async function rollbackModelVersion(
+  id: number,
+  targetVersion: string
+): Promise<ModelDetail> {
+  const response = await fetch(`${API_BASE}/models/${id}/rollback`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+    body: JSON.stringify({ target_version: targetVersion }),
+  });
+
+  return handleResponse<ModelDetail>(response);
+}
+
+/**
+ * Batch archive multiple models.
+ */
+export async function batchArchiveModels(
+  ids: number[]
+): Promise<{ success: number[]; failed: number[] }> {
+  const response = await fetch(`${API_BASE}/models/batch/archive`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+    body: JSON.stringify({ model_ids: ids }),
+  });
+
+  return handleResponse<{ success: number[]; failed: number[] }>(response);
+}

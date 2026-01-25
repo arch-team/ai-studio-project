@@ -5,17 +5,19 @@
  */
 
 import {
+  Alert,
   Box,
   BreadcrumbGroup,
   Button,
   Container,
   Header,
+  Modal,
   SpaceBetween,
   Spinner,
 } from '@cloudscape-design/components';
 import { useState, useCallback } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { useModel, useModelVersions } from '../api';
+import { useModel, useModelVersions, useRollbackModelVersion } from '../api';
 import { ModelVersionTable, ModelMetricsCompare } from '../components';
 
 /**
@@ -29,9 +31,14 @@ export function ModelVersionsPage() {
   // 版本选择状态
   const [selectedVersions, setSelectedVersions] = useState<string[]>([]);
   const [showComparison, setShowComparison] = useState(false);
+  const [showRollbackModal, setShowRollbackModal] = useState(false);
+  const [rollbackTarget, setRollbackTarget] = useState<string | null>(null);
 
   // 获取模型详情
   const { data: model, isLoading: modelLoading } = useModel(modelId);
+
+  // 回滚 mutation
+  const rollbackMutation = useRollbackModelVersion();
 
   // 获取版本列表（包括对比数据）
   const { data: versionsData, isLoading: versionsLoading, refetch } = useModelVersions(
@@ -60,6 +67,21 @@ export function ModelVersionsPage() {
     setShowComparison(false);
     setSelectedVersions([]);
   }, []);
+
+  // 打开回滚确认弹窗
+  const handleOpenRollback = useCallback((version: string) => {
+    setRollbackTarget(version);
+    setShowRollbackModal(true);
+  }, []);
+
+  // 执行回滚
+  const handleRollback = useCallback(async () => {
+    if (!modelId || !rollbackTarget) return;
+    await rollbackMutation.mutateAsync({ id: modelId, targetVersion: rollbackTarget });
+    setShowRollbackModal(false);
+    setRollbackTarget(null);
+    refetch();
+  }, [modelId, rollbackTarget, rollbackMutation, refetch]);
 
   // 加载状态
   if (modelLoading || versionsLoading) {
@@ -147,8 +169,45 @@ export function ModelVersionsPage() {
           selectedVersions={selectedVersions}
           onSelectionChange={handleSelectionChange}
           onCompare={handleCompare}
+          onRollback={handleOpenRollback}
+          currentVersion={model.version}
         />
       </Container>
+
+      {/* 回滚确认弹窗 */}
+      <Modal
+        visible={showRollbackModal}
+        onDismiss={() => setShowRollbackModal(false)}
+        header="确认回滚"
+        footer={
+          <Box float="right">
+            <SpaceBetween direction="horizontal" size="xs">
+              <Button
+                variant="link"
+                onClick={() => setShowRollbackModal(false)}
+              >
+                取消
+              </Button>
+              <Button
+                variant="primary"
+                onClick={handleRollback}
+                loading={rollbackMutation.isPending}
+              >
+                确认回滚
+              </Button>
+            </SpaceBetween>
+          </Box>
+        }
+      >
+        <SpaceBetween size="m">
+          <Box>
+            确定要将模型 <b>{model.model_name}</b> 回滚到版本 <b>{rollbackTarget}</b> 吗？
+          </Box>
+          <Alert type="warning">
+            回滚操作会创建一个新的模型版本，原有版本不会被删除。
+          </Alert>
+        </SpaceBetween>
+      </Modal>
     </SpaceBetween>
   );
 }

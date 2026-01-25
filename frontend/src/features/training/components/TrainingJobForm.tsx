@@ -5,6 +5,7 @@
  */
 
 import {
+  Alert,
   Box,
   Button,
   Container,
@@ -14,10 +15,11 @@ import {
   Input,
   Select,
   SpaceBetween,
+  StatusIndicator,
   Textarea,
   Tiles,
 } from '@cloudscape-design/components';
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import type {
   CreateTrainingJobRequest,
   JobPriority,
@@ -28,6 +30,7 @@ import {
   DISTRIBUTION_STRATEGY_LABELS,
   INSTANCE_TYPES,
 } from '../types';
+import { useResourceLimitConfigs } from '@features/resource-quotas';
 
 interface TrainingJobFormProps {
   initialValues?: Partial<CreateTrainingJobRequest>;
@@ -70,6 +73,20 @@ function getStrategyDescription(strategy: DistributionStrategy): string {
   return descriptions[strategy];
 }
 
+// S3 URI 格式验证正则
+const S3_URI_PATTERN = /^s3:\/\/[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]\/.+$/i;
+// 容器内路径格式验证正则
+const CONTAINER_PATH_PATTERN = /^\/[\w./-]+$/;
+// ECR 镜像 URI 格式验证正则
+const ECR_URI_PATTERN = /^\d{12}\.dkr\.ecr\.[a-z0-9-]+\.amazonaws\.com\/[\w./-]+$/;
+
+/**
+ * 验证训练脚本路径（支持 S3 URI 或容器内路径）
+ */
+function isValidScriptPath(path: string): boolean {
+  return S3_URI_PATTERN.test(path) || CONTAINER_PATH_PATTERN.test(path);
+}
+
 /**
  * 表单验证
  */
@@ -84,10 +101,14 @@ function validateForm(values: Partial<CreateTrainingJobRequest>): Record<string,
 
   if (!values.image_uri?.trim()) {
     errors.image_uri = '请输入容器镜像 URI';
+  } else if (!ECR_URI_PATTERN.test(values.image_uri)) {
+    errors.image_uri = '请输入有效的 ECR 镜像地址 (如: 123456789012.dkr.ecr.region.amazonaws.com/repo:tag)';
   }
 
   if (!values.entry_point?.trim()) {
     errors.entry_point = '请输入训练脚本路径';
+  } else if (!isValidScriptPath(values.entry_point)) {
+    errors.entry_point = '请输入有效的路径格式 (S3 URI 如 s3://bucket/path 或容器路径如 /opt/ml/code/train.py)';
   }
 
   if (values.node_count != null && (values.node_count < 1 || values.node_count > 64)) {
@@ -126,6 +147,44 @@ export function TrainingJobForm({
   const [gpuPerNode, setGpuPerNode] = useState(String(initialValues.gpu_per_node || 8));
   const [errors, setErrors] = useState<Record<string, string>>({});
 
+  // 获取资源配额配置
+  const { data: quotaData, isLoading: quotaLoading } = useResourceLimitConfigs();
+
+  // 计算当前配置的资源需求
+  const totalGpu = (parseInt(nodeCount, 10) || 1) * (parseInt(gpuPerNode, 10) || 8);
+  const totalNodes = parseInt(nodeCount, 10) || 1;
+
+  // 配额检查结果
+  const quotaCheck = useMemo(() => {
+    if (!quotaData?.items?.length) {
+      return { isValid: true, warnings: [], errors: [] };
+    }
+
+    // 使用第一个配置作为默认配额（实际应该根据用户角色选择）
+    const quota = quotaData.items[0];
+    const warnings: string[] = [];
+    const quotaErrors: string[] = [];
+
+    if (totalGpu > quota.max_gpu_per_job) {
+      quotaErrors.push(`GPU 数量 (${totalGpu}) 超过配额限制 (${quota.max_gpu_per_job})`);
+    } else if (totalGpu > quota.max_gpu_per_job * 0.8) {
+      warnings.push(`GPU 数量 (${totalGpu}) 接近配额限制 (${quota.max_gpu_per_job})`);
+    }
+
+    if (totalNodes > quota.max_nodes_per_job) {
+      quotaErrors.push(`节点数量 (${totalNodes}) 超过配额限制 (${quota.max_nodes_per_job})`);
+    } else if (totalNodes > quota.max_nodes_per_job * 0.8) {
+      warnings.push(`节点数量 (${totalNodes}) 接近配额限制 (${quota.max_nodes_per_job})`);
+    }
+
+    return {
+      isValid: quotaErrors.length === 0,
+      warnings,
+      errors: quotaErrors,
+      quota,
+    };
+  }, [quotaData, totalGpu, totalNodes]);
+
   // 构建表单数据
   const buildFormData = useCallback((): Partial<CreateTrainingJobRequest> => {
     return {
@@ -161,9 +220,15 @@ export function TrainingJobForm({
       return;
     }
 
+    // 配额检查
+    if (!quotaCheck.isValid) {
+      setErrors({ quota: quotaCheck.errors.join('; ') });
+      return;
+    }
+
     setErrors({});
     onSubmit(formData as CreateTrainingJobRequest);
-  }, [buildFormData, onSubmit]);
+  }, [buildFormData, onSubmit, quotaCheck]);
 
   return (
     <Form
@@ -311,6 +376,40 @@ export function TrainingJobForm({
               {parseInt(gpuPerNode, 10) || 8} GPU ={' '}
               {(parseInt(nodeCount, 10) || 1) * (parseInt(gpuPerNode, 10) || 8)} GPU
             </Box>
+
+            {/* 配额检查状态 */}
+            {quotaLoading ? (
+              <StatusIndicator type="loading">检查资源配额...</StatusIndicator>
+            ) : quotaCheck.quota ? (
+              <Box>
+                <Box margin={{ bottom: 'xs' }}>
+                  <StatusIndicator type={quotaCheck.isValid ? 'success' : 'error'}>
+                    配额检查: {quotaCheck.isValid ? '通过' : '超出限制'}
+                  </StatusIndicator>
+                </Box>
+                <Box fontSize="body-s" color="text-body-secondary">
+                  配额限制: 最大 {quotaCheck.quota.max_gpu_per_job} GPU / {quotaCheck.quota.max_nodes_per_job} 节点
+                </Box>
+              </Box>
+            ) : null}
+
+            {/* 配额警告 */}
+            {quotaCheck.warnings.length > 0 && (
+              <Alert type="warning" header="资源使用提醒">
+                {quotaCheck.warnings.map((w, i) => (
+                  <div key={i}>{w}</div>
+                ))}
+              </Alert>
+            )}
+
+            {/* 配额错误 */}
+            {quotaCheck.errors.length > 0 && (
+              <Alert type="error" header="资源超出配额">
+                {quotaCheck.errors.map((e, i) => (
+                  <div key={i}>{e}</div>
+                ))}
+              </Alert>
+            )}
           </SpaceBetween>
         </Container>
       </SpaceBetween>

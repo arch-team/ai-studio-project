@@ -60,7 +60,7 @@ export function TrainingJobListPage() {
   };
 
   // 获取训练任务列表，每 30 秒自动刷新
-  const { data, isLoading, error, refetch } = useTrainingJobs(queryFilters);
+  const { data, isLoading, error, refetch } = useTrainingJobs(queryFilters, 30000);
 
   // 处理分页变化
   const handlePageChange = useCallback((page: number) => {

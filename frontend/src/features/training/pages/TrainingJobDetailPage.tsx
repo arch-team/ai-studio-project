@@ -23,11 +23,13 @@ import { useNavigate, useParams } from 'react-router-dom';
 import {
   useTrainingJob,
   useTrainingJobCheckpoints,
+  useTrainingJobLogs,
   usePauseTrainingJob,
   useResumeTrainingJob,
   useDeleteTrainingJob,
 } from '../api';
-import { TrainingStatusBadge } from '../components';
+import { TrainingStatusBadge, TrainingStatusMonitor } from '../components';
+import type { LogEntry } from '../types';
 import type { Checkpoint } from '../types';
 import {
   JOB_PRIORITY_LABELS,
@@ -126,6 +128,15 @@ export function TrainingJobDetailPage() {
   // 获取检查点列表
   const { data: checkpointsData, isLoading: checkpointsLoading } =
     useTrainingJobCheckpoints(jobId);
+
+  // 获取日志（running 状态时 5 秒轮询）
+  const isRunning = job?.status === 'running';
+  const { data: logsData, isLoading: logsLoading, refetch: refetchLogs } =
+    useTrainingJobLogs(
+      jobId,
+      { limit: 100 },
+      isRunning ? 5000 : undefined
+    );
 
   // Mutations
   const pauseMutation = usePauseTrainingJob();
@@ -344,19 +355,76 @@ export function TrainingJobDetailPage() {
             id: 'logs',
             label: '日志',
             content: (
-              <Box padding="l" color="text-body-secondary">
-                日志功能开发中...
-              </Box>
+              <Container
+                header={
+                  <Header
+                    variant="h2"
+                    actions={
+                      <Button
+                        iconName="refresh"
+                        onClick={() => refetchLogs()}
+                        loading={logsLoading}
+                      >
+                        刷新
+                      </Button>
+                    }
+                  >
+                    训练日志
+                    {isRunning && (
+                      <Box
+                        display="inline"
+                        margin={{ left: 's' }}
+                        fontSize="body-s"
+                        color="text-body-secondary"
+                      >
+                        (每 5 秒自动刷新)
+                      </Box>
+                    )}
+                  </Header>
+                }
+              >
+                {logsLoading && !logsData ? (
+                  <Box textAlign="center" padding="l">
+                    <Spinner /> 加载日志中...
+                  </Box>
+                ) : logsData?.logs && logsData.logs.length > 0 ? (
+                  <Box padding="s" fontSize="body-s">
+                    <div
+                      style={{
+                        fontFamily: 'monospace',
+                        whiteSpace: 'pre-wrap',
+                        maxHeight: '500px',
+                        overflow: 'auto',
+                        backgroundColor: 'var(--color-background-container-content)',
+                        padding: '12px',
+                        borderRadius: '8px',
+                      }}
+                    >
+                      {logsData.logs.map((log: LogEntry, index: number) => (
+                        <div key={index} style={{ marginBottom: '4px' }}>
+                          <span style={{ color: 'var(--color-text-body-secondary)' }}>
+                            [{new Date(log.timestamp).toLocaleTimeString('zh-CN')}]
+                          </span>{' '}
+                          <span style={{ color: 'var(--color-text-status-info)' }}>
+                            [{log.pod_name}]
+                          </span>{' '}
+                          {log.message}
+                        </div>
+                      ))}
+                    </div>
+                  </Box>
+                ) : (
+                  <Box textAlign="center" color="text-body-secondary" padding="l">
+                    暂无日志数据
+                  </Box>
+                )}
+              </Container>
             ),
           },
           {
             id: 'metrics',
             label: '训练指标',
-            content: (
-              <Box padding="l" color="text-body-secondary">
-                指标监控功能开发中...
-              </Box>
-            ),
+            content: <TrainingStatusMonitor job={job} />,
           },
         ]}
       />

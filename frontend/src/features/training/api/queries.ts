@@ -28,11 +28,17 @@ import {
 
 /**
  * Fetch paginated list of training jobs.
+ * @param filters - 过滤条件
+ * @param pollInterval - 轮询间隔（毫秒），传入 undefined 禁用轮询
  */
-export function useTrainingJobs(filters: TrainingJobFilters = {}) {
+export function useTrainingJobs(
+  filters: TrainingJobFilters = {},
+  pollInterval?: number
+) {
   return useQuery({
     queryKey: queryKeys.trainingJobs.list(filters as Record<string, unknown>),
     queryFn: () => fetchTrainingJobs(filters),
+    refetchInterval: pollInterval,
   });
 }
 

@@ -13,6 +13,8 @@ import {
   updateModel,
   archiveModel,
   restoreModel,
+  rollbackModelVersion,
+  batchArchiveModels,
 } from './modelApi';
 
 // === Query Hooks ===
@@ -124,6 +126,41 @@ export function useRestoreModel() {
       queryClient.invalidateQueries({ queryKey: queryKeys.models.lists() });
       // Invalidate version queries
       queryClient.invalidateQueries({ queryKey: queryKeys.models.versionsAll() });
+    },
+  });
+}
+
+/**
+ * Rollback model to a specific version.
+ */
+export function useRollbackModelVersion() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ id, targetVersion }: { id: number; targetVersion: string }) =>
+      rollbackModelVersion(id, targetVersion),
+    onSuccess: (result) => {
+      // Update cache for this specific model
+      queryClient.setQueryData(queryKeys.models.detail(String(result.id)), result);
+      // Invalidate list queries
+      queryClient.invalidateQueries({ queryKey: queryKeys.models.lists() });
+      // Invalidate version queries
+      queryClient.invalidateQueries({ queryKey: queryKeys.models.versionsAll() });
+    },
+  });
+}
+
+/**
+ * Batch archive multiple models.
+ */
+export function useBatchArchiveModels() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (ids: number[]) => batchArchiveModels(ids),
+    onSuccess: () => {
+      // Invalidate list queries
+      queryClient.invalidateQueries({ queryKey: queryKeys.models.lists() });
     },
   });
 }
