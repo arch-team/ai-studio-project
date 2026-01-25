@@ -15,6 +15,7 @@ import asyncio
 from typing import Any
 
 import aioboto3
+from botocore.config import Config
 from botocore.exceptions import ClientError
 
 # 分片大小常量（用于优化上传性能）
@@ -69,6 +70,8 @@ class S3MultipartClient:
         self._region = region
         self._kms_key_id = kms_key_id
         self._session = aioboto3.Session()
+        # 强制使用 SigV4 签名 (AWS 推荐，支持所有 S3 功能)
+        self._config = Config(signature_version="s3v4")
 
     async def create_multipart_upload(
         self,
@@ -84,7 +87,7 @@ class S3MultipartClient:
         params = self._build_upload_params(key, content_type, metadata)
 
         try:
-            async with self._session.client("s3", region_name=self._region) as s3:
+            async with self._session.client("s3", region_name=self._region, config=self._config) as s3:
                 return await s3.create_multipart_upload(**params)
         except ClientError as e:
             raise S3MultipartUploadError(f"Failed to create multipart upload: {e}") from e
@@ -107,7 +110,7 @@ class S3MultipartClient:
         Returns:
             预签名 URL
         """
-        async with self._session.client("s3", region_name=self._region) as s3:
+        async with self._session.client("s3", region_name=self._region, config=self._config) as s3:
             return await s3.generate_presigned_url(
                 "upload_part",
                 Params={
@@ -165,7 +168,7 @@ class S3MultipartClient:
         sorted_parts = sorted(parts, key=lambda x: x["PartNumber"])
 
         try:
-            async with self._session.client("s3", region_name=self._region) as s3:
+            async with self._session.client("s3", region_name=self._region, config=self._config) as s3:
                 return await s3.complete_multipart_upload(
                     Bucket=self._bucket_name,
                     Key=key,
@@ -190,7 +193,7 @@ class S3MultipartClient:
             S3MultipartUploadError: 取消失败时
         """
         try:
-            async with self._session.client("s3", region_name=self._region) as s3:
+            async with self._session.client("s3", region_name=self._region, config=self._config) as s3:
                 await s3.abort_multipart_upload(
                     Bucket=self._bucket_name,
                     Key=key,
@@ -224,7 +227,7 @@ class S3MultipartClient:
         part_number_marker: int | None = None
 
         try:
-            async with self._session.client("s3", region_name=self._region) as s3:
+            async with self._session.client("s3", region_name=self._region, config=self._config) as s3:
                 # 循环获取所有分页结果
                 while True:
                     params: dict[str, Any] = {
@@ -263,7 +266,7 @@ class S3MultipartClient:
             S3MultipartUploadError: 对象不存在或请求失败时
         """
         try:
-            async with self._session.client("s3", region_name=self._region) as s3:
+            async with self._session.client("s3", region_name=self._region, config=self._config) as s3:
                 return await s3.head_object(
                     Bucket=self._bucket_name,
                     Key=key,
