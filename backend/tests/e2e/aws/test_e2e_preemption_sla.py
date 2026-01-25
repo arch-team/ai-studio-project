@@ -188,6 +188,7 @@ class TestPreemptionTimingSLAE2E:
         job_name: str,
         pod_name: str,
         timeout: int,
+        namespace: str = "default",
     ) -> None:
         """等待 Pod 终止
 
@@ -196,6 +197,7 @@ class TestPreemptionTimingSLAE2E:
             job_name: 任务名称
             pod_name: Pod 名称
             timeout: 超时时间 (秒)
+            namespace: Kubernetes namespace (Task Governance)
 
         Raises:
             TimeoutError: 超时未终止
@@ -205,7 +207,10 @@ class TestPreemptionTimingSLAE2E:
         while time.time() - start < timeout:
             try:
                 pod_status = await client.get_pod_status(
-                    cluster_name=cluster_name, job_name=job_name, pod_name=pod_name
+                    cluster_name=cluster_name,
+                    job_name=job_name,
+                    pod_name=pod_name,
+                    namespace=namespace,
                 )
                 phase = pod_status.get("phase", "")
                 if phase in ["Terminated", "Failed", "Succeeded"]:
@@ -358,6 +363,7 @@ class TestPreemptionTimingSLAE2E:
         """
         cluster_name = getattr(hyperpod_client, "_cluster_name", "")
         job_id: str | None = None
+        namespace = checkpoint_enabled_job_config.get("namespace", "default")
         checkpoint_base_path = checkpoint_enabled_job_config.get(
             "checkpoint_config", {}
         ).get("s3_path", "s3://ai-training-checkpoints-dev/checkpoints")
@@ -372,7 +378,7 @@ class TestPreemptionTimingSLAE2E:
             )
             job_id = result.get("job_name", job_name)
             track_resource("training_job", job_id)
-            print(f"📤 已提交 checkpoint 测试任务: {job_id}")
+            print(f"📤 已提交 checkpoint 测试任务: {job_id} (namespace: {namespace})")
 
             # Step 2: 等待 Running
             await self._wait_for_status(
@@ -380,6 +386,7 @@ class TestPreemptionTimingSLAE2E:
                 job_id,
                 "Running",
                 timeout=SLAConstants.JOB_SUBMISSION_TIMEOUT,
+                namespace=namespace,
             )
             print("✅ 任务已 Running")
 
@@ -430,7 +437,7 @@ class TestPreemptionTimingSLAE2E:
                 print(f"✅ Checkpoint 文件已验证: {s3_path}")
 
         finally:
-            await self._cleanup_jobs(hyperpod_client, [job_id])
+            await self._cleanup_jobs(hyperpod_client, [(job_id, namespace)])
 
     @pytest.mark.asyncio
     @skip_write_tests
@@ -449,6 +456,7 @@ class TestPreemptionTimingSLAE2E:
         """
         cluster_name = getattr(hyperpod_client, "_cluster_name", "")
         job_id: str | None = None
+        namespace = low_priority_job_config.get("namespace", "default")
 
         try:
             # Step 1: 提交任务
@@ -460,18 +468,19 @@ class TestPreemptionTimingSLAE2E:
             )
             job_id = result.get("job_name", job_name)
             track_resource("training_job", job_id)
-            print(f"📤 已提交任务: {job_id}")
+            print(f"📤 已提交任务: {job_id} (namespace: {namespace})")
 
             await self._wait_for_status(
                 hyperpod_client,
                 job_id,
                 "Running",
                 timeout=SLAConstants.JOB_SUBMISSION_TIMEOUT,
+                namespace=namespace,
             )
             print("✅ 任务已 Running")
 
             # Step 2: 获取 Pod 信息
-            pod_info = await hyperpod_client.get_job_pods(job_id)
+            pod_info = await hyperpod_client.get_job_pods(job_id, namespace=namespace)
             pod_names = [p.get("name") for p in pod_info if p.get("name")]
             print(f"📋 任务 Pod: {pod_names}")
 
@@ -500,6 +509,7 @@ class TestPreemptionTimingSLAE2E:
                     job_name=job_id,
                     pod_name=pod_name,
                     timeout=SLAConstants.POD_RELEASE_TIMEOUT,
+                    namespace=namespace,
                 )
 
             release_time = time.time() - release_start
@@ -512,7 +522,7 @@ class TestPreemptionTimingSLAE2E:
             )
 
         finally:
-            await self._cleanup_jobs(hyperpod_client, [job_id])
+            await self._cleanup_jobs(hyperpod_client, [(job_id, namespace)])
 
     @pytest.mark.asyncio
     @skip_write_tests
@@ -625,6 +635,7 @@ class TestPreemptionTimingSLAE2E:
         cluster_name = getattr(hyperpod_client, "_cluster_name", "")
         job_id: str | None = None
         resumed_job_id: str | None = None
+        namespace = checkpoint_enabled_job_config.get("namespace", "default")
         checkpoint_base_path = checkpoint_enabled_job_config.get(
             "checkpoint_config", {}
         ).get("s3_path", "s3://ai-training-checkpoints-dev/checkpoints")
@@ -639,13 +650,14 @@ class TestPreemptionTimingSLAE2E:
             )
             job_id = result.get("job_name", job_name)
             track_resource("training_job", job_id)
-            print(f"📤 已提交任务: {job_id}")
+            print(f"📤 已提交任务: {job_id} (namespace: {namespace})")
 
             await self._wait_for_status(
                 hyperpod_client,
                 job_id,
                 "Running",
                 timeout=SLAConstants.JOB_SUBMISSION_TIMEOUT,
+                namespace=namespace,
             )
             print("✅ 任务已 Running")
 
@@ -672,6 +684,7 @@ class TestPreemptionTimingSLAE2E:
                 job_id,
                 "Preempted",
                 timeout=60,
+                namespace=namespace,
             )
             print("✅ 任务已 Preempted")
 
@@ -708,18 +721,22 @@ class TestPreemptionTimingSLAE2E:
                 resumed_job_id,
                 "Running",
                 timeout=SLAConstants.JOB_SUBMISSION_TIMEOUT,
+                namespace=namespace,
             )
             recovery_time = time.time() - recovery_start
 
             # Assert
             job_status = await hyperpod_client.get_training_job_status(
-                cluster_name=cluster_name, job_name=resumed_job_id
+                cluster_name=cluster_name, job_name=resumed_job_id, namespace=namespace
             )
             assert job_status["status"].lower() == "running"
             print(f"✅ 自动恢复成功，耗时: {recovery_time:.2f}s")
 
         finally:
-            await self._cleanup_jobs(hyperpod_client, [job_id, resumed_job_id])
+            await self._cleanup_jobs(hyperpod_client, [
+                (job_id, namespace),
+                (resumed_job_id, namespace),
+            ])
 
 
 @pytest.mark.e2e

@@ -3,11 +3,11 @@
 from sqlalchemy import and_, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.shared.infrastructure.repository_base import EnhancedBaseRepository
 from src.modules.quotas.domain.entities import ResourceLimitConfig
 from src.modules.quotas.domain.repositories import IResourceLimitConfigRepository
 from src.modules.quotas.domain.value_objects import LimitRole, PriorityDefault
 from src.modules.quotas.infrastructure.models import ResourceLimitConfigModel
+from src.shared.infrastructure.repository_base import EnhancedBaseRepository
 
 
 class ResourceLimitConfigRepository(

@@ -16,9 +16,9 @@ from sqlalchemy import (
 from sqlalchemy.dialects.mysql import JSON
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
+from src.modules.quotas.domain.value_objects import QuotaStatus, QuotaType
 from src.shared.infrastructure.database import Base
 from src.shared.infrastructure.models import TimestampMixin
-from src.modules.quotas.domain.value_objects import QuotaStatus, QuotaType
 
 if TYPE_CHECKING:
     from src.modules.auth.infrastructure.models import UserModel

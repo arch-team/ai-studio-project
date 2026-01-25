@@ -3,9 +3,9 @@
 from sqlalchemy import BigInteger, Enum, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column
 
+from src.modules.quotas.domain.value_objects import LimitRole, PriorityDefault
 from src.shared.infrastructure.database import Base
 from src.shared.infrastructure.models import TimestampMixin
-from src.modules.quotas.domain.value_objects import LimitRole, PriorityDefault
 
 
 class ResourceLimitConfigModel(Base, TimestampMixin):
