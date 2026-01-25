@@ -1,3 +1,5 @@
-"""Monitoring API layer (skeleton)."""
+"""Monitoring API layer."""
 
-__all__ = []
+from .endpoints import router
+
+__all__ = ["router"]

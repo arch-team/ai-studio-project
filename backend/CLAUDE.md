@@ -85,65 +85,18 @@ src/
 
 ## 异常处理框架
 
-基于 `@problem` 装饰器 + `@dataclass` 的简化异常定义方式。
+> **详细实现参见**: `.claude/skills/decorator-exception/SKILL.md`
 
-### 定义异常
+使用 `@problem` 装饰器 + `@dataclass` 简化异常定义（代码量减少 60%）。
 
 ```python
-from dataclasses import dataclass
-from src.shared.domain.problem import Problem, problem
-
 @problem(404, "TRAINING_JOB_NOT_FOUND", "TrainingJob '{job_id}' not found")
 @dataclass
 class TrainingJobNotFoundError(Problem):
-    """训练任务未找到."""
     job_id: str
-```
 
-### 使用方式
-
-```python
-# 抛出异常
-raise TrainingJobNotFoundError(job_id="job-123")
-
-# 自动生成:
-# - message: "TrainingJob 'job-123' not found"
-# - http_status: 404
-# - error_code: "TRAINING_JOB_NOT_FOUND"
-# - get_details(): {"job_id": "job-123"}
-```
-
-### 装饰器参数
-
-| 参数 | 说明 | 示例 |
-|------|------|------|
-| `status` | HTTP 状态码 | `404`, `409`, `422`, `500` |
-| `code` | 错误代码 | `"ENTITY_NOT_FOUND"` |
-| `message_template` | 消息模板（可选）| `"User '{user_id}' not found"` |
-
-### 常用异常基类
-
-| 异常 | HTTP | 用途 |
-|------|------|------|
-| `EntityNotFoundError` | 404 | 资源不存在 |
-| `ValidationError` | 422 | 参数验证失败 |
-| `DuplicateEntityError` | 409 | 资源已存在 |
-| `InvalidStateTransitionError` | 409 | 状态转换非法 |
-| `ResourceQuotaExceededError` | 429 | 配额不足 |
-| `AuthenticationError` | 401 | 认证失败 |
-| `InsufficientPermissionsError` | 403 | 权限不足 |
-
-### 响应格式
-
-```json
-{
-  "error": {
-    "code": "TRAINING_JOB_NOT_FOUND",
-    "message": "TrainingJob 'job-123' not found",
-    "details": {"job_id": "job-123"},
-    "trace_id": "req-xxx"
-  }
-}
+# 使用: raise TrainingJobNotFoundError(job_id="job-123")
+# 自动生成 message, http_status, error_code, get_details()
 ```
 
 ## Environment Variables
@@ -318,44 +271,16 @@ class PasswordService:      # 密码处理
 | **问题** | SageMaker Spaces API 已提供这些信息，需要同步策略 |
 | **待确认** | 缓存更新机制（轮询/事件驱动） |
 
-### HyperPod Task Governance 集成问题
+### HyperPod Task Governance 集成
 
-#### 问题3: Kueue TopologyAwareScheduling (TAS) 配置问题 ✅ 已解决
+> **踩坑记录和诊断清单参见**: `.claude/skills/hyperpod-scheduling/SKILL.md`
 
-| 项目 | 说明 |
-|------|------|
-| **现状** | SageMaker Task Governance API 创建的 ResourceFlavor 自动启用 TAS (`topologyName: hyperpod-default`) |
-| **错误** | `topology "hyperpod-default" doesn't allow to fit any of 1 pod(s)` |
-| **根因** | Kueue TAS 无法正确匹配节点拓扑，即使节点有 `topology.k8s.aws/zone-id` 标签 |
-| **解决方案** | 重建 ResourceFlavor 时不指定 topologyName，禁用 TAS |
-
-#### 问题4: HyperPod SDK 配置注意事项 ✅ 已解决
-
-| 项目 | 说明 |
-|------|------|
-| **Spec 字段别名** | SDK 使用 snake_case 别名 (`priority_class_name`)，非 K8s 原生 camelCase |
-| **PriorityClass 双重资源** | `WorkloadPriorityClass` (Kueue) ≠ `PriorityClass` (K8s 原生)，SageMaker 只创建前者 |
-| **解决方式** | 使用 `kueue.x-k8s.io/priority-class` label 代替 Pod 的 `priorityClassName` |
-
-#### 问题5: Kueue 抢占配置要点 ✅ 已解决
-
-| 项目 | 说明 |
-|------|------|
-| **场景** | 高优先级任务抢占低优先级任务 |
-| **前提1** | 两个 ClusterQueue 必须在同一个 Cohort 中 |
-| **前提2** | 总 nominal quota 不能超过物理资源 |
-| **配置** | 高优先级队列: nominal=1, borrow=0; 低优先级队列: nominal=0, borrow=1 |
-| **注意** | `ResourceSharingConfig.Strategy=DontLend` 会创建独立 Cohort，阻止抢占 |
-
-#### 问题6: HyperPod PodsRunning 状态与实际 Pod 状态不一致
-
-| 项目 | 说明 |
-|------|------|
-| **现象** | HyperPod 界面显示 "Created"，但 Pod 实际已 Running |
-| **原因** | `PodsRunning` condition 依赖 ElasticAgent 就绪状态，简单脚本不启动 ElasticAgent |
-| **实际状态** | `Created=True, PodsRunning=False` 但 `Pod.status.phase=Running` |
-| **影响** | HyperPod 界面状态不准确，需通过 kubectl 确认真实 Pod 状态 |
-| **代码处理** | 检测到有 `PodsRunning` condition 存在即认为 "running"，不依赖其 status 值 |
+已解决的关键问题:
+- TAS 配置问题（Workload Pending）
+- 抢占不生效（Cohort 配置）
+- PriorityClass 双重资源（WorkloadPriorityClass vs PriorityClass）
+- PodsRunning 状态不一致
+- set_cluster_context 必须先调用
 
 ## Related Documentation
 

@@ -1,6 +1,6 @@
 """User Repository Implementation - SQLAlchemy data access for users."""
 
-from sqlalchemy import select
+from sqlalchemy import asc, desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.shared.infrastructure.repository_base import EnhancedBaseRepository
@@ -113,3 +113,51 @@ class UserRepositoryImpl(EnhancedBaseRepository[User, UserModel, int], IUserRepo
         if model is None:
             return None
         return self._to_entity(model)
+
+    async def list_users(
+        self,
+        offset: int = 0,
+        limit: int = 20,
+        role: UserRole | None = None,
+        status: UserStatus | None = None,
+        sort_by: str = "created_at",
+        sort_order: str = "desc",
+    ) -> list[User]:
+        """List users with pagination and filters."""
+        stmt = select(UserModel)
+
+        # Apply filters
+        if role is not None:
+            stmt = stmt.where(UserModel.role == role)
+        if status is not None:
+            stmt = stmt.where(UserModel.status == status)
+
+        # Apply sorting
+        sort_column = getattr(UserModel, sort_by, UserModel.created_at)
+        if sort_order.lower() == "asc":
+            stmt = stmt.order_by(asc(sort_column))
+        else:
+            stmt = stmt.order_by(desc(sort_column))
+
+        # Apply pagination
+        stmt = stmt.offset(offset).limit(limit)
+
+        result = await self._session.execute(stmt)
+        models = result.scalars().all()
+        return [self._to_entity(model) for model in models]
+
+    async def count_users(
+        self,
+        role: UserRole | None = None,
+        status: UserStatus | None = None,
+    ) -> int:
+        """Count users with optional filters."""
+        stmt = select(func.count(UserModel.id))
+
+        if role is not None:
+            stmt = stmt.where(UserModel.role == role)
+        if status is not None:
+            stmt = stmt.where(UserModel.status == status)
+
+        result = await self._session.execute(stmt)
+        return result.scalar_one()

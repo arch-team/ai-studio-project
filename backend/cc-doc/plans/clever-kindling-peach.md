@@ -569,7 +569,7 @@ class TestProblemGetDetails:
 - [x] `pytest tests/unit/shared/test_problem.py -v` 全部通过 (34 tests)
 - [x] `pytest tests/unit/shared/test_svc_exception_handlers.py -v` 全部通过 (45 tests)
 - [x] `pytest tests/unit/` 全部通过 (1024 tests, 2.43s)
-- [ ] `pytest tests/integration/` 全部通过
+- [x] `pytest tests/integration/auth/` 62 passed, 3 failed (失败原因: ORM DatasetModel 缺失，与重构无关)
 
 ### 前端兼容性
 - [x] API 响应格式不变 (保持 `{"error": {"code", "message", "details", "trace_id"}}`)

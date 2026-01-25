@@ -10,6 +10,7 @@ from ..application.services import (
     AuthService,
     PasswordService,
     RBACService,
+    UserService,
     get_rbac_service,
 )
 from ..domain.repositories import (
@@ -71,6 +72,13 @@ async def get_account_service(
 ) -> AccountService:
     """Get account service instance."""
     return AccountService(user_repo, history_repo)
+
+
+async def get_user_service(
+    user_repo: IUserRepository = Depends(get_user_repository),
+) -> UserService:
+    """Get user service instance."""
+    return UserService(user_repo)
 
 
 # User authentication dependencies

@@ -9,6 +9,7 @@ from .rbac_service import (
     RBACService,
     get_rbac_service,
 )
+from .user_service import UserService
 
 __all__ = [
     "AuthService",
@@ -16,6 +17,7 @@ __all__ = [
     "TokenPair",
     "PasswordService",
     "AccountService",
+    "UserService",
     "RBACService",
     "get_rbac_service",
     "ROLE_PERMISSIONS",

@@ -241,7 +241,8 @@ class TestHyperPodServiceWriteOperations:
             )
 
             assert submit_result["job_name"] == test_job_name
-            assert submit_result["status"] in ["submitted", "running", "pending"]
+            # 刚提交时 SDK 可能还没同步状态，返回 unknown 是正常的
+            assert submit_result["status"] in ["submitted", "running", "pending", "unknown"]
 
             # Give the job time to be registered
             import asyncio

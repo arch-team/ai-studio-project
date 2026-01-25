@@ -1,3 +1,5 @@
-"""Monitoring infrastructure repositories (skeleton)."""
+"""Monitoring infrastructure repositories."""
 
-__all__ = []
+from .hyperpod_cluster_repository_impl import HyperPodClusterRepositoryImpl
+
+__all__ = ["HyperPodClusterRepositoryImpl"]

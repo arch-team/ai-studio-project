@@ -120,6 +120,7 @@ class TestListTrainingJobsEndpoint:
         """Test listing jobs returns paginated response."""
         response = await client.get(
             "/api/v1/training-jobs",
+            params={"page": 1, "page_size": 20},
             headers=engineer_auth_headers,
         )
         # 200 success or 500 for DB issues in test
@@ -158,7 +159,7 @@ class TestListTrainingJobsEndpoint:
         """Test filtering jobs by status."""
         response = await client.get(
             "/api/v1/training-jobs",
-            params={"status": "running"},
+            params={"page": 1, "page_size": 20, "status": "running"},
             headers=engineer_auth_headers,
         )
         assert response.status_code in [200, 500]
@@ -172,7 +173,7 @@ class TestListTrainingJobsEndpoint:
         """Test filtering jobs by priority."""
         response = await client.get(
             "/api/v1/training-jobs",
-            params={"priority": "high"},
+            params={"page": 1, "page_size": 20, "priority": "high"},
             headers=engineer_auth_headers,
         )
         assert response.status_code in [200, 500]
@@ -371,6 +372,7 @@ class TestTrainingJobsRBAC:
         """Test viewer role can list training jobs."""
         response = await client.get(
             "/api/v1/training-jobs",
+            params={"page": 1, "page_size": 20},
             headers=viewer_auth_headers,
         )
         # Viewer should be able to list (200) or DB error (500)

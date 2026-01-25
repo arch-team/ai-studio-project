@@ -16,6 +16,15 @@ from .responses import (
     TokenResponse,
     UserResponse,
 )
+from .users import (
+    CreateUserRequest,
+    UpdateUserRequest,
+    UserDetailResponse,
+    UserListResponse,
+    UserRoleEnum,
+    UserStatusEnum,
+    UserSummaryResponse,
+)
 
 __all__ = [
     # Requests
@@ -26,6 +35,15 @@ __all__ = [
     "PasswordChangeRequest",
     "PasswordResetRequest",
     "PasswordResetConfirmRequest",
+    # User Management Requests
+    "CreateUserRequest",
+    "UpdateUserRequest",
+    # User Management Responses
+    "UserDetailResponse",
+    "UserListResponse",
+    "UserSummaryResponse",
+    "UserRoleEnum",
+    "UserStatusEnum",
     # Responses
     "TokenResponse",
     "UserResponse",
