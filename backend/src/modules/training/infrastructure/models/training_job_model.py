@@ -84,6 +84,7 @@ class TrainingJobModel(Base, TimestampMixin):
     status: Mapped[JobStatus] = mapped_column(Enum(JobStatus), nullable=False, default=JobStatus.SUBMITTED, index=True, comment="任务状态")
 
     # HyperPod/Kueue status
+    hyperpod_job_arn: Mapped[str | None] = mapped_column(String(512), nullable=True, comment="HyperPod训练任务ARN")
     hyperpod_status: Mapped[str | None] = mapped_column(String(64), nullable=True, comment="HyperPod状态")
     kueue_workload_name: Mapped[str | None] = mapped_column(String(128), nullable=True, comment="Kueue Workload名称")
     kueue_status: Mapped[str | None] = mapped_column(String(64), nullable=True, comment="Kueue状态")

@@ -65,6 +65,7 @@ class TrainingJob:
     auto_resume_checkpoint_id: int | None = None
 
     # === HyperPod/Kueue status ===
+    hyperpod_job_arn: str | None = None  # ARN of the HyperPod training job
     hyperpod_status: str | None = None
     kueue_workload_name: str | None = None
     kueue_status: str | None = None

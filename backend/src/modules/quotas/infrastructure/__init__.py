@@ -1,7 +1,8 @@
 """Quotas infrastructure layer - ORM models and repository implementations."""
 
 from .models import ResourceLimitConfigModel, ResourceQuotaModel
-from .repositories import ResourceLimitConfigRepository
+from .quota_checker_impl import QuotaCheckerImpl
+from .repositories import ResourceLimitConfigRepository, ResourceQuotaRepository
 
 __all__ = [
     # Models
@@ -9,4 +10,7 @@ __all__ = [
     "ResourceLimitConfigModel",
     # Repositories
     "ResourceLimitConfigRepository",
+    "ResourceQuotaRepository",
+    # Cross-module interfaces
+    "QuotaCheckerImpl",
 ]

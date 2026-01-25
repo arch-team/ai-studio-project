@@ -39,6 +39,18 @@ class DuplicateJobNameError(Problem):
     job_name: str
 
 
+@problem(
+    400,
+    "NO_VALID_CHECKPOINT",
+    "Cannot resume job {job_id}: no valid checkpoint available for recovery",
+)
+@dataclass
+class NoValidCheckpointError(Problem):
+    """无有效检查点可恢复."""
+
+    job_id: int
+
+
 @problem(409, "INVALID_JOB_STATE", "Cannot {operation} job {job_id} in state '{current_state}'")
 @dataclass
 class InvalidJobStateError(Problem):

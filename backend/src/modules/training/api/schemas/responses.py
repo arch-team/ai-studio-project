@@ -98,8 +98,10 @@ class TrainingJobDetail(TrainingJobSummary):
     use_spot_instances: bool
     current_step: int | None = None
     latest_accuracy: Decimal | None = None
+    duration_seconds: int | None = None
     total_gpu_hours: Decimal | None = None
     estimated_cost_usd: Decimal | None = None
+    hyperpod_job_arn: str | None = None  # Only visible to admin
     kueue_status: str | None = None
     kueue_workload_name: str | None = None
     error_message: str | None = None

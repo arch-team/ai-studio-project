@@ -5,6 +5,7 @@ from functools import lru_cache
 from fastapi import Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.modules.quotas.infrastructure import QuotaCheckerImpl, ResourceQuotaRepository
 from src.modules.training.application.interfaces import IMetricsService
 from src.modules.training.application.services import (
     CheckpointService,
@@ -18,6 +19,7 @@ from src.modules.training.infrastructure.repositories import (
     JobTemplateRepository,
     TrainingJobRepository,
 )
+from src.shared.domain.interfaces import IQuotaChecker
 from src.shared.infrastructure import get_db, get_settings
 
 
@@ -28,16 +30,29 @@ def get_hyperpod_client() -> HyperPodClient:
     return HyperPodClient(region=settings.aws_region)
 
 
+async def get_quota_checker(
+    session: AsyncSession = Depends(get_db),
+) -> IQuotaChecker:
+    """Dependency for IQuotaChecker (CE-01-05)."""
+    quota_repository = ResourceQuotaRepository(session)
+    return QuotaCheckerImpl(quota_repository)
+
+
 async def get_training_job_service(
     session: AsyncSession = Depends(get_db),
 ) -> TrainingJobService:
     """Dependency for TrainingJobService."""
     settings = get_settings()
     repository = TrainingJobRepository(session)
+    checkpoint_repository = CheckpointRepository(session)
+    quota_repository = ResourceQuotaRepository(session)
+    quota_checker = QuotaCheckerImpl(quota_repository)
     return TrainingJobService(
         repository=repository,
         hyperpod_client=get_hyperpod_client(),
         cluster_name=settings.hyperpod_cluster_name or "default-cluster",
+        checkpoint_repository=checkpoint_repository,
+        quota_checker=quota_checker,
     )
 
 

@@ -78,13 +78,13 @@ class InvalidStateTransitionError(Problem):
 
 
 @problem(
-    429,
+    507,
     "RESOURCE_QUOTA_EXCEEDED",
     "{resource_type} quota exceeded: limit={limit}, requested={requested}",
 )
 @dataclass
 class ResourceQuotaExceededError(Problem):
-    """资源配额超限 - HTTP 429."""
+    """资源配额超限 - HTTP 507 Insufficient Storage."""
 
     resource_type: str
     limit: int

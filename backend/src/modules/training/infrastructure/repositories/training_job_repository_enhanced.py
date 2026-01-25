@@ -60,6 +60,7 @@ class TrainingJobRepositoryEnhanced(
             checkpoint_mount_path=model.checkpoint_mount_path,
             checkpoint_interval=model.checkpoint_interval,
             auto_resume_checkpoint_id=model.auto_resume_checkpoint_id,
+            hyperpod_job_arn=model.hyperpod_job_arn,
             hyperpod_status=model.hyperpod_status,
             kueue_workload_name=model.kueue_workload_name,
             kueue_status=model.kueue_status,
