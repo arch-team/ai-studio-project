@@ -2,11 +2,14 @@
 
 from datetime import datetime
 from enum import Enum
-from typing import ClassVar
+from typing import TYPE_CHECKING, ClassVar
 
 from pydantic import BaseModel
 
 from src.shared.api.schemas import AutoMappingEntitySchema
+
+if TYPE_CHECKING:
+    from src.modules.spaces.domain.entities import Space  # noqa: F401
 
 
 class SpaceInstanceTypeEnum(str, Enum):

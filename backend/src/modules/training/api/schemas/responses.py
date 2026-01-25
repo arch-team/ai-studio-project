@@ -3,11 +3,14 @@
 from datetime import datetime
 from decimal import Decimal
 from enum import Enum
-from typing import ClassVar
+from typing import TYPE_CHECKING, ClassVar
 
 from pydantic import BaseModel
 
 from src.shared.api.schemas import AutoMappingEntitySchema
+
+if TYPE_CHECKING:
+    from src.modules.training.domain.entities import Checkpoint, JobTemplate, TrainingJob  # noqa: F401
 
 
 class JobStatusEnum(str, Enum):

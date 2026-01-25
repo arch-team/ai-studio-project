@@ -138,12 +138,12 @@ class RequireRole:
         return current_user
 
 
-def require_permission(permission: Permission):
+def require_permission(permission: Permission) -> RequirePermission:
     """Factory function for permission dependency."""
     return RequirePermission(permission)
 
 
-def require_role(role: str):
+def require_role(role: str) -> RequireRole:
     """Factory function for role dependency."""
     return RequireRole(role)
 

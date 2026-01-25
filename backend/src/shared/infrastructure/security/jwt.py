@@ -59,7 +59,7 @@ class TokenPayload:
 class JWTManager:
     """JWT token management using Authlib."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.settings = get_settings()
         self._header = {"alg": "HS256"}
 

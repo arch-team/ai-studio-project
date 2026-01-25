@@ -30,7 +30,7 @@ async def create_local_account(
     account_data: LocalAccountCreateRequest,
     _: None = Depends(require_admin),
     account_service: AccountService = Depends(get_account_service),
-):
+) -> UserResponse:
     """创建本地账户（仅管理员）.
 
     异常由全局处理器处理:
@@ -59,7 +59,7 @@ async def enable_account(
     user_id: int,
     _: None = Depends(require_admin),
     account_service: AccountService = Depends(get_account_service),
-):
+) -> MessageResponse:
     """启用用户账户（仅管理员）.
 
     异常由全局处理器处理: UserNotFoundError → 404
@@ -80,7 +80,7 @@ async def disable_account(
     user_id: int,
     _: None = Depends(require_admin),
     account_service: AccountService = Depends(get_account_service),
-):
+) -> MessageResponse:
     """禁用用户账户（仅管理员）.
 
     异常由全局处理器处理: UserNotFoundError → 404
@@ -101,7 +101,7 @@ async def unlock_account(
     user_id: int,
     _: None = Depends(require_admin),
     account_service: AccountService = Depends(get_account_service),
-):
+) -> MessageResponse:
     """解锁被锁定的用户账户（仅管理员）.
 
     异常由全局处理器处理: UserNotFoundError → 404

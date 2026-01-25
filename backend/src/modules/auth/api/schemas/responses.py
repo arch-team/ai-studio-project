@@ -8,7 +8,7 @@ from pydantic import BaseModel, Field
 from src.shared.api.schemas import AutoMappingEntitySchema
 
 if TYPE_CHECKING:
-    pass
+    from src.modules.auth.domain.entities import User  # noqa: F401
 
 
 class TokenResponse(BaseModel):

@@ -2,7 +2,7 @@
 
 import enum
 from datetime import datetime, timedelta
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from sqlalchemy import BigInteger, DateTime, Enum, ForeignKey, String, Text, event, func
 from sqlalchemy.dialects.mysql import JSON
@@ -142,7 +142,7 @@ class AuditLogModel(Base):
 
 
 @event.listens_for(AuditLogModel, "before_insert")
-def set_expires_at(mapper, connection, target):
+def set_expires_at(mapper: Any, connection: Any, target: AuditLogModel) -> None:
     """Auto-set expires_at to 90 days after created_at."""
     if target.expires_at is None:
         target.expires_at = utc_now() + timedelta(days=90)

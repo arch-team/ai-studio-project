@@ -9,7 +9,7 @@ from pydantic import BaseModel, Field
 from src.shared.api.schemas import AutoMappingEntitySchema
 
 if TYPE_CHECKING:
-    pass
+    from src.modules.audit.domain.entities import AuditLog  # noqa: F401
 
 
 class AuditLogResponse(AutoMappingEntitySchema["AuditLog"]):

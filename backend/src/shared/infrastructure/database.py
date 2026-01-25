@@ -3,7 +3,7 @@
 import logging
 from collections.abc import AsyncGenerator
 
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase
 
 from src.shared.infrastructure.config import get_settings
@@ -51,7 +51,7 @@ class Base(DeclarativeBase):
     pass
 
 
-def create_engine():
+def create_engine() -> AsyncEngine:
     """Create async SQLAlchemy engine."""
     settings = get_settings()
     return create_async_engine(

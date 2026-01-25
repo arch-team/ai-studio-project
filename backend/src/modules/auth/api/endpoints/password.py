@@ -31,7 +31,7 @@ async def change_password(
     password_data: PasswordChangeRequest,
     current_user: CurrentUser = Depends(get_current_active_user),
     password_service: PasswordService = Depends(get_password_service),
-):
+) -> MessageResponse:
     """修改当前用户密码.
 
     异常由全局处理器处理:
@@ -54,7 +54,7 @@ async def change_password(
 async def request_password_reset(
     reset_data: PasswordResetRequest,
     password_service: PasswordService = Depends(get_password_service),
-):
+) -> MessageResponse:
     """请求密码重置邮件."""
     # Token 在生产环境用于发送包含重置链接的邮件
     _ = await password_service.request_password_reset(reset_data.email)
@@ -75,7 +75,7 @@ async def request_password_reset(
 async def confirm_password_reset(
     reset_data: PasswordResetConfirmRequest,
     password_service: PasswordService = Depends(get_password_service),
-):
+) -> MessageResponse:
     """使用 Token 确认密码重置.
 
     异常由全局处理器处理:

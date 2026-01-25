@@ -2,11 +2,14 @@
 
 from datetime import datetime
 from enum import Enum
-from typing import Any, ClassVar
+from typing import TYPE_CHECKING, Any, ClassVar
 
 from pydantic import BaseModel
 
 from src.shared.api.schemas import AutoMappingEntitySchema
+
+if TYPE_CHECKING:
+    from src.modules.models.domain.entities import Model  # noqa: F401
 
 
 class ModelFrameworkEnum(str, Enum):

@@ -1,5 +1,7 @@
 """登录相关端点 - 登录、登出、Token 管理、用户信息."""
 
+from typing import Any
+
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 
 from src.modules.auth.api.current_user import CurrentUser
@@ -49,7 +51,7 @@ def _create_login_response(user: User, tokens: TokenPair) -> LoginResponse:
     )
 
 
-def _create_fallback_login_response(result) -> LoginResponse:
+def _create_fallback_login_response(result: Any) -> LoginResponse:
     """创建向后兼容的登录响应（当无法获取完整用户信息时）."""
     return LoginResponse(
         tokens=TokenResponse(
@@ -88,7 +90,7 @@ async def login(
     login_data: LoginRequest,
     auth_service: AuthService = Depends(get_auth_service),
     account_service: AccountService = Depends(get_account_service),
-):
+) -> LoginResponse:
     """用户登录（本地凭证或 SSO Token）.
 
     异常由全局处理器处理:
@@ -156,7 +158,7 @@ async def _handle_sso_login(
     return _create_login_response(user, tokens)
 
 
-def _get_sso_service_or_raise():
+def _get_sso_service_or_raise() -> Any:
     """获取 SSO 服务实例，未配置时抛出异常."""
     try:
         from src.api.middleware.sso import get_sso_service
@@ -175,7 +177,7 @@ def _get_sso_service_or_raise():
         )
 
 
-async def _get_or_create_sso_user(account_service: AccountService, user_info):
+async def _get_or_create_sso_user(account_service: AccountService, user_info: Any) -> User:
     """根据 SSO 用户信息获取或创建用户."""
     from src.api.middleware.sso import map_groups_to_role
 
@@ -203,7 +205,7 @@ async def _get_or_create_sso_user(account_service: AccountService, user_info):
 async def refresh_token(
     refresh_data: RefreshTokenRequest,
     auth_service: AuthService = Depends(get_auth_service),
-):
+) -> TokenResponse:
     """使用 Refresh Token 刷新 Access Token."""
     tokens = await auth_service.refresh_access_token(refresh_data.refresh_token)
 
@@ -218,7 +220,7 @@ async def refresh_token(
 @router.post("/logout", response_model=MessageResponse)
 async def logout(
     current_user: CurrentUser = Depends(get_current_active_user),
-):
+) -> MessageResponse:
     """登出当前用户."""
     # 无状态 JWT 系统中，登出由客户端丢弃 Token 处理
     # 增强安全性可在 Redis 中实现 Token 黑名单
@@ -234,7 +236,7 @@ async def logout(
 async def get_current_user_info(
     current_user: CurrentUser = Depends(get_current_active_user),
     auth_service: AuthService = Depends(get_auth_service),
-):
+) -> UserResponse:
     """获取当前用户信息."""
     user = await auth_service.get_user_by_id(current_user.user_id)
 

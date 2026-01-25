@@ -13,7 +13,7 @@
 from decimal import Decimal
 
 from src.modules.training.application.interfaces import IStorageService
-from src.modules.training.domain.entities import Checkpoint
+from src.modules.training.domain.entities import Checkpoint, TrainingJob
 from src.modules.training.domain.exceptions import (
     CheckpointNotFoundError,
     CheckpointStorageError,
@@ -292,7 +292,7 @@ class CheckpointService(EnhancedBaseService[Checkpoint, int]):
     # 私有辅助方法
     # =========================================================================
 
-    async def _validate_job_for_checkpoint(self, job_id: int):
+    async def _validate_job_for_checkpoint(self, job_id: int) -> TrainingJob | None:
         """验证任务是否存在且状态允许创建检查点"""
         if self._training_job_repo is None:
             # 无任务仓库时跳过验证 (用于测试)

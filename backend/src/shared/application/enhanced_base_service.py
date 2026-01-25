@@ -78,10 +78,10 @@ class EnhancedBaseService(Generic[T, ID]):
         Raises:
             EntityNotFoundError: If entity not found
         """
-        entity = await self._repository.get_by_id(entity_id)  # type: ignore
+        entity = await self._repository.get_by_id(entity_id)
         if entity is None:
             raise self._create_not_found_error(str(entity_id))
-        return entity  # type: ignore
+        return entity
 
     async def _get_by_field_or_none(self, field_name: str, field_value: Any) -> T | None:
         """Get entity by arbitrary field.
@@ -96,7 +96,7 @@ class EnhancedBaseService(Generic[T, ID]):
         method_name = f"get_by_{field_name}"
         if hasattr(self._repository, method_name):
             method = getattr(self._repository, method_name)
-            return await method(field_value)  # type: ignore
+            return await method(field_value)
         return None
 
     # ========== Validation Utilities ==========
@@ -224,7 +224,7 @@ class EnhancedBaseService(Generic[T, ID]):
         """
         # Try to use repository's list method if available
         if hasattr(self._repository, "list_with_filters"):
-            return await self._repository.list_with_filters(  # type: ignore
+            return await self._repository.list_with_filters(
                 filters=filters,
                 page=page,
                 page_size=page_size,
@@ -233,7 +233,7 @@ class EnhancedBaseService(Generic[T, ID]):
             )
         # Fallback to a generic list method
         elif hasattr(self._repository, "list"):
-            return await self._repository.list(  # type: ignore
+            return await self._repository.list(
                 page=page,
                 page_size=page_size,
                 sort_by=sort_by,
@@ -345,12 +345,12 @@ class EnhancedBaseService(Generic[T, ID]):
 
         # Create all entities
         if hasattr(self._repository, "create_many"):
-            return await self._repository.create_many(items)  # type: ignore
+            return await self._repository.create_many(items)
         else:
             # Fallback to individual creates
             results = []
             for item in items:
-                result = await self._repository.create(item)  # type: ignore
+                result = await self._repository.create(item)
                 results.append(result)
             return results
 
@@ -364,12 +364,12 @@ class EnhancedBaseService(Generic[T, ID]):
             List of entities (may be shorter if some not found)
         """
         if hasattr(self._repository, "get_by_ids"):
-            return await self._repository.get_by_ids(entity_ids)  # type: ignore
+            return await self._repository.get_by_ids(entity_ids)
         else:
             # Fallback to individual gets
             results = []
             for entity_id in entity_ids:
-                entity = await self._repository.get_by_id(entity_id)  # type: ignore
+                entity = await self._repository.get_by_id(entity_id)
                 if entity:
                     results.append(entity)
             return results

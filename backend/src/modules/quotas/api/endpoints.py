@@ -37,7 +37,7 @@ async def list_resource_limit_configs(
     sort_order: SortOrderParam = SortOrder.DESC,
     current_user: CurrentUser = Depends(require_admin),
     service: ResourceLimitConfigService = Depends(get_resource_limit_config_service),
-):
+) -> ResourceLimitConfigListResponse:
     """List resource limit configurations.
 
     Admin-only endpoint for listing all resource limit configurations.
@@ -67,7 +67,7 @@ async def create_resource_limit_config(
     data: CreateResourceLimitConfigRequest,
     current_user: CurrentUser = Depends(require_admin),
     service: ResourceLimitConfigService = Depends(get_resource_limit_config_service),
-):
+) -> ResourceLimitConfigResponse:
     """Create a new resource limit configuration.
 
     Admin-only endpoint for creating new resource limit configurations.
@@ -94,7 +94,7 @@ async def get_resource_limit_config(
     config_id: int,
     current_user: CurrentUser = Depends(require_admin),
     service: ResourceLimitConfigService = Depends(get_resource_limit_config_service),
-):
+) -> ResourceLimitConfigResponse:
     """Get a resource limit configuration by ID.
 
     Admin-only endpoint for retrieving a specific configuration.
@@ -109,14 +109,14 @@ async def update_resource_limit_config(
     data: UpdateResourceLimitConfigRequest,
     current_user: CurrentUser = Depends(require_admin),
     service: ResourceLimitConfigService = Depends(get_resource_limit_config_service),
-):
+) -> ResourceLimitConfigResponse:
     """Update a resource limit configuration.
 
     Admin-only endpoint for updating existing configurations.
     Supports partial updates.
     """
     # Build update data from non-None fields
-    update_data = {}
+    update_data: dict[str, str | int] = {}
     if data.config_name is not None:
         update_data["config_name"] = data.config_name
     if data.role is not None:
@@ -145,7 +145,7 @@ async def delete_resource_limit_config(
     config_id: int,
     current_user: CurrentUser = Depends(require_admin),
     service: ResourceLimitConfigService = Depends(get_resource_limit_config_service),
-):
+) -> None:
     """Delete a resource limit configuration.
 
     Admin-only endpoint for deleting configurations (soft delete).
