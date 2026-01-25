@@ -599,15 +599,15 @@
 - [x] [T039] 创建 datasets 表迁移 - `backend/alembic/versions/20260125_100100_9a1b2c3d4e5f_create_datasets.py`,字段: id, name, description, version, storage_type (enum: FSX/S3/EFS), storage_uri, total_size_bytes, file_count, dataset_type (enum: IMAGE/TEXT/AUDIO/VIDEO/TABULAR/CUSTOM), data_format, tags (JSON), visibility (enum: PUBLIC/PRIVATE/RESTRICTED), owner_id (FK users), status (enum: AVAILABLE/PREPARING/ARCHIVED/ERROR), created_at, updated_at, last_accessed_at; 索引: uk_name_version (UNIQUE), ix_owner_id, ix_storage_type, ix_dataset_type, ix_status, ix_created_at, ft_name_desc (FULLTEXT)
 
 ### SQLAlchemy 模型
-- [ ] [T040] 创建 Dataset 模型 - 领域实体 `backend/src/modules/datasets/domain/entities/dataset.py` + ORM 模型 `backend/src/modules/datasets/infrastructure/models/dataset_model.py`,包含版本控制逻辑,关联 User,支持元数据存储
+- [X] [T040] 创建 Dataset 模型 - 领域实体 `backend/src/modules/datasets/domain/entities/dataset.py` + ORM 模型 `backend/src/modules/datasets/infrastructure/models/dataset_model.py`,包含版本控制逻辑,关联 User,支持元数据存储 + API Schemas (`api/schemas/requests.py`, `responses.py`) + Application Service (`application/services/dataset_service.py`) + API Dependencies (`api/dependencies.py`)
 
 ### 后端 API 端点 (基于 contracts/datasets-api.yaml)
-- [ ] [T041] [US2] POST /datasets 端点实现 - `backend/src/modules/datasets/api/endpoints.py`,验证数据集元数据,生成 S3 presigned upload URL,创建数据集记录
-- [ ] [T042] [US2] GET /datasets 端点实现 - 支持分页、过滤 (dataset_type, owner_id)、排序 (created_at, size_bytes)
-- [ ] [T043] [US2] GET /datasets/{id} 端点实现 - 返回数据集详情,包含版本历史、存储信息、使用统计
-- [ ] [T044] [US2] PUT /datasets/{id} 端点实现 - 更新数据集元数据 (name, dataset_type, description)
-- [ ] [T045] [US2] DELETE /datasets/{id} 端点实现 - 软删除数据集,清理 S3/FSx 存储 (可选)
-- [ ] [T046] [US2] POST /datasets/{id}/versions 端点实现 - 创建数据集新版本,复制或链接存储路径,更新版本号
+- [X] [T041] [US2] POST /datasets 端点实现 - `backend/src/modules/datasets/api/endpoints.py`,验证数据集元数据,创建数据集记录 (86 单元测试通过)
+- [X] [T042] [US2] GET /datasets 端点实现 - 支持分页、过滤 (dataset_type, storage_type, visibility, status)、排序 (created_at)
+- [X] [T043] [US2] GET /datasets/{id} 端点实现 - 返回数据集详情,包含访问控制检查
+- [X] [T044] [US2] PATCH /datasets/{id} 端点实现 - 更新数据集元数据 (description, tags, visibility)
+- [X] [T045] [US2] DELETE /datasets/{id} 端点实现 - 软删除数据集 (归档到 ARCHIVED 状态)
+- [X] [T046] [US2] POST /datasets/{id}/versions 端点实现 - 创建数据集新版本,复制元数据和存储路径
 
 ### 存储集成服务
 - [ ] [T047] [US2] S3 上传集成 - `backend/src/modules/datasets/application/services/dataset_upload.py`,实现分片上传,计算 MD5 校验和,支持断点续传

@@ -1,6 +1,13 @@
 """Dataset 领域层。"""
 
 from .entities import Dataset
+from .exceptions import (
+    DatasetAccessDeniedError,
+    DatasetNotFoundError,
+    DatasetStorageError,
+    DuplicateDatasetVersionError,
+    InvalidDatasetStateError,
+)
 from .repositories import IDatasetRepository
 from .value_objects import (
     DATASET_STATUS_TRANSITIONS,
@@ -21,4 +28,10 @@ __all__ = [
     "DATASET_STATUS_TRANSITIONS",
     # 仓库接口
     "IDatasetRepository",
+    # 异常
+    "DatasetNotFoundError",
+    "DatasetAccessDeniedError",
+    "DatasetStorageError",
+    "DuplicateDatasetVersionError",
+    "InvalidDatasetStateError",
 ]

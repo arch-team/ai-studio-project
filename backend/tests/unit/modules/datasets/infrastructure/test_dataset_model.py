@@ -1,6 +1,5 @@
 """测试 DatasetModel ORM 模型。"""
 
-import pytest
 from sqlalchemy import inspect
 
 
@@ -82,12 +81,16 @@ class TestDatasetModelColumnTypes:
 
         mapper = inspect(DatasetModel)
         name_col = mapper.columns["name"]
-        assert "VARCHAR" in str(name_col.type).upper() or "STRING" in str(name_col.type).upper()
+        assert (
+            "VARCHAR" in str(name_col.type).upper()
+            or "STRING" in str(name_col.type).upper()
+        )
 
     def test_storage_type_is_enum(self) -> None:
         """验证 storage_type 为 Enum 类型。"""
-        from src.modules.datasets.infrastructure.models import DatasetModel
         from sqlalchemy import Enum as SQLEnum
+
+        from src.modules.datasets.infrastructure.models import DatasetModel
 
         mapper = inspect(DatasetModel)
         col = mapper.columns["storage_type"]
@@ -96,8 +99,9 @@ class TestDatasetModelColumnTypes:
 
     def test_status_is_enum(self) -> None:
         """验证 status 为 Enum 类型。"""
-        from src.modules.datasets.infrastructure.models import DatasetModel
         from sqlalchemy import Enum as SQLEnum
+
+        from src.modules.datasets.infrastructure.models import DatasetModel
 
         mapper = inspect(DatasetModel)
         col = mapper.columns["status"]
@@ -148,7 +152,6 @@ class TestDatasetModelDefaults:
     def test_visibility_default_is_private(self) -> None:
         """验证 visibility 默认值为 PRIVATE。"""
         from src.modules.datasets.infrastructure.models import DatasetModel
-        from src.modules.datasets.domain.value_objects import DatasetVisibility
 
         mapper = inspect(DatasetModel)
         visibility_col = mapper.columns["visibility"]
@@ -158,7 +161,6 @@ class TestDatasetModelDefaults:
     def test_status_default_is_preparing(self) -> None:
         """验证 status 默认值为 PREPARING。"""
         from src.modules.datasets.infrastructure.models import DatasetModel
-        from src.modules.datasets.domain.value_objects import DatasetStatus
 
         mapper = inspect(DatasetModel)
         status_col = mapper.columns["status"]

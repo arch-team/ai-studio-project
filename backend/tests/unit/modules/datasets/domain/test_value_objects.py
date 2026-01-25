@@ -1,6 +1,5 @@
 """测试 Dataset 值对象（枚举类型）。"""
 
-import pytest
 from enum import Enum
 
 
@@ -109,7 +108,10 @@ class TestDatasetStatusTransitions:
 
     def test_valid_transitions_defined(self) -> None:
         """验证状态转换规则已定义。"""
-        from src.modules.datasets.domain.value_objects import DATASET_STATUS_TRANSITIONS, DatasetStatus
+        from src.modules.datasets.domain.value_objects import (
+            DATASET_STATUS_TRANSITIONS,
+            DatasetStatus,
+        )
 
         assert isinstance(DATASET_STATUS_TRANSITIONS, dict)
         # 每个状态都应该有转换规则
@@ -118,7 +120,10 @@ class TestDatasetStatusTransitions:
 
     def test_preparing_transitions(self) -> None:
         """验证 PREPARING 状态的转换。"""
-        from src.modules.datasets.domain.value_objects import DATASET_STATUS_TRANSITIONS, DatasetStatus
+        from src.modules.datasets.domain.value_objects import (
+            DATASET_STATUS_TRANSITIONS,
+            DatasetStatus,
+        )
 
         transitions = DATASET_STATUS_TRANSITIONS[DatasetStatus.PREPARING]
         assert DatasetStatus.AVAILABLE in transitions
@@ -126,7 +131,10 @@ class TestDatasetStatusTransitions:
 
     def test_available_transitions(self) -> None:
         """验证 AVAILABLE 状态的转换。"""
-        from src.modules.datasets.domain.value_objects import DATASET_STATUS_TRANSITIONS, DatasetStatus
+        from src.modules.datasets.domain.value_objects import (
+            DATASET_STATUS_TRANSITIONS,
+            DatasetStatus,
+        )
 
         transitions = DATASET_STATUS_TRANSITIONS[DatasetStatus.AVAILABLE]
         assert DatasetStatus.ARCHIVED in transitions
@@ -134,14 +142,20 @@ class TestDatasetStatusTransitions:
 
     def test_archived_transitions(self) -> None:
         """验证 ARCHIVED 状态的转换。"""
-        from src.modules.datasets.domain.value_objects import DATASET_STATUS_TRANSITIONS, DatasetStatus
+        from src.modules.datasets.domain.value_objects import (
+            DATASET_STATUS_TRANSITIONS,
+            DatasetStatus,
+        )
 
         transitions = DATASET_STATUS_TRANSITIONS[DatasetStatus.ARCHIVED]
         assert DatasetStatus.AVAILABLE in transitions  # 可以恢复
 
     def test_error_transitions(self) -> None:
         """验证 ERROR 状态的转换。"""
-        from src.modules.datasets.domain.value_objects import DATASET_STATUS_TRANSITIONS, DatasetStatus
+        from src.modules.datasets.domain.value_objects import (
+            DATASET_STATUS_TRANSITIONS,
+            DatasetStatus,
+        )
 
         transitions = DATASET_STATUS_TRANSITIONS[DatasetStatus.ERROR]
         assert DatasetStatus.PREPARING in transitions  # 可以重试

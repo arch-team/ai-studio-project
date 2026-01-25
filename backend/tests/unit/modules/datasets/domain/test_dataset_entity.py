@@ -1,7 +1,7 @@
 """测试 Dataset 领域实体。"""
 
+
 import pytest
-from datetime import datetime
 
 from src.shared.domain.exceptions import InvalidStateTransitionError
 
@@ -13,10 +13,10 @@ class TestDatasetCreation:
         """创建有效数据集。"""
         from src.modules.datasets.domain.entities import Dataset
         from src.modules.datasets.domain.value_objects import (
+            DatasetStatus,
             DatasetStorageType,
             DatasetType,
             DatasetVisibility,
-            DatasetStatus,
         )
 
         dataset = Dataset(
@@ -42,10 +42,10 @@ class TestDatasetCreation:
         """创建带可选字段的数据集。"""
         from src.modules.datasets.domain.entities import Dataset
         from src.modules.datasets.domain.value_objects import (
+            DatasetStatus,
             DatasetStorageType,
             DatasetType,
             DatasetVisibility,
-            DatasetStatus,
         )
 
         dataset = Dataset(
@@ -82,9 +82,9 @@ class TestDatasetStatusTransitions:
         """可以从 PREPARING 转换到 AVAILABLE。"""
         from src.modules.datasets.domain.entities import Dataset
         from src.modules.datasets.domain.value_objects import (
+            DatasetStatus,
             DatasetStorageType,
             DatasetType,
-            DatasetStatus,
         )
 
         dataset = Dataset(
@@ -103,9 +103,9 @@ class TestDatasetStatusTransitions:
         """可以从 PREPARING 转换到 ERROR。"""
         from src.modules.datasets.domain.entities import Dataset
         from src.modules.datasets.domain.value_objects import (
+            DatasetStatus,
             DatasetStorageType,
             DatasetType,
-            DatasetStatus,
         )
 
         dataset = Dataset(
@@ -124,9 +124,9 @@ class TestDatasetStatusTransitions:
         """不能从 PREPARING 直接转换到 ARCHIVED。"""
         from src.modules.datasets.domain.entities import Dataset
         from src.modules.datasets.domain.value_objects import (
+            DatasetStatus,
             DatasetStorageType,
             DatasetType,
-            DatasetStatus,
         )
 
         dataset = Dataset(
@@ -145,9 +145,9 @@ class TestDatasetStatusTransitions:
         """转换到有效状态成功。"""
         from src.modules.datasets.domain.entities import Dataset
         from src.modules.datasets.domain.value_objects import (
+            DatasetStatus,
             DatasetStorageType,
             DatasetType,
-            DatasetStatus,
         )
 
         dataset = Dataset(
@@ -167,9 +167,9 @@ class TestDatasetStatusTransitions:
         """转换到无效状态抛出异常。"""
         from src.modules.datasets.domain.entities import Dataset
         from src.modules.datasets.domain.value_objects import (
+            DatasetStatus,
             DatasetStorageType,
             DatasetType,
-            DatasetStatus,
         )
 
         dataset = Dataset(
@@ -193,9 +193,9 @@ class TestDatasetConvenienceMethods:
         """mark_available 方法正常工作。"""
         from src.modules.datasets.domain.entities import Dataset
         from src.modules.datasets.domain.value_objects import (
+            DatasetStatus,
             DatasetStorageType,
             DatasetType,
-            DatasetStatus,
         )
 
         dataset = Dataset(
@@ -215,9 +215,9 @@ class TestDatasetConvenienceMethods:
         """mark_error 方法正常工作。"""
         from src.modules.datasets.domain.entities import Dataset
         from src.modules.datasets.domain.value_objects import (
+            DatasetStatus,
             DatasetStorageType,
             DatasetType,
-            DatasetStatus,
         )
 
         dataset = Dataset(
@@ -237,9 +237,9 @@ class TestDatasetConvenienceMethods:
         """archive 方法正常工作。"""
         from src.modules.datasets.domain.entities import Dataset
         from src.modules.datasets.domain.value_objects import (
+            DatasetStatus,
             DatasetStorageType,
             DatasetType,
-            DatasetStatus,
         )
 
         dataset = Dataset(
@@ -259,9 +259,9 @@ class TestDatasetConvenienceMethods:
         """restore 方法正常工作。"""
         from src.modules.datasets.domain.entities import Dataset
         from src.modules.datasets.domain.value_objects import (
+            DatasetStatus,
             DatasetStorageType,
             DatasetType,
-            DatasetStatus,
         )
 
         dataset = Dataset(
@@ -384,9 +384,9 @@ class TestDatasetStateQueries:
         """验证 is_available 方法。"""
         from src.modules.datasets.domain.entities import Dataset
         from src.modules.datasets.domain.value_objects import (
+            DatasetStatus,
             DatasetStorageType,
             DatasetType,
-            DatasetStatus,
         )
 
         available_dataset = Dataset(
@@ -416,9 +416,9 @@ class TestDatasetStateQueries:
         """验证 is_archived 方法。"""
         from src.modules.datasets.domain.entities import Dataset
         from src.modules.datasets.domain.value_objects import (
+            DatasetStatus,
             DatasetStorageType,
             DatasetType,
-            DatasetStatus,
         )
 
         archived_dataset = Dataset(
@@ -437,9 +437,9 @@ class TestDatasetStateQueries:
         """验证 has_error 方法。"""
         from src.modules.datasets.domain.entities import Dataset
         from src.modules.datasets.domain.value_objects import (
+            DatasetStatus,
             DatasetStorageType,
             DatasetType,
-            DatasetStatus,
         )
 
         error_dataset = Dataset(
