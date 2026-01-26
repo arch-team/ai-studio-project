@@ -39,9 +39,9 @@ class CheckpointRepository(PydanticRepository[Checkpoint, CheckpointModel, int],
         models = result.scalars().all()
         return [self._to_entity(m) for m in models]
 
-    async def delete(self, checkpoint_id: int) -> None:
+    async def delete(self, checkpoint_id: int) -> bool:
         """Delete a checkpoint by ID."""
-        await super().delete(checkpoint_id)
+        return await super().delete(checkpoint_id)
 
     async def get_latest_by_training_job_id(self, training_job_id: int) -> Checkpoint | None:
         """Get the latest checkpoint for a training job."""

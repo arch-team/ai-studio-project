@@ -102,7 +102,7 @@ class AuditLogRepositoryImpl(PydanticRepository[AuditLog, AuditLogModel, int], I
     async def delete_expired(self) -> int:
         """Delete expired audit logs."""
         result = await self._session.execute(delete(AuditLogModel).where(AuditLogModel.expires_at < utc_now()))
-        return result.rowcount
+        return int(result.rowcount) if result.rowcount else 0
 
     async def count_by_user_id(self, user_id: int) -> int:
         """Count audit logs for a specific user."""

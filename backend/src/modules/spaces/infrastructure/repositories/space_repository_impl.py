@@ -80,13 +80,13 @@ class SpaceRepository(
         sort_order: str = "desc",
     ) -> tuple[list[Space], int]:
         """List spaces with pagination and filters."""
-        filters = {}
+        filters: dict[str, int | SpaceStatus] = {}
         if owner_id is not None:
             filters["owner_id"] = owner_id
         if status is not None:
             filters["status"] = status
 
-        return await self._list_with_filters(
+        return await self.list_with_filters(
             filters=filters,
             page=page,
             page_size=page_size,

@@ -61,4 +61,4 @@ class PasswordHistoryRepositoryImpl(
             PasswordHistoryModel.id.not_in(keep_ids),
         )
         result = await self._session.execute(delete_query)
-        return result.rowcount
+        return int(result.rowcount) if result.rowcount else 0

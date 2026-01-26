@@ -109,7 +109,7 @@ class ResourceLimitConfigRepository(
 
     async def create(self, config: ResourceLimitConfig) -> ResourceLimitConfig:
         """Create a new config."""
-        return await self.add(config)
+        return await super().create(config)
 
     async def soft_delete(self, config_id: int) -> bool:
         """Soft delete a config (hard delete for now, no soft delete column)."""
