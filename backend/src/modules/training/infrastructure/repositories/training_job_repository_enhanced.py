@@ -13,13 +13,13 @@ from src.modules.training.domain.value_objects import (
     SpotInterruptionBehavior,
 )
 from src.modules.training.infrastructure.models import TrainingJobModel
-from src.shared.infrastructure.repository_base import EnhancedBaseRepository
+from src.shared.infrastructure.base_repository import BaseRepository
 
 
-class TrainingJobRepositoryEnhanced(EnhancedBaseRepository[TrainingJob, TrainingJobModel, int], ITrainingJobRepository):
+class TrainingJobRepositoryEnhanced(BaseRepository[TrainingJob, TrainingJobModel, int], ITrainingJobRepository):
     """Enhanced SQLAlchemy implementation of TrainingJob repository.
 
-    Demonstrates how to use the new EnhancedBaseRepository to reduce boilerplate.
+    Demonstrates how to use the new BaseRepository to reduce boilerplate.
     """
 
     def __init__(self, session: AsyncSession):

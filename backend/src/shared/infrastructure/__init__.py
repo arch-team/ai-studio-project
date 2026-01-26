@@ -1,7 +1,6 @@
 """Shared Infrastructure - Database, config, storage, and security utilities."""
 
 from .base_repository import BaseRepository
-from .base_repository_impl import BaseRepositoryImpl
 from .config import Settings, get_settings
 from .database import AsyncSessionLocal, Base, engine, get_db
 from .logging_config import (
@@ -13,7 +12,6 @@ from .logging_config import (
 )
 from .models import SoftDeleteMixin, TimestampMixin
 from .query_builder import QueryBuilder
-from .repository_base import EnhancedBaseRepository
 from .storage import IStorageService, S3StorageClient
 
 __all__ = [
@@ -36,11 +34,8 @@ __all__ = [
     "SoftDeleteMixin",
     # Query
     "QueryBuilder",
-    # Repository - 新的统一基类 (推荐使用)
+    # Repository
     "BaseRepository",
-    # Repository - 旧名称 (向后兼容)
-    "BaseRepositoryImpl",
-    "EnhancedBaseRepository",
     # Storage
     "IStorageService",
     "S3StorageClient",
