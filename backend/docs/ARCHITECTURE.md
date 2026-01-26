@@ -1,7 +1,7 @@
 # AI 训练平台后端架构规范
 
-> **版本**: 1.0
-> **最后更新**: 2025-01-16
+> **版本**: 1.1
+> **最后更新**: 2026-01-26
 > **架构模式**: DDD + Modular Monolith + Clean Architecture
 
 本文档是后端项目的**核心架构规范单一真实源 (Single Source of Truth)**。所有架构相关决策应以本文档为准。
@@ -261,17 +261,55 @@ class TrainingJobModel(Base):
 ### 3.4 DDD 战术模式规范
 
 #### Entity 实体
-- 继承 `BaseEntity`，使用 UUID 标识，`__eq__`/`__hash__` 基于 ID
+
+**推荐方式 - PydanticEntity（Pydantic V2）**:
+```python
+from src.shared.domain import PydanticEntity
+
+class User(PydanticEntity):
+    username: str = Field(min_length=3, max_length=64)
+    email: str
+    status: UserStatus = UserStatus.ACTIVE
+
+    def activate(self) -> None:
+        self.status = UserStatus.ACTIVE
+        self.touch()  # 更新 updated_at
+```
+
+特性：
+- 继承 `PydanticEntity`，自动获得 ORM 转换能力 (`from_attributes=True`)
+- 内置字段：`id`, `created_at`, `updated_at`
+- 使用 `touch()` 更新时间戳
 - 状态转换逻辑在 Entity 内部，**禁止**依赖外部服务或数据库
 - 只抛出 Domain 异常，**禁止** `ValueError` 等通用异常
+
+**旧方式 - BaseEntity（dataclass）**: 仅用于特殊场景，新代码应使用 `PydanticEntity`
 
 #### Value Object 值对象
 - 使用 `@dataclass(frozen=True)` 确保不可变，相等性基于值比较
 - 在 `__post_init__` 验证，无效值抛出 `ValidationError`
 
 #### Repository 仓库
-- 继承 `IRepository[T]`，含 `get_by_id`, `add`, `update`, `delete`, `exists`
-- **只负责持久化**，禁止业务逻辑；复杂查询命名 `find_by_*`, `list_by_*`
+
+**推荐方式 - PydanticRepository**:
+```python
+from src.shared.infrastructure import PydanticRepository
+
+class UserRepository(PydanticRepository[User, UserModel, int], IUserRepository):
+    _entity_class = User
+    _updatable_fields = ["username", "email", "status", "role"]
+
+    def __init__(self, session: AsyncSession):
+        super().__init__(session, UserModel)
+```
+
+特性：
+- 自动 Entity ↔ Model 转换，无需手写 `_to_entity()`, `_to_model()`
+- 内置 CRUD：`get_by_id`, `create`, `update`, `delete`, `exists`
+- 通过 `_updatable_fields` 控制可更新字段
+- 支持软删除、分页查询
+
+**旧方式 - BaseRepository**: 仅用于复杂转换场景（如 `UploadSession`）
 
 #### Domain Event 域事件
 - 继承 `DomainEvent`，自动含 `event_id: UUID` 和 `occurred_at: datetime`
