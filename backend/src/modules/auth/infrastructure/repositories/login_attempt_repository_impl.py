@@ -3,14 +3,14 @@
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.shared.infrastructure.repository_base import EnhancedBaseRepository
+from src.shared.infrastructure.base_repository import BaseRepository
 
 from ...domain.entities import LoginAttempt
 from ...domain.repositories import ILoginAttemptRepository
 from ..models import LoginAttemptModel
 
 
-class LoginAttemptRepositoryImpl(EnhancedBaseRepository[LoginAttempt, LoginAttemptModel, int], ILoginAttemptRepository):
+class LoginAttemptRepositoryImpl(BaseRepository[LoginAttempt, LoginAttemptModel, int], ILoginAttemptRepository):
     """SQLAlchemy implementation of LoginAttempt repository."""
 
     def __init__(self, session: AsyncSession):

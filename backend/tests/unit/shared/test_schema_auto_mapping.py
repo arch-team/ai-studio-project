@@ -1,4 +1,4 @@
-"""Unit tests for AutoMappingEntitySchema."""
+"""Unit tests for EntitySchema (auto-mapping)."""
 
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -6,7 +6,7 @@ from decimal import Decimal
 from enum import Enum
 from typing import ClassVar
 
-from src.shared.api.schemas.enhanced_base import AutoMappingEntitySchema
+from src.shared.api.schemas.entity_schema import EntitySchema
 
 
 # 测试用的 Domain 枚举
@@ -49,7 +49,7 @@ class TestAutoMappingBasic:
     def test_auto_maps_same_name_fields(self):
         """同名字段自动映射。"""
 
-        class SimpleSchema(AutoMappingEntitySchema["SampleEntity"]):
+        class SimpleSchema(EntitySchema["SampleEntity"]):
             id: int
             name: str
 
@@ -68,7 +68,7 @@ class TestAutoMappingBasic:
     def test_skips_fields_not_in_entity(self):
         """Schema 中有但 Entity 中没有的字段不会报错。"""
 
-        class SchemaWithExtraField(AutoMappingEntitySchema["SampleEntity"]):
+        class SchemaWithExtraField(EntitySchema["SampleEntity"]):
             id: int
             name: str
             extra_field: str | None = None  # Entity 中不存在
@@ -88,7 +88,7 @@ class TestAutoMappingBasic:
     def test_extra_fields_override_entity(self):
         """extra_fields 参数可覆盖自动映射。"""
 
-        class SimpleSchema(AutoMappingEntitySchema["SampleEntity"]):
+        class SimpleSchema(EntitySchema["SampleEntity"]):
             id: int
             name: str
 
@@ -110,7 +110,7 @@ class TestEnumMapping:
     def test_converts_enum_via_mapping(self):
         """枚举通过 _enum_mappings 配置自动转换。"""
 
-        class SchemaWithEnum(AutoMappingEntitySchema["SampleEntity"]):
+        class SchemaWithEnum(EntitySchema["SampleEntity"]):
             id: int
             status: ApiStatusEnum
 
@@ -131,7 +131,7 @@ class TestEnumMapping:
     def test_multiple_enum_mappings(self):
         """多个枚举字段同时转换。"""
 
-        class SchemaWithMultipleEnums(AutoMappingEntitySchema["SampleEntity"]):
+        class SchemaWithMultipleEnums(EntitySchema["SampleEntity"]):
             id: int
             status: ApiStatusEnum
             priority: ApiPriorityEnum
@@ -161,7 +161,7 @@ class TestEnumMapping:
             id: int
             status: DomainStatus | None = None
 
-        class SchemaWithOptionalEnum(AutoMappingEntitySchema["EntityWithOptionalEnum"]):
+        class SchemaWithOptionalEnum(EntitySchema["EntityWithOptionalEnum"]):
             id: int
             status: ApiStatusEnum | None = None
 
@@ -180,7 +180,7 @@ class TestCustomMapping:
     def test_custom_mapping_function(self):
         """自定义映射函数覆盖默认行为。"""
 
-        class SchemaWithCustomMapping(AutoMappingEntitySchema["SampleEntity"]):
+        class SchemaWithCustomMapping(EntitySchema["SampleEntity"]):
             id: int
             full_name: str  # 自定义字段名
 
@@ -202,7 +202,7 @@ class TestCustomMapping:
     def test_custom_mapping_takes_precedence(self):
         """自定义映射优先于枚举映射和默认映射。"""
 
-        class SchemaWithCustomOverride(AutoMappingEntitySchema["SampleEntity"]):
+        class SchemaWithCustomOverride(EntitySchema["SampleEntity"]):
             id: int
             name: str
 
@@ -228,7 +228,7 @@ class TestExcludeFields:
     def test_excluded_fields_not_mapped(self):
         """排除的字段不会自动映射。"""
 
-        class SchemaWithExclusion(AutoMappingEntitySchema["SampleEntity"]):
+        class SchemaWithExclusion(EntitySchema["SampleEntity"]):
             id: int
             name: str | None = None  # 可选，因为被排除
 
@@ -253,7 +253,7 @@ class TestInheritance:
     def test_detail_inherits_summary_mappings(self):
         """Detail Schema 继承 Summary 的枚举映射。"""
 
-        class SummarySchema(AutoMappingEntitySchema["SampleEntity"]):
+        class SummarySchema(EntitySchema["SampleEntity"]):
             id: int
             name: str
             status: ApiStatusEnum
@@ -297,7 +297,7 @@ class TestFromEntityList:
     def test_converts_list_of_entities(self):
         """批量转换实体列表。"""
 
-        class SimpleSchema(AutoMappingEntitySchema["SampleEntity"]):
+        class SimpleSchema(EntitySchema["SampleEntity"]):
             id: int
             name: str
 
@@ -317,7 +317,7 @@ class TestFromEntityList:
     def test_empty_list_returns_empty(self):
         """空列表返回空列表。"""
 
-        class SimpleSchema(AutoMappingEntitySchema["SampleEntity"]):
+        class SimpleSchema(EntitySchema["SampleEntity"]):
             id: int
 
         results = SimpleSchema.from_entity_list([])
@@ -331,7 +331,7 @@ class TestComplexTypes:
     def test_decimal_preserved(self):
         """Decimal 类型保持精度。"""
 
-        class SchemaWithDecimal(AutoMappingEntitySchema["SampleEntity"]):
+        class SchemaWithDecimal(EntitySchema["SampleEntity"]):
             id: int
             score: Decimal | None
 
@@ -350,7 +350,7 @@ class TestComplexTypes:
     def test_datetime_preserved(self):
         """datetime 类型保持完整。"""
 
-        class SchemaWithDatetime(AutoMappingEntitySchema["SampleEntity"]):
+        class SchemaWithDatetime(EntitySchema["SampleEntity"]):
             id: int
             created_at: datetime
 

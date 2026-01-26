@@ -3,7 +3,7 @@
 from sqlalchemy import asc, desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.shared.infrastructure.repository_base import EnhancedBaseRepository
+from src.shared.infrastructure.base_repository import BaseRepository
 
 from ...domain.entities import User
 from ...domain.repositories import IUserRepository
@@ -11,7 +11,7 @@ from ...domain.value_objects import AuthType, UserRole, UserStatus
 from ..models import UserModel
 
 
-class UserRepositoryImpl(EnhancedBaseRepository[User, UserModel, int], IUserRepository):
+class UserRepositoryImpl(BaseRepository[User, UserModel, int], IUserRepository):
     """SQLAlchemy implementation of User repository."""
 
     def __init__(self, session: AsyncSession):

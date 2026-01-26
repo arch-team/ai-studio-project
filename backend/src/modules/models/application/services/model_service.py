@@ -5,7 +5,7 @@ from typing import Any
 from src.modules.models.domain.entities import Model
 from src.modules.models.domain.repositories import IModelRepository
 from src.modules.models.domain.value_objects import ModelFramework, ModelStatus
-from src.shared.application.enhanced_base_service import EnhancedBaseService
+from src.shared.application.base_service_unified import BaseApplicationService
 from src.shared.domain.exceptions import (
     InvalidStateTransitionError,
 )
@@ -13,7 +13,7 @@ from src.shared.domain.interfaces import IEntityExistenceChecker
 from src.shared.utils import EnumMapper, utc_now
 
 
-class ModelService(EnhancedBaseService[Model, int]):
+class ModelService(BaseApplicationService[Model, int]):
     """Service for managing ML models."""
 
     def __init__(

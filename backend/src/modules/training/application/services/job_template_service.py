@@ -7,12 +7,12 @@ from src.modules.training.domain.exceptions import (
 )
 from src.modules.training.domain.repositories import IJobTemplateRepository
 from src.modules.training.domain.value_objects import TemplateVisibility
-from src.shared.application.enhanced_base_service import EnhancedBaseService
+from src.shared.application.base_service_unified import BaseApplicationService
 from src.shared.domain.exceptions import DuplicateEntityError
 from src.shared.utils import EnumMapper
 
 
-class JobTemplateService(EnhancedBaseService[JobTemplate, int]):
+class JobTemplateService(BaseApplicationService[JobTemplate, int]):
     """Service for managing job templates."""
 
     def __init__(self, repository: IJobTemplateRepository):

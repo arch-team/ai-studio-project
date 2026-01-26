@@ -15,7 +15,7 @@ from src.modules.training.domain.repositories import (
 )
 from src.modules.training.domain.value_objects import JobPriority, JobStatus
 from src.modules.training.domain.value_objects.constants import RESOURCE_TYPE_GPU
-from src.shared.application.enhanced_base_service import EnhancedBaseService
+from src.shared.application.base_service_unified import BaseApplicationService
 from src.shared.domain.exceptions import (
     InvalidStateTransitionError,
     ResourceQuotaExceededError,
@@ -23,7 +23,7 @@ from src.shared.domain.exceptions import (
 from src.shared.domain.interfaces import IQuotaChecker
 
 
-class TrainingJobService(EnhancedBaseService[TrainingJob, int]):
+class TrainingJobService(BaseApplicationService[TrainingJob, int]):
     """Service for managing training jobs."""
 
     def __init__(

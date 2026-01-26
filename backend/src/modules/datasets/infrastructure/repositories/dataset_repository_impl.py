@@ -12,11 +12,11 @@ from src.modules.datasets.domain.value_objects import (
     DatasetVisibility,
 )
 from src.modules.datasets.infrastructure.models import DatasetModel
-from src.shared.infrastructure.repository_base import EnhancedBaseRepository
+from src.shared.infrastructure.base_repository import BaseRepository
 
 
 class DatasetRepositoryImpl(
-    EnhancedBaseRepository[Dataset, DatasetModel, int],
+    BaseRepository[Dataset, DatasetModel, int],
     IDatasetRepository,
 ):
     """Dataset 仓库 SQLAlchemy 实现。"""

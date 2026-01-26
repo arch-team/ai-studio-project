@@ -16,11 +16,11 @@ from src.modules.audit.infrastructure.models import AuditLogModel
 from src.modules.audit.infrastructure.models import AuditStatus as ModelAuditStatus
 from src.modules.audit.infrastructure.models import OperationType as ModelOperationType
 from src.modules.audit.infrastructure.models import ResourceType as ModelResourceType
-from src.shared.infrastructure.repository_base import EnhancedBaseRepository
+from src.shared.infrastructure.base_repository import BaseRepository
 from src.shared.utils import utc_now
 
 
-class AuditLogRepositoryImpl(EnhancedBaseRepository[AuditLog, AuditLogModel, int], IAuditLogRepository):
+class AuditLogRepositoryImpl(BaseRepository[AuditLog, AuditLogModel, int], IAuditLogRepository):
     """SQLAlchemy implementation of audit log repository."""
 
     def __init__(self, session: AsyncSession):

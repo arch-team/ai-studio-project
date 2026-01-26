@@ -7,12 +7,12 @@ from src.modules.training.domain.entities import JobTemplate
 from src.modules.training.domain.repositories import IJobTemplateRepository
 from src.modules.training.domain.value_objects import TemplateVisibility
 from src.modules.training.infrastructure.models import JobTemplateModel
-from src.shared.infrastructure.repository_base import EnhancedBaseRepository
+from src.shared.infrastructure.base_repository import BaseRepository
 from src.shared.utils import utc_now
 
 
 class JobTemplateRepository(
-    EnhancedBaseRepository[JobTemplate, JobTemplateModel, int],
+    BaseRepository[JobTemplate, JobTemplateModel, int],
     IJobTemplateRepository,
 ):
     """SQLAlchemy implementation of JobTemplate repository."""

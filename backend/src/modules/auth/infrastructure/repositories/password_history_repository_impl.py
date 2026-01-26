@@ -3,7 +3,7 @@
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.shared.infrastructure.repository_base import EnhancedBaseRepository
+from src.shared.infrastructure.base_repository import BaseRepository
 
 from ...domain.entities import PasswordHistory
 from ...domain.repositories import IPasswordHistoryRepository
@@ -11,7 +11,7 @@ from ..models import PasswordHistoryModel
 
 
 class PasswordHistoryRepositoryImpl(
-    EnhancedBaseRepository[PasswordHistory, PasswordHistoryModel, int], IPasswordHistoryRepository
+    BaseRepository[PasswordHistory, PasswordHistoryModel, int], IPasswordHistoryRepository
 ):
     """SQLAlchemy implementation of PasswordHistory repository."""
 

@@ -10,11 +10,11 @@ from src.modules.spaces.domain.entities import Space
 from src.modules.spaces.domain.repositories import ISpaceRepository
 from src.modules.spaces.domain.value_objects import SpaceStatus
 from src.modules.spaces.infrastructure.models import DevelopmentSpaceModel
-from src.shared.infrastructure.repository_base import EnhancedBaseRepository
+from src.shared.infrastructure.base_repository import BaseRepository
 
 
 class SpaceRepository(
-    EnhancedBaseRepository[Space, DevelopmentSpaceModel, str],
+    BaseRepository[Space, DevelopmentSpaceModel, str],
     ISpaceRepository,
 ):
     """SQLAlchemy implementation of space repository."""

@@ -3,7 +3,7 @@
 from sqlalchemy import desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.shared.infrastructure.repository_base import EnhancedBaseRepository
+from src.shared.infrastructure.base_repository import BaseRepository
 
 from ...domain.entities import HyperPodCluster
 from ...domain.repositories import IHyperPodClusterRepository
@@ -12,7 +12,7 @@ from ..models import HyperPodClusterModel
 
 
 class HyperPodClusterRepositoryImpl(
-    EnhancedBaseRepository[HyperPodCluster, HyperPodClusterModel, int],
+    BaseRepository[HyperPodCluster, HyperPodClusterModel, int],
     IHyperPodClusterRepository,
 ):
     """SQLAlchemy implementation of HyperPodCluster repository."""

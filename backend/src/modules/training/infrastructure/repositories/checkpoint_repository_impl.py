@@ -14,10 +14,10 @@ from src.modules.training.domain.value_objects import (
     StorageTier,
 )
 from src.modules.training.infrastructure.models import CheckpointModel
-from src.shared.infrastructure.repository_base import EnhancedBaseRepository
+from src.shared.infrastructure.base_repository import BaseRepository
 
 
-class CheckpointRepository(EnhancedBaseRepository[Checkpoint, CheckpointModel, int], ICheckpointRepository):
+class CheckpointRepository(BaseRepository[Checkpoint, CheckpointModel, int], ICheckpointRepository):
     """SQLAlchemy implementation of Checkpoint repository."""
 
     def __init__(self, session: AsyncSession):

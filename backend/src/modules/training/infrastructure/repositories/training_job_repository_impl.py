@@ -14,11 +14,11 @@ from src.modules.training.domain.value_objects import (
     SpotInterruptionBehavior,
 )
 from src.modules.training.infrastructure.models import TrainingJobModel
-from src.shared.infrastructure.repository_base import EnhancedBaseRepository
+from src.shared.infrastructure.base_repository import BaseRepository
 
 
 class TrainingJobRepository(
-    EnhancedBaseRepository[TrainingJob, TrainingJobModel, int],
+    BaseRepository[TrainingJob, TrainingJobModel, int],
     ITrainingJobRepository,
 ):
     """SQLAlchemy implementation of TrainingJob repository."""

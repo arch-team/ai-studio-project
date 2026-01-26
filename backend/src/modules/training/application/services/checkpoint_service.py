@@ -30,11 +30,11 @@ from src.modules.training.domain.value_objects import (
     JobStatus,
     StorageTier,
 )
-from src.shared.application.enhanced_base_service import EnhancedBaseService
+from src.shared.application.base_service_unified import BaseApplicationService
 from src.shared.utils import utc_now
 
 
-class CheckpointService(EnhancedBaseService[Checkpoint, int]):
+class CheckpointService(BaseApplicationService[Checkpoint, int]):
     """Service for managing training checkpoints."""
 
     def __init__(

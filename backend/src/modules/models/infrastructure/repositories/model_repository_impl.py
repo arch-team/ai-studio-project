@@ -8,11 +8,11 @@ from src.modules.models.domain.entities import Model
 from src.modules.models.domain.repositories import IModelRepository
 from src.modules.models.domain.value_objects import ModelFramework, ModelStatus
 from src.modules.models.infrastructure.models import ModelModel
-from src.shared.infrastructure.repository_base import EnhancedBaseRepository
+from src.shared.infrastructure.base_repository import BaseRepository
 from src.shared.utils import utc_now
 
 
-class ModelRepository(EnhancedBaseRepository[Model, ModelModel, int], IModelRepository):
+class ModelRepository(BaseRepository[Model, ModelModel, int], IModelRepository):
     """SQLAlchemy implementation of model repository."""
 
     def __init__(self, session: AsyncSession):

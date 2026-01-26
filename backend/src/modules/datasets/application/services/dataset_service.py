@@ -9,12 +9,12 @@ from src.modules.datasets.domain.value_objects import (
     DatasetType,
     DatasetVisibility,
 )
-from src.shared.application.enhanced_base_service import EnhancedBaseService
+from src.shared.application.base_service_unified import BaseApplicationService
 from src.shared.domain.exceptions import DuplicateEntityError
 from src.shared.utils import utc_now
 
 
-class DatasetService(EnhancedBaseService[Dataset, int]):
+class DatasetService(BaseApplicationService[Dataset, int]):
     """数据集管理服务。"""
 
     def __init__(self, repository: IDatasetRepository):

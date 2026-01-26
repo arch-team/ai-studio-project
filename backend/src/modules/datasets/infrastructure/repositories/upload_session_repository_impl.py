@@ -15,11 +15,11 @@ from src.modules.datasets.infrastructure.models import (
     UploadSessionModel,
     UploadSessionStatus,
 )
-from src.shared.infrastructure.repository_base import EnhancedBaseRepository
+from src.shared.infrastructure.base_repository import BaseRepository
 
 
 class UploadSessionRepositoryImpl(
-    EnhancedBaseRepository[UploadSession, UploadSessionModel, int],
+    BaseRepository[UploadSession, UploadSessionModel, int],
     IUploadSessionRepository,
 ):
     """UploadSession 仓库 SQLAlchemy 实现。"""
