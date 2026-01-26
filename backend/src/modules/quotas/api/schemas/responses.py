@@ -2,7 +2,7 @@
 
 from datetime import datetime
 from enum import Enum
-from typing import TYPE_CHECKING, ClassVar
+from typing import TYPE_CHECKING
 
 from pydantic import BaseModel
 
@@ -32,8 +32,7 @@ class PriorityDefaultEnum(str, Enum):
 class ResourceLimitConfigResponse(EntitySchema["ResourceLimitConfig"]):
     """Resource limit config response.
 
-    使用 EntitySchema 自动映射同名字段，
-    只需声明枚举映射规则。
+    枚举映射由 EntitySchema 自动从字段类型推断。
     """
 
     id: int
@@ -48,11 +47,6 @@ class ResourceLimitConfigResponse(EntitySchema["ResourceLimitConfig"]):
     priority_default: PriorityDefaultEnum
     created_at: datetime
     updated_at: datetime
-
-    _enum_mappings: ClassVar[dict[str, type[Enum]]] = {
-        "role": LimitRoleEnum,
-        "priority_default": PriorityDefaultEnum,
-    }
 
 
 class ResourceLimitConfigListResponse(BaseModel):
@@ -87,7 +81,10 @@ class QuotaStatusEnum(str, Enum):
 
 
 class ResourceQuotaResponse(EntitySchema["ResourceQuota"]):
-    """Resource quota response schema."""
+    """Resource quota response schema.
+
+    枚举映射由 EntitySchema 自动从字段类型推断。
+    """
 
     id: int
     name: str
@@ -109,11 +106,6 @@ class ResourceQuotaResponse(EntitySchema["ResourceQuota"]):
     valid_until: datetime | None = None
     created_at: datetime
     updated_at: datetime
-
-    _enum_mappings: ClassVar[dict[str, type[Enum]]] = {
-        "quota_type": QuotaTypeEnum,
-        "status": QuotaStatusEnum,
-    }
 
 
 class ResourceQuotaListResponse(BaseModel):

@@ -2,7 +2,7 @@
 
 from datetime import datetime
 from enum import Enum
-from typing import TYPE_CHECKING, ClassVar
+from typing import TYPE_CHECKING
 
 from pydantic import BaseModel
 
@@ -49,7 +49,10 @@ class DatasetStatusEnum(str, Enum):
 
 
 class DatasetSummary(EntitySchema["Dataset"]):
-    """Dataset summary for list view."""
+    """Dataset summary for list view.
+
+    枚举映射由 EntitySchema 自动从字段类型推断。
+    """
 
     id: int
     name: str
@@ -63,16 +66,12 @@ class DatasetSummary(EntitySchema["Dataset"]):
     status: DatasetStatusEnum
     created_at: datetime
 
-    _enum_mappings: ClassVar[dict[str, type[Enum]]] = {
-        "storage_type": DatasetStorageTypeEnum,
-        "dataset_type": DatasetTypeEnum,
-        "visibility": DatasetVisibilityEnum,
-        "status": DatasetStatusEnum,
-    }
-
 
 class DatasetDetail(DatasetSummary):
-    """Dataset detailed view - inherits DatasetSummary."""
+    """Dataset detailed view - inherits DatasetSummary.
+
+    自动继承父类枚举映射。
+    """
 
     storage_uri: str
     data_format: str | None = None
@@ -80,10 +79,6 @@ class DatasetDetail(DatasetSummary):
     owner_id: int
     updated_at: datetime
     last_accessed_at: datetime | None = None
-
-    _enum_mappings: ClassVar[dict[str, type[Enum]]] = {
-        **DatasetSummary._enum_mappings,
-    }
 
 
 class DatasetListResponse(BaseModel):

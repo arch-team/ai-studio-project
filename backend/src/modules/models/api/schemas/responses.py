@@ -2,7 +2,7 @@
 
 from datetime import datetime
 from enum import Enum
-from typing import TYPE_CHECKING, Any, ClassVar
+from typing import TYPE_CHECKING, Any
 
 from pydantic import BaseModel
 
@@ -32,7 +32,10 @@ class ModelStatusEnum(str, Enum):
 
 
 class ModelSummary(EntitySchema["Model"]):
-    """Model summary for list responses."""
+    """Model summary for list responses.
+
+    枚举映射由 EntitySchema 自动从字段类型推断。
+    """
 
     id: int
     model_name: str
@@ -46,11 +49,6 @@ class ModelSummary(EntitySchema["Model"]):
     tags: list[str] | None = None
     created_at: datetime
     registered_at: datetime | None = None
-
-    _enum_mappings: ClassVar[dict[str, type[Enum]]] = {
-        "status": ModelStatusEnum,
-        "framework": ModelFrameworkEnum,
-    }
 
 
 class ModelDetail(ModelSummary):

@@ -3,7 +3,7 @@
 from datetime import datetime
 from decimal import Decimal
 from enum import Enum
-from typing import TYPE_CHECKING, ClassVar
+from typing import TYPE_CHECKING
 
 from pydantic import BaseModel
 
@@ -68,7 +68,10 @@ class StorageTierEnum(str, Enum):
 
 
 class TrainingJobSummary(EntitySchema["TrainingJob"]):
-    """Training job summary for list view."""
+    """Training job summary for list view.
+
+    枚举映射由 EntitySchema 自动从字段类型推断。
+    """
 
     id: int
     job_name: str
@@ -83,14 +86,12 @@ class TrainingJobSummary(EntitySchema["TrainingJob"]):
     created_at: datetime
     started_at: datetime | None = None
 
-    _enum_mappings: ClassVar[dict[str, type[Enum]]] = {
-        "status": JobStatusEnum,
-        "priority": JobPriorityEnum,
-    }
-
 
 class TrainingJobDetail(TrainingJobSummary):
-    """Training job detailed view - 继承 TrainingJobSummary 扩展更多字段."""
+    """Training job detailed view - 继承 TrainingJobSummary 扩展更多字段.
+
+    自动继承父类枚举映射，新增枚举字段自动推断。
+    """
 
     description: str | None = None
     owner_id: int
@@ -110,11 +111,6 @@ class TrainingJobDetail(TrainingJobSummary):
     error_message: str | None = None
     completed_at: datetime | None = None
 
-    _enum_mappings: ClassVar[dict[str, type[Enum]]] = {
-        **TrainingJobSummary._enum_mappings,
-        "distribution_strategy": DistributionStrategyEnum,
-    }
-
 
 class TrainingJobListResponse(BaseModel):
     """Paginated list of training jobs."""
@@ -127,7 +123,10 @@ class TrainingJobListResponse(BaseModel):
 
 
 class CheckpointResponse(EntitySchema["Checkpoint"]):
-    """Checkpoint response."""
+    """Checkpoint response.
+
+    枚举映射由 EntitySchema 自动从字段类型推断。
+    """
 
     id: int
     training_job_id: int
@@ -144,12 +143,6 @@ class CheckpointResponse(EntitySchema["Checkpoint"]):
     metadata: dict | None = None
     created_at: datetime
 
-    _enum_mappings: ClassVar[dict[str, type[Enum]]] = {
-        "checkpoint_type": CheckpointTypeEnum,
-        "storage_tier": StorageTierEnum,
-        "status": CheckpointStatusEnum,
-    }
-
 
 # === Job Template Response Schemas ===
 
@@ -163,7 +156,10 @@ class TemplateVisibilityEnum(str, Enum):
 
 
 class JobTemplateSummary(EntitySchema["JobTemplate"]):
-    """Job template summary for list view."""
+    """Job template summary for list view.
+
+    枚举映射由 EntitySchema 自动从字段类型推断。
+    """
 
     id: int
     name: str
@@ -172,10 +168,6 @@ class JobTemplateSummary(EntitySchema["JobTemplate"]):
     usage_count: int
     owner_id: int
     created_at: datetime
-
-    _enum_mappings: ClassVar[dict[str, type[Enum]]] = {
-        "visibility": TemplateVisibilityEnum,
-    }
 
 
 class JobTemplateDetail(JobTemplateSummary):

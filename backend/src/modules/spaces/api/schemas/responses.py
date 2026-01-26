@@ -2,7 +2,7 @@
 
 from datetime import datetime
 from enum import Enum
-from typing import TYPE_CHECKING, ClassVar
+from typing import TYPE_CHECKING
 
 from pydantic import BaseModel
 
@@ -41,7 +41,10 @@ class SpaceStatusEnum(str, Enum):
 
 
 class SpaceSummary(EntitySchema["Space"]):
-    """Space summary for list responses."""
+    """Space summary for list responses.
+
+    枚举映射由 EntitySchema 自动从字段类型推断。
+    """
 
     id: str
     space_name: str
@@ -50,12 +53,6 @@ class SpaceSummary(EntitySchema["Space"]):
     space_type: SpaceTypeEnum
     status: SpaceStatusEnum
     created_at: datetime
-
-    _enum_mappings: ClassVar[dict[str, type[Enum]]] = {
-        "instance_type": SpaceInstanceTypeEnum,
-        "space_type": SpaceTypeEnum,
-        "status": SpaceStatusEnum,
-    }
 
 
 class SpaceDetail(SpaceSummary):
