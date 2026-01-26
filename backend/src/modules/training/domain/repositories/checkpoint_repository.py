@@ -29,8 +29,8 @@ class ICheckpointRepository(ABC):
         """Update an existing checkpoint."""
 
     @abstractmethod
-    async def delete(self, checkpoint_id: int) -> None:
-        """Delete a checkpoint by ID."""
+    async def delete(self, checkpoint_id: int) -> bool:
+        """Delete a checkpoint by ID. Returns True if deleted, False otherwise."""
 
     @abstractmethod
     async def get_latest_by_training_job_id(self, training_job_id: int) -> Checkpoint | None:

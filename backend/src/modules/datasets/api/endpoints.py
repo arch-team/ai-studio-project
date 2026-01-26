@@ -156,6 +156,7 @@ async def update_dataset(
     service: DatasetService = Depends(get_dataset_service),
 ) -> DatasetDetail:
     """更新数据集元数据。"""
+    assert dataset.id is not None, "Dataset must have ID"
     updated = await service.update_dataset(
         dataset_id=dataset.id,
         data=data.model_dump(exclude_unset=True, mode="json"),
@@ -169,6 +170,7 @@ async def delete_dataset(
     service: DatasetService = Depends(get_dataset_service),
 ) -> None:
     """删除（归档）数据集。"""
+    assert dataset.id is not None, "Dataset must have ID"
     await service.delete_dataset(dataset.id)
     return None
 
@@ -180,6 +182,7 @@ async def create_dataset_version(
     service: DatasetService = Depends(get_dataset_service),
 ) -> DatasetDetail:
     """创建数据集的新版本。"""
+    assert dataset.id is not None, "Dataset must have ID"
     new_dataset = await service.create_version(
         dataset_id=dataset.id,
         version=data.version,
@@ -210,6 +213,7 @@ async def initiate_upload(
     upload_service: DatasetUploadService = Depends(get_dataset_upload_service),
 ) -> InitiateUploadResponse:
     """初始化分片上传。"""
+    assert dataset.id is not None, "Dataset must have ID"
     session = await upload_service.initiate_multipart_upload(
         dataset_id=dataset.id,
         filename=data.filename,
@@ -351,6 +355,7 @@ async def initiate_fsx_sync(
     fsx_service: FsxSyncService = Depends(get_fsx_sync_service),
 ) -> FsxSyncResponse:
     """发起 S3 到 FSx 同步。"""
+    assert dataset.id is not None, "Dataset must have ID"
     result = await fsx_service.initiate_s3_to_fsx_sync(dataset_id=dataset.id)
 
     return FsxSyncResponse(
@@ -391,6 +396,7 @@ async def prefetch_dataset_to_fsx(
     fsx_service: FsxSyncService = Depends(get_fsx_sync_service),
 ) -> FsxSyncResponse:
     """预热数据集到 FSx 缓存。"""
+    assert dataset.id is not None, "Dataset must have ID"
     result = await fsx_service.prefetch_dataset(
         dataset_id=dataset.id,
         paths=data.paths,
@@ -411,6 +417,7 @@ async def release_dataset_cache(
     fsx_service: FsxSyncService = Depends(get_fsx_sync_service),
 ) -> None:
     """释放数据集 FSx 缓存。"""
+    assert dataset.id is not None, "Dataset must have ID"
     await fsx_service.release_dataset(dataset_id=dataset.id)
     return None
 

@@ -2,7 +2,6 @@
 
 from .base_entity import BaseEntity, EntityT
 from .base_repository import IRepository, T
-from .pydantic_entity import PydanticEntity
 from .events import DomainEvent, EventBus, EventT, event_bus, event_handler
 from .exceptions import (
     DomainError,
@@ -14,6 +13,7 @@ from .exceptions import (
 )
 from .interfaces import IEntityExistenceChecker, IQuotaChecker
 from .problem import Problem, problem
+from .pydantic_entity import PydanticEntity
 
 __all__ = [
     # Base classes

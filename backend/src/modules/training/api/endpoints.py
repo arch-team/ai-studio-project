@@ -226,6 +226,7 @@ async def create_manual_checkpoint(
         accuracy=job.latest_accuracy,
     )
 
+    assert checkpoint.id is not None, "Checkpoint must have ID"
     return CheckpointResponse(
         id=checkpoint.id,
         training_job_id=checkpoint.training_job_id,

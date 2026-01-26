@@ -156,6 +156,8 @@ class CheckpointService(BaseApplicationService[Checkpoint, int]):
 
         checkpoints = []
         for job in running_jobs:
+            if job.id is None:
+                continue
             try:
                 checkpoint = await self.create_checkpoint(
                     job_id=job.id,

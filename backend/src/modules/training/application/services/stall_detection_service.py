@@ -121,6 +121,7 @@ class StallDetectionService:
                     error_type=type(e).__name__,
                     error=str(e),
                 )
+                assert job.id is not None, "Job must have an ID"
                 results.append(
                     StallCheckResult(
                         job_id=job.id,
@@ -147,6 +148,7 @@ class StallDetectionService:
             StallCheckResult: 检查结果
         """
         config = config or StallDetectionConfig()
+        assert job.id is not None, "Job must have an ID"
 
         # 检测禁用时跳过
         if not config.enabled:
@@ -217,6 +219,7 @@ class StallDetectionService:
         """
         metrics_to_try = self._get_metrics_to_try(config)
 
+        assert job.id is not None, "Job must have ID to fetch metrics"
         for metric_name in metrics_to_try:
             points = await self._metrics.get_metric_history(
                 job_id=job.id,

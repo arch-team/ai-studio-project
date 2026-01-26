@@ -23,9 +23,7 @@ class AuditService:
 
     async def get_audit_log_by_id(self, audit_log_id: int) -> AuditLog | None:
         """根据ID获取审计日志."""
-        from uuid import UUID
-
-        return await self._repository.get_by_id(UUID(int=audit_log_id))
+        return await self._repository.get_by_id(audit_log_id)
 
     async def get_user_audit_logs(
         self,

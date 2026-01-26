@@ -70,6 +70,7 @@ class PasswordService:
         if user.status != UserStatus.ACTIVE:
             return None
 
+        assert user.id is not None, "User must have ID to create password reset token"
         return self._jwt.create_password_reset_token(user.id, user.email)
 
     async def confirm_password_reset(
@@ -103,6 +104,7 @@ class PasswordService:
 
     async def _update_user_password(self, user: User, new_password: str) -> None:
         """Update user password and add to history."""
+        assert user.id is not None, "User must have ID to update password"
         new_hash = self._hasher.hash_password(new_password)
         user.update_password(
             password_hash=new_hash,

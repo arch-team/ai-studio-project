@@ -25,6 +25,22 @@ class AuditLogRepositoryImpl(PydanticRepository[AuditLog, AuditLogModel, int], I
     def __init__(self, session: AsyncSession):
         super().__init__(session, AuditLogModel)
 
+    # ========== IAuditLogRepository 基础方法 ==========
+
+    async def add(self, entity: AuditLog) -> AuditLog:
+        """Add new audit log entry (alias for create)."""
+        return await self.create(entity)
+
+    async def get_all(self, limit: int = 100, offset: int = 0) -> list[AuditLog]:
+        """Get all audit logs with pagination."""
+        result = await self._session.execute(
+            select(AuditLogModel)
+            .order_by(AuditLogModel.created_at.desc())
+            .limit(limit)
+            .offset(offset)
+        )
+        return [self._to_entity(model) for model in result.scalars()]
+
     # ========== IAuditLogRepository 接口方法 ==========
 
     async def get_by_user_id(

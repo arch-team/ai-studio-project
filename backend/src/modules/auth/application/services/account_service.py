@@ -71,6 +71,7 @@ class AccountService:
         created_user = await self._user_repository.create(user)
 
         # Add to password history
+        assert created_user.id is not None, "Created user must have ID"
         history = PasswordHistory.create(
             user_id=created_user.id,
             password_hash=password_hash,

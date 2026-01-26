@@ -85,7 +85,8 @@ class AuditMiddleware(BaseHTTPMiddleware):
         将未捕获的异常转换为 500 响应，避免中间件链中断。
         """
         try:
-            return await call_next(request)
+            response: Response = await call_next(request)
+            return response
         except Exception as e:
             logger.exception(
                 "unhandled_exception",
@@ -174,7 +175,8 @@ class AuditMiddleware(BaseHTTPMiddleware):
             content_type = request.headers.get("content-type", "")
             if "application/json" in content_type:
                 data = json.loads(body.decode("utf-8"))
-                return self._sanitize_data(data)
+                result: dict[str, Any] | None = self._sanitize_data(data)
+                return result
 
             return None
         except (json.JSONDecodeError, UnicodeDecodeError):
@@ -227,7 +229,8 @@ class AuditMiddleware(BaseHTTPMiddleware):
     def _get_user_id(self, request: Request) -> int | None:
         """Extract user ID from request state (set by auth middleware)."""
         if hasattr(request.state, "user_id"):
-            return request.state.user_id
+            user_id: int | None = request.state.user_id
+            return user_id
         return None
 
     async def _write_audit_log(

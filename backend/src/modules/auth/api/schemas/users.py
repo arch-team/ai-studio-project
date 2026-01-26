@@ -94,6 +94,7 @@ class UserSummaryResponse(BaseModel):
     @classmethod
     def from_entity(cls, entity: "User") -> "UserSummaryResponse":
         """Create response from domain entity."""
+        assert entity.id is not None, "User must have ID"
         return cls(
             id=entity.id,
             username=entity.username,

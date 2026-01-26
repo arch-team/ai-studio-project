@@ -95,7 +95,8 @@ class BaseApplicationService(Generic[T, ID]):
         method_name = f"get_by_{field_name}"
         if hasattr(self._repository, method_name):
             method = getattr(self._repository, method_name)
-            return await method(field_value)
+            result: T | None = await method(field_value)
+            return result
         return None
 
     # ========== 验证工具 ==========
@@ -110,7 +111,7 @@ class BaseApplicationService(Generic[T, ID]):
                 raise self._create_duplicate_error(field_name, str(field_value))
         # 回退到通用的 exists_by 方法
         elif hasattr(self._repository, "exists_by"):
-            if await self._repository.exists_by(field_name, field_value):  # type: ignore
+            if await self._repository.exists_by(field_name, field_value):
                 raise self._create_duplicate_error(field_name, str(field_value))
 
     async def _validate_entity_exists(
@@ -233,9 +234,11 @@ class BaseApplicationService(Generic[T, ID]):
         await self._get_or_raise(entity_id)  # 验证存在
 
         if soft_delete and hasattr(self._repository, "soft_delete"):
-            await self._repository.soft_delete(entity_id)  # type: ignore
-        else:
-            await self._repository.delete(entity_id)  # type: ignore
+            soft_delete_method = getattr(self._repository, "soft_delete")
+            await soft_delete_method(entity_id)
+        elif hasattr(self._repository, "delete"):
+            delete_method = getattr(self._repository, "delete")
+            await delete_method(entity_id)
 
     # ========== 批量操作 ==========
 

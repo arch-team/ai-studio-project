@@ -81,11 +81,12 @@ class JWTManager:
             "jti": str(uuid.uuid4()),
         }
 
-        return authlib_jwt.encode(
+        encoded: bytes = authlib_jwt.encode(
             self._header,
             token_payload,
             self.settings.secret_key,
-        ).decode("utf-8")
+        )
+        return encoded.decode("utf-8")
 
     def create_access_token(
         self,

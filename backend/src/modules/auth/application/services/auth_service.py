@@ -114,6 +114,7 @@ class AuthService:
 
             tokens = self._create_token_pair(user)
 
+            assert user.id is not None, "User must have ID after authentication"
             return AuthResult(
                 user_id=user.id,
                 username=user.username,
@@ -147,6 +148,7 @@ class AuthService:
 
     def _create_token_pair(self, user: User) -> TokenPair:
         """Create access and refresh token pair."""
+        assert user.id is not None, "User must have ID to create tokens"
         access_token = self._jwt.create_access_token(
             user_id=user.id,
             username=user.username,

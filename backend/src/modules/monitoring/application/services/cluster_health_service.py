@@ -65,6 +65,7 @@ class ClusterHealthService:
         # 判断健康状态
         health_status = self._determine_health_status(storage_alerts, network_alerts)
 
+        assert cluster.id is not None, "Cluster must have ID"
         return HealthCheckResult(
             cluster_id=cluster.id,
             cluster_name=cluster.cluster_name,
@@ -109,6 +110,8 @@ class ClusterHealthService:
 
         results: list[HealthCheckResult] = []
         for cluster in clusters:
+            if cluster.id is None:
+                continue
             try:
                 result = await self.check_health(cluster.id)
                 # 同步状态

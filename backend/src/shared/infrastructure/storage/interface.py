@@ -131,7 +131,7 @@ class IStorageService(ABC):
         pass
 
     @abstractmethod
-    async def stream_file(self, remote_path: str, chunk_size: int = 8192) -> AsyncIterator[bytes]:
+    def stream_file(self, remote_path: str, chunk_size: int = 8192) -> AsyncIterator[bytes]:
         """Stream file contents.
 
         Args:
@@ -140,5 +140,10 @@ class IStorageService(ABC):
 
         Yields:
             File content chunks.
+
+        Note:
+            This is an async generator, not an async function.
+            Implementations should use 'async def' without declaring
+            the method as abstract with 'async'.
         """
-        pass
+        ...

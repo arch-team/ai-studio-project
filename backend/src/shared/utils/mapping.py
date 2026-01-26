@@ -1,7 +1,7 @@
 """Bidirectional enum mapper for Domain ↔ API enum conversion."""
 
 from enum import Enum
-from typing import TypeVar
+from typing import TypeVar, overload
 
 DomainEnumT = TypeVar("DomainEnumT", bound=Enum)
 ApiEnumT = TypeVar("ApiEnumT", bound=Enum)
@@ -60,6 +60,22 @@ class EnumMapper:
             JobStatus.RUNNING → JobStatusModel.RUNNING
         """
         return model_class(domain_enum.value) if domain_enum else None
+
+    @overload
+    @staticmethod
+    def from_string(
+        value: str | None,
+        enum_class: type[EnumT],
+        default: EnumT,
+    ) -> EnumT: ...
+
+    @overload
+    @staticmethod
+    def from_string(
+        value: str | None,
+        enum_class: type[EnumT],
+        default: None = None,
+    ) -> EnumT | None: ...
 
     @staticmethod
     def from_string(

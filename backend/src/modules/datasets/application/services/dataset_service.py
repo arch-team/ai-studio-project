@@ -57,7 +57,7 @@ class DatasetService(BaseApplicationService[Dataset, int]):
 
     async def list_datasets(
         self,
-        owner_id: int,
+        owner_id: int | None = None,
         status: DatasetStatus | None = None,
         dataset_type: DatasetType | None = None,
         visibility: DatasetVisibility | None = None,
@@ -66,9 +66,9 @@ class DatasetService(BaseApplicationService[Dataset, int]):
         sort_by: str = "created_at",
         sort_order: str = "desc",
     ) -> tuple[list[Dataset], int]:
-        """列出用户数据集，支持过滤和分页。"""
+        """列出用户数据集，支持过滤和分页。owner_id 为 None 时列出所有数据集。"""
         return await self._repository.list_by_owner(
-            owner_id=owner_id,
+            owner_id=owner_id if owner_id is not None else 0,  # 0 表示列出所有
             status=status,
             dataset_type=dataset_type,
             visibility=visibility,

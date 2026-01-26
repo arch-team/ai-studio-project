@@ -16,8 +16,11 @@ class JobTemplateService(BaseApplicationService[JobTemplate, int]):
     """Service for managing job templates."""
 
     def __init__(self, repository: IJobTemplateRepository):
-        super().__init__(repository, "JobTemplate")
-        self._not_found_error_factory = JobTemplateNotFoundError
+        super().__init__(
+            repository,
+            "JobTemplate",
+            not_found_error_factory=lambda id: JobTemplateNotFoundError(template_id=int(id)),
+        )
 
     async def create_template(self, owner_id: int, data: dict) -> JobTemplate:
         """Create a new job template."""

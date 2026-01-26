@@ -1,16 +1,26 @@
 """Audit log repository interface."""
 
-from abc import abstractmethod
+from abc import ABC, abstractmethod
 from datetime import datetime
-
-from src.shared.domain import IRepository
 
 from ..entities import AuditLog
 from ..value_objects import OperationType, ResourceType
 
 
-class IAuditLogRepository(IRepository[AuditLog]):
+class IAuditLogRepository(ABC):
     """Repository interface for audit log operations."""
+
+    @abstractmethod
+    async def get_by_id(self, id: int) -> AuditLog | None:
+        """Get audit log by ID."""
+
+    @abstractmethod
+    async def get_all(self, limit: int = 100, offset: int = 0) -> list[AuditLog]:
+        """Get all audit logs with pagination."""
+
+    @abstractmethod
+    async def add(self, entity: AuditLog) -> AuditLog:
+        """Add new audit log entry."""
 
     @abstractmethod
     async def get_by_user_id(

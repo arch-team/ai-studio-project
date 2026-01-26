@@ -183,7 +183,7 @@ class ResourceLimitConfigService(BaseApplicationService[ResourceLimitConfig, int
             return True, None
 
         # 验证各项资源限制
-        errors = []
+        errors: list[str] = []
         validations = [
             (requested_gpu, config.max_gpu_per_job, "GPU"),
             (requested_cpu, config.max_cpu_per_job, "CPU"),

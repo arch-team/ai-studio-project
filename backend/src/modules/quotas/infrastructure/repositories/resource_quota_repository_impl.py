@@ -86,10 +86,11 @@ class ResourceQuotaRepository(PydanticRepository[ResourceQuota, ResourceQuotaMod
         stmt = stmt.offset(offset).limit(page_size)
 
         # Execute query
-        result = await self._session.execute(stmt)
-        models = result.scalars().all()
+        query_result = await self._session.execute(stmt)
+        models: list[ResourceQuotaModel] = list(query_result.scalars().all())
 
-        return [self._to_entity(m) for m in models], total
+        entities = [self._to_entity(m) for m in models]
+        return entities, int(total)
 
     async def soft_delete(self, quota_id: int) -> bool:
         """Soft delete a quota (set status to expired)."""

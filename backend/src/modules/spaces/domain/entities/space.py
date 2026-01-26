@@ -20,7 +20,7 @@ from ..value_objects import (
 class Space(PydanticEntity):
     """Development space domain entity for online IDE environments."""
 
-    id: str | None = None  # UUID
+    id: str | None = None  # type: ignore[assignment]  # UUID (Space uses str ID instead of int)
     space_name: str = Field(min_length=1, max_length=255)
     owner_id: int
 

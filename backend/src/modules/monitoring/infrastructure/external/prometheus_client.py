@@ -84,7 +84,7 @@ class PrometheusClient(IPrometheusClient):
     ) -> list[dict[str, Any]]:
         """执行范围查询."""
         url = f"{self._endpoint}/api/v1/query_range"
-        params = {
+        params: dict[str, str | float] = {
             "query": query,
             "start": start.timestamp(),
             "end": end.timestamp(),

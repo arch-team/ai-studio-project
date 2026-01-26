@@ -101,12 +101,20 @@ class TrainingMetricsService:
         # 转换指标类型为 Prometheus 指标名称
         prometheus_metric_names = [METRIC_TYPE_MAPPING.get(mt, f"training_{mt}") for mt in metric_types]
 
-        # 查询 Prometheus
+        # 查询 Prometheus (提供默认值以满足类型要求)
+        from datetime import timedelta
+
+        from src.shared.utils import utc_now
+
+        effective_start_time = start_time if start_time is not None else utc_now() - timedelta(hours=1)
+        effective_end_time = end_time if end_time is not None else utc_now()
+        effective_step = step if step is not None else "1m"
+
         raw_metrics = await self._prometheus.query_metrics(
             metric_names=prometheus_metric_names,
-            start_time=start_time,
-            end_time=end_time,
-            step=step,
+            start_time=effective_start_time,
+            end_time=effective_end_time,
+            step=effective_step,
         )
 
         # 转换结果

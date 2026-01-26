@@ -206,17 +206,18 @@ class TrainingJobService(BaseApplicationService[TrainingJob, int]):
 
         if job.is_terminal():
             raise InvalidStateTransitionError(
-                "TrainingJob",
-                job.status.value,
-                "update",
-                "Cannot update a completed or failed job",
+                entity_type="TrainingJob",
+                current_state=job.status.value,
+                target_state="update",
             )
 
         # Update allowed fields
         if "priority" in data and data["priority"] is not None:
             from src.shared.utils import EnumMapper
 
-            job.priority = EnumMapper.from_string(data["priority"], JobPriority, job.priority)
+            new_priority = EnumMapper.from_string(data["priority"], JobPriority, job.priority)
+            if new_priority is not None:
+                job.priority = new_priority
 
         if "description" in data:
             job.description = data["description"]

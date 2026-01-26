@@ -31,7 +31,12 @@ class QueryBuilder(Generic[ModelT]):
 
         try:
             mapper = inspect(self._model_class)
-            column = mapper.columns.get(column_name)
+            if not hasattr(mapper, "columns"):
+                return value
+            columns = getattr(mapper, "columns", None)
+            if columns is None:
+                return value
+            column = columns.get(column_name)
             if column is None:
                 return value
 

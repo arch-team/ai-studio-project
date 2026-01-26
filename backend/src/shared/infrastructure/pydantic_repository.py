@@ -1,6 +1,5 @@
 """Pydantic V2 优化的仓库基类 - 自动化 Entity ↔ Model 转换。"""
 
-from enum import Enum
 from typing import Any, Generic, TypeVar
 
 from sqlalchemy import func, select
@@ -163,9 +162,10 @@ class PydanticRepository(Generic[EntityT, ModelT, IdT]):
         if model is None:
             return False
 
-        model.deleted_at = utc_now()
+        # 使用 setattr 来设置属性，因为 TypeVar 无法推断具体属性
+        setattr(model, "deleted_at", utc_now())
         if hasattr(model, "updated_at"):
-            model.updated_at = utc_now()
+            setattr(model, "updated_at", utc_now())
 
         await self._session.flush()
         return True
@@ -191,7 +191,8 @@ class PydanticRepository(Generic[EntityT, ModelT, IdT]):
 
         # 应用软删除过滤
         if hasattr(self._model_class, "deleted_at"):
-            query = query.where(self._model_class.deleted_at.is_(None))
+            deleted_at_col = getattr(self._model_class, "deleted_at")
+            query = query.where(deleted_at_col.is_(None))
 
         result = await self._session.execute(query)
         count = result.scalar() or 0

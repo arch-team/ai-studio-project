@@ -149,7 +149,8 @@ class CheckpointMigrationService:
             return result
 
         # 迁移所有检查点 (保留最新 3 个)
-        for checkpoint in checkpoints[CHECKPOINT_MIGRATION_CONFIG["hot_retention_count"] :]:
+        hot_retention = int(CHECKPOINT_MIGRATION_CONFIG["hot_retention_count"])
+        for checkpoint in checkpoints[hot_retention:]:
             migration_result = await self.migrate_checkpoint(checkpoint, target_tier)
             if migration_result.success:
                 result.migrated_count += 1
@@ -176,7 +177,7 @@ class CheckpointMigrationService:
         Returns:
             SingleMigrationResult: 迁移结果
         """
-        max_retries = CHECKPOINT_MIGRATION_CONFIG["max_retry_count"]
+        max_retries = int(CHECKPOINT_MIGRATION_CONFIG["max_retry_count"])
         last_error = None
 
         for attempt in range(max_retries):
@@ -189,8 +190,10 @@ class CheckpointMigrationService:
                 )
 
                 # 验证迁移后的完整性
+                assert checkpoint.checksum is not None, "Checkpoint must have checksum for integrity verification"
                 is_valid = await self._storage.verify_integrity(new_path, checkpoint.checksum)
                 if not is_valid:
+                    assert checkpoint.id is not None, "Checkpoint must have ID"
                     raise CheckpointMigrationError(
                         checkpoint_id=checkpoint.id,
                         source_tier=checkpoint.storage_tier.value,
@@ -210,6 +213,7 @@ class CheckpointMigrationService:
                     target_tier=target_tier.value,
                 )
 
+                assert checkpoint.id is not None, "Checkpoint must have ID"
                 return SingleMigrationResult(
                     success=True,
                     checkpoint_id=checkpoint.id,
@@ -233,6 +237,7 @@ class CheckpointMigrationService:
         # 所有重试都失败
         await self._send_migration_failure_alert(checkpoint, target_tier, last_error)
 
+        assert checkpoint.id is not None, "Checkpoint must have ID"
         return SingleMigrationResult(
             success=False,
             checkpoint_id=checkpoint.id,
@@ -312,7 +317,8 @@ class CheckpointMigrationService:
             sorted_cps = sorted(cps, key=lambda x: x.created_at, reverse=True)
 
             # 迁移第 4 个及以后的
-            for cp in sorted_cps[CHECKPOINT_MIGRATION_CONFIG["hot_retention_count"] :]:
+            hot_retention_count = int(CHECKPOINT_MIGRATION_CONFIG["hot_retention_count"])
+            for cp in sorted_cps[hot_retention_count:]:
                 migration_result = await self.migrate_checkpoint(cp, StorageTier.FSX)
                 if migration_result.success:
                     result.migrated_count += 1
@@ -328,7 +334,7 @@ class CheckpointMigrationService:
         for cp in checkpoints:
             old_checkpoints = await self._checkpoint_repo.get_oldest_checkpoints(
                 cp.training_job_id,
-                hours_threshold=CHECKPOINT_MIGRATION_CONFIG["cold_age_threshold_hours"],
+                hours_threshold=int(CHECKPOINT_MIGRATION_CONFIG["cold_age_threshold_hours"]),
             )
 
             for old_cp in old_checkpoints:

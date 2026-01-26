@@ -142,7 +142,11 @@ class TrainingSyncService:
             None: 状态未变化
         """
         # 映射并验证状态
-        new_status = HYPERPOD_TO_PLATFORM_STATUS.get(hyperpod_response.get("status"))
+        hyperpod_status = hyperpod_response.get("status")
+        if hyperpod_status is None or not isinstance(hyperpod_status, str):
+            logger.warning("missing_hyperpod_status", response=hyperpod_response)
+            return False
+        new_status = HYPERPOD_TO_PLATFORM_STATUS.get(hyperpod_status)
         if new_status is None:
             logger.warning("unknown_hyperpod_status", status=hyperpod_response.get("status"))
             return False

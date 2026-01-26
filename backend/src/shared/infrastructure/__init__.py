@@ -1,7 +1,6 @@
 """Shared Infrastructure - Database, config, storage, and security utilities."""
 
 from .base_repository import BaseRepository
-from .pydantic_repository import PydanticRepository
 from .config import Settings, get_settings
 from .database import AsyncSessionLocal, Base, engine, get_db
 from .logging_config import (
@@ -12,6 +11,7 @@ from .logging_config import (
     unbind_context,
 )
 from .models import SoftDeleteMixin, TimestampMixin
+from .pydantic_repository import PydanticRepository
 from .query_builder import QueryBuilder
 from .storage import IStorageService, S3StorageClient
 
