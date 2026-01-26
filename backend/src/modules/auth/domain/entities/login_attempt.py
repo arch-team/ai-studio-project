@@ -1,23 +1,23 @@
 """LoginAttempt domain entity - Records login attempts for audit and security."""
 
-from dataclasses import dataclass, field
 from datetime import datetime
 
+from pydantic import Field
+
+from src.shared.domain import PydanticEntity
 from src.shared.utils import utc_now
 
 
-@dataclass
-class LoginAttempt:
+class LoginAttempt(PydanticEntity):
     """Login attempt domain entity for tracking authentication events."""
 
-    id: int | None
-    username: str
+    username: str = Field(min_length=1)
     ip_address: str
     success: bool
     user_id: int | None = None
     user_agent: str | None = None
     failure_reason: str | None = None
-    created_at: datetime = field(default_factory=utc_now)
+    created_at: datetime = Field(default_factory=utc_now)
 
     @classmethod
     def create_failed(

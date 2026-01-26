@@ -1,19 +1,17 @@
 """HyperPodCluster domain entity."""
 
-from dataclasses import dataclass, field
 from datetime import datetime
 
-from src.modules.monitoring.domain.value_objects import (
-    CLUSTER_STATUS_TRANSITIONS,
-    ClusterStatus,
-    HealthStatus,
-)
-from src.shared.domain import InvalidStateTransitionError
+from pydantic import Field
+
+from src.shared.domain import PydanticEntity
+from src.shared.domain.exceptions import InvalidStateTransitionError
 from src.shared.utils import utc_now
 
+from ..value_objects import CLUSTER_STATUS_TRANSITIONS, ClusterStatus, HealthStatus
 
-@dataclass
-class HyperPodCluster:
+
+class HyperPodCluster(PydanticEntity):
     """HyperPod 集群域实体.
 
     表示 AWS SageMaker HyperPod 集群的业务模型。
@@ -21,12 +19,11 @@ class HyperPodCluster:
     """
 
     # === 必填字段 ===
-    id: int
-    cluster_name: str
+    cluster_name: str = Field(min_length=1, max_length=255)
     cluster_arn: str
     region: str
     vpc_id: str
-    instance_groups: list[dict]
+    instance_groups: list[dict] = Field(default_factory=list)
     total_nodes: int
 
     # === 可选字段 ===
@@ -48,11 +45,9 @@ class HyperPodCluster:
     grafana_workspace_id: str | None = None
 
     # === 时间戳 ===
-    created_at: datetime = field(default_factory=utc_now)
-    updated_at: datetime = field(default_factory=utc_now)
     last_sync_at: datetime | None = None
 
-    # === 状态转换方法 ===
+    # ========== 状态转换方法 ==========
 
     def can_transition_to(self, new_status: ClusterStatus) -> bool:
         """检查是否可以转换到新状态."""
@@ -60,11 +55,7 @@ class HyperPodCluster:
         return new_status in valid_transitions
 
     def transition_to(self, new_status: ClusterStatus) -> None:
-        """转换到新状态.
-
-        Raises:
-            InvalidStateTransitionError: 无效状态转换
-        """
+        """转换到新状态."""
         if not self.can_transition_to(new_status):
             raise InvalidStateTransitionError(
                 entity_type="HyperPodCluster",
@@ -72,7 +63,7 @@ class HyperPodCluster:
                 target_state=new_status.value,
             )
         self.status = new_status
-        self.updated_at = utc_now()
+        self.touch()
 
     def activate(self) -> None:
         """激活集群 (creating/updating → active)."""
@@ -90,7 +81,7 @@ class HyperPodCluster:
         """开始删除集群 (active → deleting)."""
         self.transition_to(ClusterStatus.DELETING)
 
-    # === 资源利用率属性 ===
+    # ========== 资源利用率属性 ==========
 
     @property
     def used_nodes(self) -> int:
@@ -104,7 +95,7 @@ class HyperPodCluster:
             return 0.0
         return self.used_nodes / self.total_nodes
 
-    # === 状态检查方法 ===
+    # ========== 状态检查方法 ==========
 
     def is_active(self) -> bool:
         """检查集群是否活跃."""
@@ -122,12 +113,12 @@ class HyperPodCluster:
         """检查集群是否创建中."""
         return self.status == ClusterStatus.CREATING
 
-    # === 同步方法 ===
+    # ========== 同步方法 ==========
 
     def mark_synced(self) -> None:
         """标记已同步."""
         self.last_sync_at = utc_now()
-        self.updated_at = utc_now()
+        self.touch()
 
     def update_resources(
         self,
@@ -143,9 +134,9 @@ class HyperPodCluster:
         self.total_cpu_cores = total_cpu_cores
         self.total_gpu_count = total_gpu_count
         self.total_memory_gb = total_memory_gb
-        self.updated_at = utc_now()
+        self.touch()
 
     def update_health(self, health_status: HealthStatus) -> None:
         """更新健康状态."""
         self.health_status = health_status
-        self.updated_at = utc_now()
+        self.touch()

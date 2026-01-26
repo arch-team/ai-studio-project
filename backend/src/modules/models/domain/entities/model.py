@@ -1,21 +1,21 @@
 """Model domain entity for trained model management."""
 
-from dataclasses import dataclass, field
 from datetime import datetime
 
+from pydantic import Field
+
+from src.shared.domain import PydanticEntity
 from src.shared.domain.exceptions import InvalidStateTransitionError
 from src.shared.utils import utc_now
 
 from ..value_objects import MODEL_STATE_TRANSITIONS, ModelFramework, ModelStatus
 
 
-@dataclass
-class Model:
+class Model(PydanticEntity):
     """Model domain entity for trained models."""
 
     # === Required fields ===
-    id: int
-    model_name: str
+    model_name: str = Field(min_length=1, max_length=255)
     owner_id: int
 
     # === Version ===
@@ -53,10 +53,10 @@ class Model:
     tags: list[str] | None = None
 
     # === Audit fields ===
-    created_at: datetime = field(default_factory=utc_now)
-    updated_at: datetime = field(default_factory=utc_now)
     registered_at: datetime | None = None
     archived_at: datetime | None = None
+
+    # ========== 业务方法 ==========
 
     def can_transition_to(self, new_status: ModelStatus) -> bool:
         """Check if transition to new_status is valid."""
@@ -64,15 +64,11 @@ class Model:
         return new_status in valid_transitions
 
     def transition_to(self, new_status: ModelStatus) -> None:
-        """Transition to new status if valid.
-
-        Raises:
-            InvalidStateTransitionError: If transition is not allowed
-        """
+        """Transition to new status if valid."""
         if not self.can_transition_to(new_status):
             raise InvalidStateTransitionError("Model", self.status.value, new_status.value)
         self.status = new_status
-        self.updated_at = utc_now()
+        self.touch()
 
     def is_training(self) -> bool:
         """Check if model is currently training."""
@@ -99,32 +95,20 @@ class Model:
         return self.status == ModelStatus.REGISTERED
 
     def register(self) -> None:
-        """Register the model (transition from TRAINING to REGISTERED).
-
-        Raises:
-            InvalidStateTransitionError: If model cannot be registered
-        """
+        """Register the model (transition from TRAINING to REGISTERED)."""
         if self.status != ModelStatus.TRAINING:
             raise InvalidStateTransitionError("Model", self.status.value, ModelStatus.REGISTERED.value)
         self.transition_to(ModelStatus.REGISTERED)
         self.registered_at = utc_now()
 
     def deploy(self) -> None:
-        """Deploy the model.
-
-        Raises:
-            InvalidStateTransitionError: If model cannot be deployed
-        """
+        """Deploy the model."""
         if not self.can_deploy():
             raise InvalidStateTransitionError("Model", self.status.value, ModelStatus.DEPLOYED.value)
         self.transition_to(ModelStatus.DEPLOYED)
 
     def archive(self) -> None:
-        """Archive the model.
-
-        Raises:
-            InvalidStateTransitionError: If model cannot be archived
-        """
+        """Archive the model."""
         if not self.can_transition_to(ModelStatus.ARCHIVED):
             raise InvalidStateTransitionError("Model", self.status.value, ModelStatus.ARCHIVED.value)
         self.transition_to(ModelStatus.ARCHIVED)
@@ -137,7 +121,7 @@ class Model:
         else:
             # Force transition for TRAINING state
             self.status = ModelStatus.FAILED
-            self.updated_at = utc_now()
+            self.touch()
 
     @staticmethod
     def parse_version(version: str) -> int:
@@ -151,11 +135,7 @@ class Model:
         return f"v{num + 1}"
 
     def compare_version(self, other: "Model") -> int:
-        """Compare version with another model.
-
-        Returns:
-            -1 if self < other, 0 if equal, 1 if self > other
-        """
+        """Compare version with another model."""
         self_num = self.parse_version(self.version)
         other_num = self.parse_version(other.version)
         if self_num < other_num:

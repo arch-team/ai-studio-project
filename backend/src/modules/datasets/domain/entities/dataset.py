@@ -1,8 +1,10 @@
 """Dataset 领域实体 - 数据集管理核心业务对象。"""
 
-from dataclasses import dataclass, field
 from datetime import datetime
 
+from pydantic import Field
+
+from src.shared.domain import PydanticEntity
 from src.shared.domain.exceptions import InvalidStateTransitionError
 from src.shared.utils import utc_now
 
@@ -15,13 +17,11 @@ from ..value_objects import (
 )
 
 
-@dataclass
-class Dataset:
+class Dataset(PydanticEntity):
     """数据集领域实体。"""
 
     # === 必填字段 ===
-    id: int
-    name: str
+    name: str = Field(min_length=1, max_length=255)
     storage_type: DatasetStorageType
     storage_uri: str
     dataset_type: DatasetType
@@ -44,8 +44,6 @@ class Dataset:
     status: DatasetStatus = DatasetStatus.PREPARING
 
     # === 时间戳 ===
-    created_at: datetime = field(default_factory=utc_now)
-    updated_at: datetime = field(default_factory=utc_now)
     last_accessed_at: datetime | None = None
 
     # === 状态转换方法 ===
@@ -61,7 +59,7 @@ class Dataset:
             raise InvalidStateTransitionError("Dataset", self.status.value, new_status.value)
 
         self.status = new_status
-        self.updated_at = utc_now()
+        self.touch()
 
     # === 便捷状态转换方法 ===
 
@@ -120,4 +118,4 @@ class Dataset:
     def update_access_time(self) -> None:
         """更新最后访问时间。"""
         self.last_accessed_at = utc_now()
-        self.updated_at = utc_now()
+        self.touch()

@@ -1,8 +1,10 @@
 """Space domain entity - SageMaker Spaces for online development environments."""
 
-from dataclasses import dataclass, field
 from datetime import datetime
 
+from pydantic import Field
+
+from src.shared.domain import PydanticEntity
 from src.shared.domain.exceptions import InvalidStateTransitionError
 from src.shared.utils import utc_now
 
@@ -15,12 +17,11 @@ from ..value_objects import (
 )
 
 
-@dataclass
-class Space:
+class Space(PydanticEntity):
     """Development space domain entity for online IDE environments."""
 
-    id: str  # UUID
-    space_name: str
+    id: str | None = None  # UUID
+    space_name: str = Field(min_length=1, max_length=255)
     owner_id: int
 
     # Configuration
@@ -36,9 +37,9 @@ class Space:
     sagemaker_space_arn: str | None = None
 
     # Timestamps
-    created_at: datetime = field(default_factory=utc_now)
-    updated_at: datetime = field(default_factory=utc_now)
     deleted_at: datetime | None = None
+
+    # ========== 业务方法 ==========
 
     def can_transition_to(self, new_status: SpaceStatus) -> bool:
         """Check if transition to new_status is valid."""
@@ -46,15 +47,11 @@ class Space:
         return new_status in valid_transitions
 
     def transition_to(self, new_status: SpaceStatus) -> None:
-        """Transition to new status if valid.
-
-        Raises:
-            InvalidStateTransitionError: If transition is not allowed
-        """
+        """Transition to new status if valid."""
         if not self.can_transition_to(new_status):
             raise InvalidStateTransitionError("Space", self.status.value, new_status.value)
         self.status = new_status
-        self.updated_at = utc_now()
+        self.touch()
 
         if new_status == SpaceStatus.DELETED:
             self.deleted_at = utc_now()
@@ -102,10 +99,7 @@ class Space:
         return self.status == SpaceStatus.RUNNING
 
     def get_resource_requirements(self) -> dict[str, int]:
-        """Get resource requirements based on instance type.
-
-        Returns dict with cpu_cores, memory_gb, gpu_count.
-        """
+        """Get resource requirements based on instance type."""
         return INSTANCE_TYPE_RESOURCES.get(
             self.instance_type,
             {"cpu_cores": 4, "memory_gb": 16, "gpu_count": 1},
@@ -117,11 +111,7 @@ class Space:
         available_memory_gb: int,
         available_gpu: int,
     ) -> tuple[bool, str | None]:
-        """Validate space resource requirements against available quota.
-
-        Returns:
-            Tuple of (is_valid, error_message)
-        """
+        """Validate space resource requirements against available quota."""
         requirements = self.get_resource_requirements()
 
         if requirements["cpu_cores"] > available_cpu:

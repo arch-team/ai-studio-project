@@ -3,95 +3,48 @@
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.modules.datasets.domain.entities import Dataset
-from src.modules.datasets.domain.repositories import IDatasetRepository
-from src.modules.datasets.domain.value_objects import (
+from src.shared.infrastructure import PydanticRepository
+
+from ...domain.entities import Dataset
+from ...domain.repositories import IDatasetRepository
+from ...domain.value_objects import (
     DatasetStatus,
-    DatasetStorageType,
     DatasetType,
     DatasetVisibility,
 )
-from src.modules.datasets.infrastructure.models import DatasetModel
-from src.shared.infrastructure.base_repository import BaseRepository
+from ..models import DatasetModel
 
 
-class DatasetRepositoryImpl(
-    BaseRepository[Dataset, DatasetModel, int],
-    IDatasetRepository,
-):
-    """Dataset 仓库 SQLAlchemy 实现。"""
+class DatasetRepositoryImpl(PydanticRepository[Dataset, DatasetModel, int], IDatasetRepository):
+    """Dataset 仓库 SQLAlchemy 实现。
+
+    使用 PydanticRepository 自动处理 Entity ↔ Model 转换。
+    """
+
+    _entity_class = Dataset
+    _updatable_fields = [
+        "name",
+        "description",
+        "version",
+        "storage_type",
+        "storage_uri",
+        "total_size_bytes",
+        "file_count",
+        "dataset_type",
+        "data_format",
+        "tags",
+        "visibility",
+        "status",
+        "last_accessed_at",
+    ]
 
     def __init__(self, session: AsyncSession):
         super().__init__(session, DatasetModel)
 
-    def _to_entity(self, model: DatasetModel) -> Dataset:
-        """ORM 模型转换为领域实体。"""
-        return Dataset(
-            id=model.id,
-            name=model.name,
-            description=model.description,
-            version=model.version,
-            storage_type=DatasetStorageType(model.storage_type.value),
-            storage_uri=model.storage_uri,
-            total_size_bytes=model.total_size_bytes,
-            file_count=model.file_count,
-            dataset_type=DatasetType(model.dataset_type.value),
-            data_format=model.data_format,
-            tags=model.tags,
-            visibility=DatasetVisibility(model.visibility.value),
-            owner_id=model.owner_id,
-            status=DatasetStatus(model.status.value),
-            created_at=model.created_at,
-            updated_at=model.updated_at,
-            last_accessed_at=model.last_accessed_at,
-        )
-
-    def _to_model(self, entity: Dataset) -> DatasetModel:
-        """领域实体转换为 ORM 模型。"""
-        # 定义需要转换的字段映射
-        fields = [
-            "name",
-            "description",
-            "version",
-            "storage_type",
-            "storage_uri",
-            "total_size_bytes",
-            "file_count",
-            "dataset_type",
-            "data_format",
-            "tags",
-            "visibility",
-            "owner_id",
-            "status",
-            "last_accessed_at",
-        ]
-        return DatasetModel(**{field: getattr(entity, field) for field in fields})
-
-    def _update_model(self, model: DatasetModel, entity: Dataset) -> None:
-        """更新 ORM 模型字段。"""
-        # 定义需要更新的字段列表（不包括 owner_id，因为它不应该被更新）
-        fields = [
-            "name",
-            "description",
-            "version",
-            "storage_type",
-            "storage_uri",
-            "total_size_bytes",
-            "file_count",
-            "dataset_type",
-            "data_format",
-            "tags",
-            "visibility",
-            "status",
-            "last_accessed_at",
-        ]
-        for field in fields:
-            setattr(model, field, getattr(entity, field))
-
     # ========== IDatasetRepository 接口方法 ==========
 
     async def add(self, dataset: Dataset) -> Dataset:
-        """添加新数据集（委托给 BaseRepository.create）。"""
+        """添加新数据集（委托给 PydanticRepository.create）。"""
         return await self.create(dataset)
 
     # ========== 领域特定查询方法 ==========

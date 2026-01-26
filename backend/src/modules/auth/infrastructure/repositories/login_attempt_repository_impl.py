@@ -3,50 +3,23 @@
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.shared.infrastructure.base_repository import BaseRepository
+from src.shared.infrastructure import PydanticRepository
 
 from ...domain.entities import LoginAttempt
 from ...domain.repositories import ILoginAttemptRepository
 from ..models import LoginAttemptModel
 
 
-class LoginAttemptRepositoryImpl(BaseRepository[LoginAttempt, LoginAttemptModel, int], ILoginAttemptRepository):
+class LoginAttemptRepositoryImpl(PydanticRepository[LoginAttempt, LoginAttemptModel, int], ILoginAttemptRepository):
     """SQLAlchemy implementation of LoginAttempt repository."""
+
+    _entity_class = LoginAttempt
+    _updatable_fields: list[str] = []  # Immutable after creation
 
     def __init__(self, session: AsyncSession):
         super().__init__(session, LoginAttemptModel)
 
-    def _to_entity(self, model: LoginAttemptModel) -> LoginAttempt:
-        """Convert ORM model to domain entity."""
-        return LoginAttempt(
-            id=model.id,
-            user_id=model.user_id,
-            username=model.username,
-            ip_address=model.ip_address,
-            user_agent=model.user_agent,
-            success=model.success,
-            failure_reason=model.failure_reason,
-            created_at=model.created_at,
-        )
-
-    def _to_model(self, entity: LoginAttempt) -> LoginAttemptModel:
-        """Convert domain entity to ORM model."""
-        return LoginAttemptModel(
-            id=entity.id if entity.id else None,
-            user_id=entity.user_id,
-            username=entity.username,
-            ip_address=entity.ip_address,
-            user_agent=entity.user_agent,
-            success=entity.success,
-            failure_reason=entity.failure_reason,
-        )
-
-    def _update_model(self, model: LoginAttemptModel, entity: LoginAttempt) -> None:
-        """Update ORM model fields from entity.
-
-        LoginAttempt records are immutable after creation, so this is a no-op.
-        """
-        pass
+    # ========== ILoginAttemptRepository 接口方法 ==========
 
     async def add(self, attempt: LoginAttempt) -> LoginAttempt:
         """Create a new login attempt record."""

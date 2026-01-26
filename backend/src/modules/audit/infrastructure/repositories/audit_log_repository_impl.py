@@ -5,60 +5,27 @@ from datetime import datetime
 from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.modules.audit.domain.entities import AuditLog
-from src.modules.audit.domain.repositories import IAuditLogRepository
-from src.modules.audit.domain.value_objects import (
-    AuditStatus,
-    OperationType,
-    ResourceType,
-)
-from src.modules.audit.infrastructure.models import AuditLogModel
-from src.modules.audit.infrastructure.models import AuditStatus as ModelAuditStatus
-from src.modules.audit.infrastructure.models import OperationType as ModelOperationType
-from src.modules.audit.infrastructure.models import ResourceType as ModelResourceType
-from src.shared.infrastructure.base_repository import BaseRepository
+from src.shared.infrastructure import PydanticRepository
 from src.shared.utils import utc_now
 
+from ...domain.entities import AuditLog
+from ...domain.repositories import IAuditLogRepository
+from ...domain.value_objects import OperationType, ResourceType
+from ..models import AuditLogModel
+from ..models import OperationType as ModelOperationType
+from ..models import ResourceType as ModelResourceType
 
-class AuditLogRepositoryImpl(BaseRepository[AuditLog, AuditLogModel, int], IAuditLogRepository):
+
+class AuditLogRepositoryImpl(PydanticRepository[AuditLog, AuditLogModel, int], IAuditLogRepository):
     """SQLAlchemy implementation of audit log repository."""
+
+    _entity_class = AuditLog
+    _updatable_fields: list[str] = []  # Audit logs are immutable
 
     def __init__(self, session: AsyncSession):
         super().__init__(session, AuditLogModel)
 
-    def _to_entity(self, model: AuditLogModel) -> AuditLog:
-        """Convert ORM model to domain entity."""
-        return AuditLog(
-            id=model.id,
-            operation_type=OperationType(model.operation_type.value),
-            resource_type=ResourceType(model.resource_type.value),
-            status=AuditStatus(model.status.value),
-            user_id=model.user_id,
-            resource_id=model.resource_id,
-            request_data=model.request_data,
-            response_data=model.response_data,
-            ip_address=model.ip_address,
-            user_agent=model.user_agent,
-            created_at=model.created_at,
-            expires_at=model.expires_at,
-        )
-
-    def _to_model(self, entity: AuditLog) -> AuditLogModel:
-        """Convert domain entity to ORM model."""
-        return AuditLogModel(
-            id=entity.id if entity.id != 0 else None,
-            operation_type=ModelOperationType(entity.operation_type.value),
-            resource_type=ModelResourceType(entity.resource_type.value),
-            status=ModelAuditStatus(entity.status.value),
-            user_id=entity.user_id,
-            resource_id=entity.resource_id,
-            request_data=entity.request_data,
-            response_data=entity.response_data,
-            ip_address=entity.ip_address,
-            user_agent=entity.user_agent,
-            created_at=entity.created_at,
-            expires_at=entity.expires_at,
-        )
+    # ========== IAuditLogRepository 接口方法 ==========
 
     async def get_by_user_id(
         self,

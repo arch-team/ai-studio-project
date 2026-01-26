@@ -3,7 +3,7 @@
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.shared.infrastructure.base_repository import BaseRepository
+from src.shared.infrastructure import PydanticRepository
 
 from ...domain.entities import PasswordHistory
 from ...domain.repositories import IPasswordHistoryRepository
@@ -11,36 +11,17 @@ from ..models import PasswordHistoryModel
 
 
 class PasswordHistoryRepositoryImpl(
-    BaseRepository[PasswordHistory, PasswordHistoryModel, int], IPasswordHistoryRepository
+    PydanticRepository[PasswordHistory, PasswordHistoryModel, int], IPasswordHistoryRepository
 ):
     """SQLAlchemy implementation of PasswordHistory repository."""
+
+    _entity_class = PasswordHistory
+    _updatable_fields: list[str] = []  # Immutable after creation
 
     def __init__(self, session: AsyncSession):
         super().__init__(session, PasswordHistoryModel)
 
-    def _to_entity(self, model: PasswordHistoryModel) -> PasswordHistory:
-        """Convert ORM model to domain entity."""
-        return PasswordHistory(
-            id=model.id,
-            user_id=model.user_id,
-            password_hash=model.password_hash,
-            created_at=model.created_at,
-        )
-
-    def _to_model(self, entity: PasswordHistory) -> PasswordHistoryModel:
-        """Convert domain entity to ORM model."""
-        return PasswordHistoryModel(
-            id=entity.id if entity.id else None,
-            user_id=entity.user_id,
-            password_hash=entity.password_hash,
-        )
-
-    def _update_model(self, model: PasswordHistoryModel, entity: PasswordHistory) -> None:
-        """Update ORM model fields from entity.
-
-        PasswordHistory records are immutable after creation, so this is a no-op.
-        """
-        pass
+    # ========== IPasswordHistoryRepository 接口方法 ==========
 
     async def add(self, history: PasswordHistory) -> PasswordHistory:
         """Create a new password history entry."""
@@ -63,7 +44,6 @@ class PasswordHistoryRepositoryImpl(
 
     async def cleanup_old_entries(self, user_id: int, keep_count: int = 5) -> int:
         """Remove old password history entries, keeping only the most recent ones."""
-        # First, get IDs of entries to keep
         keep_query = (
             select(PasswordHistoryModel.id)
             .where(PasswordHistoryModel.user_id == user_id)
@@ -76,7 +56,6 @@ class PasswordHistoryRepositoryImpl(
         if not keep_ids:
             return 0
 
-        # Delete entries not in the keep list
         delete_query = delete(PasswordHistoryModel).where(
             PasswordHistoryModel.user_id == user_id,
             PasswordHistoryModel.id.not_in(keep_ids),

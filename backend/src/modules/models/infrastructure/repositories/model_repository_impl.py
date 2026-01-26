@@ -4,96 +4,46 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from src.modules.models.domain.entities import Model
-from src.modules.models.domain.repositories import IModelRepository
-from src.modules.models.domain.value_objects import ModelFramework, ModelStatus
-from src.modules.models.infrastructure.models import ModelModel
-from src.shared.infrastructure.base_repository import BaseRepository
+from src.shared.infrastructure import PydanticRepository
 from src.shared.utils import utc_now
 
+from ...domain.entities import Model
+from ...domain.repositories import IModelRepository
+from ...domain.value_objects import ModelFramework, ModelStatus
+from ..models import ModelModel
 
-class ModelRepository(BaseRepository[Model, ModelModel, int], IModelRepository):
+
+class ModelRepository(PydanticRepository[Model, ModelModel, int], IModelRepository):
     """SQLAlchemy implementation of model repository."""
+
+    _entity_class = Model
+    _updatable_fields = [
+        "model_name",
+        "owner_id",
+        "version",
+        "display_name",
+        "description",
+        "training_job_id",
+        "checkpoint_id",
+        "model_uri",
+        "registry_arn",
+        "registry_status",
+        "metrics",
+        "hyperparameters",
+        "framework",
+        "framework_version",
+        "status",
+        "size_bytes",
+        "model_format",
+        "tags",
+        "registered_at",
+        "archived_at",
+    ]
 
     def __init__(self, session: AsyncSession):
         super().__init__(session, ModelModel)
 
-    def _to_entity(self, model: ModelModel) -> Model:
-        """Convert ORM model to domain entity."""
-        return Model(
-            id=model.id,
-            model_name=model.model_name,
-            owner_id=model.owner_id,
-            version=model.version,
-            display_name=model.display_name,
-            description=model.description,
-            training_job_id=model.training_job_id,
-            checkpoint_id=model.checkpoint_id,
-            model_uri=model.model_uri,
-            registry_arn=model.registry_arn,
-            registry_status=model.registry_status,
-            metrics=model.metrics,
-            hyperparameters=model.hyperparameters,
-            framework=model.framework,
-            framework_version=model.framework_version,
-            status=model.status,
-            size_bytes=model.size_bytes,
-            model_format=model.model_format,
-            tags=model.tags,
-            created_at=model.created_at,
-            updated_at=model.updated_at,
-            registered_at=model.registered_at,
-            archived_at=model.archived_at,
-        )
-
-    def _to_model(self, entity: Model) -> ModelModel:
-        """Convert domain entity to ORM model."""
-        return ModelModel(
-            id=entity.id if entity.id else None,
-            model_name=entity.model_name,
-            owner_id=entity.owner_id,
-            version=entity.version,
-            display_name=entity.display_name,
-            description=entity.description,
-            training_job_id=entity.training_job_id,
-            checkpoint_id=entity.checkpoint_id,
-            model_uri=entity.model_uri,
-            registry_arn=entity.registry_arn,
-            registry_status=entity.registry_status,
-            metrics=entity.metrics,
-            hyperparameters=entity.hyperparameters,
-            framework=entity.framework,
-            framework_version=entity.framework_version,
-            status=entity.status,
-            size_bytes=entity.size_bytes,
-            model_format=entity.model_format,
-            tags=entity.tags,
-            registered_at=entity.registered_at,
-            archived_at=entity.archived_at,
-        )
-
-    def _update_model(self, model: ModelModel, entity: Model) -> None:
-        """Update ORM model fields from entity."""
-        model.model_name = entity.model_name
-        model.owner_id = entity.owner_id
-        model.version = entity.version
-        model.display_name = entity.display_name
-        model.description = entity.description
-        model.training_job_id = entity.training_job_id
-        model.checkpoint_id = entity.checkpoint_id
-        model.model_uri = entity.model_uri
-        model.registry_arn = entity.registry_arn
-        model.registry_status = entity.registry_status
-        model.metrics = entity.metrics
-        model.hyperparameters = entity.hyperparameters
-        model.framework = entity.framework
-        model.framework_version = entity.framework_version
-        model.status = entity.status
-        model.size_bytes = entity.size_bytes
-        model.model_format = entity.model_format
-        model.tags = entity.tags
-        model.registered_at = entity.registered_at
-        model.archived_at = entity.archived_at
+    # ========== IModelRepository 接口方法 ==========
 
     async def get_by_id(self, model_id: int) -> Model | None:
         """Get model by ID with owner preloaded."""
@@ -101,9 +51,7 @@ class ModelRepository(BaseRepository[Model, ModelModel, int], IModelRepository):
             select(ModelModel).options(selectinload(ModelModel.owner)).where(ModelModel.id == model_id)
         )
         model = result.scalar_one_or_none()
-        if model is None:
-            return None
-        return self._to_entity(model)
+        return self._to_entity(model) if model else None
 
     async def get_by_name_and_version(self, model_name: str, version: str) -> Model | None:
         """Get model by name and version."""
@@ -113,9 +61,7 @@ class ModelRepository(BaseRepository[Model, ModelModel, int], IModelRepository):
             .where(ModelModel.model_name == model_name, ModelModel.version == version)
         )
         model = result.scalar_one_or_none()
-        if model is None:
-            return None
-        return self._to_entity(model)
+        return self._to_entity(model) if model else None
 
     async def get_latest_version(self, model_name: str) -> Model | None:
         """Get the latest version of a model by name."""
@@ -127,9 +73,7 @@ class ModelRepository(BaseRepository[Model, ModelModel, int], IModelRepository):
             .limit(1)
         )
         model = result.scalar_one_or_none()
-        if model is None:
-            return None
-        return self._to_entity(model)
+        return self._to_entity(model) if model else None
 
     async def list_models(
         self,
@@ -143,7 +87,6 @@ class ModelRepository(BaseRepository[Model, ModelModel, int], IModelRepository):
         sort_order: str = "desc",
     ) -> tuple[list[Model], int]:
         """List models with pagination and filters."""
-        # Build base query
         query = select(ModelModel).options(selectinload(ModelModel.owner))
         count_query = select(func.count(ModelModel.id))
 
@@ -157,7 +100,6 @@ class ModelRepository(BaseRepository[Model, ModelModel, int], IModelRepository):
             count_query = count_query.where(ModelModel.training_job_id == training_job_id)
 
         if status is not None:
-            # Handle both string and enum
             if isinstance(status, str):
                 status_enum = ModelStatus[status.upper()]
             else:
@@ -166,7 +108,6 @@ class ModelRepository(BaseRepository[Model, ModelModel, int], IModelRepository):
             count_query = count_query.where(ModelModel.status == status_enum)
 
         if framework is not None:
-            # Handle both string and enum
             if isinstance(framework, str):
                 framework_enum = ModelFramework[framework.upper()]
             else:

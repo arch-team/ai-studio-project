@@ -3,64 +3,36 @@
 from sqlalchemy import and_, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.modules.quotas.domain.entities import ResourceLimitConfig
-from src.modules.quotas.domain.repositories import IResourceLimitConfigRepository
-from src.modules.quotas.domain.value_objects import LimitRole, PriorityDefault
-from src.modules.quotas.infrastructure.models import ResourceLimitConfigModel
-from src.shared.infrastructure.base_repository import BaseRepository
+from src.shared.infrastructure import PydanticRepository
+
+from ...domain.entities import ResourceLimitConfig
+from ...domain.repositories import IResourceLimitConfigRepository
+from ...domain.value_objects import LimitRole
+from ..models import ResourceLimitConfigModel
 
 
 class ResourceLimitConfigRepository(
-    BaseRepository[ResourceLimitConfig, ResourceLimitConfigModel, int], IResourceLimitConfigRepository
+    PydanticRepository[ResourceLimitConfig, ResourceLimitConfigModel, int], IResourceLimitConfigRepository
 ):
     """SQLAlchemy implementation of ResourceLimitConfig repository."""
+
+    _entity_class = ResourceLimitConfig
+    _updatable_fields = [
+        "config_name",
+        "role",
+        "project_id",
+        "max_gpu_per_job",
+        "max_cpu_per_job",
+        "max_memory_gb_per_job",
+        "max_storage_gb_per_job",
+        "max_nodes_per_job",
+        "priority_default",
+    ]
 
     def __init__(self, session: AsyncSession):
         super().__init__(session, ResourceLimitConfigModel)
 
-    def _to_entity(self, model: ResourceLimitConfigModel) -> ResourceLimitConfig:
-        """Convert ORM model to domain entity."""
-        return ResourceLimitConfig(
-            id=model.id,
-            config_name=model.config_name,
-            role=LimitRole(model.role.value),
-            project_id=model.project_id,
-            max_gpu_per_job=model.max_gpu_per_job,
-            max_cpu_per_job=model.max_cpu_per_job,
-            max_memory_gb_per_job=model.max_memory_gb_per_job,
-            max_storage_gb_per_job=model.max_storage_gb_per_job,
-            max_nodes_per_job=model.max_nodes_per_job,
-            priority_default=PriorityDefault(model.priority_default.value),
-            created_at=model.created_at,
-            updated_at=model.updated_at,
-        )
-
-    def _to_model(self, entity: ResourceLimitConfig) -> ResourceLimitConfigModel:
-        """Convert domain entity to ORM model."""
-        return ResourceLimitConfigModel(
-            id=entity.id if entity.id else None,
-            config_name=entity.config_name,
-            role=LimitRole(entity.role.value),
-            project_id=entity.project_id,
-            max_gpu_per_job=entity.max_gpu_per_job,
-            max_cpu_per_job=entity.max_cpu_per_job,
-            max_memory_gb_per_job=entity.max_memory_gb_per_job,
-            max_storage_gb_per_job=entity.max_storage_gb_per_job,
-            max_nodes_per_job=entity.max_nodes_per_job,
-            priority_default=PriorityDefault(entity.priority_default.value),
-        )
-
-    def _update_model(self, model: ResourceLimitConfigModel, entity: ResourceLimitConfig) -> None:
-        """Update ORM model fields from entity."""
-        model.config_name = entity.config_name
-        model.role = LimitRole(entity.role.value)
-        model.project_id = entity.project_id
-        model.max_gpu_per_job = entity.max_gpu_per_job
-        model.max_cpu_per_job = entity.max_cpu_per_job
-        model.max_memory_gb_per_job = entity.max_memory_gb_per_job
-        model.max_storage_gb_per_job = entity.max_storage_gb_per_job
-        model.max_nodes_per_job = entity.max_nodes_per_job
-        model.priority_default = PriorityDefault(entity.priority_default.value)
+    # ========== IResourceLimitConfigRepository 接口方法 ==========
 
     async def get_by_role_and_project(self, role: LimitRole, project_id: int | None) -> ResourceLimitConfig | None:
         """Get config by role and project combination."""
@@ -81,9 +53,7 @@ class ResourceLimitConfigRepository(
 
         result = await self._session.execute(query)
         model = result.scalar_one_or_none()
-        if model is None:
-            return None
-        return self._to_entity(model)
+        return self._to_entity(model) if model else None
 
     async def list_configs(
         self,
@@ -107,13 +77,11 @@ class ResourceLimitConfigRepository(
         # Apply project filter
         if project_id is not None:
             if include_global:
-                # Include both project-specific and global configs
                 project_condition = or_(
                     ResourceLimitConfigModel.project_id == project_id,
                     ResourceLimitConfigModel.project_id.is_(None),
                 )
             else:
-                # Only project-specific
                 project_condition = ResourceLimitConfigModel.project_id == project_id
             query = query.where(project_condition)
             count_query = count_query.where(project_condition)

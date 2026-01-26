@@ -98,6 +98,7 @@ def mock_training_job_model() -> MagicMock:
     model.checkpoint_interval = None
     model.auto_resume_checkpoint_id = None
     model.hyperpod_status = None
+    model.hyperpod_job_arn = None
     model.kueue_workload_name = None
     model.kueue_status = None
     model.total_pods = None
@@ -119,14 +120,13 @@ def mock_training_job_model() -> MagicMock:
     model.created_at = datetime.utcnow()
     model.updated_at = datetime.utcnow()
 
-    # Mock enum values
-    model.distribution_strategy = MagicMock()
-    model.distribution_strategy.value = "DDP"
-    model.priority = MagicMock()
-    model.priority.value = "MEDIUM"
-    model.status = MagicMock()
-    model.status.value = "SUBMITTED"
+    # Use real enum values for Pydantic validation
+    model.distribution_strategy = DistributionStrategy.DDP
+    model.priority = JobPriority.MEDIUM
+    model.status = JobStatus.SUBMITTED
     model.spot_interruption_behavior = None
+    model.mixed_precision = True
+    model.use_spot_instances = False
 
     return model
 

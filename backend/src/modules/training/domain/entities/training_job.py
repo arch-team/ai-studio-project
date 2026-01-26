@@ -1,9 +1,11 @@
 """TrainingJob domain entity for distributed training task management."""
 
-from dataclasses import dataclass, field
 from datetime import datetime
 from decimal import Decimal
 
+from pydantic import Field
+
+from src.shared.domain import PydanticEntity
 from src.shared.domain.exceptions import InvalidStateTransitionError
 from src.shared.utils import utc_now
 
@@ -16,13 +18,11 @@ from ..value_objects import (
 from ..value_objects.job_status import TRAINING_JOB_STATE_TRANSITIONS
 
 
-@dataclass
-class TrainingJob:
+class TrainingJob(PydanticEntity):
     """Training job domain entity for distributed training tasks."""
 
     # === Required fields ===
-    id: int
-    job_name: str
+    job_name: str = Field(min_length=1, max_length=255)
     owner_id: int
     image_uri: str
     instance_type: str
@@ -96,9 +96,7 @@ class TrainingJob:
     error_message: str | None = None
     failure_reason: str | None = None
 
-    # === Audit fields ===
-    created_at: datetime = field(default_factory=utc_now)
-    updated_at: datetime = field(default_factory=utc_now)
+    # ========== 状态转换方法 ==========
 
     def can_transition_to(self, new_status: JobStatus) -> bool:
         """Check if transition to new_status is valid."""
@@ -119,13 +117,15 @@ class TrainingJob:
             self.preemption_count += 1
 
         self.status = new_status
-        self.updated_at = utc_now()
+        self.touch()
 
         # Set timestamps based on status
         if new_status == JobStatus.RUNNING and self.started_at is None:
             self.started_at = utc_now()
         elif new_status in (JobStatus.COMPLETED, JobStatus.FAILED):
             self.completed_at = utc_now()
+
+    # ========== 状态查询方法 ==========
 
     def is_running(self) -> bool:
         """Check if job is currently running."""
@@ -142,6 +142,8 @@ class TrainingJob:
     def can_resume(self) -> bool:
         """Check if job can be resumed."""
         return self.status in (JobStatus.PAUSED, JobStatus.PREEMPTED)
+
+    # ========== 状态操作方法 ==========
 
     def pause(self) -> None:
         """Pause the training job."""

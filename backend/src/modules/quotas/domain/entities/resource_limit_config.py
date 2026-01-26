@@ -1,15 +1,13 @@
 """ResourceLimitConfig domain entity - Per-job resource limits by role."""
 
-from dataclasses import dataclass, field
-from datetime import datetime
+from pydantic import Field
 
-from src.shared.utils import utc_now
+from src.shared.domain import PydanticEntity
 
 from ..value_objects import LimitRole, PriorityDefault
 
 
-@dataclass
-class ResourceLimitConfig:
+class ResourceLimitConfig(PydanticEntity):
     """Resource limit configuration per role and optionally per project.
 
     Defines maximum resource limits per job for different user roles.
@@ -17,8 +15,7 @@ class ResourceLimitConfig:
     Project-specific configs override global configs.
     """
 
-    id: int
-    config_name: str
+    config_name: str = Field(min_length=1, max_length=255)
     role: LimitRole
 
     # Project scope (None = global config)
@@ -34,9 +31,7 @@ class ResourceLimitConfig:
     # Default priority
     priority_default: PriorityDefault = PriorityDefault.MEDIUM
 
-    # Audit fields
-    created_at: datetime = field(default_factory=utc_now)
-    updated_at: datetime = field(default_factory=utc_now)
+    # ========== 业务方法 ==========
 
     def is_global_config(self) -> bool:
         """Check if this is a global (not project-specific) config."""
@@ -50,11 +45,7 @@ class ResourceLimitConfig:
         storage_gb: int,
         node_count: int,
     ) -> tuple[bool, str | None]:
-        """Validate job resources against limits.
-
-        Returns:
-            Tuple of (is_valid, error_message)
-        """
+        """Validate job resources against limits."""
         if gpu_count > self.max_gpu_per_job:
             return False, f"GPU count {gpu_count} exceeds limit {self.max_gpu_per_job}"
 
@@ -87,10 +78,7 @@ class ResourceLimitConfig:
 
     @staticmethod
     def get_default_for_role(role: LimitRole) -> "ResourceLimitConfig":
-        """Get default resource limits for a given role.
-
-        Factory method returning sensible defaults based on role hierarchy.
-        """
+        """Get default resource limits for a given role."""
         defaults = {
             LimitRole.ADMIN: {
                 "max_gpu_per_job": 64,

@@ -1,9 +1,11 @@
 """Checkpoint domain entity for training checkpoint management."""
 
-from dataclasses import dataclass, field
 from datetime import datetime
 from decimal import Decimal
 
+from pydantic import Field
+
+from src.shared.domain import PydanticEntity
 from src.shared.domain.exceptions import InvalidStateTransitionError
 from src.shared.utils import utc_now
 
@@ -16,14 +18,12 @@ from ..value_objects import (
 from ..value_objects.checkpoint_enums import STORAGE_TIER_HIERARCHY
 
 
-@dataclass
-class Checkpoint:
+class Checkpoint(PydanticEntity):
     """Checkpoint domain entity for training checkpoints."""
 
     # === Required fields ===
-    id: int
     training_job_id: int
-    checkpoint_name: str
+    checkpoint_name: str = Field(min_length=1, max_length=255)
     storage_path: str
     size_bytes: int
 
@@ -46,10 +46,10 @@ class Checkpoint:
     status: CheckpointStatus = CheckpointStatus.AVAILABLE
 
     # === Audit fields ===
-    created_at: datetime = field(default_factory=utc_now)
-    updated_at: datetime = field(default_factory=utc_now)
     archived_at: datetime | None = None
     deleted_at: datetime | None = None
+
+    # ========== 业务方法 ==========
 
     def can_migrate_to(self, target_tier: StorageTier) -> bool:
         """Check if migration to target tier is valid."""
@@ -57,15 +57,11 @@ class Checkpoint:
         return target_tier in valid_targets
 
     def migrate_to(self, target_tier: StorageTier) -> None:
-        """Migrate to target storage tier.
-
-        Raises:
-            InvalidStateTransitionError: If migration is not allowed
-        """
+        """Migrate to target storage tier."""
         if not self.can_migrate_to(target_tier):
             raise InvalidStateTransitionError("Checkpoint.storage_tier", self.storage_tier.value, target_tier.value)
         self.storage_tier = target_tier
-        self.updated_at = utc_now()
+        self.touch()
 
     def get_next_tier(self) -> StorageTier | None:
         """Get the next tier in the hierarchy."""
@@ -93,28 +89,20 @@ class Checkpoint:
         return self.status != CheckpointStatus.DELETED
 
     def archive(self) -> None:
-        """Archive the checkpoint.
-
-        Raises:
-            InvalidStateTransitionError: If checkpoint cannot be archived
-        """
+        """Archive the checkpoint."""
         if not self.can_archive():
             raise InvalidStateTransitionError("Checkpoint", self.status.value, CheckpointStatus.ARCHIVED.value)
         self.status = CheckpointStatus.ARCHIVED
         self.archived_at = utc_now()
-        self.updated_at = utc_now()
+        self.touch()
 
     def soft_delete(self) -> None:
-        """Soft delete the checkpoint.
-
-        Raises:
-            InvalidStateTransitionError: If checkpoint cannot be deleted
-        """
+        """Soft delete the checkpoint."""
         if not self.can_delete():
             raise InvalidStateTransitionError("Checkpoint", self.status.value, CheckpointStatus.DELETED.value)
         self.status = CheckpointStatus.DELETED
         self.deleted_at = utc_now()
-        self.updated_at = utc_now()
+        self.touch()
 
     def verify_integrity(self, calculated_checksum: str) -> bool:
         """Verify checkpoint integrity against stored checksum."""

@@ -3,60 +3,34 @@
 from sqlalchemy import and_, func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.modules.training.domain.entities import JobTemplate
-from src.modules.training.domain.repositories import IJobTemplateRepository
-from src.modules.training.domain.value_objects import TemplateVisibility
-from src.modules.training.infrastructure.models import JobTemplateModel
-from src.shared.infrastructure.base_repository import BaseRepository
+from src.shared.infrastructure import PydanticRepository
 from src.shared.utils import utc_now
+
+from ...domain.entities import JobTemplate
+from ...domain.repositories import IJobTemplateRepository
+from ...domain.value_objects import TemplateVisibility
+from ..models import JobTemplateModel
 
 
 class JobTemplateRepository(
-    BaseRepository[JobTemplate, JobTemplateModel, int],
+    PydanticRepository[JobTemplate, JobTemplateModel, int],
     IJobTemplateRepository,
 ):
     """SQLAlchemy implementation of JobTemplate repository."""
 
+    _entity_class = JobTemplate
+    _updatable_fields = [
+        "name",
+        "description",
+        "visibility",
+        "training_config",
+        "usage_count",
+        "last_used_at",
+        "deleted_at",
+    ]
+
     def __init__(self, session: AsyncSession):
         super().__init__(session, JobTemplateModel)
-
-    def _to_entity(self, model: JobTemplateModel) -> JobTemplate:
-        """Convert ORM model to domain entity."""
-        return JobTemplate(
-            id=model.id,
-            name=model.name,
-            owner_id=model.owner_id,
-            training_config=model.training_config,
-            description=model.description,
-            visibility=TemplateVisibility(model.visibility.value),
-            usage_count=model.usage_count,
-            last_used_at=model.last_used_at,
-            created_at=model.created_at,
-            updated_at=model.updated_at,
-            deleted_at=model.deleted_at,
-        )
-
-    def _to_model(self, entity: JobTemplate) -> JobTemplateModel:
-        """Convert domain entity to ORM model."""
-        return JobTemplateModel(
-            name=entity.name,
-            owner_id=entity.owner_id,
-            training_config=entity.training_config,
-            description=entity.description,
-            visibility=entity.visibility,
-            usage_count=entity.usage_count,
-            last_used_at=entity.last_used_at,
-        )
-
-    def _update_model(self, model: JobTemplateModel, entity: JobTemplate) -> None:
-        """Update ORM model fields from entity."""
-        model.name = entity.name
-        model.description = entity.description
-        model.visibility = entity.visibility
-        model.training_config = entity.training_config
-        model.usage_count = entity.usage_count
-        model.last_used_at = entity.last_used_at
-        model.deleted_at = entity.deleted_at
 
     # ========== Override get_by_id to exclude soft deleted ==========
 
@@ -71,11 +45,9 @@ class JobTemplateRepository(
             )
         )
         model = result.scalar_one_or_none()
-        if model is None:
-            return None
-        return self._to_entity(model)
+        return self._to_entity(model) if model else None
 
-    # ========== Domain-specific queries ==========
+    # ========== IJobTemplateRepository 接口方法 ==========
 
     async def list_templates(
         self,
@@ -142,7 +114,6 @@ class JobTemplateRepository(
         sort_order: str = "desc",
     ) -> tuple[list[JobTemplate], int]:
         """List templates visible to a user (own + public)."""
-        # User can see: their own templates OR public templates
         visibility_condition = or_(
             JobTemplateModel.owner_id == user_id,
             JobTemplateModel.visibility == TemplateVisibility.PUBLIC,

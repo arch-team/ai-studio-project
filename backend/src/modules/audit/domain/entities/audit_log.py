@@ -1,9 +1,11 @@
 """AuditLog domain entity - Audit trail for platform operations."""
 
-from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from typing import Any
 
+from pydantic import Field, model_validator
+
+from src.shared.domain import PydanticEntity
 from src.shared.utils import utc_now
 
 from ..value_objects import AuditStatus, OperationType, ResourceType
@@ -12,14 +14,9 @@ from ..value_objects import AuditStatus, OperationType, ResourceType
 AUDIT_LOG_RETENTION_DAYS = 90
 
 
-@dataclass
-class AuditLog:
-    """Audit log domain entity for tracking platform operations.
+class AuditLog(PydanticEntity):
+    """Audit log domain entity for tracking platform operations."""
 
-    Automatically sets expiration date based on retention policy.
-    """
-
-    id: int
     operation_type: OperationType
     resource_type: ResourceType
     status: AuditStatus = AuditStatus.SUCCESS
@@ -37,30 +34,36 @@ class AuditLog:
     user_agent: str | None = None
 
     # Timestamps
-    created_at: datetime = field(default_factory=utc_now)
-    expires_at: datetime = field(default=None)  # type: ignore
+    created_at: datetime = Field(default_factory=utc_now)
+    expires_at: datetime | None = None
 
-    def __post_init__(self) -> None:
+    @model_validator(mode="after")
+    def set_expires_at(self) -> "AuditLog":
         """Set expires_at if not provided."""
         if self.expires_at is None:
-            self.expires_at = self.created_at + timedelta(days=AUDIT_LOG_RETENTION_DAYS)
+            object.__setattr__(self, "expires_at", self.created_at + timedelta(days=AUDIT_LOG_RETENTION_DAYS))
+        return self
+
+    # ========== 业务方法 ==========
 
     def is_expired(self) -> bool:
         """Check if audit log has expired."""
-        return utc_now() > self.expires_at
+        return self.expires_at is not None and utc_now() > self.expires_at
 
     def days_until_expiration(self) -> int:
         """Get number of days until expiration."""
+        if self.expires_at is None:
+            return 0
         delta = self.expires_at - utc_now()
         return max(0, delta.days)
 
     def mark_as_failed(self, error_message: str | None = None) -> None:
         """Mark operation as failed with optional error message."""
         self.status = AuditStatus.FAILED
-        if error_message and self.response_data is None:
-            self.response_data = {}
         if error_message:
-            self.response_data["error"] = error_message  # type: ignore
+            if self.response_data is None:
+                self.response_data = {}
+            self.response_data["error"] = error_message
 
     @staticmethod
     def create_login_log(
@@ -117,5 +120,5 @@ class AuditLog:
             "ip_address": self.ip_address,
             "user_agent": self.user_agent,
             "created_at": self.created_at.isoformat(),
-            "expires_at": self.expires_at.isoformat(),
+            "expires_at": self.expires_at.isoformat() if self.expires_at else None,
         }

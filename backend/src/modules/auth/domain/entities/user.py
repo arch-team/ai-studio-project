@@ -1,36 +1,41 @@
 """User domain entity - Core business object for platform users."""
 
-from dataclasses import dataclass, field
 from datetime import datetime
 
+from pydantic import Field
+
+from src.shared.domain import PydanticEntity
 from src.shared.utils import utc_now
 
 from ..value_objects import AuthType, UserRole, UserStatus
 
 
-@dataclass
-class User:
+class User(PydanticEntity):
     """User domain entity representing a platform user."""
 
-    id: int
-    username: str
+    # 身份信息
+    username: str = Field(min_length=1, max_length=64)
     email: str
     status: UserStatus = UserStatus.ACTIVE
     role: UserRole = UserRole.ENGINEER
     display_name: str | None = None
-    iam_identity_id: str | None = None
-    iam_groups: list[str] = field(default_factory=list)
-    resource_quota_id: int | None = None
-    last_login_at: datetime | None = None
-    created_at: datetime = field(default_factory=utc_now)
-    updated_at: datetime = field(default_factory=utc_now)
 
-    # Authentication fields (for local accounts)
+    # IAM 集成
+    iam_identity_id: str | None = None
+    iam_groups: list[str] = Field(default_factory=list)
+    resource_quota_id: int | None = None
+
+    # 登录信息
+    last_login_at: datetime | None = None
+
+    # 认证字段（本地账户）
     auth_type: AuthType = AuthType.SSO
     password_hash: str | None = None
     password_expires_at: datetime | None = None
     locked_until: datetime | None = None
     failed_login_count: int = 0
+
+    # ========== 业务方法 ==========
 
     def is_active(self) -> bool:
         """Check if user account is active."""
@@ -55,17 +60,17 @@ class User:
     def suspend(self) -> None:
         """Suspend user account."""
         self.status = UserStatus.SUSPENDED
-        self.updated_at = utc_now()
+        self.touch()
 
     def activate(self) -> None:
         """Activate user account."""
         self.status = UserStatus.ACTIVE
-        self.updated_at = utc_now()
+        self.touch()
 
     def record_login(self) -> None:
         """Record user login timestamp."""
         self.last_login_at = utc_now()
-        self.updated_at = utc_now()
+        self.touch()
 
     def is_locked(self) -> bool:
         """Check if account is currently locked."""
@@ -82,18 +87,18 @@ class User:
     def record_failed_login(self) -> None:
         """Record a failed login attempt."""
         self.failed_login_count += 1
-        self.updated_at = utc_now()
+        self.touch()
 
     def lock_account(self, until: datetime) -> None:
         """Lock the account until specified time."""
         self.locked_until = until
-        self.updated_at = utc_now()
+        self.touch()
 
     def reset_login_failures(self) -> None:
         """Reset failed login count and unlock account."""
         self.failed_login_count = 0
         self.locked_until = None
-        self.updated_at = utc_now()
+        self.touch()
 
     def update_password(self, password_hash: str, expires_at: datetime) -> None:
         """Update password hash and expiration."""
@@ -101,4 +106,4 @@ class User:
         self.password_expires_at = expires_at
         self.failed_login_count = 0
         self.locked_until = None
-        self.updated_at = utc_now()
+        self.touch()

@@ -1,6 +1,7 @@
 """Shared Infrastructure - Database, config, storage, and security utilities."""
 
 from .base_repository import BaseRepository
+from .pydantic_repository import PydanticRepository
 from .config import Settings, get_settings
 from .database import AsyncSessionLocal, Base, engine, get_db
 from .logging_config import (
@@ -36,6 +37,7 @@ __all__ = [
     "QueryBuilder",
     # Repository
     "BaseRepository",
+    "PydanticRepository",
     # Storage
     "IStorageService",
     "S3StorageClient",

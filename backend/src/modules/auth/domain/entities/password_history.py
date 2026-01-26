@@ -1,19 +1,19 @@
 """PasswordHistory domain entity - Tracks password changes for security compliance."""
 
-from dataclasses import dataclass, field
 from datetime import datetime
 
+from pydantic import Field
+
+from src.shared.domain import PydanticEntity
 from src.shared.utils import utc_now
 
 
-@dataclass
-class PasswordHistory:
+class PasswordHistory(PydanticEntity):
     """Password history domain entity for tracking password changes."""
 
-    id: int | None
     user_id: int
-    password_hash: str
-    created_at: datetime = field(default_factory=utc_now)
+    password_hash: str = Field(min_length=1)
+    created_at: datetime = Field(default_factory=utc_now)
 
     @classmethod
     def create(cls, user_id: int, password_hash: str) -> "PasswordHistory":

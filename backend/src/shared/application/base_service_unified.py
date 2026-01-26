@@ -33,7 +33,14 @@ class BaseApplicationService(Generic[T, ID]):
     - 减少样板代码
     - 一致的错误处理
     - 可重用的验证模式
+
+    子类可通过以下方式自定义未找到错误：
+    1. 类属性: _not_found_error_factory = CustomNotFoundError
+    2. 构造函数参数: super().__init__(repo, "Entity", CustomNotFoundError)
     """
+
+    # 默认使用通用的 EntityNotFoundError，子类可覆盖
+    _not_found_error_factory: Callable[[str], Exception] | None = None
 
     def __init__(
         self,
@@ -50,7 +57,9 @@ class BaseApplicationService(Generic[T, ID]):
         """
         self._repository = repository
         self._entity_type = entity_type
-        self._not_found_error_factory = not_found_error_factory
+        # 只有在传入参数时才覆盖类属性，保持子类可通过类属性定义 error factory
+        if not_found_error_factory is not None:
+            self._not_found_error_factory = not_found_error_factory
 
     # ========== 错误创建 ==========
 

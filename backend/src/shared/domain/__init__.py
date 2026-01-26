@@ -2,6 +2,7 @@
 
 from .base_entity import BaseEntity, EntityT
 from .base_repository import IRepository, T
+from .pydantic_entity import PydanticEntity
 from .events import DomainEvent, EventBus, EventT, event_bus, event_handler
 from .exceptions import (
     DomainError,
@@ -18,6 +19,7 @@ __all__ = [
     # Base classes
     "BaseEntity",
     "EntityT",
+    "PydanticEntity",
     "IRepository",
     "T",
     # Events

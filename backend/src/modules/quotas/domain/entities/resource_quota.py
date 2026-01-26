@@ -1,22 +1,22 @@
 """ResourceQuota domain entity - Resource allocation and limits for users/teams."""
 
-from dataclasses import dataclass, field
 from datetime import datetime
 
+from pydantic import Field
+
+from src.shared.domain import PydanticEntity
 from src.shared.utils import utc_now
 
 from ..value_objects import QuotaStatus, QuotaType
 
 
-@dataclass
-class ResourceQuota:
+class ResourceQuota(PydanticEntity):
     """Resource quota domain entity for managing resource allocation.
 
     Maps to Kueue ClusterQueue and ResourceFlavor resources.
     """
 
-    id: int
-    name: str
+    name: str = Field(min_length=1, max_length=255)
     quota_type: QuotaType = QuotaType.USER
     description: str | None = None
 
@@ -27,7 +27,7 @@ class ResourceQuota:
     # GPU quota
     max_gpu_count: int = 0
     reserved_gpu_count: int = 0
-    gpu_types: list[str] = field(default_factory=list)
+    gpu_types: list[str] = Field(default_factory=list)
 
     # Memory quota (GB)
     max_memory_gb: int = 0
@@ -45,13 +45,13 @@ class ResourceQuota:
 
     # Status and validity
     status: QuotaStatus = QuotaStatus.ACTIVE
-    valid_from: datetime = field(default_factory=utc_now)
+    valid_from: datetime = Field(default_factory=utc_now)
     valid_until: datetime | None = None
 
     # Audit fields
     created_by: int | None = None
-    created_at: datetime = field(default_factory=utc_now)
-    updated_at: datetime = field(default_factory=utc_now)
+
+    # ========== 业务方法 ==========
 
     def is_active(self) -> bool:
         """Check if quota is currently active and valid."""
@@ -102,11 +102,7 @@ class ResourceQuota:
         current_running_jobs: int,
         gpu_type: str | None = None,
     ) -> tuple[bool, str | None]:
-        """Validate if a new job can be submitted within quota limits.
-
-        Returns:
-            Tuple of (is_valid, error_message)
-        """
+        """Validate if a new job can be submitted within quota limits."""
         if not self.is_active():
             return False, "Quota is not active"
 
@@ -133,9 +129,9 @@ class ResourceQuota:
     def suspend(self) -> None:
         """Suspend quota."""
         self.status = QuotaStatus.SUSPENDED
-        self.updated_at = utc_now()
+        self.touch()
 
     def activate(self) -> None:
         """Activate quota."""
         self.status = QuotaStatus.ACTIVE
-        self.updated_at = utc_now()
+        self.touch()
