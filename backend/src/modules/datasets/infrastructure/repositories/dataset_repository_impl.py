@@ -91,7 +91,7 @@ class DatasetRepositoryImpl(
     # ========== IDatasetRepository 接口方法 ==========
 
     async def add(self, dataset: Dataset) -> Dataset:
-        """添加新数据集（委托给 EnhancedBaseRepository.create）。"""
+        """添加新数据集（委托给 BaseRepository.create）。"""
         return await self.create(dataset)
 
     # ========== 领域特定查询方法 ==========

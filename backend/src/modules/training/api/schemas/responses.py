@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, ClassVar
 
 from pydantic import BaseModel
 
-from src.shared.api.schemas import AutoMappingEntitySchema
+from src.shared.api.schemas import EntitySchema
 
 if TYPE_CHECKING:
     from src.modules.training.domain.entities import Checkpoint, JobTemplate, TrainingJob  # noqa: F401
@@ -67,7 +67,7 @@ class StorageTierEnum(str, Enum):
     S3 = "s3"
 
 
-class TrainingJobSummary(AutoMappingEntitySchema["TrainingJob"]):
+class TrainingJobSummary(EntitySchema["TrainingJob"]):
     """Training job summary for list view."""
 
     id: int
@@ -126,7 +126,7 @@ class TrainingJobListResponse(BaseModel):
     total_pages: int
 
 
-class CheckpointResponse(AutoMappingEntitySchema["Checkpoint"]):
+class CheckpointResponse(EntitySchema["Checkpoint"]):
     """Checkpoint response."""
 
     id: int
@@ -162,7 +162,7 @@ class TemplateVisibilityEnum(str, Enum):
     PUBLIC = "public"
 
 
-class JobTemplateSummary(AutoMappingEntitySchema["JobTemplate"]):
+class JobTemplateSummary(EntitySchema["JobTemplate"]):
     """Job template summary for list view."""
 
     id: int

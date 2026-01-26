@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, ClassVar
 
 from pydantic import BaseModel
 
-from src.shared.api.schemas import AutoMappingEntitySchema
+from src.shared.api.schemas import EntitySchema
 
 if TYPE_CHECKING:
     from src.modules.quotas.domain.entities import ResourceLimitConfig, ResourceQuota  # noqa: F401
@@ -29,10 +29,10 @@ class PriorityDefaultEnum(str, Enum):
     LOW = "low"
 
 
-class ResourceLimitConfigResponse(AutoMappingEntitySchema["ResourceLimitConfig"]):
+class ResourceLimitConfigResponse(EntitySchema["ResourceLimitConfig"]):
     """Resource limit config response.
 
-    使用 AutoMappingEntitySchema 自动映射同名字段，
+    使用 EntitySchema 自动映射同名字段，
     只需声明枚举映射规则。
     """
 
@@ -86,7 +86,7 @@ class QuotaStatusEnum(str, Enum):
     EXPIRED = "expired"
 
 
-class ResourceQuotaResponse(AutoMappingEntitySchema["ResourceQuota"]):
+class ResourceQuotaResponse(EntitySchema["ResourceQuota"]):
     """Resource quota response schema."""
 
     id: int

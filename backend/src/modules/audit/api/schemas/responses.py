@@ -6,13 +6,13 @@ from typing import TYPE_CHECKING, Any, ClassVar
 
 from pydantic import BaseModel, Field
 
-from src.shared.api.schemas import AutoMappingEntitySchema
+from src.shared.api.schemas import EntitySchema
 
 if TYPE_CHECKING:
     from src.modules.audit.domain.entities import AuditLog  # noqa: F401
 
 
-class AuditLogResponse(AutoMappingEntitySchema["AuditLog"]):
+class AuditLogResponse(EntitySchema["AuditLog"]):
     """Response schema for audit log.
 
     枚举字段转换为字符串值（使用 _custom_mappings）。

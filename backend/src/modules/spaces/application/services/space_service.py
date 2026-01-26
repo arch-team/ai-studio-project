@@ -10,11 +10,11 @@ from src.modules.spaces.domain.value_objects import (
     SpaceStatus,
     SpaceType,
 )
-from src.shared.application import BaseService
+from src.shared.application import BaseApplicationService
 from src.shared.utils import utc_now
 
 
-class SpaceService(BaseService[Space, str]):
+class SpaceService(BaseApplicationService[Space, str]):
     """Service for managing development spaces."""
 
     def __init__(

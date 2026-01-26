@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, ClassVar
 
 from pydantic import BaseModel
 
-from src.shared.api.schemas import AutoMappingEntitySchema
+from src.shared.api.schemas import EntitySchema
 
 if TYPE_CHECKING:
     from src.modules.spaces.domain.entities import Space  # noqa: F401
@@ -40,7 +40,7 @@ class SpaceStatusEnum(str, Enum):
     DELETED = "deleted"
 
 
-class SpaceSummary(AutoMappingEntitySchema["Space"]):
+class SpaceSummary(EntitySchema["Space"]):
     """Space summary for list responses."""
 
     id: str

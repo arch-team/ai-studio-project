@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Any, ClassVar
 
 from pydantic import BaseModel
 
-from src.shared.api.schemas import AutoMappingEntitySchema
+from src.shared.api.schemas import EntitySchema
 
 if TYPE_CHECKING:
     from src.modules.models.domain.entities import Model  # noqa: F401
@@ -31,7 +31,7 @@ class ModelStatusEnum(str, Enum):
     FAILED = "failed"
 
 
-class ModelSummary(AutoMappingEntitySchema["Model"]):
+class ModelSummary(EntitySchema["Model"]):
     """Model summary for list responses."""
 
     id: int

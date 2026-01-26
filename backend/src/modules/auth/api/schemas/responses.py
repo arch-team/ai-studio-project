@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING, Any, ClassVar
 
 from pydantic import BaseModel, Field
 
-from src.shared.api.schemas import AutoMappingEntitySchema
+from src.shared.api.schemas import EntitySchema
 
 if TYPE_CHECKING:
     from src.modules.auth.domain.entities import User  # noqa: F401
@@ -20,7 +20,7 @@ class TokenResponse(BaseModel):
     expires_in: int = Field(..., description="Token expiry in seconds")
 
 
-class UserResponse(AutoMappingEntitySchema["User"]):
+class UserResponse(EntitySchema["User"]):
     """User response schema."""
 
     id: int = Field(..., description="User ID")

@@ -4,10 +4,10 @@ from src.modules.quotas.domain.entities import ResourceLimitConfig
 from src.modules.quotas.domain.exceptions import DuplicateConfigError, QuotaNotFoundError
 from src.modules.quotas.domain.repositories import IResourceLimitConfigRepository
 from src.modules.quotas.domain.value_objects import LimitRole, PriorityDefault
-from src.shared.application import BaseService
+from src.shared.application import BaseApplicationService
 
 
-class ResourceLimitConfigService(BaseService[ResourceLimitConfig, int]):
+class ResourceLimitConfigService(BaseApplicationService[ResourceLimitConfig, int]):
     """Service for managing resource limit configurations."""
 
     _not_found_error_factory = QuotaNotFoundError

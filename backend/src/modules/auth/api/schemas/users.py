@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, Any, ClassVar
 from pydantic import BaseModel, EmailStr, Field
 
 from src.shared.api.pagination import PaginatedResponse
-from src.shared.api.schemas import AutoMappingEntitySchema
+from src.shared.api.schemas import EntitySchema
 
 if TYPE_CHECKING:
     from src.modules.auth.domain.entities import User
@@ -56,7 +56,7 @@ class UpdateUserRequest(BaseModel):
 # === Response Schemas ===
 
 
-class UserDetailResponse(AutoMappingEntitySchema["User"]):
+class UserDetailResponse(EntitySchema["User"]):
     """User detail response schema."""
 
     id: int = Field(..., description="用户 ID")

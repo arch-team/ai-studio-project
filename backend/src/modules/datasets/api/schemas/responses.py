@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, ClassVar
 
 from pydantic import BaseModel
 
-from src.shared.api.schemas import AutoMappingEntitySchema
+from src.shared.api.schemas import EntitySchema
 
 if TYPE_CHECKING:
     from src.modules.datasets.domain.entities import Dataset  # noqa: F401
@@ -48,7 +48,7 @@ class DatasetStatusEnum(str, Enum):
     ERROR = "error"
 
 
-class DatasetSummary(AutoMappingEntitySchema["Dataset"]):
+class DatasetSummary(EntitySchema["Dataset"]):
     """Dataset summary for list view."""
 
     id: int

@@ -128,7 +128,7 @@ class UploadSessionRepositoryImpl(
     # ========== IUploadSessionRepository 接口方法 ==========
 
     async def add(self, session: UploadSession) -> UploadSession:
-        """添加新上传会话（委托给 EnhancedBaseRepository.create）。"""
+        """添加新上传会话（委托给 BaseRepository.create）。"""
         return await self.create(session)
 
     # ========== 领域特定查询方法 ==========
