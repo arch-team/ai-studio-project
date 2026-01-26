@@ -677,7 +677,7 @@
   - **缓存策略**: 已完成任务的指标数据缓存 1 小时,减少 Prometheus 查询压力
   - **参考**: spec.md FR-026 Prometheus 指标查询 API, research.md Section 2.3 HyperPod Observability Add-on
   - **依赖**: T008c (HyperPod Observability Add-on 部署), T062 (Prometheus 服务基础)
-- [ ] [T221] [US1] [P] 训练指标展示组件 - `frontend/src/features/training/components/TrainingMetricsChart.tsx`,在训练任务详情页展示 Loss/Accuracy 曲线图,使用 Recharts,支持多指标叠加、时间范围选择、数据点悬停提示:
+- [X] [T221] [US1] [P] 训练指标展示组件 - `frontend/src/features/training/components/TrainingMetricsChart.tsx`,在训练任务详情页展示 Loss/Accuracy 曲线图,使用 Cloudscape LineChart (遵循项目 UI 规范),支持多指标叠加、时间范围选择、数据点悬停提示:
   - **图表功能**: 折线图展示训练曲线,支持缩放、导出 PNG
   - **实时更新**: 训练中任务自动刷新 (30秒间隔)
   - **多任务对比**: 支持选择多个任务叠加对比训练曲线

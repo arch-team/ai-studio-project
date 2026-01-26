@@ -12,6 +12,7 @@ from src.modules.training.application.services import (
     JobTemplateService,
     MLflowService,
     TrainingJobService,
+    TrainingMetricsService,
 )
 from src.modules.training.infrastructure.hyperpod import HyperPodClient
 from src.modules.training.infrastructure.repositories import (
@@ -82,3 +83,13 @@ def get_mlflow_service() -> IMetricsService:
         timeout=settings.mlflow_request_timeout,
         max_retries=settings.mlflow_max_retries,
     )
+
+
+def get_training_metrics_service() -> TrainingMetricsService:
+    """Get TrainingMetricsService instance (T220)."""
+    from src.modules.monitoring.application.services import PrometheusService
+    from src.modules.monitoring.infrastructure.external import get_prometheus_client
+
+    client = get_prometheus_client()
+    prometheus_service = PrometheusService(client)
+    return TrainingMetricsService(prometheus_service)

@@ -13,6 +13,8 @@ from .responses import (
     CheckpointResponse,
     CheckpointStatusEnum,
     CheckpointTypeEnum,
+    JobMetricsComparisonResponse,
+    JobMetricsData,
     JobPriorityEnum,
     JobStatusEnum,
     JobTemplateDetail,
@@ -26,6 +28,7 @@ from .responses import (
     KueueWorkloadStatus,
     # Log responses
     LogEntry,
+    MetricDataPoint,
     PreemptionEvent,
     QueueInfo,
     StorageTierEnum,
@@ -34,6 +37,8 @@ from .responses import (
     TrainingJobListResponse,
     TrainingJobSummary,
     TrainingLogsResponse,
+    # Metrics responses (T220)
+    TrainingMetricsResponse,
 )
 
 __all__ = [
@@ -71,4 +76,9 @@ __all__ = [
     "KueueQuotaUsage",
     "QueueInfo",
     "PreemptionEvent",
+    # Metrics responses (T220)
+    "MetricDataPoint",
+    "TrainingMetricsResponse",
+    "JobMetricsData",
+    "JobMetricsComparisonResponse",
 ]

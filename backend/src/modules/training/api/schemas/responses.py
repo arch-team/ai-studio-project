@@ -288,3 +288,35 @@ class KueueDebugResponse(BaseModel):
     quota_usage: KueueQuotaUsage | None = None
     preemption_history: list[PreemptionEvent] | None = None
     raw_yaml: str | None = None  # Only visible to admin
+
+
+# === Training Metrics Schemas (T220) ===
+
+
+class MetricDataPoint(BaseModel):
+    """单个指标数据点."""
+
+    timestamp: datetime
+    value: float
+
+
+class TrainingMetricsResponse(BaseModel):
+    """训练指标查询响应 (FR-026)."""
+
+    job_id: int
+    metrics: dict[str, list[MetricDataPoint]]
+
+
+class JobMetricsData(BaseModel):
+    """单个任务的指标数据 (用于对比)."""
+
+    job_id: int
+    metric_type: str
+    data_points: list[MetricDataPoint]
+
+
+class JobMetricsComparisonResponse(BaseModel):
+    """多任务指标对比响应."""
+
+    metric_type: str
+    jobs: list[JobMetricsData]

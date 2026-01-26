@@ -42,5 +42,5 @@
 
 
 
-/speckit.implement Phase 4: US2 (P1) - 数据集管理 (14 tasks)的### 存储集成服务这个子阶段, 
+/speckit.implement ## Phase 5: US3 (P1) - 资源配额和集群监控 (21 tasks) 的# ## 存储集成服务这个子阶段, 
 每个任务按照TDD（测试驱动开发的流程进行），完成后将tasks.md中已经明确完成的任务标记为完成状态
