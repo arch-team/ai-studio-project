@@ -20,6 +20,7 @@ class Settings(BaseSettings):
     app_version: str = "1.0.0"
     debug: bool = False
     environment: str = "development"
+    log_level: str = "INFO"
 
     # Database
     database_url: str = "mysql+aiomysql://ai_training:ai_training_pass@localhost:3306/ai_training"

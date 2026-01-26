@@ -8,9 +8,10 @@
 参考: spec.md FR-022 训练任务停滞检测机制
 """
 
-import logging
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
+
+import structlog
 
 from src.modules.training.application.interfaces import (
     Alert,
@@ -25,7 +26,7 @@ from src.modules.training.domain.repositories.training_job_repository import (
 from src.modules.training.domain.value_objects import JobStatus
 from src.shared.utils import utc_now
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 # 默认指标回退顺序
 DEFAULT_METRIC_FALLBACK = ["loss", "accuracy", "perplexity"]
@@ -113,10 +114,12 @@ class StallDetectionService:
                 result = await self.check_job_stall(job, config)
                 results.append(result)
             except Exception as e:
-                logger.error(
-                    f"检查任务 {job.job_name} 停滞状态失败: {type(e).__name__}: {e}",
-                    exc_info=True,
-                    extra={"job_id": job.id, "job_name": job.job_name},
+                logger.exception(
+                    "stall_check_failed",
+                    job_id=job.id,
+                    job_name=job.job_name,
+                    error_type=type(e).__name__,
+                    error=str(e),
                 )
                 results.append(
                     StallCheckResult(
@@ -274,7 +277,7 @@ class StallDetectionService:
             result: 停滞检查结果
         """
         if not self._notification:
-            logger.warning("通知服务未配置，跳过告警发送")
+            logger.warning("notification_service_not_configured")
             return
 
         alert = Alert(
@@ -297,7 +300,7 @@ class StallDetectionService:
         )
 
         await self._notification.send_alert(alert)
-        logger.info(f"已发送任务 {job.job_name} 停滞告警")
+        logger.info("stall_alert_sent", job_name=job.job_name)
 
     @staticmethod
     def _calculate_change_rate(values: list[float]) -> float:

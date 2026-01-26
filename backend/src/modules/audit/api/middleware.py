@@ -2,11 +2,11 @@
 
 import asyncio
 import json
-import logging
 import re
 from collections.abc import Callable
 from typing import Any
 
+import structlog
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
@@ -22,7 +22,7 @@ from src.shared.infrastructure.security.paths import (
     AUDIT_EXEMPT_PREFIXES,
 )
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 
 class AuditMiddleware(BaseHTTPMiddleware):
@@ -87,9 +87,11 @@ class AuditMiddleware(BaseHTTPMiddleware):
         try:
             return await call_next(request)
         except Exception as e:
-            logger.error(
-                f"Unhandled exception in request {request.method} {request.url.path}: {e}",
-                exc_info=True,
+            logger.exception(
+                "unhandled_exception",
+                method=request.method,
+                path=request.url.path,
+                error=str(e),
             )
             return JSONResponse(
                 status_code=500,
@@ -178,11 +180,7 @@ class AuditMiddleware(BaseHTTPMiddleware):
         except (json.JSONDecodeError, UnicodeDecodeError):
             return None
         except Exception as e:
-            logger.warning(
-                f"Failed to capture request data: {e}",
-                exc_info=True,
-                extra={"path": request.url.path},
-            )
+            logger.warning("capture_request_data_failed", path=request.url.path, error=str(e))
             return None
 
     def _sanitize_data(self, data: Any) -> Any:
@@ -265,15 +263,13 @@ class AuditMiddleware(BaseHTTPMiddleware):
             if hasattr(request.app.state, "audit_repository"):
                 await request.app.state.audit_repository.create(audit_log)
             else:
-                logger.debug("Audit repository not configured, skipping audit log write")
+                logger.debug("audit_repository_not_configured")
 
         except Exception as e:
             # Log error but don't fail the request (audit should never block main flow)
-            logger.error(
-                f"Failed to write audit log: {e}",
-                exc_info=True,
-                extra={
-                    "operation_type": operation_type.value if operation_type else None,
-                    "path": request.url.path,
-                },
+            logger.exception(
+                "audit_log_write_failed",
+                operation_type=operation_type.value if operation_type else None,
+                path=request.url.path,
+                error=str(e),
             )

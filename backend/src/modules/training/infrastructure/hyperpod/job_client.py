@@ -1,11 +1,12 @@
 """HyperPod 训练任务客户端 - 专注于任务管理操作"""
 
-import logging
 from typing import Any
+
+import structlog
 
 from .base_client import HyperPodBaseClient
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 
 class HyperPodJobClient(HyperPodBaseClient):
@@ -57,6 +58,7 @@ class HyperPodJobClient(HyperPodBaseClient):
                 Spec,
                 Template,
             )
+
             from src.modules.training.domain.value_objects.constants import (
                 DEFAULT_CONTAINER_NAME,
                 DEFAULT_GPU_PER_NODE,
@@ -164,7 +166,7 @@ class HyperPodJobClient(HyperPodBaseClient):
             try:
                 job.refresh()
             except Exception as e:
-                logger.debug(f"Job refresh failed for {job_name}, using cached status: {e}")
+                logger.debug("job_refresh_failed", job_name=job_name, error=str(e))
 
             # 解析状态
             status_str = self._parse_job_status(job)

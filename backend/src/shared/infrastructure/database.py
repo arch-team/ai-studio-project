@@ -1,14 +1,14 @@
 """Database configuration - SQLAlchemy 2.0 async setup."""
 
-import logging
 from collections.abc import AsyncGenerator
 
+import structlog
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase
 
 from src.shared.infrastructure.config import get_settings
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 
 def import_all_models() -> None:
@@ -42,7 +42,7 @@ def import_all_models() -> None:
         TrainingJobModel,
     )
 
-    logger.debug("All ORM models imported successfully")
+    logger.debug("orm_models_imported")
 
 
 class Base(DeclarativeBase):
@@ -81,7 +81,7 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
             yield session
             await session.commit()
         except Exception as e:
-            logger.warning(f"Database transaction rolled back: {type(e).__name__}: {e}")
+            logger.warning("database_transaction_rollback", error_type=type(e).__name__, error=str(e))
             await session.rollback()
             raise
         finally:

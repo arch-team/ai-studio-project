@@ -1,11 +1,11 @@
 """HyperPod Client - SageMaker HyperPod SDK integration."""
 
 import asyncio
-import logging
 from collections.abc import Callable
 from typing import Any, TypeVar
 
 import aioboto3
+import structlog
 from botocore.exceptions import ClientError
 
 from src.modules.training.application.interfaces import IHyperPodClient
@@ -15,7 +15,7 @@ from src.modules.training.domain.exceptions import (
     HyperPodSDKUnavailableError,
 )
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 # Conditional imports for testing environments
 try:
@@ -93,7 +93,7 @@ class HyperPodClient(IHyperPodClient):
         target_cluster = cluster_name or self._default_cluster_name
 
         if not target_cluster:
-            logger.warning("No cluster name provided for context setup")
+            logger.warning("no_cluster_name_for_context")
             return
 
         # 检查是否已设置此集群的上下文
@@ -101,18 +101,20 @@ class HyperPodClient(IHyperPodClient):
             return
 
         if set_cluster_context is None:
-            logger.warning("set_cluster_context not available, SDK status operations may fail")
+            logger.warning("set_cluster_context_unavailable")
             return
 
         try:
-            logger.info(f"Setting cluster context for: {target_cluster}")
+            logger.info("setting_cluster_context", cluster=target_cluster)
             set_cluster_context(target_cluster)
             self._cluster_contexts.add(target_cluster)
-            logger.info(f"Cluster context set successfully: {target_cluster}")
+            logger.info("cluster_context_set", cluster=target_cluster)
         except Exception as e:
-            logger.error(
-                f"Failed to set cluster context for {target_cluster}: {type(e).__name__}: {e}",
-                exc_info=True,
+            logger.exception(
+                "cluster_context_failed",
+                cluster=target_cluster,
+                error_type=type(e).__name__,
+                error=str(e),
             )
             # 不抛出异常，让操作继续尝试 (可能已经配置了 kubeconfig)
 
@@ -352,7 +354,7 @@ class HyperPodClient(IHyperPodClient):
                 job.refresh()
             except Exception as e:
                 # refresh 可能失败，继续使用当前状态
-                logger.debug(f"Job refresh failed for {job_name}, using cached status: {e}")
+                logger.debug("job_refresh_failed", job_name=job_name, error=str(e))
 
             # 从 conditions 获取当前状态
             status_str = "submitted"  # 默认状态: 已提交

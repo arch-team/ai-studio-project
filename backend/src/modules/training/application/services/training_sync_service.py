@@ -9,9 +9,10 @@
 遵循 Constitution I.B: 优先使用 sagemaker-hyperpod SDK
 """
 
-import logging
 from dataclasses import dataclass, field
 from typing import Any
+
+import structlog
 
 from src.modules.training.application.interfaces import IHyperPodClient
 from src.modules.training.domain.entities.training_job import TrainingJob
@@ -21,7 +22,7 @@ from src.modules.training.domain.repositories.training_job_repository import (
 from src.modules.training.domain.value_objects import JobStatus
 from src.shared.domain.exceptions import EntityNotFoundError
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 # 连续抢占次数上限
 MAX_PREEMPTION_COUNT = 3
@@ -86,7 +87,10 @@ class TrainingSyncService:
                 result.skipped_count += 1
 
         logger.info(
-            f"同步完成: synced={result.synced_count}, " f"skipped={result.skipped_count}, failed={result.failed_count}"
+            "sync_completed",
+            synced=result.synced_count,
+            skipped=result.skipped_count,
+            failed=result.failed_count,
         )
         return result
 
@@ -120,10 +124,12 @@ class TrainingSyncService:
             return await self._process_status_change(job, hyperpod_response)
 
         except Exception as e:
-            logger.error(
-                f"同步任务 {job.job_name} 失败: {type(e).__name__}: {e}",
-                exc_info=True,
-                extra={"job_id": job.id, "job_name": job.job_name},
+            logger.exception(
+                "sync_job_failed",
+                job_id=job.id,
+                job_name=job.job_name,
+                error_type=type(e).__name__,
+                error=str(e),
             )
             return False
 
@@ -138,7 +144,7 @@ class TrainingSyncService:
         # 映射并验证状态
         new_status = HYPERPOD_TO_PLATFORM_STATUS.get(hyperpod_response.get("status"))
         if new_status is None:
-            logger.warning(f"未知的 HyperPod 状态: {hyperpod_response.get('status')}")
+            logger.warning("unknown_hyperpod_status", status=hyperpod_response.get("status"))
             return False
 
         # 状态未变化，跳过
@@ -147,7 +153,12 @@ class TrainingSyncService:
 
         # 检查状态转换是否合法
         if not job.can_transition_to(new_status):
-            logger.warning(f"任务 {job.job_name} 状态转换非法: " f"{job.status.value} → {new_status.value}")
+            logger.warning(
+                "invalid_status_transition",
+                job_name=job.job_name,
+                from_status=job.status.value,
+                to_status=new_status.value,
+            )
             return False
 
         # 执行状态转换
@@ -163,7 +174,7 @@ class TrainingSyncService:
             )
         except EntityNotFoundError:
             # HyperPod 中找不到任务，标记为 Failed
-            logger.warning(f"HyperPod 中找不到任务 {job.job_name}，标记为 Failed")
+            logger.warning("job_not_found_in_hyperpod", job_name=job.job_name)
             job.fail(
                 error_message=f"HyperPod 中找不到任务 {job.job_name}",
                 failure_reason="JobNotFoundInHyperPod",
@@ -171,10 +182,12 @@ class TrainingSyncService:
             await self._repo.update(job)
             return None
         except Exception as e:
-            logger.error(
-                f"获取任务 {job.job_name} 状态失败: {type(e).__name__}: {e}",
-                exc_info=True,
-                extra={"job_id": job.id, "job_name": job.job_name},
+            logger.exception(
+                "fetch_job_status_failed",
+                job_id=job.id,
+                job_name=job.job_name,
+                error_type=type(e).__name__,
+                error=str(e),
             )
             return None
 
@@ -197,7 +210,12 @@ class TrainingSyncService:
             job.transition_to(new_status)
 
         await self._repo.update(job)
-        logger.info(f"任务 {job.job_name} 状态更新: {old_status.value} → {new_status.value}")
+        logger.info(
+            "job_status_updated",
+            job_name=job.job_name,
+            from_status=old_status.value,
+            to_status=new_status.value,
+        )
 
     async def _handle_preemption(self, job: TrainingJob) -> None:
         """处理抢占状态转换"""
@@ -210,11 +228,20 @@ class TrainingSyncService:
                 error_message=f"连续抢占次数超限 ({new_preemption_count}/{MAX_PREEMPTION_COUNT})",
                 failure_reason="PreemptionExhausted",
             )
-            logger.warning(f"任务 {job.job_name} 连续抢占 {new_preemption_count} 次，标记为 Failed")
+            logger.warning(
+                "preemption_exhausted",
+                job_name=job.job_name,
+                preemption_count=new_preemption_count,
+                max_count=MAX_PREEMPTION_COUNT,
+            )
         else:
             # 正常抢占，transition_to 会累加 preemption_count
             job.transition_to(JobStatus.PREEMPTED)
-            logger.info(f"任务 {job.job_name} 被抢占，preemption_count={job.preemption_count}")
+            logger.info(
+                "job_preempted",
+                job_name=job.job_name,
+                preemption_count=job.preemption_count,
+            )
 
     async def _get_active_jobs(self) -> list[TrainingJob]:
         """获取所有需要同步的活跃任务"""

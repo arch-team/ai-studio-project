@@ -9,16 +9,16 @@
 """
 
 import asyncio
-import logging
 from datetime import UTC, datetime
 from typing import Any
 
+import structlog
 from mlflow.exceptions import MlflowException
 from mlflow.tracking import MlflowClient
 
 from src.modules.training.application.interfaces import IMetricsService, MetricPoint
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 
 class MLflowServiceError(Exception):
@@ -81,7 +81,7 @@ class MLflowService(IMetricsService):
         # 1. 查找对应的 MLflow run
         run = await self._find_run_by_job_id(job_id)
         if not run:
-            logger.debug(f"未找到 job_id={job_id} 对应的 MLflow run")
+            logger.debug("mlflow_run_not_found", job_id=job_id)
             return []
 
         run_id = run.info.run_id
@@ -182,10 +182,7 @@ class MLflowService(IMetricsService):
         except MlflowException:
             return False
         except Exception as e:
-            logger.warning(
-                f"MLflow 健康检查失败: {type(e).__name__}: {e}",
-                exc_info=True,
-            )
+            logger.warning("mlflow_health_check_failed", error_type=type(e).__name__, error=str(e))
             return False
 
     async def _find_run_by_job_id(self, job_id: int) -> Any | None:
@@ -237,7 +234,7 @@ class MLflowService(IMetricsService):
                 last_error = e
                 if attempt < self._max_retries - 1:
                     await asyncio.sleep(0.1 * (attempt + 1))  # 指数退避
-                    logger.debug(f"重试 MLflow 搜索 (attempt {attempt + 1})")
+                    logger.debug("mlflow_search_retry", attempt=attempt + 1)
                 continue
 
         raise MLflowServiceError(f"MLflow unavailable after {self._max_retries} retries: {last_error}")

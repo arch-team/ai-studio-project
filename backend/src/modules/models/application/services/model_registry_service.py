@@ -8,8 +8,9 @@
 - 获取模型血缘关系
 """
 
-import logging
 from typing import Any
+
+import structlog
 
 from src.modules.models.application.interfaces import ISageMakerClient
 from src.modules.models.domain.entities import Model
@@ -17,7 +18,7 @@ from src.modules.models.domain.exceptions import ModelNotFoundError
 from src.modules.models.domain.repositories import IModelRepository
 from src.shared.utils import utc_now
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 
 class ModelRegistryService:
@@ -65,7 +66,7 @@ class ModelRegistryService:
             )
         except Exception as e:
             # 组已存在或其他错误，记录并继续
-            logger.debug(f"Model package group '{group_name}' creation skipped: {type(e).__name__}: {e}")
+            logger.debug("model_package_group_creation_skipped", group_name=group_name, error_type=type(e).__name__, error=str(e))
 
         # 创建模型包
         model_package_arn = await self._sagemaker.create_model_package(
@@ -118,7 +119,7 @@ class ModelRegistryService:
             model_approval_status="PendingManualApproval",
         )
 
-        logger.info(f"Created new model version: {model_package_arn}")
+        logger.info("model_version_created", model_package_arn=model_package_arn)
         return model_package_arn
 
     async def update_model_approval_status(
@@ -150,7 +151,7 @@ class ModelRegistryService:
         model.updated_at = utc_now()
         await self._model_repo.update(model)
 
-        logger.info(f"Model {model_id} approval status updated to {status}")
+        logger.info("model_approval_status_updated", model_id=model_id, status=status)
 
     # =========================================================================
     # 归档功能

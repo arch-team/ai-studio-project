@@ -11,8 +11,9 @@
 - 重试机制: 失败最多重试 3 次
 """
 
-import logging
 from dataclasses import dataclass
+
+import structlog
 
 from src.modules.training.application.interfaces import (
     Alert,
@@ -24,7 +25,7 @@ from src.modules.training.domain.exceptions import CheckpointMigrationError
 from src.modules.training.domain.repositories import ICheckpointRepository
 from src.modules.training.domain.value_objects import StorageTier
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 
 # =============================================================================
@@ -133,7 +134,9 @@ class CheckpointMigrationService:
         result = MigrationResult(is_emergency=True)
 
         logger.warning(
-            f"Storage pressure detected: {tier.value} at {usage_percent:.1%}, triggering emergency migration"
+            "storage_pressure_detected",
+            tier=tier.value,
+            usage_percent=usage_percent,
         )
 
         # 获取该存储层的所有检查点
@@ -142,7 +145,7 @@ class CheckpointMigrationService:
         # 确定目标层
         target_tier = self._get_next_tier(tier)
         if target_tier is None:
-            logger.error(f"No target tier available for migration from {tier.value}")
+            logger.error("no_target_tier_available", source_tier=tier.value)
             return result
 
         # 迁移所有检查点 (保留最新 3 个)
@@ -201,7 +204,10 @@ class CheckpointMigrationService:
                 await self._checkpoint_repo.update(checkpoint)
 
                 logger.info(
-                    f"Checkpoint {checkpoint.id} migrated from {checkpoint.storage_tier.value} to {target_tier.value}"
+                    "checkpoint_migrated",
+                    checkpoint_id=checkpoint.id,
+                    source_tier=checkpoint.storage_tier.value,
+                    target_tier=target_tier.value,
                 )
 
                 return SingleMigrationResult(
@@ -215,10 +221,12 @@ class CheckpointMigrationService:
             except Exception as e:
                 last_error = f"{type(e).__name__}: {e}"
                 logger.warning(
-                    f"Migration attempt {attempt + 1}/{max_retries} failed for "
-                    f"checkpoint {checkpoint.id}: {type(e).__name__}: {e}",
-                    exc_info=True,
-                    extra={"checkpoint_id": checkpoint.id, "attempt": attempt + 1},
+                    "migration_attempt_failed",
+                    checkpoint_id=checkpoint.id,
+                    attempt=attempt + 1,
+                    max_retries=max_retries,
+                    error_type=type(e).__name__,
+                    error=str(e),
                 )
                 continue
 

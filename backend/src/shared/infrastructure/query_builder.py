@@ -1,13 +1,13 @@
 """Query builder utility for common repository operations."""
 
-import logging
 from enum import Enum
 from typing import Any, Generic, TypeVar
 
+import structlog
 from sqlalchemy import Select, asc, desc, func, inspect, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 ModelT = TypeVar("ModelT")
 
@@ -50,7 +50,7 @@ class QueryBuilder(Generic[ModelT]):
                                 return member
         except (AttributeError, KeyError) as e:
             # 枚举转换失败时记录警告，返回原始值继续处理
-            logger.debug(f"Enum conversion skipped for column '{column_name}': {e}")
+            logger.debug("enum_conversion_skipped", column_name=column_name, error=str(e))
 
         return value
 

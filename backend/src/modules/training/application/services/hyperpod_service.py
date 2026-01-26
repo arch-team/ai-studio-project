@@ -5,14 +5,15 @@ Encapsulates HyperPod SDK operations with retry mechanism and error handling.
 """
 
 import asyncio
-import logging
 from typing import Any
+
+import structlog
 
 from src.modules.training.application.interfaces import IHyperPodClient
 from src.modules.training.domain.entities.training_job import TrainingJob
 from src.shared.domain.exceptions import EntityNotFoundError
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 # Status mapping: HyperPod SDK status -> Platform standard status
 STATUS_MAPPING = {
@@ -153,9 +154,12 @@ class HyperPodService:
             except Exception as e:
                 last_error = e
                 logger.warning(
-                    f"HyperPod {operation} attempt {attempt + 1}/{self._max_retries} "
-                    f"failed: {type(e).__name__}: {e}",
-                    extra={"operation": operation, "attempt": attempt + 1},
+                    "hyperpod_operation_retry",
+                    operation=operation,
+                    attempt=attempt + 1,
+                    max_retries=self._max_retries,
+                    error_type=type(e).__name__,
+                    error=str(e),
                 )
                 if attempt < self._max_retries - 1:
                     await asyncio.sleep(self._retry_delay)
@@ -210,12 +214,12 @@ class HyperPodService:
             )
         except Exception as e:
             if "not found" in str(e).lower():
-                logger.info(f"Job {job_name} not found in HyperPod, converting to EntityNotFoundError")
+                logger.info("job_not_found_in_hyperpod", job_name=job_name)
                 raise EntityNotFoundError(
                     entity_type="TrainingJob",
                     entity_id=job_name,
                 ) from e
-            logger.error(f"Failed to get job status for {job_name}: {type(e).__name__}: {e}")
+            logger.error("get_job_status_failed", job_name=job_name, error_type=type(e).__name__, error=str(e))
             raise
 
     async def terminate_job(self, job_name: str) -> dict[str, Any]:

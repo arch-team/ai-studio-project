@@ -1,11 +1,12 @@
 """HyperPod 客户端基类 - 提供通用功能和辅助方法"""
 
 import asyncio
-import logging
 from collections.abc import Callable
 from typing import Any, TypeVar
 
-logger = logging.getLogger(__name__)
+import structlog
+
+logger = structlog.get_logger(__name__)
 
 # 类型变量
 T = TypeVar("T")
@@ -60,7 +61,7 @@ class HyperPodBaseClient:
         target_cluster = cluster_name or self._default_cluster_name
 
         if not target_cluster:
-            logger.warning("No cluster name provided for context setup")
+            logger.warning("no_cluster_name_for_context")
             return
 
         # 检查是否已设置此集群的上下文
@@ -68,18 +69,20 @@ class HyperPodBaseClient:
             return
 
         if set_cluster_context is None:
-            logger.warning("set_cluster_context not available, SDK status operations may fail")
+            logger.warning("set_cluster_context_unavailable")
             return
 
         try:
-            logger.info(f"Setting cluster context for: {target_cluster}")
+            logger.info("setting_cluster_context", cluster=target_cluster)
             set_cluster_context(target_cluster)
             self._cluster_contexts.add(target_cluster)
-            logger.info(f"Cluster context set successfully: {target_cluster}")
+            logger.info("cluster_context_set", cluster=target_cluster)
         except Exception as e:
-            logger.error(
-                f"Failed to set cluster context for {target_cluster}: {type(e).__name__}: {e}",
-                exc_info=True,
+            logger.exception(
+                "cluster_context_failed",
+                cluster=target_cluster,
+                error_type=type(e).__name__,
+                error=str(e),
             )
 
     async def _run_in_executor(self, func: Callable[[], T]) -> T:
