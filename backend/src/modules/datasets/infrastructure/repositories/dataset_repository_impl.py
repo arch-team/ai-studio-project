@@ -48,38 +48,45 @@ class DatasetRepositoryImpl(
 
     def _to_model(self, entity: Dataset) -> DatasetModel:
         """领域实体转换为 ORM 模型。"""
-        return DatasetModel(
-            name=entity.name,
-            description=entity.description,
-            version=entity.version,
-            storage_type=entity.storage_type,
-            storage_uri=entity.storage_uri,
-            total_size_bytes=entity.total_size_bytes,
-            file_count=entity.file_count,
-            dataset_type=entity.dataset_type,
-            data_format=entity.data_format,
-            tags=entity.tags,
-            visibility=entity.visibility,
-            owner_id=entity.owner_id,
-            status=entity.status,
-            last_accessed_at=entity.last_accessed_at,
-        )
+        # 定义需要转换的字段映射
+        fields = [
+            "name",
+            "description",
+            "version",
+            "storage_type",
+            "storage_uri",
+            "total_size_bytes",
+            "file_count",
+            "dataset_type",
+            "data_format",
+            "tags",
+            "visibility",
+            "owner_id",
+            "status",
+            "last_accessed_at",
+        ]
+        return DatasetModel(**{field: getattr(entity, field) for field in fields})
 
     def _update_model(self, model: DatasetModel, entity: Dataset) -> None:
         """更新 ORM 模型字段。"""
-        model.name = entity.name
-        model.description = entity.description
-        model.version = entity.version
-        model.storage_type = entity.storage_type
-        model.storage_uri = entity.storage_uri
-        model.total_size_bytes = entity.total_size_bytes
-        model.file_count = entity.file_count
-        model.dataset_type = entity.dataset_type
-        model.data_format = entity.data_format
-        model.tags = entity.tags
-        model.visibility = entity.visibility
-        model.status = entity.status
-        model.last_accessed_at = entity.last_accessed_at
+        # 定义需要更新的字段列表（不包括 owner_id，因为它不应该被更新）
+        fields = [
+            "name",
+            "description",
+            "version",
+            "storage_type",
+            "storage_uri",
+            "total_size_bytes",
+            "file_count",
+            "dataset_type",
+            "data_format",
+            "tags",
+            "visibility",
+            "status",
+            "last_accessed_at",
+        ]
+        for field in fields:
+            setattr(model, field, getattr(entity, field))
 
     # ========== IDatasetRepository 接口方法 ==========
 

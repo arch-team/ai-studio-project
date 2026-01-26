@@ -84,11 +84,18 @@ class DatasetUploadService:
             DatasetNotFoundError: 数据集不存在
             UploadSessionActiveError: 数据集已有活跃上传会话
         """
-        # 验证数据集和会话
-        await self._validate_dataset_and_session(dataset_id)
+        # 验证数据集存在
+        dataset = await self._dataset_repository.get_by_id(dataset_id)
+        if dataset is None:
+            raise DatasetNotFoundError(dataset_id=dataset_id)
+
+        # 检查是否有活跃上传会话
+        active_session = await self._upload_session_repository.get_active_by_dataset(dataset_id)
+        if active_session is not None:
+            raise UploadSessionActiveError(dataset_id=dataset_id, upload_id=active_session.upload_id)
 
         # 构建 S3 key 并创建分片上传
-        s3_key = self._build_s3_key(dataset_id, filename)
+        s3_key = f"datasets/{dataset_id}/{filename}"
         response = await self._s3_client.create_multipart_upload(
             key=s3_key,
             content_type=content_type,
@@ -96,15 +103,20 @@ class DatasetUploadService:
         )
 
         # 创建并持久化会话
-        session = self._create_upload_session(
+        now = utc_now()
+        session = UploadSession(
             upload_id=response["UploadId"],
             dataset_id=dataset_id,
-            s3_key=s3_key,
+            bucket=self._s3_client._bucket_name,
+            key=s3_key,
             filename=filename,
             content_type=content_type,
             total_size=total_size,
             part_size=part_size,
+            status=UploadStatus.INITIATED,
             owner_id=owner_id,
+            created_at=now,
+            updated_at=now,
         )
         return await self._upload_session_repository.add(session)
 
@@ -304,58 +316,3 @@ class DatasetUploadService:
         if session is None:
             raise UploadSessionNotFoundError(upload_id=upload_id)
         return session
-
-    async def _validate_dataset_and_session(self, dataset_id: int) -> None:
-        """验证数据集存在且没有活跃会话。
-
-        Args:
-            dataset_id: 数据集 ID
-
-        Raises:
-            DatasetNotFoundError: 数据集不存在
-            UploadSessionActiveError: 已有活跃上传会话
-        """
-        # 验证数据集存在
-        dataset = await self._dataset_repository.get_by_id(dataset_id)
-        if dataset is None:
-            raise DatasetNotFoundError(dataset_id=dataset_id)
-
-        # 检查是否有活跃上传会话
-        active_session = await self._upload_session_repository.get_active_by_dataset(dataset_id)
-        if active_session is not None:
-            raise UploadSessionActiveError(
-                dataset_id=dataset_id,
-                upload_id=active_session.upload_id,
-            )
-
-    def _build_s3_key(self, dataset_id: int, filename: str) -> str:
-        """构建 S3 对象键。"""
-        return f"datasets/{dataset_id}/{filename}"
-
-    def _create_upload_session(
-        self,
-        upload_id: str,
-        dataset_id: int,
-        s3_key: str,
-        filename: str,
-        content_type: str,
-        total_size: int,
-        part_size: int,
-        owner_id: int,
-    ) -> UploadSession:
-        """创建上传会话对象。"""
-        now = utc_now()
-        return UploadSession(
-            upload_id=upload_id,
-            dataset_id=dataset_id,
-            bucket=self._s3_client._bucket_name,
-            key=s3_key,
-            filename=filename,
-            content_type=content_type,
-            total_size=total_size,
-            part_size=part_size,
-            status=UploadStatus.INITIATED,
-            owner_id=owner_id,
-            created_at=now,
-            updated_at=now,
-        )
