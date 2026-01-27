@@ -122,84 +122,75 @@ class EntitySchema(BaseModel, Generic[Entity]):
 
     @classmethod
     def _infer_enum_from_annotation(cls, field_name: str) -> type[Enum] | None:
-        """从字段类型注解推断枚举类型。
-
-        支持直接枚举类型和 Optional[Enum] / Enum | None 类型。
-        """
+        """从字段类型注解推断枚举类型。支持直接枚举和 Optional[Enum] 类型。"""
         field_info = cls.model_fields.get(field_name)
-        if not field_info:
+        if not field_info or field_info.annotation is None:
             return None
+        return cls._extract_enum_from_type(field_info.annotation)
 
-        annotation = field_info.annotation
-        if annotation is None:
-            return None
-
+    @classmethod
+    def _extract_enum_from_type(cls, annotation: Any) -> type[Enum] | None:
+        """从类型注解中提取枚举类型。"""
         # 直接是枚举类型
         if isinstance(annotation, type) and issubclass(annotation, Enum):
             return annotation
-
-        # 处理 Union 类型（如 Enum | None 或 Optional[Enum]）
-        origin = get_origin(annotation)
-        if origin is not None:
-            # UnionType (Python 3.10+ 的 X | Y) 或 typing.Union
-            args = get_args(annotation)
-            for arg in args:
-                if isinstance(arg, type) and issubclass(arg, Enum):
-                    return arg
-
+        # 处理 Union 类型（Enum | None 或 Optional[Enum]）
+        if get_origin(annotation) is not None:
+            return next(
+                (arg for arg in get_args(annotation) if isinstance(arg, type) and issubclass(arg, Enum)),
+                None,
+            )
         return None
 
     @classmethod
-    def _auto_map_fields(cls, entity: Entity) -> dict[str, Any]:
-        """自动映射实体字段到模式。
-
-        映射规则（按优先级）：
-        1. 跳过 _exclude_fields 中的字段
-        2. 应用 _custom_mappings（如果为字段定义）
-        3. 应用显式 _enum_mappings（包括继承的）
-        4. 自动推断字段类型的枚举映射
-        5. 其他同名字段直接赋值
-        """
-        result: dict[str, Any] = {}
-
-        # 收集所有枚举映射（包括继承的）
-        all_enum_mappings = cls._get_all_enum_mappings()
-
-        # 收集所有自定义映射（包括继承的）
-        all_custom_mappings: dict[str, Callable[[Any], Any]] = {}
+    def _get_all_custom_mappings(cls) -> dict[str, Callable[[Any], Any]]:
+        """收集当前类和所有父类的自定义映射。"""
+        result: dict[str, Callable[[Any], Any]] = {}
         for base in reversed(cls.__mro__):
             if hasattr(base, "_custom_mappings") and base._custom_mappings:
-                all_custom_mappings.update(base._custom_mappings)
+                result.update(base._custom_mappings)
+        return result
 
-        # 获取所有声明的模式字段
+    @classmethod
+    def _get_enum_type(cls, field_name: str, enum_mappings: dict[str, type[Enum]]) -> type[Enum] | None:
+        """获取字段的枚举类型（显式映射优先，否则自动推断）。"""
+        return enum_mappings.get(field_name) or cls._infer_enum_from_annotation(field_name)
+
+    @classmethod
+    def _map_field_value(
+        cls,
+        field_name: str,
+        entity: Entity,
+        custom_mappings: dict[str, Callable[[Any], Any]],
+        enum_mappings: dict[str, type[Enum]],
+    ) -> tuple[bool, Any]:
+        """映射单个字段值。返回 (是否有值, 值)。"""
+        # 自定义映射优先
+        if field_name in custom_mappings:
+            return True, custom_mappings[field_name](entity)
+        # 检查实体是否有该字段
+        if not hasattr(entity, field_name):
+            return False, None
+        value = getattr(entity, field_name)
+        # 枚举转换
+        if value is not None:
+            if enum_type := cls._get_enum_type(field_name, enum_mappings):
+                value = EnumMapper.to_api(value, enum_type)
+        return True, value
+
+    @classmethod
+    def _auto_map_fields(cls, entity: Entity) -> dict[str, Any]:
+        """自动映射实体字段到模式。"""
+        enum_mappings = cls._get_all_enum_mappings()
+        custom_mappings = cls._get_all_custom_mappings()
+        result: dict[str, Any] = {}
+
         for field_name in cls.model_fields:
-            # 跳过排除的字段
             if field_name in cls._exclude_fields:
                 continue
-
-            # 自定义映射优先
-            if field_name in all_custom_mappings:
-                mapper = all_custom_mappings[field_name]
-                result[field_name] = mapper(entity)
-                continue
-
-            # 检查实体是否有该字段
-            if not hasattr(entity, field_name):
-                continue
-
-            value = getattr(entity, field_name)
-
-            # 枚举转换：显式映射 > 自动推断
-            if value is not None:
-                api_enum_class = all_enum_mappings.get(field_name)
-                if api_enum_class is None:
-                    # 尝试从类型注解自动推断
-                    api_enum_class = cls._infer_enum_from_annotation(field_name)
-
-                if api_enum_class is not None:
-                    value = EnumMapper.to_api(value, api_enum_class)
-
-            result[field_name] = value
+            has_value, value = cls._map_field_value(field_name, entity, custom_mappings, enum_mappings)
+            if has_value:
+                result[field_name] = value
 
         return result
 

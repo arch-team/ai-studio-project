@@ -61,6 +61,45 @@ class AuthService:
         self._jwt = jwt_manager or get_jwt_manager()
         self._hasher = password_hasher or get_password_hasher()
 
+    def _check_user_login_eligibility(self, user: User | None, password: str) -> str | None:
+        """检查用户登录资格。返回 failure_reason（None 表示通过）。"""
+        if not user:
+            return "user_not_found"
+        if user.auth_type != AuthType.LOCAL:
+            return "not_local_account"
+        if user.status != UserStatus.ACTIVE:
+            return "account_inactive"
+        if user.is_locked():
+            return "account_locked"
+        if not user.password_hash or not self._hasher.verify_password(password, user.password_hash):
+            return "invalid_password"
+        if user.is_password_expired():
+            return "password_expired"
+        return None
+
+    def _raise_login_error(self, reason: str, user: User | None) -> None:
+        """根据失败原因抛出对应异常。"""
+        error_map = {
+            "user_not_found": lambda: InvalidCredentialsError("Invalid credentials"),
+            "not_local_account": lambda: InvalidCredentialsError("This account uses SSO authentication"),
+            "account_inactive": lambda: InvalidCredentialsError("Account is not active"),
+            "account_locked": lambda: AccountLockedError(locked_until=(user.locked_until.isoformat() if user and user.locked_until else None)),
+            "invalid_password": lambda: InvalidCredentialsError("Invalid credentials"),
+            "password_expired": lambda: PasswordExpiredError(),
+        }
+        raise error_map.get(reason, lambda: InvalidCredentialsError("Unknown error"))()
+
+    def _build_auth_result(self, user: User) -> AuthResult:
+        """构建认证结果。"""
+        assert user.id is not None, "User must have ID after authentication"
+        return AuthResult(
+            user_id=user.id,
+            username=user.username,
+            email=user.email,
+            role=user.role.value,
+            tokens=self._create_token_pair(user),
+        )
+
     async def local_login(
         self,
         username: str,
@@ -68,63 +107,25 @@ class AuthService:
         ip_address: str,
         user_agent: str | None = None,
     ) -> AuthResult:
-        """Authenticate with username and password."""
+        """使用用户名和密码进行本地认证。"""
         user = await self._user_repository.get_by_username(username)
-
-        # Create login attempt record (initially failed)
         attempt = LoginAttempt(
-            id=None,
-            user_id=user.id if user else None,
-            username=username,
-            ip_address=ip_address,
-            user_agent=user_agent,
-            success=False,
-            failure_reason=None,
+            id=None, user_id=user.id if user else None, username=username,
+            ip_address=ip_address, user_agent=user_agent, success=False, failure_reason=None,
         )
 
         try:
-            if not user:
-                attempt.failure_reason = "user_not_found"
-                raise InvalidCredentialsError("Invalid credentials")
+            failure_reason = self._check_user_login_eligibility(user, password)
+            if failure_reason:
+                attempt.failure_reason = failure_reason
+                if failure_reason == "invalid_password" and user:
+                    await self._handle_failed_login(user)
+                self._raise_login_error(failure_reason, user)
 
-            if user.auth_type != AuthType.LOCAL:
-                attempt.failure_reason = "not_local_account"
-                raise InvalidCredentialsError("This account uses SSO authentication")
-
-            if user.status != UserStatus.ACTIVE:
-                attempt.failure_reason = "account_inactive"
-                raise InvalidCredentialsError("Account is not active")
-
-            if user.is_locked():
-                attempt.failure_reason = "account_locked"
-                raise AccountLockedError(locked_until=(user.locked_until.isoformat() if user.locked_until else None))
-
-            if not user.password_hash or not self._hasher.verify_password(password, user.password_hash):
-                await self._handle_failed_login(user)
-                attempt.failure_reason = "invalid_password"
-                raise InvalidCredentialsError("Invalid credentials")
-
-            if user.is_password_expired():
-                attempt.failure_reason = "password_expired"
-                raise PasswordExpiredError()
-
-            # Login successful
             attempt.success = True
-            await self._handle_successful_login(user)
-
-            tokens = self._create_token_pair(user)
-
-            assert user.id is not None, "User must have ID after authentication"
-            return AuthResult(
-                user_id=user.id,
-                username=user.username,
-                email=user.email,
-                role=user.role.value,
-                tokens=tokens,
-            )
-
+            await self._handle_successful_login(user)  # type: ignore
+            return self._build_auth_result(user)  # type: ignore
         finally:
-            # Always record the login attempt
             await self._login_attempt_repository.create(attempt)
 
     async def refresh_access_token(self, refresh_token: str) -> TokenPair:
@@ -142,26 +143,20 @@ class AuthService:
         """Get user by ID."""
         return await self._user_repository.get_by_id(user_id)
 
-    def create_token_pair_for_user(self, user: User) -> TokenPair:
-        """Create token pair for a user (used for SSO login)."""
-        return self._create_token_pair(user)
-
     def _create_token_pair(self, user: User) -> TokenPair:
-        """Create access and refresh token pair."""
-        assert user.id is not None, "User must have ID to create tokens"
-        access_token = self._jwt.create_access_token(
-            user_id=user.id,
-            username=user.username,
-            email=user.email,
-            role=user.role.value,
-        )
-        refresh_token = self._jwt.create_refresh_token(user_id=user.id)
-
+        """创建访问令牌和刷新令牌对（内部使用和 SSO 登录）。"""
+        if user.id is None:
+            raise ValueError("User must have ID to create tokens")
         return TokenPair(
-            access_token=access_token,
-            refresh_token=refresh_token,
+            access_token=self._jwt.create_access_token(
+                user_id=user.id, username=user.username, email=user.email, role=user.role.value,
+            ),
+            refresh_token=self._jwt.create_refresh_token(user_id=user.id),
             expires_in=ACCESS_TOKEN_EXPIRE_MINUTES * 60,
         )
+
+    # 向后兼容的别名
+    create_token_pair_for_user = _create_token_pair
 
     async def _handle_failed_login(self, user: User) -> None:
         """Handle failed login attempt."""

@@ -99,6 +99,22 @@ class BaseApplicationService(Generic[T, ID]):
             return result
         return None
 
+    async def _get_by_field_or_raise(self, field_name: str, field_value: Any) -> T:
+        """根据任意字段获取实体或抛出未找到错误。"""
+        entity = await self._get_by_field_or_none(field_name, field_value)
+        if entity is None:
+            raise self._create_not_found_error(f"{field_name}={field_value}")
+        return entity
+
+    async def _ensure_exists(self, entity_id: ID) -> None:
+        """确保实体存在，否则抛出未找到错误。"""
+        if hasattr(self._repository, "exists"):
+            exists_method = getattr(self._repository, "exists")
+            if not await exists_method(entity_id):
+                raise self._create_not_found_error(str(entity_id))
+        else:
+            await self._get_or_raise(entity_id)
+
     # ========== 验证工具 ==========
 
     async def _validate_unique_field(self, field_name: str, field_value: Any) -> None:
@@ -289,3 +305,36 @@ class BaseApplicationService(Generic[T, ID]):
     ) -> Any:
         """将字符串转换为枚举值。"""
         return EnumMapper.from_string(value, enum_class, default)
+
+    def _ensure_not_terminal(self, entity: Any, action: str = "update") -> None:
+        """确保实体不在终态，否则抛出无效状态转换错误。"""
+        if hasattr(entity, "is_terminal") and entity.is_terminal():
+            current_state = getattr(entity, "status", None) or getattr(entity, "state", "unknown")
+            raise self._create_invalid_transition_error(str(current_state), action)
+
+    async def _with_validation(
+        self,
+        entity_id: ID,
+        allowed_states: list[Any] | None = None,
+        require_non_terminal: bool = False,
+    ) -> T:
+        """获取实体并验证其状态。常用于状态转换操作。
+
+        Args:
+            entity_id: 实体 ID
+            allowed_states: 允许的当前状态列表
+            require_non_terminal: 是否要求实体不在终态
+
+        Returns:
+            验证通过的实体
+        """
+        entity = await self._get_or_raise(entity_id)
+        if require_non_terminal:
+            self._ensure_not_terminal(entity)
+        if allowed_states:
+            current_state = getattr(entity, "status", None) or getattr(entity, "state", None)
+            if current_state and current_state not in allowed_states:
+                raise self._create_invalid_transition_error(
+                    str(current_state), "operation"
+                )
+        return entity

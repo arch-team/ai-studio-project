@@ -61,20 +61,20 @@ class PydanticRepository(Generic[EntityT, ModelT, IdT]):
         data = entity.to_model_dict(exclude=exclude)
         return self._model_class(**data)
 
+    # 默认排除的更新字段
+    _default_exclude_fields: set[str] = {"id", "created_at", "updated_at", "owner_id"}
+
+    def _get_updatable_fields(self) -> list[str]:
+        """获取可更新的字段列表。"""
+        if self._updatable_fields:
+            return self._updatable_fields
+        return [f for f in self._entity_class.model_fields.keys() if f not in self._default_exclude_fields]
+
     def _update_model(self, model: ModelT, entity: EntityT) -> None:
         """更新 ORM 模型（只更新指定字段）。"""
-        if self._updatable_fields:
-            fields = self._updatable_fields
-        else:
-            # 默认：排除 id, created_at, updated_at, owner_id
-            exclude = {"id", "created_at", "updated_at", "owner_id"}
-            fields = [f for f in entity.model_fields.keys() if f not in exclude]
-
-        for field_name in fields:
+        for field_name in self._get_updatable_fields():
             if hasattr(entity, field_name):
-                value = getattr(entity, field_name)
-                # SQLAlchemy Enum 列可以直接接收枚举值
-                setattr(model, field_name, value)
+                setattr(model, field_name, getattr(entity, field_name))
 
     def _get_id_column(self) -> Any:
         """获取主键列。"""

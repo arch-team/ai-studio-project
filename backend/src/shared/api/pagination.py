@@ -45,6 +45,55 @@ COMMON_SORT_FIELDS = ["created_at", "updated_at", "name", "id", "status"]
 
 
 # =========================================================================
+# 统一查询参数
+# =========================================================================
+
+
+class ListingParams(BaseModel):
+    """统一的列表查询参数。简化服务和端点之间的参数传递。"""
+
+    page: int = 1
+    page_size: int = 20
+    sort_by: str = "created_at"
+    sort_order: str = "desc"
+
+    @property
+    def offset(self) -> int:
+        """计算偏移量。"""
+        return (self.page - 1) * self.page_size
+
+    def to_dict(self) -> dict:
+        """转换为字典，便于解包到仓库方法。"""
+        return {
+            "page": self.page,
+            "page_size": self.page_size,
+            "sort_by": self.sort_by,
+            "sort_order": self.sort_order,
+        }
+
+
+def get_listing_params(
+    page: PageParam = 1,
+    page_size: PageSizeParam = 20,
+    sort_by: SortByParam = "created_at",
+    sort_order: SortOrderParam = SortOrder.DESC,
+) -> ListingParams:
+    """FastAPI 依赖：获取统一的列表查询参数。
+
+    使用示例:
+        @router.get("/items")
+        async def list_items(params: ListingParams = Depends(get_listing_params)):
+            return await service.list(**params.to_dict())
+    """
+    return ListingParams(
+        page=page,
+        page_size=page_size,
+        sort_by=sort_by,
+        sort_order=sort_order.value,
+    )
+
+
+# =========================================================================
 # 分页响应
 # =========================================================================
 
