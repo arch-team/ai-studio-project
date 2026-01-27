@@ -1,3 +1,10 @@
-"""Billing API layer (skeleton)."""
+"""Billing API layer."""
 
-__all__ = []
+from .dependencies import get_report_service, get_usage_aggregator_service
+from .endpoints import router
+
+__all__ = [
+    "router",
+    "get_report_service",
+    "get_usage_aggregator_service",
+]

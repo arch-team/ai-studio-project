@@ -11,6 +11,7 @@ from src.modules.audit.api.endpoints import router as audit_router
 # Import module routers
 from src.modules.auth.api.endpoints import router as auth_router
 from src.modules.auth.api.endpoints.users import router as users_router
+from src.modules.billing.api.endpoints import router as billing_router
 from src.modules.datasets.api.endpoints import router as datasets_router
 from src.modules.models.api.endpoints import router as models_router
 from src.modules.monitoring.api.endpoints import router as monitoring_router
@@ -35,5 +36,6 @@ api_router.include_router(datasets_router, prefix="/datasets", tags=["数据集"
 api_router.include_router(spaces_router, prefix="/spaces", tags=["开发空间"])
 api_router.include_router(audit_router, prefix="/audit-logs", tags=["审计日志"])
 api_router.include_router(monitoring_router, prefix="/monitoring", tags=["监控"])
+api_router.include_router(billing_router, tags=["计费报表"])
 
 __all__ = ["api_router"]

@@ -3,6 +3,7 @@
 from .base_repository import BaseRepository
 from .config import Settings, get_settings
 from .database import AsyncSessionLocal, Base, engine, get_db
+from .external import CloudWatchLogsClient, ICloudWatchLogsClient, get_cloudwatch_logs_client
 from .logging_config import (
     bind_context,
     clear_context,
@@ -24,6 +25,10 @@ __all__ = [
     "engine",
     "AsyncSessionLocal",
     "get_db",
+    # External
+    "ICloudWatchLogsClient",
+    "CloudWatchLogsClient",
+    "get_cloudwatch_logs_client",
     # Logging
     "configure_logging",
     "get_logger",
