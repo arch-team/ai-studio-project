@@ -2,4 +2,4 @@
  * Monitoring pages exports.
  */
 
-export {};
+export { MonitoringDashboardPage } from './MonitoringDashboardPage';

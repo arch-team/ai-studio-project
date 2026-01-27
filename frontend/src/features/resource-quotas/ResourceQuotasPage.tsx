@@ -1,9 +1,10 @@
 /**
  * Resource Quotas Page
  *
- * 资源配额管理页面 - 显示资源限制配置列表
+ * 资源配额管理页面 - 显示资源限制配置列表，支持创建/编辑
  */
 
+import { useState } from 'react';
 import {
   Box,
   Button,
@@ -14,40 +15,76 @@ import {
   StatusIndicator,
   Table,
 } from '@cloudscape-design/components';
-import { useState } from 'react';
-import { useResourceLimitConfigs } from './hooks';
-import type { ResourceLimitConfig, Priority, UserRole } from './types';
-
-// 角色显示映射
-const roleLabels: Record<UserRole, string> = {
-  admin: '管理员',
-  project_manager: '项目经理',
-  engineer: '工程师',
-  viewer: '查看者',
-};
-
-// 优先级显示映射
-const priorityLabels: Record<Priority, string> = {
-  high: '高',
-  medium: '中',
-  low: '低',
-};
-
-// 优先级状态颜色
-const priorityStatus: Record<Priority, 'success' | 'warning' | 'info'> = {
-  high: 'success',
-  medium: 'warning',
-  low: 'info',
-};
+import {
+  useResourceLimitConfigs,
+  useCreateResourceLimitConfig,
+  useUpdateResourceLimitConfig,
+} from './hooks';
+import { QuotaFormModal } from './components/QuotaFormModal';
+import type {
+  ResourceLimitConfig,
+  CreateResourceLimitConfigRequest,
+  UpdateResourceLimitConfigRequest,
+} from './types';
+import { ROLE_LABELS, PRIORITY_LABELS, PRIORITY_STATUS } from './types';
 
 export function ResourceQuotasPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 20;
 
+  // Modal 状态
+  const [isModalVisible, setIsModalVisible] = useState(false);
+  const [editingQuota, setEditingQuota] = useState<ResourceLimitConfig | null>(null);
+
+  // 数据查询
   const { data, isLoading, error } = useResourceLimitConfigs({
     page: currentPage,
     page_size: pageSize,
   });
+
+  // 创建/更新 mutations
+  const createMutation = useCreateResourceLimitConfig();
+  const updateMutation = useUpdateResourceLimitConfig();
+
+  // 打开创建 Modal
+  const handleCreate = () => {
+    setEditingQuota(null);
+    setIsModalVisible(true);
+  };
+
+  // 打开编辑 Modal
+  const handleEdit = (quota: ResourceLimitConfig) => {
+    setEditingQuota(quota);
+    setIsModalVisible(true);
+  };
+
+  // 关闭 Modal
+  const handleModalDismiss = () => {
+    setIsModalVisible(false);
+    setEditingQuota(null);
+  };
+
+  // 提交表单
+  const handleSubmit = (
+    formData: CreateResourceLimitConfigRequest | UpdateResourceLimitConfigRequest
+  ) => {
+    if (editingQuota) {
+      updateMutation.mutate(
+        { id: editingQuota.id, data: formData as UpdateResourceLimitConfigRequest },
+        {
+          onSuccess: () => {
+            handleModalDismiss();
+          },
+        }
+      );
+    } else {
+      createMutation.mutate(formData as CreateResourceLimitConfigRequest, {
+        onSuccess: () => {
+          handleModalDismiss();
+        },
+      });
+    }
+  };
 
   const columnDefinitions = [
     {
@@ -59,7 +96,7 @@ export function ResourceQuotasPage() {
     {
       id: 'role',
       header: '适用角色',
-      cell: (item: ResourceLimitConfig) => roleLabels[item.role] || item.role,
+      cell: (item: ResourceLimitConfig) => ROLE_LABELS[item.role] || item.role,
     },
     {
       id: 'max_gpu_per_job',
@@ -85,9 +122,18 @@ export function ResourceQuotasPage() {
       id: 'priority_default',
       header: '默认优先级',
       cell: (item: ResourceLimitConfig) => (
-        <StatusIndicator type={priorityStatus[item.priority_default]}>
-          {priorityLabels[item.priority_default] || item.priority_default}
+        <StatusIndicator type={PRIORITY_STATUS[item.priority_default]}>
+          {PRIORITY_LABELS[item.priority_default] || item.priority_default}
         </StatusIndicator>
+      ),
+    },
+    {
+      id: 'actions',
+      header: '操作',
+      cell: (item: ResourceLimitConfig) => (
+        <Button variant="inline-link" onClick={() => handleEdit(item)}>
+          编辑
+        </Button>
       ),
     },
   ];
@@ -107,7 +153,7 @@ export function ResourceQuotasPage() {
       <Header
         variant="h1"
         actions={
-          <Button variant="primary" disabled>
+          <Button variant="primary" onClick={handleCreate}>
             新建配置
           </Button>
         }
@@ -123,10 +169,7 @@ export function ResourceQuotasPage() {
         sortingDisabled
         variant="container"
         header={
-          <Header
-            variant="h2"
-            counter={data ? `(${data.total})` : undefined}
-          >
+          <Header variant="h2" counter={data ? `(${data.total})` : undefined}>
             资源限制配置
           </Header>
         }
@@ -134,9 +177,7 @@ export function ResourceQuotasPage() {
           <Box textAlign="center" color="inherit" padding="xl">
             <SpaceBetween size="m">
               <b>暂无配置</b>
-              <Box color="text-body-secondary">
-                尚未创建任何资源限制配置
-              </Box>
+              <Box color="text-body-secondary">尚未创建任何资源限制配置</Box>
             </SpaceBetween>
           </Box>
         }
@@ -149,6 +190,14 @@ export function ResourceQuotasPage() {
             />
           ) : undefined
         }
+      />
+
+      <QuotaFormModal
+        visible={isModalVisible}
+        onDismiss={handleModalDismiss}
+        onSubmit={handleSubmit}
+        editingQuota={editingQuota}
+        isLoading={createMutation.isPending || updateMutation.isPending}
       />
     </SpaceBetween>
   );

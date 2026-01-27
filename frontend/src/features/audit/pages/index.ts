@@ -2,4 +2,4 @@
  * Audit pages exports.
  */
 
-export {};
+export { AuditLogsPage } from './AuditLogsPage';

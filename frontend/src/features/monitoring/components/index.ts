@@ -2,4 +2,4 @@
  * Monitoring components exports.
  */
 
-export {};
+export { MetricsCharts } from './MetricsCharts';
