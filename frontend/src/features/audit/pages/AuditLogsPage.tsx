@@ -317,7 +317,6 @@ export function AuditLogsPage() {
                 applyButtonLabel: '应用',
               }}
               placeholder="选择时间范围"
-              ariaLabel="时间范围"
             />
           </div>
         </SpaceBetween>

@@ -61,6 +61,17 @@ export interface UpdateUserRequest {
 
 // === UI Helper Types ===
 
+// Cloudscape StatusIndicator 有效类型
+type StatusIndicatorType =
+  | 'success'
+  | 'warning'
+  | 'error'
+  | 'info'
+  | 'stopped'
+  | 'pending'
+  | 'in-progress'
+  | 'loading';
+
 export const USER_ROLE_LABELS: Record<UserRole, string> = {
   admin: '管理员',
   project_manager: '项目经理',
@@ -68,10 +79,10 @@ export const USER_ROLE_LABELS: Record<UserRole, string> = {
   viewer: '查看者',
 };
 
-export const USER_ROLE_COLORS: Record<UserRole, 'blue' | 'green' | 'grey' | 'pending'> = {
-  admin: 'blue',
-  project_manager: 'green',
-  engineer: 'grey',
+export const USER_ROLE_COLORS: Record<UserRole, StatusIndicatorType> = {
+  admin: 'info',
+  project_manager: 'success',
+  engineer: 'stopped',
   viewer: 'pending',
 };
 
@@ -81,8 +92,8 @@ export const USER_STATUS_LABELS: Record<UserStatus, string> = {
   pending: '待激活',
 };
 
-export const USER_STATUS_COLORS: Record<UserStatus, 'green' | 'red' | 'pending'> = {
-  active: 'green',
-  disabled: 'red',
+export const USER_STATUS_COLORS: Record<UserStatus, StatusIndicatorType> = {
+  active: 'success',
+  disabled: 'error',
   pending: 'pending',
 };

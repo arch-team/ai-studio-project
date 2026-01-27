@@ -170,6 +170,17 @@ export interface AlertListResponse {
 
 // === UI Helper Types ===
 
+// Cloudscape StatusIndicator 有效类型
+type StatusIndicatorType =
+  | 'success'
+  | 'warning'
+  | 'error'
+  | 'info'
+  | 'stopped'
+  | 'pending'
+  | 'in-progress'
+  | 'loading';
+
 export const CLUSTER_STATUS_LABELS: Record<ClusterStatus, string> = {
   creating: '创建中',
   active: '活跃',
@@ -178,15 +189,12 @@ export const CLUSTER_STATUS_LABELS: Record<ClusterStatus, string> = {
   failed: '失败',
 };
 
-export const CLUSTER_STATUS_COLORS: Record<
-  ClusterStatus,
-  'blue' | 'green' | 'pending' | 'red' | 'grey'
-> = {
-  creating: 'blue',
-  active: 'green',
+export const CLUSTER_STATUS_COLORS: Record<ClusterStatus, StatusIndicatorType> = {
+  creating: 'in-progress',
+  active: 'success',
   updating: 'pending',
-  deleting: 'grey',
-  failed: 'red',
+  deleting: 'stopped',
+  failed: 'error',
 };
 
 export const CLUSTER_HEALTH_LABELS: Record<ClusterHealthStatus, string> = {
@@ -195,10 +203,10 @@ export const CLUSTER_HEALTH_LABELS: Record<ClusterHealthStatus, string> = {
   unhealthy: '不健康',
 };
 
-export const CLUSTER_HEALTH_COLORS: Record<ClusterHealthStatus, 'green' | 'pending' | 'red'> = {
-  healthy: 'green',
-  degraded: 'pending',
-  unhealthy: 'red',
+export const CLUSTER_HEALTH_COLORS: Record<ClusterHealthStatus, StatusIndicatorType> = {
+  healthy: 'success',
+  degraded: 'warning',
+  unhealthy: 'error',
 };
 
 export const NODE_STATUS_LABELS: Record<NodeStatus, string> = {
@@ -207,10 +215,10 @@ export const NODE_STATUS_LABELS: Record<NodeStatus, string> = {
   unknown: '未知',
 };
 
-export const NODE_STATUS_COLORS: Record<NodeStatus, 'green' | 'red' | 'grey'> = {
-  ready: 'green',
-  not_ready: 'red',
-  unknown: 'grey',
+export const NODE_STATUS_COLORS: Record<NodeStatus, StatusIndicatorType> = {
+  ready: 'success',
+  not_ready: 'error',
+  unknown: 'stopped',
 };
 
 export const ALERT_SEVERITY_LABELS: Record<Alert['severity'], string> = {
@@ -219,8 +227,8 @@ export const ALERT_SEVERITY_LABELS: Record<Alert['severity'], string> = {
   info: '信息',
 };
 
-export const ALERT_SEVERITY_COLORS: Record<Alert['severity'], 'red' | 'pending' | 'blue'> = {
-  critical: 'red',
-  warning: 'pending',
-  info: 'blue',
+export const ALERT_SEVERITY_COLORS: Record<Alert['severity'], StatusIndicatorType> = {
+  critical: 'error',
+  warning: 'warning',
+  info: 'info',
 };

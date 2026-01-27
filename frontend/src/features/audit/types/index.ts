@@ -82,6 +82,17 @@ export interface AuditLogListResponse {
 
 // === UI Helper Types ===
 
+// Cloudscape StatusIndicator 有效类型
+type StatusIndicatorType =
+  | 'success'
+  | 'warning'
+  | 'error'
+  | 'info'
+  | 'stopped'
+  | 'pending'
+  | 'in-progress'
+  | 'loading';
+
 export const AUDIT_ACTION_LABELS: Record<AuditAction, string> = {
   create: '创建',
   read: '查看',
@@ -97,22 +108,19 @@ export const AUDIT_ACTION_LABELS: Record<AuditAction, string> = {
   logout: '登出',
 };
 
-export const AUDIT_ACTION_COLORS: Record<
-  AuditAction,
-  'green' | 'blue' | 'grey' | 'red' | 'pending'
-> = {
-  create: 'green',
-  read: 'grey',
-  update: 'blue',
-  delete: 'red',
-  submit: 'blue',
+export const AUDIT_ACTION_COLORS: Record<AuditAction, StatusIndicatorType> = {
+  create: 'success',
+  read: 'stopped',
+  update: 'info',
+  delete: 'error',
+  submit: 'info',
   cancel: 'pending',
   pause: 'pending',
-  resume: 'green',
-  start: 'green',
-  stop: 'red',
-  login: 'green',
-  logout: 'grey',
+  resume: 'success',
+  start: 'success',
+  stop: 'error',
+  login: 'success',
+  logout: 'stopped',
 };
 
 export const AUDIT_RESOURCE_TYPE_LABELS: Record<AuditResourceType, string> = {
@@ -132,8 +140,8 @@ export const AUDIT_RESULT_LABELS: Record<AuditResult, string> = {
   partial: '部分成功',
 };
 
-export const AUDIT_RESULT_COLORS: Record<AuditResult, 'green' | 'red' | 'pending'> = {
-  success: 'green',
-  failure: 'red',
-  partial: 'pending',
+export const AUDIT_RESULT_COLORS: Record<AuditResult, StatusIndicatorType> = {
+  success: 'success',
+  failure: 'error',
+  partial: 'warning',
 };
