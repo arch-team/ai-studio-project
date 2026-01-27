@@ -684,11 +684,11 @@
   - **依赖**: T220 (训练指标查询服务), T067 (通用图表组件), T041 (训练任务详情页)
 
 ### 前端页面组件
-- [ ] [T064] [US3] [P] 用户管理页面 - `frontend/src/features/admin/pages/UserManagementPage.tsx`,使用 Cloudscape Table,支持用户创建/编辑/禁用,显示配额使用情况,创建模块 API 层 `frontend/src/features/admin/api/queries.ts`,创建模块类型定义 `frontend/src/features/admin/types/index.ts`
-- [ ] [T065] [US3] [P] 资源配额管理页面 - `frontend/src/features/resources/pages/QuotaManagementPage.tsx`,使用 Cloudscape Form,支持配额模板创建/编辑,显示配额分配统计,创建模块类型定义 `frontend/src/features/resources/types/index.ts`
-- [ ] [T066] [US3] [P] 集群监控仪表盘 - `frontend/src/features/monitoring/pages/MonitoringDashboardPage.tsx`,嵌入 Grafana 仪表盘 (iframe),显示实时指标图表,支持时间范围选择,创建模块 API 层 `frontend/src/features/monitoring/api/queries.ts`
-- [ ] [T067] [US3] [P] 实时指标图表组件 - `frontend/src/features/monitoring/components/MetricsCharts.tsx`,使用 Recharts 渲染 Prometheus 指标,支持多种图表类型 (折线图、柱状图、饼图)
-- [ ] [T067a] [US3] [P] 审计日志查询页面 - `frontend/src/features/admin/pages/AuditLogsPage.tsx`,使用 Cloudscape Table 展示审计日志,支持高级过滤 (用户、操作类型、资源类型、时间范围)、导出 CSV、管理员权限
+- [X] [T064] [US3] [P] 用户管理页面 - `frontend/src/features/admin/pages/UserManagementPage.tsx`,使用 Cloudscape Table,支持用户创建/编辑/禁用,显示配额使用情况,创建模块 API 层 `frontend/src/features/admin/api/queries.ts`,创建模块类型定义 `frontend/src/features/admin/types/index.ts`
+- [X] [T065] [US3] [P] 资源配额管理页面 - `frontend/src/features/resources/pages/QuotaManagementPage.tsx`,使用 Cloudscape Form,支持配额模板创建/编辑,显示配额分配统计,创建模块类型定义 `frontend/src/features/resources/types/index.ts`
+- [X] [T066] [US3] [P] 集群监控仪表盘 - `frontend/src/features/monitoring/pages/MonitoringDashboardPage.tsx`,嵌入 Grafana 仪表盘 (iframe),显示实时指标图表,支持时间范围选择,创建模块 API 层 `frontend/src/features/monitoring/api/queries.ts`
+- [X] [T067] [US3] [P] 实时指标图表组件 - `frontend/src/features/monitoring/components/MetricsCharts.tsx`,使用 Recharts 渲染 Prometheus 指标,支持多种图表类型 (折线图、柱状图、饼图)
+- [X] [T067a] [US3] [P] 审计日志查询页面 - `frontend/src/features/admin/pages/AuditLogsPage.tsx`,使用 Cloudscape Table 展示审计日志,支持高级过滤 (用户、操作类型、资源类型、时间范围)、导出 CSV、管理员权限
 
 **并行执行机会**:
 - 数据库迁移: T053 独立
