@@ -16,3 +16,6 @@ export * from './hooks';
 
 // Events
 export * from './events';
+
+// Components
+export * from './components';

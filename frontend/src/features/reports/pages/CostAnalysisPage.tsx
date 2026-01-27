@@ -1,0 +1,473 @@
+/**
+ * Cost Analysis Dashboard Page
+ *
+ * Task: T075 - 成本分析仪表盘前端页面
+ * 功能:
+ * - 成本概要卡片（总成本、计算、存储、网络）
+ * - 时间范围选择器
+ * - 成本趋势图表
+ * - 成本明细表格
+ * - 聚合维度切换
+ * - 导出功能
+ */
+
+import { useState, useMemo } from 'react';
+import {
+  Box,
+  Button,
+  ColumnLayout,
+  Container,
+  DateRangePicker,
+  Header,
+  PieChart,
+  Select,
+  SpaceBetween,
+  StatusIndicator,
+  Table,
+} from '@cloudscape-design/components';
+import type { DateRangePickerProps, SelectProps } from '@cloudscape-design/components';
+import { useCostAnalysis, useExportReport } from '../api';
+import { CostTrendChart } from '../components';
+import type { CostBreakdown, GroupBy, CostAnalysisFilters } from '../types';
+import { GROUP_BY_LABELS, COST_CATEGORY_LABELS, COST_CATEGORY_COLORS } from '../types';
+
+// === 常量配置 ===
+
+// 时间范围预设选项
+const TIME_RANGE_OPTIONS: DateRangePickerProps.RelativeOption[] = [
+  { key: '7d', amount: 7, unit: 'day', type: 'relative' },
+  { key: '14d', amount: 14, unit: 'day', type: 'relative' },
+  { key: '30d', amount: 30, unit: 'day', type: 'relative' },
+  { key: '90d', amount: 90, unit: 'day', type: 'relative' },
+];
+
+// 聚合维度选项
+const GROUP_BY_OPTIONS: SelectProps.Option[] = [
+  { value: 'category', label: GROUP_BY_LABELS.category },
+  { value: 'user', label: GROUP_BY_LABELS.user },
+  { value: 'project', label: GROUP_BY_LABELS.project },
+  { value: 'resource_type', label: GROUP_BY_LABELS.resource_type },
+];
+
+// === 工具函数 ===
+
+/**
+ * 格式化货币
+ */
+function formatCurrency(value: number): string {
+  if (value >= 1000) {
+    return `$${(value / 1000).toFixed(1)}K`;
+  }
+  return `$${value.toFixed(2)}`;
+}
+
+/**
+ * 计算时间范围
+ */
+function calculateDateRange(
+  dateRange: DateRangePickerProps.Value | null
+): { startDate: string; endDate: string } {
+  const now = new Date();
+  let startDate: Date;
+  let endDate: Date = now;
+
+  if (!dateRange) {
+    // 默认最近 30 天
+    startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+  } else if (dateRange.type === 'relative') {
+    const { amount, unit } = dateRange;
+    const milliseconds =
+      unit === 'minute'
+        ? amount * 60 * 1000
+        : unit === 'hour'
+          ? amount * 60 * 60 * 1000
+          : amount * 24 * 60 * 60 * 1000;
+    startDate = new Date(now.getTime() - milliseconds);
+  } else {
+    startDate = new Date(dateRange.startDate);
+    endDate = new Date(dateRange.endDate);
+  }
+
+  return {
+    startDate: startDate.toISOString().split('T')[0],
+    endDate: endDate.toISOString().split('T')[0],
+  };
+}
+
+// === 子组件 ===
+
+/**
+ * 成本概要卡片
+ */
+function CostSummaryCards({
+  totalCost,
+  computeCost,
+  storageCost,
+  networkCost,
+  loading,
+}: {
+  totalCost: number;
+  computeCost: number;
+  storageCost: number;
+  networkCost: number;
+  loading: boolean;
+}) {
+  const costCards = [
+    { label: '总成本', value: formatCurrency(totalCost), color: '#0073bb' },
+    { label: '计算成本', value: formatCurrency(computeCost), color: '#3184c2' },
+    { label: '存储成本', value: formatCurrency(storageCost), color: '#1d8102' },
+    { label: '网络成本', value: formatCurrency(networkCost), color: '#9469d6' },
+  ];
+
+  if (loading) {
+    return (
+      <ColumnLayout columns={4} variant="text-grid">
+        {costCards.map((card) => (
+          <Container key={card.label}>
+            <Box textAlign="center">
+              <Box variant="awsui-key-label">{card.label}</Box>
+              <Box padding={{ top: 'xs' }}>
+                <StatusIndicator type="loading">加载中</StatusIndicator>
+              </Box>
+            </Box>
+          </Container>
+        ))}
+      </ColumnLayout>
+    );
+  }
+
+  return (
+    <ColumnLayout columns={4} variant="text-grid">
+      {costCards.map((card) => (
+        <Container key={card.label}>
+          <Box textAlign="center">
+            <Box variant="awsui-key-label">{card.label}</Box>
+            <Box variant="awsui-value-large" color="text-status-info">
+              {card.value}
+            </Box>
+          </Box>
+        </Container>
+      ))}
+    </ColumnLayout>
+  );
+}
+
+/**
+ * 成本分布饼图
+ */
+function CostDistributionPie({
+  breakdown,
+  loading,
+}: {
+  breakdown: CostBreakdown[];
+  loading: boolean;
+}) {
+  const pieData = useMemo(() => {
+    return breakdown.map((item) => ({
+      title: COST_CATEGORY_LABELS[item.category] || item.name,
+      value: item.cost_usd,
+      color: COST_CATEGORY_COLORS[item.category] || '#879596',
+    }));
+  }, [breakdown]);
+
+  if (loading) {
+    return (
+      <Container header={<Header variant="h2">成本分布</Header>}>
+        <Box textAlign="center" padding="l">
+          <StatusIndicator type="loading">加载中...</StatusIndicator>
+        </Box>
+      </Container>
+    );
+  }
+
+  if (breakdown.length === 0) {
+    return (
+      <Container header={<Header variant="h2">成本分布</Header>}>
+        <Box textAlign="center" color="text-body-secondary" padding="l">
+          暂无数据
+        </Box>
+      </Container>
+    );
+  }
+
+  return (
+    <Container header={<Header variant="h2">成本分布</Header>}>
+      <PieChart
+        data={pieData}
+        size="medium"
+        variant="donut"
+        hideFilter
+        hideLegend={false}
+        i18nStrings={{
+          detailsValue: '金额',
+          detailsPercentage: '占比',
+          legendAriaLabel: '图例',
+          chartAriaRoleDescription: '成本分布饼图',
+        }}
+        empty={<Box textAlign="center">暂无数据</Box>}
+      />
+    </Container>
+  );
+}
+
+/**
+ * 成本明细表格
+ */
+function CostBreakdownTable({
+  breakdown,
+  loading,
+}: {
+  breakdown: CostBreakdown[];
+  loading: boolean;
+}) {
+  const columnDefinitions = [
+    {
+      id: 'category',
+      header: '类别',
+      cell: (item: CostBreakdown) =>
+        COST_CATEGORY_LABELS[item.category] || item.name,
+      width: 150,
+    },
+    {
+      id: 'cost',
+      header: '成本',
+      cell: (item: CostBreakdown) => formatCurrency(item.cost_usd),
+      width: 120,
+    },
+    {
+      id: 'percentage',
+      header: '占比',
+      cell: (item: CostBreakdown) => `${item.percentage.toFixed(1)}%`,
+      width: 100,
+    },
+    {
+      id: 'count',
+      header: '项目数',
+      cell: (item: CostBreakdown) => item.item_count ?? '-',
+      width: 100,
+    },
+  ];
+
+  return (
+    <Table
+      columnDefinitions={columnDefinitions}
+      items={breakdown}
+      loading={loading}
+      loadingText="加载成本明细..."
+      sortingDisabled
+      variant="container"
+      header={
+        <Header
+          variant="h2"
+          counter={breakdown.length > 0 ? `(${breakdown.length})` : undefined}
+        >
+          成本明细
+        </Header>
+      }
+      empty={
+        <Box textAlign="center" color="inherit" padding="l">
+          <Box color="text-body-secondary">暂无成本数据</Box>
+        </Box>
+      }
+    />
+  );
+}
+
+// === 主组件 ===
+
+/**
+ * 成本分析仪表盘页面
+ */
+export function CostAnalysisPage() {
+  // === 状态管理 ===
+
+  // 时间范围状态 (默认最近 30 天)
+  const [dateRange, setDateRange] = useState<DateRangePickerProps.Value | null>({
+    type: 'relative',
+    amount: 30,
+    unit: 'day',
+  } as DateRangePickerProps.RelativeValue);
+
+  // 聚合维度状态
+  const [groupBy, setGroupBy] = useState<SelectProps.Option | null>(
+    GROUP_BY_OPTIONS[0]
+  );
+
+  // === 计算过滤条件 ===
+  const filters: CostAnalysisFilters = useMemo(() => {
+    const { startDate, endDate } = calculateDateRange(dateRange);
+    return {
+      start_date: startDate,
+      end_date: endDate,
+      group_by: (groupBy?.value as GroupBy) || 'category',
+    };
+  }, [dateRange, groupBy]);
+
+  // === 数据查询 ===
+  const { data, isLoading, error, refetch } = useCostAnalysis(filters);
+  const exportMutation = useExportReport();
+
+  // === 数据处理 ===
+  const summary = data?.summary;
+  const breakdown = data?.breakdown || [];
+  const dailyCosts = data?.daily_costs || [];
+
+  // === 事件处理 ===
+  const handleRefresh = () => {
+    refetch();
+  };
+
+  const handleExport = () => {
+    const { startDate, endDate } = calculateDateRange(dateRange);
+    exportMutation.mutate({
+      report_type: 'cost_analysis',
+      format: 'csv',
+      start_date: startDate,
+      end_date: endDate,
+      group_by: (groupBy?.value as GroupBy) || 'category',
+    });
+  };
+
+  // === 错误处理 ===
+  if (error) {
+    return (
+      <Container>
+        <Box textAlign="center" color="text-status-error" padding="xl">
+          加载失败: {error.message}
+        </Box>
+      </Container>
+    );
+  }
+
+  // === 渲染 ===
+  return (
+    <SpaceBetween size="l" data-testid="cost-analysis-page">
+      {/* 页面标题 */}
+      <Header
+        variant="h1"
+        description="分析和追踪平台资源使用成本"
+        actions={
+          <SpaceBetween direction="horizontal" size="xs">
+            <Button
+              iconName="refresh"
+              onClick={handleRefresh}
+              loading={isLoading}
+            >
+              刷新
+            </Button>
+            <Button
+              iconName="download"
+              onClick={handleExport}
+              loading={exportMutation.isPending}
+            >
+              导出 CSV
+            </Button>
+          </SpaceBetween>
+        }
+      >
+        成本分析
+      </Header>
+
+      {/* 过滤器区域 */}
+      <Container>
+        <SpaceBetween direction="horizontal" size="m">
+          <div style={{ minWidth: 280 }}>
+            <DateRangePicker
+              value={dateRange}
+              onChange={({ detail }) => setDateRange(detail.value)}
+              relativeOptions={TIME_RANGE_OPTIONS}
+              isValidRange={(range) => {
+                if (range?.type === 'absolute') {
+                  const start = new Date(range.startDate);
+                  const end = new Date(range.endDate);
+                  if (start > end) {
+                    return {
+                      valid: false,
+                      errorMessage: '开始时间不能晚于结束时间',
+                    };
+                  }
+                  // 限制最大范围为 365 天
+                  const maxRange = 365 * 24 * 60 * 60 * 1000;
+                  if (end.getTime() - start.getTime() > maxRange) {
+                    return {
+                      valid: false,
+                      errorMessage: '时间范围不能超过 365 天',
+                    };
+                  }
+                }
+                return { valid: true };
+              }}
+              i18nStrings={{
+                todayAriaLabel: '今天',
+                nextMonthAriaLabel: '下个月',
+                previousMonthAriaLabel: '上个月',
+                customRelativeRangeDurationLabel: '持续时间',
+                customRelativeRangeDurationPlaceholder: '输入持续时间',
+                customRelativeRangeOptionLabel: '自定义范围',
+                customRelativeRangeOptionDescription: '设置自定义时间范围',
+                customRelativeRangeUnitLabel: '时间单位',
+                formatRelativeRange: (e) => {
+                  const unitText =
+                    e.unit === 'minute'
+                      ? '分钟'
+                      : e.unit === 'hour'
+                        ? '小时'
+                        : '天';
+                  return `最近 ${e.amount} ${unitText}`;
+                },
+                formatUnit: (e, _n) =>
+                  e === 'minute' ? '分钟' : e === 'hour' ? '小时' : '天',
+                dateTimeConstraintText: '时间范围最长 365 天',
+                relativeModeTitle: '相对时间',
+                absoluteModeTitle: '绝对时间',
+                relativeRangeSelectionHeading: '选择时间范围',
+                startDateLabel: '开始日期',
+                endDateLabel: '结束日期',
+                startTimeLabel: '开始时间',
+                endTimeLabel: '结束时间',
+                clearButtonLabel: '清除',
+                cancelButtonLabel: '取消',
+                applyButtonLabel: '应用',
+              }}
+              placeholder="选择时间范围"
+            />
+          </div>
+
+          <div style={{ minWidth: 180 }}>
+            <Select
+              selectedOption={groupBy}
+              onChange={({ detail }) => setGroupBy(detail.selectedOption)}
+              options={GROUP_BY_OPTIONS}
+              placeholder="聚合维度"
+            />
+          </div>
+        </SpaceBetween>
+      </Container>
+
+      {/* 成本概要卡片 */}
+      <CostSummaryCards
+        totalCost={summary?.total_cost_usd || 0}
+        computeCost={summary?.compute_cost_usd || 0}
+        storageCost={summary?.storage_cost_usd || 0}
+        networkCost={summary?.network_cost_usd || 0}
+        loading={isLoading}
+      />
+
+      {/* 成本趋势图表 */}
+      <CostTrendChart
+        data={dailyCosts}
+        title="成本趋势"
+        loading={isLoading}
+        height={350}
+      />
+
+      {/* 成本分布和明细 */}
+      <ColumnLayout columns={2}>
+        <CostDistributionPie breakdown={breakdown} loading={isLoading} />
+        <CostBreakdownTable breakdown={breakdown} loading={isLoading} />
+      </ColumnLayout>
+    </SpaceBetween>
+  );
+}
+
+export default CostAnalysisPage;

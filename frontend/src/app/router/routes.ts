@@ -49,6 +49,8 @@ export const ROUTES = {
   // 管理员
   ADMIN: '/admin',
   REPORTS: '/reports',
+  REPORTS_RESOURCE_USAGE: '/reports/resource-usage',
+  REPORTS_COST_ANALYSIS: '/reports/cost-analysis',
 
   // 开发工具
   IDE: '/ide',

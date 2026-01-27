@@ -37,6 +37,9 @@ import {
 // Resource Quotas 模块页面
 import { ResourceQuotasPage } from '@features/resource-quotas';
 
+// Reports 模块页面
+import { CostAnalysisPage, ResourceUsageReportPage } from '@features/reports';
+
 // 占位页面组件 (待实现)
 const HomePage = () => <div>首页</div>;
 const LoginPage = () => <div>登录页</div>;
@@ -153,6 +156,22 @@ export const router = createBrowserRouter([
         element: (
           <RoleGuard allowedRoles={['admin', 'team_lead']}>
             <ReportsPage />
+          </RoleGuard>
+        ),
+      },
+      {
+        path: ROUTES.REPORTS_RESOURCE_USAGE,
+        element: (
+          <RoleGuard allowedRoles={['admin', 'team_lead']}>
+            <ResourceUsageReportPage />
+          </RoleGuard>
+        ),
+      },
+      {
+        path: ROUTES.REPORTS_COST_ANALYSIS,
+        element: (
+          <RoleGuard allowedRoles={['admin', 'team_lead']}>
+            <CostAnalysisPage />
           </RoleGuard>
         ),
       },
