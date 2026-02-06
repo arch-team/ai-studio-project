@@ -38,6 +38,8 @@ exclude = '''
 [tool.ruff]
 line-length = 120
 target-version = "py311"
+
+[tool.ruff.lint]
 select = [
     "E",   # pycodestyle errors
     "W",   # pycodestyle warnings
@@ -49,7 +51,7 @@ ignore = [
     "E501",  # line too long (handled by black)
 ]
 
-[tool.ruff.isort]
+[tool.ruff.lint.isort]
 known-first-party = ["src"]
 
 [tool.mypy]
@@ -91,7 +93,7 @@ module = [
     "src.modules.auth.application.services.*",
 ]
 warn_return_any = false
-disable_error_code = ["attr-defined"]
+disable_error_code = ["attr-defined", "var-annotated"]
 
 # 基础仓库类 - 泛型类型限制
 [[tool.mypy.overrides]]

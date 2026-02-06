@@ -128,9 +128,7 @@ class TestPricingModelService:
         assert pricing.gpu_count == 1
         assert pricing.gpu_type == "A10G"
 
-    def test_get_instance_rate_ml_g5_2xlarge(
-        self, pricing_service: PricingModelService
-    ):
+    def test_get_instance_rate_ml_g5_2xlarge(self, pricing_service: PricingModelService):
         """测试获取 ml.g5.2xlarge 定价"""
         pricing = pricing_service.get_instance_rate("ml.g5.2xlarge")
 
@@ -146,21 +144,15 @@ class TestPricingModelService:
 
         assert pricing is None
 
-    def test_get_instance_rate_with_region(
-        self, pricing_service: PricingModelService
-    ):
+    def test_get_instance_rate_with_region(self, pricing_service: PricingModelService):
         """测试按区域获取实例定价"""
         # 默认区域
-        pricing_us_east = pricing_service.get_instance_rate(
-            "p4d.24xlarge", region="us-east-1"
-        )
+        pricing_us_east = pricing_service.get_instance_rate("p4d.24xlarge", region="us-east-1")
         assert pricing_us_east is not None
         assert pricing_us_east.region == "us-east-1"
 
         # 其他区域 (暂不支持, 返回 None)
-        pricing_eu = pricing_service.get_instance_rate(
-            "p4d.24xlarge", region="eu-west-1"
-        )
+        pricing_eu = pricing_service.get_instance_rate("p4d.24xlarge", region="eu-west-1")
         assert pricing_eu is None
 
     def test_get_storage_rate_fsx_lustre(self, pricing_service: PricingModelService):

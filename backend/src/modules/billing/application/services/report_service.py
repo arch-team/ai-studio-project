@@ -10,11 +10,52 @@ from src.modules.datasets.infrastructure.models.dataset_model import DatasetMode
 from src.modules.training.infrastructure.models.training_job_model import TrainingJobModel
 
 
+class CostProportions:
+    """成本比例配置."""
+
+    COMPUTE_RATIO = Decimal("0.7")  # 计算成本占比 70%
+    STORAGE_RATIO = Decimal("0.2")  # 存储成本占比 20%
+    NETWORK_RATIO = Decimal("0.1")  # 网络成本占比 10%
+
+
 class ReportService:
     """报表服务 - 提供资源使用和成本分析报表."""
 
     def __init__(self, session: AsyncSession):
         self._session = session
+
+    def _build_base_conditions(
+        self,
+        start_date: datetime,
+        end_date: datetime,
+        user_id: int | None = None,
+        project_id: str | None = None,
+    ) -> list:
+        """构建基础查询条件.
+
+        Args:
+            start_date: 开始日期
+            end_date: 结束日期
+            user_id: 用户 ID 过滤
+            project_id: 项目 ID 过滤
+
+        Returns:
+            查询条件列表
+        """
+        conditions = [
+            TrainingJobModel.status == "completed",
+            TrainingJobModel.completed_at >= start_date,
+            TrainingJobModel.completed_at <= end_date,
+        ]
+
+        if user_id:
+            conditions.append(TrainingJobModel.owner_id == user_id)
+
+        # Note: project_id 字段暂未在 TrainingJobModel 中实现
+        # if project_id:
+        #     conditions.append(TrainingJobModel.project_id == project_id)
+
+        return conditions
 
     async def get_resource_usage_report(
         self,
@@ -54,17 +95,7 @@ class ReportService:
         period_column = func.date_format(TrainingJobModel.completed_at, date_format).label("period")
 
         # 构建基础查询条件
-        conditions = [
-            TrainingJobModel.status == "completed",
-            TrainingJobModel.completed_at >= start_date,
-            TrainingJobModel.completed_at <= end_date,
-        ]
-
-        if user_id:
-            conditions.append(TrainingJobModel.owner_id == user_id)
-
-        if project_id:
-            conditions.append(TrainingJobModel.project_id == project_id)
+        conditions = self._build_base_conditions(start_date, end_date, user_id, project_id)
 
         # 时间序列数据查询
         stmt = (
@@ -110,7 +141,7 @@ class ReportService:
             total_gb = storage_result.scalar_one()
             # 简化计算: 存储大小 × 时间范围小时数
             duration_hours = (end_date - start_date).total_seconds() / 3600
-            storage_gb_hours = total_gb * Decimal(str(duration_hours))
+            storage_gb_hours = (total_gb or Decimal("0")) * Decimal(str(duration_hours))
 
         # 构建数据点列表
         data_points = [
@@ -173,18 +204,7 @@ class ReportService:
             包含成本时间序列数据、趋势分析和预测的字典
         """
         # 构建查询条件
-        conditions = [
-            TrainingJobModel.status == "completed",
-            TrainingJobModel.completed_at >= start_date,
-            TrainingJobModel.completed_at <= end_date,
-        ]
-
-        if user_id:
-            conditions.append(TrainingJobModel.owner_id == user_id)
-
-        # Note: project_id 字段暂未在 TrainingJobModel 中实现
-        # if project_id:
-        #     conditions.append(TrainingJobModel.project_id == project_id)
+        conditions = self._build_base_conditions(start_date, end_date, user_id, project_id)
 
         # 按天分组查询成本数据
         period_column = func.date_format(TrainingJobModel.completed_at, "%Y-%m-%d").label("period")
@@ -197,15 +217,15 @@ class ReportService:
                 period_column,
                 func.min(TrainingJobModel.completed_at).label("period_start"),
                 func.max(TrainingJobModel.completed_at).label("period_end"),
-                func.coalesce(func.sum(TrainingJobModel.estimated_cost_usd * Decimal("0.7")), Decimal("0")).label(
-                    "compute_cost"
-                ),  # 假设计算成本占 70%
-                func.coalesce(func.sum(TrainingJobModel.estimated_cost_usd * Decimal("0.2")), Decimal("0")).label(
-                    "storage_cost"
-                ),  # 假设存储成本占 20%
-                func.coalesce(func.sum(TrainingJobModel.estimated_cost_usd * Decimal("0.1")), Decimal("0")).label(
-                    "network_cost"
-                ),  # 假设网络成本占 10%
+                func.coalesce(
+                    func.sum(TrainingJobModel.estimated_cost_usd * CostProportions.COMPUTE_RATIO), Decimal("0")
+                ).label("compute_cost"),
+                func.coalesce(
+                    func.sum(TrainingJobModel.estimated_cost_usd * CostProportions.STORAGE_RATIO), Decimal("0")
+                ).label("storage_cost"),
+                func.coalesce(
+                    func.sum(TrainingJobModel.estimated_cost_usd * CostProportions.NETWORK_RATIO), Decimal("0")
+                ).label("network_cost"),
                 func.coalesce(func.sum(TrainingJobModel.estimated_cost_usd), Decimal("0")).label("total_cost"),
             )
             .where(and_(*conditions))

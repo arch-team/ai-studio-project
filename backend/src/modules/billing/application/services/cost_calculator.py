@@ -6,7 +6,7 @@
 from dataclasses import dataclass
 from decimal import Decimal
 from enum import Enum
-from typing import Literal
+from typing import Any, Literal
 
 
 class CostDimension(str, Enum):
@@ -283,6 +283,29 @@ class CostCalculator:
             job_count=len(breakdowns),
         )
 
+    def _allocate_costs(
+        self,
+        costs: dict[Any, list[tuple[int, CostBreakdown]]],
+        dimension: Literal["user", "project", "time_range"],
+    ) -> list[AllocatedCost]:
+        """通用成本分摊方法.
+
+        Args:
+            costs: 维度值到 (job_id, 成本明细) 列表的映射
+            dimension: 分摊维度
+
+        Returns:
+            按指定维度分摊的成本列表
+        """
+        return [
+            AllocatedCost(
+                allocation_key=CostAllocationKey(dimension=dimension, value=key),
+                total_cost=self.aggregate_costs([breakdown for _, breakdown in job_costs]),
+                jobs=[job_id for job_id, _ in job_costs],
+            )
+            for key, job_costs in costs.items()
+        ]
+
     def allocate_by_user(
         self,
         costs: dict[int, list[tuple[int, CostBreakdown]]],  # user_id -> [(job_id, breakdown)]
@@ -295,22 +318,7 @@ class CostCalculator:
         Returns:
             按用户分摊的成本列表
         """
-        allocated_costs: list[AllocatedCost] = []
-
-        for user_id, job_costs in costs.items():
-            job_ids = [job_id for job_id, _ in job_costs]
-            breakdowns = [breakdown for _, breakdown in job_costs]
-            total = self.aggregate_costs(breakdowns)
-
-            allocated_costs.append(
-                AllocatedCost(
-                    allocation_key=CostAllocationKey(dimension="user", value=user_id),
-                    total_cost=total,
-                    jobs=job_ids,
-                )
-            )
-
-        return allocated_costs
+        return self._allocate_costs(costs, "user")
 
     def allocate_by_project(
         self,
@@ -324,22 +332,7 @@ class CostCalculator:
         Returns:
             按项目分摊的成本列表
         """
-        allocated_costs: list[AllocatedCost] = []
-
-        for project_id, job_costs in costs.items():
-            job_ids = [job_id for job_id, _ in job_costs]
-            breakdowns = [breakdown for _, breakdown in job_costs]
-            total = self.aggregate_costs(breakdowns)
-
-            allocated_costs.append(
-                AllocatedCost(
-                    allocation_key=CostAllocationKey(dimension="project", value=project_id),
-                    total_cost=total,
-                    jobs=job_ids,
-                )
-            )
-
-        return allocated_costs
+        return self._allocate_costs(costs, "project")
 
     def allocate_by_time_range(
         self,
@@ -353,19 +346,4 @@ class CostCalculator:
         Returns:
             按时间范围分摊的成本列表
         """
-        allocated_costs: list[AllocatedCost] = []
-
-        for date_str, job_costs in costs.items():
-            job_ids = [job_id for job_id, _ in job_costs]
-            breakdowns = [breakdown for _, breakdown in job_costs]
-            total = self.aggregate_costs(breakdowns)
-
-            allocated_costs.append(
-                AllocatedCost(
-                    allocation_key=CostAllocationKey(dimension="time_range", value=date_str),
-                    total_cost=total,
-                    jobs=job_ids,
-                )
-            )
-
-        return allocated_costs
+        return self._allocate_costs(costs, "time_range")

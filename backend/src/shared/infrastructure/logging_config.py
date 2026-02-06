@@ -13,9 +13,7 @@ from structlog.types import EventDict, Processor
 from src.shared.infrastructure.config import get_settings
 
 
-def _add_module_info(
-    logger: logging.Logger, method_name: str, event_dict: EventDict
-) -> EventDict:
+def _add_module_info(logger: logging.Logger, method_name: str, event_dict: EventDict) -> EventDict:
     """添加模块信息到日志上下文。"""
     # structlog 的 logger 可能是字符串（logger name）或 logging.Logger
     if isinstance(logger, str):
@@ -25,17 +23,13 @@ def _add_module_info(
     return event_dict
 
 
-def _drop_color_message(
-    logger: logging.Logger, method_name: str, event_dict: EventDict
-) -> EventDict:
+def _drop_color_message(logger: logging.Logger, method_name: str, event_dict: EventDict) -> EventDict:
     """移除 uvicorn 产生的 color_message 字段。"""
     event_dict.pop("color_message", None)
     return event_dict
 
 
-def _ensure_exception_info(
-    logger: logging.Logger, method_name: str, event_dict: EventDict
-) -> EventDict:
+def _ensure_exception_info(logger: logging.Logger, method_name: str, event_dict: EventDict) -> EventDict:
     """确保异常信息被正确记录。"""
     if method_name in ("exception", "error"):
         exc_info = event_dict.get("exc_info")
@@ -69,18 +63,22 @@ def get_processors(is_json: bool = False) -> list[Processor]:
 
     if is_json:
         # 生产环境：JSON 格式
-        shared_processors.extend([
-            structlog.processors.format_exc_info,
-            structlog.processors.JSONRenderer(),
-        ])
+        shared_processors.extend(
+            [
+                structlog.processors.format_exc_info,
+                structlog.processors.JSONRenderer(),
+            ]
+        )
     else:
         # 开发环境：彩色控制台输出
-        shared_processors.extend([
-            structlog.dev.ConsoleRenderer(
-                colors=True,
-                exception_formatter=structlog.dev.plain_traceback,
-            ),
-        ])
+        shared_processors.extend(
+            [
+                structlog.dev.ConsoleRenderer(
+                    colors=True,
+                    exception_formatter=structlog.dev.plain_traceback,
+                ),
+            ]
+        )
 
     return shared_processors
 

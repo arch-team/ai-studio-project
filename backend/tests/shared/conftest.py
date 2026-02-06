@@ -4,7 +4,6 @@ Import fixtures from this file in test-level conftest.py files:
     from tests.shared.conftest import *
 """
 
-
 # Re-export all fixtures from fixture modules
 from tests.shared.fixtures.auth import (
     admin_user_data,

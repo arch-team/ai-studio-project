@@ -101,9 +101,7 @@ class EntitySchema(BaseModel, Generic[Entity]):
         """
         if cls._auto_mapping:
             return cls._auto_map_fields(entity)
-        raise NotImplementedError(
-            f"{cls.__name__} 必须实现 _map_entity_fields() 或启用 _auto_mapping"
-        )
+        raise NotImplementedError(f"{cls.__name__} 必须实现 _map_entity_fields() 或启用 _auto_mapping")
 
     @classmethod
     def _get_all_enum_mappings(cls) -> dict[str, type[Enum]]:
@@ -230,9 +228,7 @@ class EntitySchema(BaseModel, Generic[Entity]):
         return cls.model_construct(**fields)
 
     @classmethod
-    def from_entity_list_fast(
-        cls, entities: list[Entity], **extra_fields: Any
-    ) -> list[Self]:
+    def from_entity_list_fast(cls, entities: list[Entity], **extra_fields: Any) -> list[Self]:
         """快速路径：从实体列表批量创建模式实例（跳过验证）。
 
         警告：仅用于可信数据源，不适用于用户输入。

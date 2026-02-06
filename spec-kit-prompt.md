@@ -42,5 +42,5 @@
 
 
 
-/speckit.implement ## Phase 5: US3 (P1) - 资源配额和集群监控 (21 tasks) 的# ## 存储集成服务这个子阶段, 
+/speckit.implement ## Phase 5: US3 (P1) - 资源配额和集群监控 (21 tasks) 的### 前端页面组件 (FR-026)这个子阶段中的T064、T065、T066、T067、T067a
 每个任务按照TDD（测试驱动开发的流程进行），完成后将tasks.md中已经明确完成的任务标记为完成状态

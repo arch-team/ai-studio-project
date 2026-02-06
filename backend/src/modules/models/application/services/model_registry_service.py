@@ -66,7 +66,9 @@ class ModelRegistryService:
             )
         except Exception as e:
             # 组已存在或其他错误，记录并继续
-            logger.debug("model_package_group_creation_skipped", group_name=group_name, error_type=type(e).__name__, error=str(e))
+            logger.debug(
+                "model_package_group_creation_skipped", group_name=group_name, error_type=type(e).__name__, error=str(e)
+            )
 
         # 创建模型包
         model_package_arn = await self._sagemaker.create_model_package(

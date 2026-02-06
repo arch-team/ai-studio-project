@@ -248,9 +248,9 @@ class TestNetworkCostAccuracy:
         assert pricing is not None, f"未找到传输类型 {transfer_type} 的定价"
 
         # 验证定价数据正确性
-        assert pricing.rate_per_gb == expected_rate, (
-            f"定价数据不正确: {transfer_type} 期望费率 {expected_rate}, 实际 {pricing.rate_per_gb}"
-        )
+        assert (
+            pricing.rate_per_gb == expected_rate
+        ), f"定价数据不正确: {transfer_type} 期望费率 {expected_rate}, 实际 {pricing.rate_per_gb}"
 
         cost = NetworkCost.calculate(
             data_transfer_gb=transfer_gb,

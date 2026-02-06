@@ -26,6 +26,9 @@ from src.shared.domain.interfaces import IQuotaChecker
 class TrainingJobService(BaseApplicationService[TrainingJob, int]):
     """Service for managing training jobs."""
 
+    # 可更新字段列表
+    UPDATABLE_FIELDS = ["priority", "description", "max_epochs", "checkpoint_interval"]
+
     def __init__(
         self,
         repository: ITrainingJobRepository,
@@ -59,6 +62,18 @@ class TrainingJobService(BaseApplicationService[TrainingJob, int]):
 
         # Save to database
         return await self._repository.create(job)
+
+    async def _stop_job_if_running(self, job: TrainingJob) -> None:
+        """如果任务正在运行，则停止它。
+
+        Args:
+            job: 训练任务实体
+        """
+        if job.status in (JobStatus.RUNNING, JobStatus.SUBMITTED):
+            await self._hyperpod_client.stop_training_job(
+                cluster_name=self._cluster_name,
+                job_name=job.job_name,
+            )
 
     async def _check_resource_quota(self, owner_id: int, data: dict) -> None:
         """检查资源配额
@@ -94,7 +109,6 @@ class TrainingJobService(BaseApplicationService[TrainingJob, int]):
                 limit=available,
                 requested=total_gpus,
             )
-
 
     async def _submit_to_hyperpod(self, job: TrainingJob) -> None:
         """提交任务到 HyperPod
@@ -184,14 +198,32 @@ class TrainingJobService(BaseApplicationService[TrainingJob, int]):
         if job.is_terminal():
             raise InvalidStateTransitionError("TrainingJob", job.status.value, JobStatus.FAILED.value)
 
-        if job.status in (JobStatus.RUNNING, JobStatus.SUBMITTED):
-            await self._hyperpod_client.stop_training_job(
-                cluster_name=self._cluster_name,
-                job_name=job.job_name,
-            )
-
+        await self._stop_job_if_running(job)
         job.fail(error_message="Job cancelled by user", failure_reason="CANCELLED_BY_USER")
         return await self._repository.update(job)
+
+    def _apply_updates(self, job: TrainingJob, updates: dict) -> None:
+        """应用更新到任务。
+
+        Args:
+            job: 训练任务实体
+            updates: 更新数据字典
+        """
+        from src.shared.utils import EnumMapper
+
+        for field in self.UPDATABLE_FIELDS:
+            if field not in updates:
+                continue
+
+            value = updates[field]
+            if field == "priority" and value is not None:
+                # 特殊处理枚举类型
+                new_priority = EnumMapper.from_string(value, JobPriority, job.priority)
+                if new_priority is not None:
+                    job.priority = new_priority
+            elif value is not None or field == "description":
+                # description 允许设为 None，其他字段跳过 None 值
+                setattr(job, field, value)
 
     async def update_job(self, job_id: int, data: dict) -> TrainingJob:
         """Update a training job.
@@ -211,34 +243,15 @@ class TrainingJobService(BaseApplicationService[TrainingJob, int]):
                 target_state="update",
             )
 
-        # Update allowed fields
-        if "priority" in data and data["priority"] is not None:
-            from src.shared.utils import EnumMapper
-
-            new_priority = EnumMapper.from_string(data["priority"], JobPriority, job.priority)
-            if new_priority is not None:
-                job.priority = new_priority
-
-        if "description" in data:
-            job.description = data["description"]
-
-        if "max_epochs" in data and data["max_epochs"] is not None:
-            job.max_epochs = data["max_epochs"]
-
-        if "checkpoint_interval" in data and data["checkpoint_interval"] is not None:
-            job.checkpoint_interval = data["checkpoint_interval"]
-
+        self._apply_updates(job, data)
         return await self._repository.update(job)
 
     async def delete_job(self, job_id: int) -> None:
         """Delete a training job (soft delete)."""
         job = await self._get_or_raise(job_id)
 
-        if job.status in (JobStatus.RUNNING, JobStatus.SUBMITTED):
-            await self._hyperpod_client.stop_training_job(
-                cluster_name=self._cluster_name,
-                job_name=job.job_name,
-            )
+        if not job.is_terminal():
+            await self._stop_job_if_running(job)
             job.fail(error_message="Job deleted by user", failure_reason="USER_DELETED")
             await self._repository.update(job)
 

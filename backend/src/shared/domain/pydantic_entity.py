@@ -34,12 +34,12 @@ class PydanticEntity(BaseModel):
     """
 
     model_config = ConfigDict(
-        from_attributes=True,       # 支持从 ORM 模型转换
-        validate_assignment=True,   # 赋值时触发验证
+        from_attributes=True,  # 支持从 ORM 模型转换
+        validate_assignment=True,  # 赋值时触发验证
         str_strip_whitespace=True,  # 字符串去空格
-        use_enum_values=False,      # 保留枚举对象（不转为值）
+        use_enum_values=False,  # 保留枚举对象（不转为值）
         arbitrary_types_allowed=True,  # 允许任意类型
-        extra="ignore",             # 忽略额外字段
+        extra="ignore",  # 忽略额外字段
     )
 
     # 通用字段 - 子类可选择覆盖
@@ -107,10 +107,7 @@ class PydanticEntity(BaseModel):
             elif isinstance(value, dict):
                 result[key] = self._convert_enums_to_values(value)
             elif isinstance(value, list):
-                result[key] = [
-                    v.value if isinstance(v, Enum) else v
-                    for v in value
-                ]
+                result[key] = [v.value if isinstance(v, Enum) else v for v in value]
             else:
                 result[key] = value
         return result

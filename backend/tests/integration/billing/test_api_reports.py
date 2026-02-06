@@ -104,7 +104,9 @@ class TestCostAnalysisReportAPI:
         assert "page" in data
         assert "page_size" in data
 
-    async def test_get_cost_analysis_report_with_cost_type_filter(self, client: AsyncClient, engineer_auth_headers: dict):
+    async def test_get_cost_analysis_report_with_cost_type_filter(
+        self, client: AsyncClient, engineer_auth_headers: dict
+    ):
         """测试成本类型过滤."""
         start_date = datetime.utcnow() - timedelta(days=7)
         end_date = datetime.utcnow()

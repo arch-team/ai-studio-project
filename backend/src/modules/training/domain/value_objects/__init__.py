@@ -6,7 +6,13 @@ from .checkpoint_enums import (
     CheckpointType,
     StorageTier,
 )
-from .job_status import DistributionStrategy, JobPriority, JobStatus, SpotInterruptionBehavior
+from .job_status import (
+    DistributionStrategy,
+    JobPriority,
+    JobStateTransition,
+    JobStatus,
+    SpotInterruptionBehavior,
+)
 from .pod_statistics import PodStatistics
 from .template_visibility import TemplateVisibility
 from .training_metrics import TrainingMetrics
@@ -17,6 +23,7 @@ __all__ = [
     "JobPriority",
     "DistributionStrategy",
     "SpotInterruptionBehavior",
+    "JobStateTransition",
     # Template enums
     "TemplateVisibility",
     # Checkpoint enums

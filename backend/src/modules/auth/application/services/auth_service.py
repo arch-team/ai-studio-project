@@ -83,7 +83,9 @@ class AuthService:
             "user_not_found": lambda: InvalidCredentialsError("Invalid credentials"),
             "not_local_account": lambda: InvalidCredentialsError("This account uses SSO authentication"),
             "account_inactive": lambda: InvalidCredentialsError("Account is not active"),
-            "account_locked": lambda: AccountLockedError(locked_until=(user.locked_until.isoformat() if user and user.locked_until else None)),
+            "account_locked": lambda: AccountLockedError(
+                locked_until=(user.locked_until.isoformat() if user and user.locked_until else None)
+            ),
             "invalid_password": lambda: InvalidCredentialsError("Invalid credentials"),
             "password_expired": lambda: PasswordExpiredError(),
         }
@@ -110,8 +112,13 @@ class AuthService:
         """使用用户名和密码进行本地认证。"""
         user = await self._user_repository.get_by_username(username)
         attempt = LoginAttempt(
-            id=None, user_id=user.id if user else None, username=username,
-            ip_address=ip_address, user_agent=user_agent, success=False, failure_reason=None,
+            id=None,
+            user_id=user.id if user else None,
+            username=username,
+            ip_address=ip_address,
+            user_agent=user_agent,
+            success=False,
+            failure_reason=None,
         )
 
         try:
@@ -149,7 +156,10 @@ class AuthService:
             raise ValueError("User must have ID to create tokens")
         return TokenPair(
             access_token=self._jwt.create_access_token(
-                user_id=user.id, username=user.username, email=user.email, role=user.role.value,
+                user_id=user.id,
+                username=user.username,
+                email=user.email,
+                role=user.role.value,
             ),
             refresh_token=self._jwt.create_refresh_token(user_id=user.id),
             expires_in=ACCESS_TOKEN_EXPIRE_MINUTES * 60,

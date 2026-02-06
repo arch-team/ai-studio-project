@@ -34,10 +34,7 @@ class AuditLogRepositoryImpl(PydanticRepository[AuditLog, AuditLogModel, int], I
     async def get_all(self, limit: int = 100, offset: int = 0) -> list[AuditLog]:
         """Get all audit logs with pagination."""
         result = await self._session.execute(
-            select(AuditLogModel)
-            .order_by(AuditLogModel.created_at.desc())
-            .limit(limit)
-            .offset(offset)
+            select(AuditLogModel).order_by(AuditLogModel.created_at.desc()).limit(limit).offset(offset)
         )
         return [self._to_entity(model) for model in result.scalars()]
 

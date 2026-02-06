@@ -89,9 +89,7 @@ class PydanticRepository(Generic[EntityT, ModelT, IdT]):
     async def get_by_id(self, id: IdT) -> EntityT | None:
         """根据主键获取实体。"""
         id_column = self._get_id_column()
-        result = await self._session.execute(
-            select(self._model_class).where(id_column == id)
-        )
+        result = await self._session.execute(select(self._model_class).where(id_column == id))
         model = result.scalar_one_or_none()
         return self._to_entity(model) if model else None
 
@@ -115,9 +113,7 @@ class PydanticRepository(Generic[EntityT, ModelT, IdT]):
         id_value = entity.id
         id_column = self._get_id_column()
 
-        result = await self._session.execute(
-            select(self._model_class).where(id_column == id_value)
-        )
+        result = await self._session.execute(select(self._model_class).where(id_column == id_value))
         model = result.scalar_one_or_none()
 
         if model is None:
@@ -136,9 +132,7 @@ class PydanticRepository(Generic[EntityT, ModelT, IdT]):
     async def delete(self, id: IdT) -> bool:
         """硬删除实体。"""
         id_column = self._get_id_column()
-        result = await self._session.execute(
-            select(self._model_class).where(id_column == id)
-        )
+        result = await self._session.execute(select(self._model_class).where(id_column == id))
         model = result.scalar_one_or_none()
 
         if model is None:
@@ -154,9 +148,7 @@ class PydanticRepository(Generic[EntityT, ModelT, IdT]):
             return await self.delete(id)
 
         id_column = self._get_id_column()
-        result = await self._session.execute(
-            select(self._model_class).where(id_column == id)
-        )
+        result = await self._session.execute(select(self._model_class).where(id_column == id))
         model = result.scalar_one_or_none()
 
         if model is None:
@@ -175,9 +167,7 @@ class PydanticRepository(Generic[EntityT, ModelT, IdT]):
     async def exists(self, id: IdT) -> bool:
         """检查实体是否存在。"""
         id_column = self._get_id_column()
-        result = await self._session.execute(
-            select(func.count(id_column)).where(id_column == id)
-        )
+        result = await self._session.execute(select(func.count(id_column)).where(id_column == id))
         count = result.scalar() or 0
         return count > 0
 
@@ -263,9 +253,7 @@ class PydanticRepository(Generic[EntityT, ModelT, IdT]):
             return []
 
         id_column = self._get_id_column()
-        result = await self._session.execute(
-            select(self._model_class).where(id_column.in_(ids))
-        )
+        result = await self._session.execute(select(self._model_class).where(id_column.in_(ids)))
         models = result.scalars().all()
 
         return [self._to_entity(model) for model in models]

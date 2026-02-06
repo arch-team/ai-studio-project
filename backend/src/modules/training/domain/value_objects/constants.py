@@ -33,13 +33,11 @@ GPU_INSTANCE_MAPPING: Final[dict[str, int]] = {
     # P4 系列 (NVIDIA A100)
     "ml.p4d.24xlarge": 8,
     "ml.p4de.24xlarge": 8,
-
     # P3 系列 (NVIDIA V100)
     "ml.p3.2xlarge": 1,
     "ml.p3.8xlarge": 4,
     "ml.p3.16xlarge": 8,
     "ml.p3dn.24xlarge": 8,
-
     # G4 系列 (NVIDIA T4)
     "ml.g4dn.xlarge": 1,
     "ml.g4dn.2xlarge": 1,
@@ -48,7 +46,6 @@ GPU_INSTANCE_MAPPING: Final[dict[str, int]] = {
     "ml.g4dn.12xlarge": 4,
     "ml.g4dn.16xlarge": 1,
     "ml.g4dn.metal": 8,
-
     # G5 系列 (NVIDIA A10G)
     "ml.g5.xlarge": 1,
     "ml.g5.2xlarge": 1,
@@ -58,7 +55,6 @@ GPU_INSTANCE_MAPPING: Final[dict[str, int]] = {
     "ml.g5.16xlarge": 1,
     "ml.g5.24xlarge": 4,
     "ml.g5.48xlarge": 8,
-
     # TRN1 系列 (AWS Trainium)
     "ml.trn1.2xlarge": 1,
     "ml.trn1.32xlarge": 16,
@@ -79,7 +75,6 @@ HYPERPOD_STATUS_MAPPING: Final[dict[str, str]] = {
     "Completed": "completed",
     "Failed": "failed",
     "Error": "failed",
-
     # Kueue Task Governance 状态
     "Suspended": "suspended",
     "Preempted": "preempted",
