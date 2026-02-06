@@ -3,6 +3,7 @@
  * RESTful API calls to backend /api/v1/training-jobs endpoints.
  */
 
+import { apiClient } from '@shared/api/client';
 import type {
   TrainingJobListResponse,
   TrainingJobDetail,
@@ -16,48 +17,6 @@ import type {
   TrainingMetricsResponse,
 } from '../types';
 
-const API_BASE = '/api/v1';
-
-/**
- * Get authorization header from localStorage.
- */
-function getAuthHeaders(): HeadersInit {
-  return {
-    'Content-Type': 'application/json',
-    Authorization: `Bearer ${localStorage.getItem('access_token') || ''}`,
-  };
-}
-
-/**
- * Build URL with query parameters.
- */
-function buildUrl(path: string, params?: Record<string, unknown>): string {
-  const url = new URL(`${API_BASE}${path}`, window.location.origin);
-  if (params) {
-    Object.entries(params).forEach(([key, value]) => {
-      if (value !== undefined && value !== null) {
-        if (Array.isArray(value)) {
-          value.forEach((v) => url.searchParams.append(key, String(v)));
-        } else {
-          url.searchParams.set(key, String(value));
-        }
-      }
-    });
-  }
-  return url.toString();
-}
-
-/**
- * Handle API response and errors.
- */
-async function handleResponse<T>(response: Response): Promise<T> {
-  if (!response.ok) {
-    const errorData = await response.json().catch(() => ({}));
-    throw new Error(errorData.detail || errorData.message || `HTTP Error: ${response.status}`);
-  }
-  return response.json();
-}
-
 // === List and Query ===
 
 /**
@@ -66,34 +25,24 @@ async function handleResponse<T>(response: Response): Promise<T> {
 export async function fetchTrainingJobs(
   filters: TrainingJobFilters = {}
 ): Promise<TrainingJobListResponse> {
-  const url = buildUrl('/training-jobs', {
-    page: filters.page,
-    page_size: filters.page_size,
-    status: filters.status,
-    priority: filters.priority,
-    owner_id: filters.owner_id,
-    sort_by: filters.sort_by,
-    sort_order: filters.sort_order,
+  return apiClient.get<TrainingJobListResponse>('/training-jobs', {
+    params: {
+      page: filters.page,
+      page_size: filters.page_size,
+      status: filters.status,
+      priority: filters.priority,
+      owner_id: filters.owner_id,
+      sort_by: filters.sort_by,
+      sort_order: filters.sort_order,
+    },
   });
-
-  const response = await fetch(url, {
-    method: 'GET',
-    headers: getAuthHeaders(),
-  });
-
-  return handleResponse<TrainingJobListResponse>(response);
 }
 
 /**
  * Fetch a single training job by ID.
  */
 export async function fetchTrainingJob(id: number): Promise<TrainingJobDetail> {
-  const response = await fetch(`${API_BASE}/training-jobs/${id}`, {
-    method: 'GET',
-    headers: getAuthHeaders(),
-  });
-
-  return handleResponse<TrainingJobDetail>(response);
+  return apiClient.get<TrainingJobDetail>(`/training-jobs/${id}`);
 }
 
 // === Create, Update, Delete ===
@@ -104,13 +53,7 @@ export async function fetchTrainingJob(id: number): Promise<TrainingJobDetail> {
 export async function createTrainingJob(
   data: CreateTrainingJobRequest
 ): Promise<TrainingJobDetail> {
-  const response = await fetch(`${API_BASE}/training-jobs`, {
-    method: 'POST',
-    headers: getAuthHeaders(),
-    body: JSON.stringify(data),
-  });
-
-  return handleResponse<TrainingJobDetail>(response);
+  return apiClient.post<TrainingJobDetail>('/training-jobs', data);
 }
 
 /**
@@ -120,28 +63,14 @@ export async function updateTrainingJob(
   id: number,
   data: UpdateTrainingJobRequest
 ): Promise<TrainingJobDetail> {
-  const response = await fetch(`${API_BASE}/training-jobs/${id}`, {
-    method: 'PUT',
-    headers: getAuthHeaders(),
-    body: JSON.stringify(data),
-  });
-
-  return handleResponse<TrainingJobDetail>(response);
+  return apiClient.put<TrainingJobDetail>(`/training-jobs/${id}`, data);
 }
 
 /**
  * Delete (soft) a training job.
  */
 export async function deleteTrainingJob(id: number): Promise<void> {
-  const response = await fetch(`${API_BASE}/training-jobs/${id}`, {
-    method: 'DELETE',
-    headers: getAuthHeaders(),
-  });
-
-  if (!response.ok) {
-    const errorData = await response.json().catch(() => ({}));
-    throw new Error(errorData.detail || `HTTP Error: ${response.status}`);
-  }
+  return apiClient.delete(`/training-jobs/${id}`);
 }
 
 // === Job Control Actions ===
@@ -150,24 +79,14 @@ export async function deleteTrainingJob(id: number): Promise<void> {
  * Pause a running training job.
  */
 export async function pauseTrainingJob(id: number): Promise<TrainingJobDetail> {
-  const response = await fetch(`${API_BASE}/training-jobs/${id}/pause`, {
-    method: 'POST',
-    headers: getAuthHeaders(),
-  });
-
-  return handleResponse<TrainingJobDetail>(response);
+  return apiClient.post<TrainingJobDetail>(`/training-jobs/${id}/pause`);
 }
 
 /**
  * Resume a paused training job.
  */
 export async function resumeTrainingJob(id: number): Promise<TrainingJobDetail> {
-  const response = await fetch(`${API_BASE}/training-jobs/${id}/resume`, {
-    method: 'POST',
-    headers: getAuthHeaders(),
-  });
-
-  return handleResponse<TrainingJobDetail>(response);
+  return apiClient.post<TrainingJobDetail>(`/training-jobs/${id}/resume`);
 }
 
 // === Checkpoints ===
@@ -178,12 +97,7 @@ export async function resumeTrainingJob(id: number): Promise<TrainingJobDetail> 
 export async function fetchTrainingJobCheckpoints(
   jobId: number
 ): Promise<CheckpointListResponse> {
-  const response = await fetch(`${API_BASE}/training-jobs/${jobId}/checkpoints`, {
-    method: 'GET',
-    headers: getAuthHeaders(),
-  });
-
-  return handleResponse<CheckpointListResponse>(response);
+  return apiClient.get<CheckpointListResponse>(`/training-jobs/${jobId}/checkpoints`);
 }
 
 /**
@@ -193,13 +107,7 @@ export async function createCheckpoint(
   jobId: number,
   data?: CreateCheckpointRequest
 ): Promise<Checkpoint> {
-  const response = await fetch(`${API_BASE}/training-jobs/${jobId}/checkpoints`, {
-    method: 'POST',
-    headers: getAuthHeaders(),
-    body: JSON.stringify(data || {}),
-  });
-
-  return handleResponse<Checkpoint>(response);
+  return apiClient.post<Checkpoint>(`/training-jobs/${jobId}/checkpoints`, data || {});
 }
 
 // === Logs and Metrics ===
@@ -216,14 +124,9 @@ export async function fetchTrainingJobLogs(
     next_token?: string;
   }
 ): Promise<TrainingLogsResponse> {
-  const url = buildUrl(`/training-jobs/${jobId}/logs`, options);
-
-  const response = await fetch(url, {
-    method: 'GET',
-    headers: getAuthHeaders(),
+  return apiClient.get<TrainingLogsResponse>(`/training-jobs/${jobId}/logs`, {
+    params: options,
   });
-
-  return handleResponse<TrainingLogsResponse>(response);
 }
 
 /**
@@ -238,17 +141,12 @@ export async function fetchTrainingJobMetrics(
     step?: number;
   }
 ): Promise<TrainingMetricsResponse> {
-  const url = buildUrl(`/training-jobs/${jobId}/metrics`, {
-    metric_names: options?.metric_names,
-    start_time: options?.start_time,
-    end_time: options?.end_time,
-    step: options?.step,
+  return apiClient.get<TrainingMetricsResponse>(`/training-jobs/${jobId}/metrics`, {
+    params: {
+      metric_names: options?.metric_names,
+      start_time: options?.start_time,
+      end_time: options?.end_time,
+      step: options?.step,
+    },
   });
-
-  const response = await fetch(url, {
-    method: 'GET',
-    headers: getAuthHeaders(),
-  });
-
-  return handleResponse<TrainingMetricsResponse>(response);
 }

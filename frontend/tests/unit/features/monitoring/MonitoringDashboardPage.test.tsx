@@ -96,11 +96,13 @@ const mockAlertsResponse: AlertListResponse = {
 const mockUseClusters = vi.fn();
 const mockUseResourceUtilization = vi.fn();
 const mockUseAlerts = vi.fn();
+const mockUseMetricSeries = vi.fn();
 
 vi.mock('@features/monitoring/api', () => ({
   useClusters: () => mockUseClusters(),
   useResourceUtilization: () => mockUseResourceUtilization(),
   useAlerts: () => mockUseAlerts(),
+  useMetricSeries: (...args: unknown[]) => mockUseMetricSeries(...args),
 }));
 
 describe('MonitoringDashboardPage', () => {
@@ -122,6 +124,12 @@ describe('MonitoringDashboardPage', () => {
 
     mockUseAlerts.mockReturnValue({
       data: mockAlertsResponse,
+      isLoading: false,
+      error: null,
+    });
+
+    mockUseMetricSeries.mockReturnValue({
+      data: [],
       isLoading: false,
       error: null,
     });
@@ -165,7 +173,7 @@ describe('MonitoringDashboardPage', () => {
   describe('资源利用率卡片', () => {
     it('should display resource utilization section', () => {
       renderWithProviders(<MonitoringDashboardPage />);
-      expect(screen.getByText(/资源利用率/i)).toBeInTheDocument();
+      expect(screen.getAllByText(/资源利用率/i).length).toBeGreaterThan(0);
     });
 
     it('should display CPU utilization', () => {

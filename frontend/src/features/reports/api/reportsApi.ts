@@ -5,6 +5,7 @@
  * 调用后端报表 API 端点
  */
 
+import { apiClient } from '@shared/api/client';
 import type {
   CostAnalysisResponse,
   CostAnalysisFilters,
@@ -13,43 +14,21 @@ import type {
   ReportExportFilters,
 } from '../types';
 
-const API_BASE = '/api/v1';
-
-/**
- * 构建查询参数字符串
- */
-function buildQueryString(
-  params: Record<string, string | number | boolean | undefined>
-): string {
-  const searchParams = new URLSearchParams();
-  Object.entries(params).forEach(([key, value]) => {
-    if (value !== undefined && value !== null && value !== '') {
-      searchParams.append(key, String(value));
-    }
-  });
-  const queryString = searchParams.toString();
-  return queryString ? `?${queryString}` : '';
-}
-
 /**
  * 获取成本分析报表
  */
 export async function fetchCostAnalysis(
   filters: CostAnalysisFilters = {}
 ): Promise<CostAnalysisResponse> {
-  const queryString = buildQueryString({
-    start_date: filters.start_date,
-    end_date: filters.end_date,
-    group_by: filters.group_by,
-    user_id: filters.user_id,
-    project_id: filters.project_id,
+  return apiClient.get<CostAnalysisResponse>('/reports/cost-analysis', {
+    params: {
+      start_date: filters.start_date,
+      end_date: filters.end_date,
+      group_by: filters.group_by,
+      user_id: filters.user_id,
+      project_id: filters.project_id,
+    },
   });
-
-  const response = await fetch(`${API_BASE}/reports/cost-analysis${queryString}`);
-  if (!response.ok) {
-    throw new Error(`获取成本分析报表失败: ${response.statusText}`);
-  }
-  return response.json();
 }
 
 /**
@@ -58,19 +37,15 @@ export async function fetchCostAnalysis(
 export async function fetchResourceUsage(
   filters: ResourceUsageFilters = {}
 ): Promise<ResourceUsageResponse> {
-  const queryString = buildQueryString({
-    start_date: filters.start_date,
-    end_date: filters.end_date,
-    group_by: filters.group_by,
-    user_id: filters.user_id,
-    resource_type: filters.resource_type,
+  return apiClient.get<ResourceUsageResponse>('/reports/resource-usage', {
+    params: {
+      start_date: filters.start_date,
+      end_date: filters.end_date,
+      group_by: filters.group_by,
+      user_id: filters.user_id,
+      resource_type: filters.resource_type,
+    },
   });
-
-  const response = await fetch(`${API_BASE}/reports/resource-usage${queryString}`);
-  if (!response.ok) {
-    throw new Error(`获取资源使用报表失败: ${response.statusText}`);
-  }
-  return response.json();
 }
 
 /**
@@ -79,17 +54,13 @@ export async function fetchResourceUsage(
 export async function exportReport(
   filters: ReportExportFilters
 ): Promise<Blob> {
-  const queryString = buildQueryString({
-    report_type: filters.report_type,
-    format: filters.format,
-    start_date: filters.start_date,
-    end_date: filters.end_date,
-    group_by: filters.group_by,
+  return apiClient.download('/reports/export', {
+    params: {
+      report_type: filters.report_type,
+      format: filters.format,
+      start_date: filters.start_date,
+      end_date: filters.end_date,
+      group_by: filters.group_by,
+    },
   });
-
-  const response = await fetch(`${API_BASE}/reports/export${queryString}`);
-  if (!response.ok) {
-    throw new Error(`导出报表失败: ${response.statusText}`);
-  }
-  return response.blob();
 }

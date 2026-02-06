@@ -2,6 +2,7 @@
  * Billing API client functions.
  */
 
+import { apiClient } from '@shared/api/client';
 import type {
   CostReportResponse,
   CostFilters,
@@ -10,28 +11,22 @@ import type {
   ResourceCostFilters,
 } from '../types';
 
-const API_BASE = '/api/v1';
-
 /**
  * Fetch cost report with summary and breakdown.
  */
 export async function fetchCostReport(
   filters: CostFilters = {}
 ): Promise<CostReportResponse> {
-  const params = new URLSearchParams();
-
-  if (filters.period) params.append('period', filters.period);
-  if (filters.start_date) params.append('start_date', filters.start_date);
-  if (filters.end_date) params.append('end_date', filters.end_date);
-  if (filters.user_id) params.append('user_id', String(filters.user_id));
-  if (filters.resource_type) params.append('resource_type', filters.resource_type);
-  if (filters.category) params.append('category', filters.category);
-
-  const response = await fetch(`${API_BASE}/billing/report?${params.toString()}`);
-  if (!response.ok) {
-    throw new Error(`Failed to fetch cost report: ${response.statusText}`);
-  }
-  return response.json();
+  return apiClient.get<CostReportResponse>('/billing/report', {
+    params: {
+      period: filters.period,
+      start_date: filters.start_date,
+      end_date: filters.end_date,
+      user_id: filters.user_id,
+      resource_type: filters.resource_type,
+      category: filters.category,
+    },
+  });
 }
 
 /**
@@ -40,16 +35,12 @@ export async function fetchCostReport(
 export async function fetchUserCosts(
   filters: CostFilters = {}
 ): Promise<UserCostListResponse> {
-  const params = new URLSearchParams();
-
-  if (filters.start_date) params.append('start_date', filters.start_date);
-  if (filters.end_date) params.append('end_date', filters.end_date);
-
-  const response = await fetch(`${API_BASE}/billing/users?${params.toString()}`);
-  if (!response.ok) {
-    throw new Error(`Failed to fetch user costs: ${response.statusText}`);
-  }
-  return response.json();
+  return apiClient.get<UserCostListResponse>('/billing/users', {
+    params: {
+      start_date: filters.start_date,
+      end_date: filters.end_date,
+    },
+  });
 }
 
 /**
@@ -59,19 +50,13 @@ export async function fetchUserCostDetail(
   userId: number,
   filters: CostFilters = {}
 ): Promise<CostReportResponse> {
-  const params = new URLSearchParams();
-
-  if (filters.period) params.append('period', filters.period);
-  if (filters.start_date) params.append('start_date', filters.start_date);
-  if (filters.end_date) params.append('end_date', filters.end_date);
-
-  const response = await fetch(
-    `${API_BASE}/billing/users/${userId}?${params.toString()}`
-  );
-  if (!response.ok) {
-    throw new Error(`Failed to fetch user cost detail: ${response.statusText}`);
-  }
-  return response.json();
+  return apiClient.get<CostReportResponse>(`/billing/users/${userId}`, {
+    params: {
+      period: filters.period,
+      start_date: filters.start_date,
+      end_date: filters.end_date,
+    },
+  });
 }
 
 /**
@@ -80,23 +65,19 @@ export async function fetchUserCostDetail(
 export async function fetchResourceCosts(
   filters: ResourceCostFilters = {}
 ): Promise<ResourceCostListResponse> {
-  const params = new URLSearchParams();
-
-  if (filters.resource_type) params.append('resource_type', filters.resource_type);
-  if (filters.user_id) params.append('user_id', String(filters.user_id));
-  if (filters.start_date) params.append('start_date', filters.start_date);
-  if (filters.end_date) params.append('end_date', filters.end_date);
-  if (filters.min_cost) params.append('min_cost', String(filters.min_cost));
-  if (filters.page) params.append('page', String(filters.page));
-  if (filters.page_size) params.append('page_size', String(filters.page_size));
-  if (filters.sort_by) params.append('sort_by', filters.sort_by);
-  if (filters.sort_order) params.append('sort_order', filters.sort_order);
-
-  const response = await fetch(`${API_BASE}/billing/resources?${params.toString()}`);
-  if (!response.ok) {
-    throw new Error(`Failed to fetch resource costs: ${response.statusText}`);
-  }
-  return response.json();
+  return apiClient.get<ResourceCostListResponse>('/billing/resources', {
+    params: {
+      resource_type: filters.resource_type,
+      user_id: filters.user_id,
+      start_date: filters.start_date,
+      end_date: filters.end_date,
+      min_cost: filters.min_cost,
+      page: filters.page,
+      page_size: filters.page_size,
+      sort_by: filters.sort_by,
+      sort_order: filters.sort_order,
+    },
+  });
 }
 
 /**
@@ -105,16 +86,12 @@ export async function fetchResourceCosts(
 export async function exportBillingReport(
   filters: CostFilters = {}
 ): Promise<Blob> {
-  const params = new URLSearchParams();
-
-  if (filters.period) params.append('period', filters.period);
-  if (filters.start_date) params.append('start_date', filters.start_date);
-  if (filters.end_date) params.append('end_date', filters.end_date);
-  if (filters.user_id) params.append('user_id', String(filters.user_id));
-
-  const response = await fetch(`${API_BASE}/billing/export?${params.toString()}`);
-  if (!response.ok) {
-    throw new Error(`Failed to export billing report: ${response.statusText}`);
-  }
-  return response.blob();
+  return apiClient.download('/billing/export', {
+    params: {
+      period: filters.period,
+      start_date: filters.start_date,
+      end_date: filters.end_date,
+      user_id: filters.user_id,
+    },
+  });
 }

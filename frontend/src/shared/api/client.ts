@@ -15,8 +15,10 @@ const DEFAULT_TIMEOUT = 30000; // 30 seconds
 
 // === 类型定义 ===
 
+export type ParamValue = string | number | boolean | undefined | null | (string | number | boolean)[];
+
 export interface RequestConfig extends Omit<RequestInit, 'body'> {
-  params?: Record<string, string | number | boolean | undefined>;
+  params?: Record<string, ParamValue>;
   timeout?: number;
   retries?: number;
   retryDelay?: number;
@@ -31,12 +33,15 @@ export interface ApiResponse<T> {
 // === 工具函数 ===
 
 /**
- * 构建 URL 查询参数
+ * 构建 URL 查询参数（支持数组参数）
  */
-function buildQueryString(params: Record<string, string | number | boolean | undefined>): string {
+function buildQueryString(params: Record<string, ParamValue>): string {
   const searchParams = new URLSearchParams();
   Object.entries(params).forEach(([key, value]) => {
-    if (value !== undefined && value !== null && value !== '') {
+    if (value === undefined || value === null || value === '') return;
+    if (Array.isArray(value)) {
+      value.forEach((v) => searchParams.append(key, String(v)));
+    } else {
       searchParams.append(key, String(value));
     }
   });
@@ -98,6 +103,20 @@ class ApiClient {
   }
 
   /**
+   * 获取带自动 token 的 headers
+   */
+  private getHeadersWithAuth(extra?: Record<string, string>): Record<string, string> {
+    const headers: Record<string, string> = { ...this.defaultHeaders, ...extra };
+    if (!headers['Authorization'] && typeof localStorage !== 'undefined') {
+      const token = localStorage.getItem('access_token');
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+    }
+    return headers;
+  }
+
+  /**
    * 设置认证 token
    */
   setAuthToken(token: string): void {
@@ -130,7 +149,7 @@ class ApiClient {
     } = config;
 
     const url = `${this.baseUrl}${path}${params ? buildQueryString(params) : ''}`;
-    const headers = { ...this.defaultHeaders, ...customHeaders };
+    const headers = this.getHeadersWithAuth(customHeaders as Record<string, string>);
 
     const options: RequestInit = {
       method,
@@ -246,7 +265,7 @@ class ApiClient {
       url,
       {
         method: 'GET',
-        headers: this.defaultHeaders,
+        headers: this.getHeadersWithAuth(),
         ...restConfig,
       },
       timeout
@@ -282,7 +301,7 @@ class ApiClient {
     const url = `${this.baseUrl}${path}`;
 
     // 上传时不设置 Content-Type，让浏览器自动设置 multipart/form-data
-    const headers = { ...this.defaultHeaders };
+    const headers = this.getHeadersWithAuth();
     delete headers['Content-Type'];
 
     const response = await fetchWithTimeout(

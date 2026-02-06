@@ -6,3 +6,6 @@
 
 // Forms
 export * from './forms';
+
+// Status
+export { StatusBadge } from './StatusBadge';

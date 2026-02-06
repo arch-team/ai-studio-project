@@ -5,6 +5,7 @@
  * 对应后端端点: /api/v1/job-templates
  */
 
+import { apiClient } from '@shared/api/client';
 import type {
   CreateJobFromTemplateRequest,
   CreateJobTemplateRequest,
@@ -15,37 +16,6 @@ import type {
   UpdateJobTemplateRequest,
 } from '../types';
 
-const API_BASE = '/api/v1';
-
-// === Helper Functions ===
-
-function getAuthHeaders(): HeadersInit {
-  return {
-    'Content-Type': 'application/json',
-    Authorization: `Bearer ${localStorage.getItem('access_token') || ''}`,
-  };
-}
-
-function buildUrl(path: string, params?: Record<string, unknown>): string {
-  const url = new URL(`${API_BASE}${path}`, window.location.origin);
-  if (params) {
-    Object.entries(params).forEach(([key, value]) => {
-      if (value !== undefined && value !== null && value !== '') {
-        url.searchParams.set(key, String(value));
-      }
-    });
-  }
-  return url.toString();
-}
-
-async function handleResponse<T>(response: Response): Promise<T> {
-  if (!response.ok) {
-    const errorData = await response.json().catch(() => ({}));
-    throw new Error(errorData.detail || errorData.message || `HTTP Error: ${response.status}`);
-  }
-  return response.json();
-}
-
 // === Query APIs ===
 
 /**
@@ -54,32 +24,22 @@ async function handleResponse<T>(response: Response): Promise<T> {
 export async function fetchJobTemplates(
   filters: TemplateFilters = {}
 ): Promise<TemplateListResponse> {
-  const url = buildUrl('/job-templates', {
-    search: filters.search,
-    page: filters.page,
-    page_size: filters.page_size,
-    sort_by: filters.sort_by,
-    sort_order: filters.sort_order,
+  return apiClient.get<TemplateListResponse>('/job-templates', {
+    params: {
+      search: filters.search,
+      page: filters.page,
+      page_size: filters.page_size,
+      sort_by: filters.sort_by,
+      sort_order: filters.sort_order,
+    },
   });
-
-  const response = await fetch(url, {
-    method: 'GET',
-    headers: getAuthHeaders(),
-  });
-
-  return handleResponse<TemplateListResponse>(response);
 }
 
 /**
  * 获取单个模板详情
  */
 export async function fetchJobTemplate(id: number): Promise<JobTemplateDetail> {
-  const response = await fetch(`${API_BASE}/job-templates/${id}`, {
-    method: 'GET',
-    headers: getAuthHeaders(),
-  });
-
-  return handleResponse<JobTemplateDetail>(response);
+  return apiClient.get<JobTemplateDetail>(`/job-templates/${id}`);
 }
 
 /**
@@ -88,14 +48,9 @@ export async function fetchJobTemplate(id: number): Promise<JobTemplateDetail> {
 export async function fetchPopularTemplates(
   limit: number = 10
 ): Promise<JobTemplateSummary[]> {
-  const url = buildUrl('/job-templates/popular', { limit });
-
-  const response = await fetch(url, {
-    method: 'GET',
-    headers: getAuthHeaders(),
+  return apiClient.get<JobTemplateSummary[]>('/job-templates/popular', {
+    params: { limit },
   });
-
-  return handleResponse<JobTemplateSummary[]>(response);
 }
 
 // === Mutation APIs ===
@@ -106,13 +61,7 @@ export async function fetchPopularTemplates(
 export async function createJobTemplate(
   data: CreateJobTemplateRequest
 ): Promise<JobTemplateDetail> {
-  const response = await fetch(`${API_BASE}/job-templates`, {
-    method: 'POST',
-    headers: getAuthHeaders(),
-    body: JSON.stringify(data),
-  });
-
-  return handleResponse<JobTemplateDetail>(response);
+  return apiClient.post<JobTemplateDetail>('/job-templates', data);
 }
 
 /**
@@ -122,28 +71,14 @@ export async function updateJobTemplate(
   id: number,
   data: UpdateJobTemplateRequest
 ): Promise<JobTemplateDetail> {
-  const response = await fetch(`${API_BASE}/job-templates/${id}`, {
-    method: 'PUT',
-    headers: getAuthHeaders(),
-    body: JSON.stringify(data),
-  });
-
-  return handleResponse<JobTemplateDetail>(response);
+  return apiClient.put<JobTemplateDetail>(`/job-templates/${id}`, data);
 }
 
 /**
  * 删除模板
  */
 export async function deleteJobTemplate(id: number): Promise<void> {
-  const response = await fetch(`${API_BASE}/job-templates/${id}`, {
-    method: 'DELETE',
-    headers: getAuthHeaders(),
-  });
-
-  if (!response.ok) {
-    const errorData = await response.json().catch(() => ({}));
-    throw new Error(errorData.detail || `HTTP Error: ${response.status}`);
-  }
+  return apiClient.delete(`/job-templates/${id}`);
 }
 
 /**
@@ -153,11 +88,5 @@ export async function createJobFromTemplate(
   templateId: number,
   data: CreateJobFromTemplateRequest
 ): Promise<unknown> {
-  const response = await fetch(`${API_BASE}/training-jobs/from-template/${templateId}`, {
-    method: 'POST',
-    headers: getAuthHeaders(),
-    body: JSON.stringify(data),
-  });
-
-  return handleResponse<unknown>(response);
+  return apiClient.post<unknown>(`/training-jobs/from-template/${templateId}`, data);
 }

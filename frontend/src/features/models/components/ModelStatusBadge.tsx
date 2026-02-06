@@ -4,12 +4,12 @@
  * 显示模型状态的徽章组件
  */
 
-import { StatusIndicator, StatusIndicatorProps } from '@cloudscape-design/components';
+import type { StatusIndicatorProps } from '@cloudscape-design/components';
+import { StatusBadge } from '@shared/components';
 import type { ModelStatus } from '../types';
 import { MODEL_STATUS_LABELS } from '../types';
 
-// 状态到 StatusIndicator 类型的映射
-const statusTypeMap: Record<ModelStatus, StatusIndicatorProps['type']> = {
+const STATUS_TYPE_MAP: Record<ModelStatus, StatusIndicatorProps['type']> = {
   training: 'in-progress',
   registered: 'success',
   deployed: 'success',
@@ -17,18 +17,8 @@ const statusTypeMap: Record<ModelStatus, StatusIndicatorProps['type']> = {
   failed: 'error',
 };
 
-interface ModelStatusBadgeProps {
-  status: ModelStatus;
-}
-
-/**
- * 模型状态徽章
- */
-export function ModelStatusBadge({ status }: ModelStatusBadgeProps) {
-  const type = statusTypeMap[status] || 'info';
-  const label = MODEL_STATUS_LABELS[status] || status;
-
-  return <StatusIndicator type={type}>{label}</StatusIndicator>;
+export function ModelStatusBadge({ status }: { status: ModelStatus }) {
+  return <StatusBadge status={status} typeMap={STATUS_TYPE_MAP} labelMap={MODEL_STATUS_LABELS} />;
 }
 
 export default ModelStatusBadge;
