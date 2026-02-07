@@ -4,7 +4,7 @@ This test ensures that the application layer does not directly import
 infrastructure layer modules, maintaining proper dependency direction:
     API → Application → Domain ← Infrastructure
 
-Modular Monolith Rules (see docs/module-dependency-spec.md):
+Modular Monolith Rules (see .claude/rules/architecture.md):
     R1: Module Domain layer MUST NOT import any other module code
     R2: Module Application layer MUST only depend on interfaces, not implementations
     R3: Cross-module communication MUST use EventBus or shared interfaces
@@ -609,7 +609,7 @@ class TestModuleDomainLayerIsolation:
 
         assert not violations, (
             "Module domain layer MUST NOT import from other modules.\n"
-            "See docs/module-dependency-spec.md Rule R1.\n"
+            "See .claude/rules/architecture.md §2 Rule R1.\n"
             f"Found {len(violations)} violation(s):\n" + "\n".join(f"  - {v}" for v in violations)
         )
 
@@ -676,7 +676,7 @@ class TestModuleApplicationLayerDependencies:
         assert not violations, (
             "Application layer MUST NOT import other modules' services directly.\n"
             "Use EventBus or shared interfaces for cross-module communication.\n"
-            "See docs/module-dependency-spec.md Rule R3.\n"
+            "See .claude/rules/architecture.md §2 Rule R3.\n"
             f"Found {len(violations)} violation(s):\n" + "\n".join(f"  - {v}" for v in violations)
         )
 
@@ -709,7 +709,7 @@ class TestModuleApplicationLayerDependencies:
         assert not violations, (
             "Application layer MUST NOT import other modules' infrastructure.\n"
             "Depend on interfaces, not implementations.\n"
-            "See docs/module-dependency-spec.md Rule R2.\n"
+            "See .claude/rules/architecture.md §2 Rule R2.\n"
             f"Found {len(violations)} violation(s):\n" + "\n".join(f"  - {v}" for v in violations)
         )
 
@@ -773,7 +773,7 @@ class TestModuleApiLayerAuthDependency:
         assert not violations, (
             "Only API layer can import auth module dependencies.\n"
             "Domain/Application layers should not import auth.\n"
-            "See docs/module-dependency-spec.md Rule R4.\n"
+            "See .claude/rules/architecture.md §2 Rule R4.\n"
             f"Found {len(violations)} violation(s):\n" + "\n".join(f"  - {v}" for v in violations)
         )
 
@@ -812,7 +812,7 @@ class TestModuleInfrastructureLayerIsolation:
         2. Cross-module query implementations (*_query_impl.py) are allowed to
            import other modules' ORM models for aggregation queries, as they
            implement application-layer interfaces for cross-module data access.
-        See: docs/ARCHITECTURE.md Section 3.3, 4.3
+        See: .claude/rules/architecture.md §2, §3
         """
         violations = []
 

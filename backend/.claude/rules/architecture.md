@@ -21,6 +21,8 @@
 | **Infrastructure** | ✅ | ❌ | ❌ | ❌ | ⚠️ 仅外键 |
 | **API** | ✅ | ✅ | ❌ | ❌ | ❌ |
 
+> **Composition Root 例外**: API 层 `dependencies.py` 作为依赖组装点，允许导入其他模块 Infrastructure 实现来注入跨模块依赖。Service 层本身仍通过 shared 接口依赖。
+
 ### 0.2 数据模型选择速查
 
 | 层级 | 组件类型 | 推荐方案 | 理由 |
@@ -113,7 +115,9 @@ from src.modules.quotas.domain.entities import ResourceQuota                   #
 from src.modules.quotas.infrastructure.repositories import QuotaRepoImpl       # ❌
 ```
 
-**唯一例外**: ORM 模型文件 (`*_model.py`) 允许导入其他模块 ORM Model 定义外键关系
+**Infrastructure 跨模块例外**:
+- ORM 模型文件 (`*_model.py`): 允许导入其他模块 ORM Model 定义外键关系
+- 跨模块查询实现 (`*_query_impl.py`): 允许导入其他模块 ORM Model 用于聚合查询
 
 ---
 
@@ -242,6 +246,21 @@ async def get_{entity}_service(
     return {Entity}Service(repository=repository)
 ```
 
+### 跨模块依赖注入
+
+跨模块依赖在**消费方 API 层** `dependencies.py` 中组装，Service 只依赖 shared 接口:
+
+```python
+# training/api/dependencies.py — 注入 quotas 模块的 IQuotaChecker
+from src.modules.quotas.infrastructure import QuotaCheckerImpl, ResourceQuotaRepository
+from src.shared.domain.interfaces import IQuotaChecker
+
+async def get_quota_checker(session = Depends(get_db)) -> IQuotaChecker:
+    return QuotaCheckerImpl(ResourceQuotaRepository(session))
+```
+
+**规则**: Service 层通过接口依赖，API 层 `dependencies.py` 负责实例化具体实现。
+
 ---
 
 ## 7. 模块结构模板
@@ -285,44 +304,27 @@ modules/{module}/
 
 ## 8. 架构合规测试
 
-> **测试位置**: `tests/architecture/test_arch_*.py`
+> **测试文件**: `tests/architecture/test_architecture_compliance.py`
 
 ```bash
-# 运行架构合规测试
 pytest tests/architecture -v
 ```
 
+**Clean Architecture 层级测试**:
+
 | 测试类 | 验证规则 |
 |--------|---------|
-| `TestCleanArchitectureLayers` | 分层依赖方向 |
-| `TestModuleDomainLayerIsolation` | R1: Domain 层绝对隔离 |
-| `TestModuleApplicationLayerDependencies` | R2: Application 层依赖接口 |
+| `TestApplicationLayerDoesNotImportInfrastructure` | Application 不导入 Infrastructure |
+| `TestDomainLayerIndependence` | Domain 不依赖 Infrastructure/API |
+| `TestApiLayerDoesNotImportInfrastructureModels` | API 不直接使用 ORM |
+| `TestDomainExceptionUsage` | Entity 用域异常，非 ValueError |
+
+**Modular Monolith 模块隔离测试**:
+
+| 测试类 | 验证规则 |
+|--------|---------|
+| `TestModuleDomainLayerIsolation` | R1: Domain 零跨模块导入 |
+| `TestModuleApplicationLayerDependencies` | R2/R3: Application 跨模块隔离 |
 | `TestModuleApiLayerAuthDependency` | R4: Auth 依赖例外验证 |
-
----
-
-## 快速参考卡片
-
-```
-┌────────────────────────────────────────────────────────┐
-│            Modular Monolith 依赖速查                    │
-├────────────────────────────────────────────────────────┤
-│ ✅ 允许                                                │
-│   • 导入 shared/* 任意内容                              │
-│   • API 层导入 auth 的认证依赖                          │
-│   • 通过 EventBus 发布/订阅事件                         │
-│   • 依赖 shared/domain/interfaces 中定义的接口          │
-│   • 其他模块 Application 层导入 Domain Events (R5)      │
-├────────────────────────────────────────────────────────┤
-│ ❌ 禁止                                                │
-│   • Domain 层导入任何外部模块                           │
-│   • 直接导入其他模块的 Service                          │
-│   • 直接导入其他模块的 Repository 实现                  │
-│   • 导入其他模块的 ORM Model (外键关系除外)             │
-├────────────────────────────────────────────────────────┤
-│ 🔄 模块间通信                                          │
-│   • 优先: EventBus (异步解耦)                          │
-│   • 备选: shared/domain/interfaces (同步调用)          │
-│   • 禁止: 直接依赖其他模块实现                          │
-└────────────────────────────────────────────────────────┘
-```
+| `TestModuleInfrastructureLayerIsolation` | Infrastructure 跨模块隔离 |
+| `TestModulePublicApiExports` | `__init__.py` 定义 `__all__` |
