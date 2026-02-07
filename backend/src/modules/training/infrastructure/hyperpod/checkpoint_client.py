@@ -82,40 +82,12 @@ class CheckpointClient:
         """从检查点恢复训练任务。"""
 
         def _resume() -> dict[str, Any]:
-            if HyperPodPytorchJob is None:
-                raise HyperPodSDKUnavailableError()
-
-            if job_config is None:
-                raise HyperPodOperationError("resume", "job_config is required", job_name)
-
+            self._validate_resume_prerequisites(job_config, job_name)
             self._cluster.ensure_cluster_context(cluster_name)
 
-            from sagemaker.hyperpod.common.config import Metadata
-            from sagemaker.hyperpod.training.config.hyperpod_pytorch_job_unified_config import RunPolicy
-
-            # 添加检查点恢复环境变量
-            env_dict = (job_config.get("environment") or {}).copy()
-            if checkpoint_path:
-                env_dict["CHECKPOINT_PATH"] = checkpoint_path
-                env_dict["RESUME_FROM_CHECKPOINT"] = "true"
-
-            # 使用 config_builder 构建配置（消除重复代码）
-            image_uri = job_config.get("image_uri")
-            command = job_config.get("command")
-            gpu_count = job_config.get("gpu_count", 0)
-            node_count = job_config.get("node_count", 1)
-
-            container = build_container(image_uri, command, env_dict, gpu_count)
-            replica_spec = build_replica_spec(container, node_count)
-
-            # 创建 HyperPodPytorchJob
-            nproc_per_node = str(job_config.get("tasks_per_node", 1))
-            job = HyperPodPytorchJob(
-                metadata=Metadata(name=job_name),
-                nproc_per_node=nproc_per_node,
-                replica_specs=[replica_spec],
-                run_policy=RunPolicy(),
-            )
+            # 准备恢复配置
+            env_dict = self._prepare_resume_environment(job_config, checkpoint_path)
+            job = self._create_resume_job(job_name, job_config, env_dict)
             job.create()
 
             return {
@@ -129,6 +101,43 @@ class CheckpointClient:
         loop = asyncio.get_running_loop()
         return await loop.run_in_executor(None, _resume)
 
+    def _validate_resume_prerequisites(self, job_config: dict[str, Any] | None, job_name: str) -> None:
+        """验证恢复前置条件."""
+        if HyperPodPytorchJob is None:
+            raise HyperPodSDKUnavailableError()
+        if job_config is None:
+            raise HyperPodOperationError("resume", "job_config is required", job_name)
+
+    def _prepare_resume_environment(self, job_config: dict[str, Any], checkpoint_path: str | None) -> dict:
+        """准备恢复环境变量."""
+        env_dict = (job_config.get("environment") or {}).copy()
+        if checkpoint_path:
+            env_dict["CHECKPOINT_PATH"] = checkpoint_path
+            env_dict["RESUME_FROM_CHECKPOINT"] = "true"
+        return env_dict
+
+    def _create_resume_job(self, job_name: str, job_config: dict[str, Any], env_dict: dict):
+        """创建恢复任务."""
+        from sagemaker.hyperpod.common.config import Metadata
+        from sagemaker.hyperpod.training.config.hyperpod_pytorch_job_unified_config import RunPolicy
+
+        # 构建配置
+        container = build_container(
+            job_config.get("image_uri"),
+            job_config.get("command"),
+            env_dict,
+            job_config.get("gpu_count", 0),
+        )
+        replica_spec = build_replica_spec(container, job_config.get("node_count", 1))
+
+        # 创建任务
+        return HyperPodPytorchJob(
+            metadata=Metadata(name=job_name),
+            nproc_per_node=str(job_config.get("tasks_per_node", 1)),
+            replica_specs=[replica_spec],
+            run_policy=RunPolicy(),
+        )
+
     async def trigger_preemption(
         self,
         cluster_name: str,
@@ -138,41 +147,12 @@ class CheckpointClient:
         """通过提交高优先级任务触发抢占。"""
 
         def _trigger() -> dict[str, Any]:
-            if HyperPodPytorchJob is None:
-                raise HyperPodSDKUnavailableError()
-
+            self._validate_preemption_prerequisites(target_job_name)
             self._cluster.ensure_cluster_context(cluster_name)
 
-            from sagemaker.hyperpod.common.config import Metadata
-            from sagemaker.hyperpod.training.config.hyperpod_pytorch_job_unified_config import RunPolicy
-
-            # 验证目标任务存在
-            target_job = HyperPodPytorchJob.get(name=target_job_name)
-            if target_job.status != "Running":
-                raise HyperPodOperationError("trigger_preemption", "Target job is not running", target_job_name)
-
-            # 生成高优先级任务名称
+            # 创建高优先级任务
             preemption_job_name = f"preempt-{target_job_name}-{int(time.time())}"
-
-            # 确保高优先级配置
-            env_dict = (preemption_job_config.get("environment") or {}).copy()
-            env_dict["KUEUE_PRIORITY_CLASS"] = "critical"
-
-            # 使用 config_builder 构建配置（消除重复代码）
-            image_uri = preemption_job_config.get("image_uri")
-            command = preemption_job_config.get("command")
-            node_count = preemption_job_config.get("node_count", 1)
-
-            container = build_container(image_uri, command, env_dict, 0)
-            replica_spec = build_replica_spec(container, node_count)
-
-            # 创建并提交高优先级任务
-            preemption_job = HyperPodPytorchJob(
-                metadata=Metadata(name=preemption_job_name),
-                nproc_per_node="1",
-                replica_specs=[replica_spec],
-                run_policy=RunPolicy(),
-            )
+            preemption_job = self._create_preemption_job(preemption_job_name, preemption_job_config)
             preemption_job.create()
 
             return {
@@ -184,6 +164,41 @@ class CheckpointClient:
 
         loop = asyncio.get_running_loop()
         return await loop.run_in_executor(None, _trigger)
+
+    def _validate_preemption_prerequisites(self, target_job_name: str) -> None:
+        """验证抢占前置条件."""
+        if HyperPodPytorchJob is None:
+            raise HyperPodSDKUnavailableError()
+
+        target_job = HyperPodPytorchJob.get(name=target_job_name)
+        if target_job.status != "Running":
+            raise HyperPodOperationError("trigger_preemption", "Target job is not running", target_job_name)
+
+    def _create_preemption_job(self, job_name: str, job_config: dict[str, Any]):
+        """创建高优先级抢占任务."""
+        from sagemaker.hyperpod.common.config import Metadata
+        from sagemaker.hyperpod.training.config.hyperpod_pytorch_job_unified_config import RunPolicy
+
+        # 设置高优先级环境变量
+        env_dict = (job_config.get("environment") or {}).copy()
+        env_dict["KUEUE_PRIORITY_CLASS"] = "critical"
+
+        # 构建配置
+        container = build_container(
+            job_config.get("image_uri"),
+            job_config.get("command"),
+            env_dict,
+            0,  # 不需要 GPU
+        )
+        replica_spec = build_replica_spec(container, job_config.get("node_count", 1))
+
+        # 创建任务
+        return HyperPodPytorchJob(
+            metadata=Metadata(name=job_name),
+            nproc_per_node="1",
+            replica_specs=[replica_spec],
+            run_policy=RunPolicy(),
+        )
 
     async def get_pod_status(
         self,

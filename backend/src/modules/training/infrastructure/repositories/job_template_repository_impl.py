@@ -61,48 +61,17 @@ class JobTemplateRepository(
         sort_order: str = "desc",
     ) -> tuple[list[JobTemplate], int]:
         """List templates with pagination and filters."""
+        # 构建基础查询
         query = select(JobTemplateModel)
         count_query = select(func.count(JobTemplateModel.id))
 
-        # Exclude soft deleted unless explicitly requested
-        if not include_deleted:
-            query = query.where(JobTemplateModel.deleted_at.is_(None))
-            count_query = count_query.where(JobTemplateModel.deleted_at.is_(None))
+        # 应用过滤条件
+        query, count_query = self._apply_template_filters(
+            query, count_query, owner_id, visibility, search_name, include_deleted
+        )
 
-        # Apply filters
-        if owner_id is not None:
-            query = query.where(JobTemplateModel.owner_id == owner_id)
-            count_query = count_query.where(JobTemplateModel.owner_id == owner_id)
-
-        if visibility is not None:
-            query = query.where(JobTemplateModel.visibility == visibility)
-            count_query = count_query.where(JobTemplateModel.visibility == visibility)
-
-        if search_name is not None:
-            search_pattern = f"%{search_name}%"
-            query = query.where(JobTemplateModel.name.ilike(search_pattern))
-            count_query = count_query.where(JobTemplateModel.name.ilike(search_pattern))
-
-        # Get total count
-        total_result = await self._session.execute(count_query)
-        total = total_result.scalar() or 0
-
-        # Apply sorting
-        sort_column = getattr(JobTemplateModel, sort_by, JobTemplateModel.usage_count)
-        if sort_order.lower() == "desc":
-            query = query.order_by(sort_column.desc())
-        else:
-            query = query.order_by(sort_column.asc())
-
-        # Apply pagination
-        offset = (page - 1) * page_size
-        query = query.offset(offset).limit(page_size)
-
-        # Execute query
-        result = await self._session.execute(query)
-        models = result.scalars().all()
-
-        return [self._to_entity(m) for m in models], total
+        # 执行分页查询
+        return await self._execute_paginated_query(query, count_query, page, page_size, sort_by, sort_order)
 
     async def list_visible_templates(
         self,
@@ -114,46 +83,82 @@ class JobTemplateRepository(
         sort_order: str = "desc",
     ) -> tuple[list[JobTemplate], int]:
         """List templates visible to a user (own + public)."""
+        # 构建可见性条件
         visibility_condition = or_(
             JobTemplateModel.owner_id == user_id,
             JobTemplateModel.visibility == TemplateVisibility.PUBLIC,
         )
 
+        # 构建查询
         query = select(JobTemplateModel).where(
-            and_(
-                JobTemplateModel.deleted_at.is_(None),
-                visibility_condition,
-            )
+            and_(JobTemplateModel.deleted_at.is_(None), visibility_condition)
         )
         count_query = select(func.count(JobTemplateModel.id)).where(
-            and_(
-                JobTemplateModel.deleted_at.is_(None),
-                visibility_condition,
-            )
+            and_(JobTemplateModel.deleted_at.is_(None), visibility_condition)
         )
 
-        # Apply search filter
-        if search_name is not None:
-            search_pattern = f"%{search_name}%"
-            query = query.where(JobTemplateModel.name.ilike(search_pattern))
-            count_query = count_query.where(JobTemplateModel.name.ilike(search_pattern))
+        # 应用搜索过滤
+        if search_name:
+            query, count_query = self._apply_search_filter(query, count_query, search_name)
 
-        # Get total count
+        # 执行分页查询
+        return await self._execute_paginated_query(query, count_query, page, page_size, sort_by, sort_order)
+
+    def _apply_template_filters(
+        self,
+        query,
+        count_query,
+        owner_id: int | None,
+        visibility: TemplateVisibility | None,
+        search_name: str | None,
+        include_deleted: bool,
+    ):
+        """应用模板过滤条件."""
+        # 排除软删除
+        if not include_deleted:
+            query = query.where(JobTemplateModel.deleted_at.is_(None))
+            count_query = count_query.where(JobTemplateModel.deleted_at.is_(None))
+
+        # 所有者过滤
+        if owner_id is not None:
+            query = query.where(JobTemplateModel.owner_id == owner_id)
+            count_query = count_query.where(JobTemplateModel.owner_id == owner_id)
+
+        # 可见性过滤
+        if visibility is not None:
+            query = query.where(JobTemplateModel.visibility == visibility)
+            count_query = count_query.where(JobTemplateModel.visibility == visibility)
+
+        # 名称搜索
+        if search_name:
+            query, count_query = self._apply_search_filter(query, count_query, search_name)
+
+        return query, count_query
+
+    def _apply_search_filter(self, query, count_query, search_name: str):
+        """应用名称搜索过滤."""
+        search_pattern = f"%{search_name}%"
+        query = query.where(JobTemplateModel.name.ilike(search_pattern))
+        count_query = count_query.where(JobTemplateModel.name.ilike(search_pattern))
+        return query, count_query
+
+    async def _execute_paginated_query(
+        self, query, count_query, page: int, page_size: int, sort_by: str, sort_order: str
+    ) -> tuple[list[JobTemplate], int]:
+        """执行分页查询."""
+        # 获取总数
         total_result = await self._session.execute(count_query)
         total = total_result.scalar() or 0
 
-        # Apply sorting
+        # 应用排序
         sort_column = getattr(JobTemplateModel, sort_by, JobTemplateModel.usage_count)
-        if sort_order.lower() == "desc":
-            query = query.order_by(sort_column.desc())
-        else:
-            query = query.order_by(sort_column.asc())
+        query = query.order_by(sort_column.desc() if sort_order.lower() == "desc" else sort_column.asc())
 
-        # Apply pagination
+        # 应用分页
         offset = (page - 1) * page_size
         query = query.offset(offset).limit(page_size)
 
-        # Execute query
+        # 执行查询
         result = await self._session.execute(query)
         models = result.scalars().all()
 

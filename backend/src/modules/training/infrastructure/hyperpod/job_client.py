@@ -91,53 +91,67 @@ class JobClient:
         """提交训练任务到集群。"""
 
         def _submit() -> dict[str, Any]:
-            if HyperPodPytorchJob is None:
-                raise HyperPodSDKUnavailableError()
-
+            self._validate_sdk_available()
             self._cluster.ensure_cluster_context(cluster_name)
 
-            from sagemaker.hyperpod.common.config import Metadata
-            from sagemaker.hyperpod.training.config.hyperpod_pytorch_job_unified_config import RunPolicy
+            # 解析配置
+            parsed_config = self._parse_job_config(job_config)
 
-            # 提取配置参数
-            image_uri = job_config.get("image_uri")
-            command = job_config.get("command") or job_config.get("entrypoint_command")
-            env_dict = job_config.get("environment") or {}
-            gpu_count = job_config.get("gpu_count", 1)
-            node_count = job_config.get("node_count", 1)
-            namespace = job_config.get("namespace", "default")
-            queue_name = job_config.get("queue_name")
-            priority_class = job_config.get("priority_class")
-
-            # 使用 config_builder 构建配置
-            container = build_container(image_uri, command, env_dict, gpu_count)
-            replica_spec = build_replica_spec(container, node_count)
-            labels = build_kueue_labels(queue_name, priority_class)
-
-            # 构建 Metadata
-            metadata_kwargs: dict[str, Any] = {"name": job_name, "namespace": namespace}
-            if labels:
-                metadata_kwargs["labels"] = labels
-
-            # 创建 HyperPodPytorchJob
-            nproc_per_node = str(job_config.get("tasks_per_node", 1))
-            job = HyperPodPytorchJob(
-                metadata=Metadata(**metadata_kwargs),
-                nproc_per_node=nproc_per_node,
-                replica_specs=[replica_spec],
-                run_policy=RunPolicy(),
-            )
+            # 创建并提交任务
+            job = self._create_hyperpod_job(job_name, parsed_config)
             job.create()
 
             return {
                 "job_name": job_name,
                 "status": _get_initial_status(job),
                 "cluster_name": cluster_name,
-                "namespace": namespace,
+                "namespace": parsed_config["namespace"],
             }
 
         loop = asyncio.get_running_loop()
         return await loop.run_in_executor(None, _submit)
+
+    def _validate_sdk_available(self) -> None:
+        """验证 SDK 可用性."""
+        if HyperPodPytorchJob is None:
+            raise HyperPodSDKUnavailableError()
+
+    def _parse_job_config(self, job_config: dict[str, Any]) -> dict[str, Any]:
+        """解析任务配置."""
+        return {
+            "image_uri": job_config.get("image_uri"),
+            "command": job_config.get("command") or job_config.get("entrypoint_command"),
+            "env_dict": job_config.get("environment") or {},
+            "gpu_count": job_config.get("gpu_count", 1),
+            "node_count": job_config.get("node_count", 1),
+            "namespace": job_config.get("namespace", "default"),
+            "queue_name": job_config.get("queue_name"),
+            "priority_class": job_config.get("priority_class"),
+            "tasks_per_node": job_config.get("tasks_per_node", 1),
+        }
+
+    def _create_hyperpod_job(self, job_name: str, config: dict[str, Any]):
+        """创建 HyperPod 任务对象."""
+        from sagemaker.hyperpod.common.config import Metadata
+        from sagemaker.hyperpod.training.config.hyperpod_pytorch_job_unified_config import RunPolicy
+
+        # 构建配置组件
+        container = build_container(config["image_uri"], config["command"], config["env_dict"], config["gpu_count"])
+        replica_spec = build_replica_spec(container, config["node_count"])
+        labels = build_kueue_labels(config["queue_name"], config["priority_class"])
+
+        # 构建元数据
+        metadata_kwargs: dict[str, Any] = {"name": job_name, "namespace": config["namespace"]}
+        if labels:
+            metadata_kwargs["labels"] = labels
+
+        # 创建任务
+        return HyperPodPytorchJob(
+            metadata=Metadata(**metadata_kwargs),
+            nproc_per_node=str(config["tasks_per_node"]),
+            replica_specs=[replica_spec],
+            run_policy=RunPolicy(),
+        )
 
     async def get_training_job_status(
         self, cluster_name: str, job_name: str, namespace: str = "default"

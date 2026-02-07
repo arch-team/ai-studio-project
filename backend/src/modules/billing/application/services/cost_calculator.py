@@ -41,47 +41,53 @@ class CostCalculator:
         storage_type: str = "FSx",
         transfer_direction: str = "out",
     ) -> CostBreakdown:
-        """计算单个训练任务的成本明细.
-
-        Args:
-            instance_type: 实例类型 (p4d.24xlarge, p5.48xlarge, ...)
-            instance_hourly_rate: 实例小时价格
-            node_count: 节点数量
-            training_duration_hours: 训练时长（小时）
-            storage_size_gb: 存储空间大小 (GB)
-            storage_rate_per_gb_hour: 存储每 GB 每小时价格
-            data_transfer_gb: 数据传输量 (GB)
-            transfer_rate_per_gb: 数据传输每 GB 价格
-            storage_type: 存储类型 (FSx, S3, EBS)
-            transfer_direction: 传输方向 (in, out, inter-region)
-
-        Returns:
-            包含计算、存储、网络三维度的成本明细
-        """
-        compute_cost = ComputeCost.calculate(
-            instance_type=instance_type,
-            instance_hourly_rate=instance_hourly_rate,
-            node_count=node_count,
-            duration_hours=training_duration_hours,
+        """计算单个训练任务的成本明细."""
+        compute_cost = self._calculate_compute_cost(
+            instance_type, instance_hourly_rate, node_count, training_duration_hours
         )
 
-        storage_cost = StorageCost.calculate(
-            storage_type=storage_type,
-            storage_size_gb=storage_size_gb,
-            storage_rate_per_gb_hour=storage_rate_per_gb_hour,
-            duration_hours=training_duration_hours,
+        storage_cost = self._calculate_storage_cost(
+            storage_type, storage_size_gb, storage_rate_per_gb_hour, training_duration_hours
         )
 
-        network_cost = NetworkCost.calculate(
-            data_transfer_gb=data_transfer_gb,
-            transfer_rate_per_gb=transfer_rate_per_gb,
-            transfer_direction=transfer_direction,
-        )
+        network_cost = self._calculate_network_cost(data_transfer_gb, transfer_rate_per_gb, transfer_direction)
 
         return CostBreakdown(
             compute_cost=compute_cost,
             storage_cost=storage_cost,
             network_cost=network_cost,
+        )
+
+    def _calculate_compute_cost(
+        self, instance_type: str, instance_hourly_rate: Decimal, node_count: int, duration_hours: Decimal
+    ) -> ComputeCost:
+        """计算计算成本."""
+        return ComputeCost.calculate(
+            instance_type=instance_type,
+            instance_hourly_rate=instance_hourly_rate,
+            node_count=node_count,
+            duration_hours=duration_hours,
+        )
+
+    def _calculate_storage_cost(
+        self, storage_type: str, storage_size_gb: Decimal, storage_rate_per_gb_hour: Decimal, duration_hours: Decimal
+    ) -> StorageCost:
+        """计算存储成本."""
+        return StorageCost.calculate(
+            storage_type=storage_type,
+            storage_size_gb=storage_size_gb,
+            storage_rate_per_gb_hour=storage_rate_per_gb_hour,
+            duration_hours=duration_hours,
+        )
+
+    def _calculate_network_cost(
+        self, data_transfer_gb: Decimal, transfer_rate_per_gb: Decimal, transfer_direction: str
+    ) -> NetworkCost:
+        """计算网络成本."""
+        return NetworkCost.calculate(
+            data_transfer_gb=data_transfer_gb,
+            transfer_rate_per_gb=transfer_rate_per_gb,
+            transfer_direction=transfer_direction,
         )
 
     def aggregate_costs(self, breakdowns: list[CostBreakdown]) -> TotalCost:
