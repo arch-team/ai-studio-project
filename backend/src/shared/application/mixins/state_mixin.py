@@ -22,13 +22,9 @@ class StateManagementMixin:
     _entity_type: str
     _not_found_error_factory: Callable[[str], Exception] | None
 
-    def _create_invalid_transition_error(
-        self, current_state: str, target_state: str
-    ) -> Exception:
+    def _create_invalid_transition_error(self, current_state: str, target_state: str) -> Exception:
         """创建无效状态转换错误."""
-        return InvalidStateTransitionError(
-            self._entity_type, current_state, target_state
-        )
+        return InvalidStateTransitionError(self._entity_type, current_state, target_state)
 
     def _validate_state_transition(
         self,
@@ -49,14 +45,10 @@ class StateManagementMixin:
         # 检查实体是否有 can_transition_to 方法
         if hasattr(entity, "can_transition_to"):
             if not entity.can_transition_to(target_state):
-                raise self._create_invalid_transition_error(
-                    str(current_state), str(target_state)
-                )
+                raise self._create_invalid_transition_error(str(current_state), str(target_state))
         # 否则检查 allowed_from_states
         elif allowed_from_states and current_state not in allowed_from_states:
-            raise self._create_invalid_transition_error(
-                str(current_state), str(target_state)
-            )
+            raise self._create_invalid_transition_error(str(current_state), str(target_state))
 
     def _ensure_not_terminal(self, entity: Any, action: str = "update") -> None:
         """确保实体不在终态，否则抛出无效状态转换错误."""
@@ -95,8 +87,6 @@ class StateManagementMixin:
         if allowed_states:
             current_state = getattr(entity, "status", None) or getattr(entity, "state", None)
             if current_state and current_state not in allowed_states:
-                raise self._create_invalid_transition_error(
-                    str(current_state), "operation"
-                )
+                raise self._create_invalid_transition_error(str(current_state), "operation")
 
         return entity  # type: ignore[no-any-return]

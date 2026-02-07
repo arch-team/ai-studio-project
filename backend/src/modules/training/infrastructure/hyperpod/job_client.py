@@ -165,9 +165,7 @@ class JobClient:
             if job.status:
                 start_time = getattr(job.status, "startTime", None)
                 end_time = getattr(job.status, "completionTime", None)
-                status_str = self._resolve_status_from_conditions(
-                    getattr(job.status, "conditions", None)
-                )
+                status_str = self._resolve_status_from_conditions(getattr(job.status, "conditions", None))
 
             return {
                 "job_name": job.metadata.name if job.metadata else job_name,

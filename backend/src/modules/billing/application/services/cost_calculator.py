@@ -1,202 +1,22 @@
 """成本计算引擎核心逻辑 (T069).
 
-实现多维度成本分析 (compute/storage/network)、成本累加和分摊逻辑。
+协调成本计算、分摊和聚合。
 """
 
-from dataclasses import dataclass
 from decimal import Decimal
-from enum import Enum
-from typing import Any, Literal
 
-
-class CostDimension(str, Enum):
-    """成本维度枚举."""
-
-    COMPUTE = "compute"  # 计算成本 (EC2 实例)
-    STORAGE = "storage"  # 存储成本 (FSx, S3, EBS)
-    NETWORK = "network"  # 网络传输成本
-
-
-@dataclass
-class ComputeCost:
-    """计算成本详细信息."""
-
-    instance_type: str
-    instance_hourly_rate: Decimal
-    node_count: int
-    duration_hours: Decimal
-    total_cost: Decimal
-
-    @classmethod
-    def calculate(
-        cls,
-        instance_type: str,
-        instance_hourly_rate: Decimal,
-        node_count: int,
-        duration_hours: Decimal,
-    ) -> "ComputeCost":
-        """计算计算成本.
-
-        公式: total = instance_hourly_rate × node_count × duration_hours
-        """
-        total_cost = instance_hourly_rate * node_count * duration_hours
-        return cls(
-            instance_type=instance_type,
-            instance_hourly_rate=instance_hourly_rate,
-            node_count=node_count,
-            duration_hours=duration_hours,
-            total_cost=total_cost,
-        )
-
-
-@dataclass
-class StorageCost:
-    """存储成本详细信息."""
-
-    storage_type: str  # FSx, S3, EBS
-    storage_size_gb: Decimal
-    storage_rate_per_gb_hour: Decimal
-    duration_hours: Decimal
-    total_cost: Decimal
-
-    @classmethod
-    def calculate(
-        cls,
-        storage_type: str,
-        storage_size_gb: Decimal,
-        storage_rate_per_gb_hour: Decimal,
-        duration_hours: Decimal,
-    ) -> "StorageCost":
-        """计算存储成本.
-
-        公式: total = storage_size_gb × storage_rate_per_gb_hour × duration_hours
-        """
-        total_cost = storage_size_gb * storage_rate_per_gb_hour * duration_hours
-        return cls(
-            storage_type=storage_type,
-            storage_size_gb=storage_size_gb,
-            storage_rate_per_gb_hour=storage_rate_per_gb_hour,
-            duration_hours=duration_hours,
-            total_cost=total_cost,
-        )
-
-
-@dataclass
-class NetworkCost:
-    """网络传输成本详细信息."""
-
-    data_transfer_gb: Decimal
-    transfer_rate_per_gb: Decimal
-    transfer_direction: str  # in, out, inter-region
-    total_cost: Decimal
-
-    @classmethod
-    def calculate(
-        cls,
-        data_transfer_gb: Decimal,
-        transfer_rate_per_gb: Decimal,
-        transfer_direction: str = "out",
-    ) -> "NetworkCost":
-        """计算网络传输成本.
-
-        公式: total = data_transfer_gb × transfer_rate_per_gb
-        """
-        total_cost = data_transfer_gb * transfer_rate_per_gb
-        return cls(
-            data_transfer_gb=data_transfer_gb,
-            transfer_rate_per_gb=transfer_rate_per_gb,
-            transfer_direction=transfer_direction,
-            total_cost=total_cost,
-        )
-
-
-@dataclass
-class CostBreakdown:
-    """成本明细分解."""
-
-    compute_cost: ComputeCost
-    storage_cost: StorageCost
-    network_cost: NetworkCost
-
-    @property
-    def total_cost(self) -> Decimal:
-        """总成本 = 计算 + 存储 + 网络."""
-        return self.compute_cost.total_cost + self.storage_cost.total_cost + self.network_cost.total_cost
-
-    def to_dict(self) -> dict:
-        """转换为字典格式."""
-        return {
-            "compute": {
-                "instance_type": self.compute_cost.instance_type,
-                "node_count": self.compute_cost.node_count,
-                "duration_hours": float(self.compute_cost.duration_hours),
-                "hourly_rate": float(self.compute_cost.instance_hourly_rate),
-                "total": float(self.compute_cost.total_cost),
-            },
-            "storage": {
-                "storage_type": self.storage_cost.storage_type,
-                "size_gb": float(self.storage_cost.storage_size_gb),
-                "rate_per_gb_hour": float(self.storage_cost.storage_rate_per_gb_hour),
-                "duration_hours": float(self.storage_cost.duration_hours),
-                "total": float(self.storage_cost.total_cost),
-            },
-            "network": {
-                "data_transfer_gb": float(self.network_cost.data_transfer_gb),
-                "rate_per_gb": float(self.network_cost.transfer_rate_per_gb),
-                "direction": self.network_cost.transfer_direction,
-                "total": float(self.network_cost.total_cost),
-            },
-            "total": float(self.total_cost),
-        }
-
-
-@dataclass
-class TotalCost:
-    """总成本统计."""
-
-    total_compute: Decimal
-    total_storage: Decimal
-    total_network: Decimal
-    grand_total: Decimal
-    job_count: int
-
-    def to_dict(self) -> dict:
-        """转换为字典格式."""
-        return {
-            "compute": float(self.total_compute),
-            "storage": float(self.total_storage),
-            "network": float(self.total_network),
-            "total": float(self.grand_total),
-            "job_count": self.job_count,
-        }
-
-
-@dataclass
-class CostAllocationKey:
-    """成本分摊维度键."""
-
-    dimension: Literal["user", "project", "time_range"]
-    value: str | int  # user_id, project_id, or "YYYY-MM-DD"
-
-
-@dataclass
-class AllocatedCost:
-    """分摊后的成本."""
-
-    allocation_key: CostAllocationKey
-    total_cost: TotalCost
-    jobs: list[int]  # job_ids
-
-    def to_dict(self) -> dict:
-        """转换为字典格式."""
-        return {
-            "allocation": {
-                "dimension": self.allocation_key.dimension,
-                "value": self.allocation_key.value,
-            },
-            "cost": self.total_cost.to_dict(),
-            "job_ids": self.jobs,
-        }
+from src.modules.billing.application.services.cost_allocation import (
+    AllocatedCost,
+    CostAllocationService,
+)
+from src.modules.billing.application.services.cost_models import (
+    ComputeCost,
+    CostBreakdown,
+    CostDimension,
+    NetworkCost,
+    StorageCost,
+    TotalCost,
+)
 
 
 class CostCalculator:
@@ -204,6 +24,9 @@ class CostCalculator:
 
     提供单任务成本计算和批量聚合功能，支持多维度成本分析。
     """
+
+    def __init__(self) -> None:
+        self._allocation_service = CostAllocationService()
 
     def calculate_job_cost(
         self,
@@ -270,41 +93,7 @@ class CostCalculator:
         Returns:
             聚合后的总成本统计
         """
-        total_compute = sum((b.compute_cost.total_cost for b in breakdowns), start=Decimal("0"))
-        total_storage = sum((b.storage_cost.total_cost for b in breakdowns), start=Decimal("0"))
-        total_network = sum((b.network_cost.total_cost for b in breakdowns), start=Decimal("0"))
-        grand_total = total_compute + total_storage + total_network
-
-        return TotalCost(
-            total_compute=total_compute,
-            total_storage=total_storage,
-            total_network=total_network,
-            grand_total=grand_total,
-            job_count=len(breakdowns),
-        )
-
-    def _allocate_costs(
-        self,
-        costs: dict[Any, list[tuple[int, CostBreakdown]]],
-        dimension: Literal["user", "project", "time_range"],
-    ) -> list[AllocatedCost]:
-        """通用成本分摊方法.
-
-        Args:
-            costs: 维度值到 (job_id, 成本明细) 列表的映射
-            dimension: 分摊维度
-
-        Returns:
-            按指定维度分摊的成本列表
-        """
-        return [
-            AllocatedCost(
-                allocation_key=CostAllocationKey(dimension=dimension, value=key),
-                total_cost=self.aggregate_costs([breakdown for _, breakdown in job_costs]),
-                jobs=[job_id for job_id, _ in job_costs],
-            )
-            for key, job_costs in costs.items()
-        ]
+        return self._allocation_service.aggregate_costs(breakdowns)
 
     def allocate_by_user(
         self,
@@ -318,7 +107,7 @@ class CostCalculator:
         Returns:
             按用户分摊的成本列表
         """
-        return self._allocate_costs(costs, "user")
+        return self._allocation_service.allocate_by_user(costs)
 
     def allocate_by_project(
         self,
@@ -332,7 +121,7 @@ class CostCalculator:
         Returns:
             按项目分摊的成本列表
         """
-        return self._allocate_costs(costs, "project")
+        return self._allocation_service.allocate_by_project(costs)
 
     def allocate_by_time_range(
         self,
@@ -346,4 +135,17 @@ class CostCalculator:
         Returns:
             按时间范围分摊的成本列表
         """
-        return self._allocate_costs(costs, "time_range")
+        return self._allocation_service.allocate_by_time_range(costs)
+
+
+# 导出常用类型以保持兼容性
+__all__ = [
+    "CostCalculator",
+    "CostBreakdown",
+    "CostDimension",
+    "ComputeCost",
+    "StorageCost",
+    "NetworkCost",
+    "TotalCost",
+    "AllocatedCost",
+]

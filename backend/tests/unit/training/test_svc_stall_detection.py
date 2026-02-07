@@ -551,43 +551,35 @@ class TestStallDetectionServiceChangeRate:
 
     def test_calculate_change_rate_normal(self) -> None:
         """正常情况下的变化率计算"""
-        from src.modules.training.application.services.stall_detection_service import (
-            StallDetectionService,
-        )
+        from src.modules.training.application.services.stall_analysis import StallAnalyzer
 
         # 从 1.0 下降到 0.5，变化率为 50%
-        rate = StallDetectionService._calculate_change_rate([1.0, 0.75, 0.5])
+        rate = StallAnalyzer.calculate_change_rate([1.0, 0.75, 0.5])
         assert abs(rate - 0.5) < 0.001
 
     def test_calculate_change_rate_unchanged(self) -> None:
         """值未变化时变化率为 0"""
-        from src.modules.training.application.services.stall_detection_service import (
-            StallDetectionService,
-        )
+        from src.modules.training.application.services.stall_analysis import StallAnalyzer
 
-        rate = StallDetectionService._calculate_change_rate([0.5, 0.5, 0.5])
+        rate = StallAnalyzer.calculate_change_rate([0.5, 0.5, 0.5])
         assert rate == 0.0
 
     def test_calculate_change_rate_from_zero(self) -> None:
         """起始值为 0 时的特殊处理"""
-        from src.modules.training.application.services.stall_detection_service import (
-            StallDetectionService,
-        )
+        from src.modules.training.application.services.stall_analysis import StallAnalyzer
 
         # 从 0 变为非 0，返回绝对值
-        rate = StallDetectionService._calculate_change_rate([0.0, 0.5])
+        rate = StallAnalyzer.calculate_change_rate([0.0, 0.5])
         assert rate == 0.5
 
     def test_calculate_change_rate_insufficient_data(self) -> None:
         """数据不足时返回高变化率（不判定为停滞）"""
-        from src.modules.training.application.services.stall_detection_service import (
-            StallDetectionService,
-        )
+        from src.modules.training.application.services.stall_analysis import StallAnalyzer
 
         # 只有一个数据点
-        rate = StallDetectionService._calculate_change_rate([0.5])
+        rate = StallAnalyzer.calculate_change_rate([0.5])
         assert rate == 1.0  # 返回高变化率
 
         # 空列表
-        rate = StallDetectionService._calculate_change_rate([])
+        rate = StallAnalyzer.calculate_change_rate([])
         assert rate == 1.0

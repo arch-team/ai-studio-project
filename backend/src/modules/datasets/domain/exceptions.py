@@ -6,16 +6,12 @@
 from dataclasses import dataclass
 
 from src.shared.domain.problem import Problem, problem
-
-
 @problem(404, "DATASET_NOT_FOUND", "Dataset '{dataset_id}' not found")
 @dataclass
 class DatasetNotFoundError(Problem):
     """数据集未找到."""
 
     dataset_id: int | str
-
-
 @problem(
     409,
     "DUPLICATE_DATASET_VERSION",
@@ -27,8 +23,6 @@ class DuplicateDatasetVersionError(Problem):
 
     name: str
     version: str
-
-
 @problem(
     409,
     "INVALID_DATASET_STATE",
@@ -41,8 +35,6 @@ class InvalidDatasetStateError(Problem):
     dataset_id: int
     current_state: str
     operation: str
-
-
 @problem(
     403,
     "DATASET_ACCESS_DENIED",
@@ -54,8 +46,6 @@ class DatasetAccessDeniedError(Problem):
 
     user_id: int
     dataset_id: int
-
-
 @problem(
     500,
     "DATASET_STORAGE_ERROR",
@@ -67,11 +57,7 @@ class DatasetStorageError(Problem):
 
     dataset_id: int | None = None
     reason: str = "Unknown error"
-
-
 # ========== 上传相关异常 ==========
-
-
 @problem(
     409,
     "UPLOAD_SESSION_ACTIVE",
@@ -83,8 +69,6 @@ class UploadSessionActiveError(Problem):
 
     dataset_id: int
     upload_id: str
-
-
 @problem(
     404,
     "UPLOAD_SESSION_NOT_FOUND",
@@ -95,8 +79,6 @@ class UploadSessionNotFoundError(Problem):
     """上传会话未找到."""
 
     upload_id: str
-
-
 @problem(
     409,
     "UPLOAD_INCOMPLETE",
@@ -108,11 +90,7 @@ class UploadIncompleteError(Problem):
 
     upload_id: str
     missing_parts: list[int]
-
-
 # ========== FSx 相关异常 ==========
-
-
 @problem(
     404,
     "FSX_SYNC_TASK_NOT_FOUND",
@@ -123,8 +101,6 @@ class FsxSyncTaskNotFoundError(Problem):
     """FSx 同步任务未找到."""
 
     task_id: str
-
-
 @problem(
     500,
     "FSX_SYNC_FAILED",

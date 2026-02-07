@@ -40,7 +40,10 @@ class ResourceUsageQueryImpl(IResourceUsageQuery):
         self._session = session
 
     async def build_training_conditions(
-        self, start_date: datetime, end_date: datetime, user_id: int | None = None,
+        self,
+        start_date: datetime,
+        end_date: datetime,
+        user_id: int | None = None,
     ) -> list[Any]:
         """构建训练任务查询条件。"""
         conditions: list[Any] = [
@@ -53,7 +56,9 @@ class ResourceUsageQueryImpl(IResourceUsageQuery):
         return conditions
 
     async def get_training_job_stats_by_period(
-        self, date_format: str, conditions: list[Any],
+        self,
+        date_format: str,
+        conditions: list[Any],
     ) -> list[TrainingJobStats]:
         """按时间维度聚合训练任务统计。"""
         period_col = _period_column(date_format)
@@ -75,8 +80,12 @@ class ResourceUsageQueryImpl(IResourceUsageQuery):
         result = await self._session.execute(stmt)
         return [
             TrainingJobStats(
-                period=row.period, period_start=row.period_start, period_end=row.period_end,
-                cpu_hours=row.cpu_hours, gpu_hours=row.gpu_hours, job_count=row.job_count,
+                period=row.period,
+                period_start=row.period_start,
+                period_end=row.period_end,
+                cpu_hours=row.cpu_hours,
+                gpu_hours=row.gpu_hours,
+                job_count=row.job_count,
             )
             for row in result.all()
         ]
@@ -85,9 +94,7 @@ class ResourceUsageQueryImpl(IResourceUsageQuery):
         """获取用户存储统计。"""
         stmt = (
             select(
-                func.coalesce(
-                    func.sum(DatasetModel.total_size_bytes / _GB_DIVISOR), _ZERO
-                ).label("total_gb"),
+                func.coalesce(func.sum(DatasetModel.total_size_bytes / _GB_DIVISOR), _ZERO).label("total_gb"),
                 func.coalesce(func.sum(DatasetModel.total_size_bytes), 0).label("total_bytes"),
             )
             .where(DatasetModel.owner_id == user_id)
@@ -123,9 +130,12 @@ class ResourceUsageQueryImpl(IResourceUsageQuery):
         result = await self._session.execute(stmt)
         return [
             {
-                "period_start": row.period_start, "period_end": row.period_end,
-                "compute_cost": row.compute_cost, "storage_cost": row.storage_cost,
-                "network_cost": row.network_cost, "total_cost": row.total_cost,
+                "period_start": row.period_start,
+                "period_end": row.period_end,
+                "compute_cost": row.compute_cost,
+                "storage_cost": row.storage_cost,
+                "network_cost": row.network_cost,
+                "total_cost": row.total_cost,
             }
             for row in result.all()
         ]
@@ -143,12 +153,18 @@ class ResourceUsageQueryImpl(IResourceUsageQuery):
         )
         row = (await self._session.execute(stmt)).one()
         return UserTrainingStats(
-            user_id=user_id, total_gpu_hours=row.total_gpu_hours,
-            total_cost_usd=row.total_cost_usd, job_count=row.job_count,
+            user_id=user_id,
+            total_gpu_hours=row.total_gpu_hours,
+            total_cost_usd=row.total_cost_usd,
+            job_count=row.job_count,
         )
 
     async def get_user_training_by_period(
-        self, user_id: int, start_date: datetime, end_date: datetime, date_format: str,
+        self,
+        user_id: int,
+        start_date: datetime,
+        end_date: datetime,
+        date_format: str,
     ) -> list[TrainingJobStats]:
         """按用户和时间维度聚合训练统计。"""
         period_col = _period_column(date_format)
@@ -160,20 +176,26 @@ class ResourceUsageQueryImpl(IResourceUsageQuery):
                 func.coalesce(func.sum(TrainingJobModel.estimated_cost_usd), _ZERO).label("total_cost_usd"),
                 func.count(TrainingJobModel.id).label("job_count"),
             )
-            .where(and_(
-                TrainingJobModel.owner_id == user_id,
-                TrainingJobModel.status == "completed",
-                TrainingJobModel.completed_at >= start_date,
-                TrainingJobModel.completed_at <= end_date,
-            ))
+            .where(
+                and_(
+                    TrainingJobModel.owner_id == user_id,
+                    TrainingJobModel.status == "completed",
+                    TrainingJobModel.completed_at >= start_date,
+                    TrainingJobModel.completed_at <= end_date,
+                )
+            )
             .group_by(period_col)
             .order_by(period_col)
         )
         result = await self._session.execute(stmt)
         return [
             TrainingJobStats(
-                period=row.period, period_start=row.period_start, period_end=row.period_end,
-                gpu_hours=row.gpu_hours, estimated_cost_usd=row.total_cost_usd, job_count=row.job_count,
+                period=row.period,
+                period_start=row.period_start,
+                period_end=row.period_end,
+                gpu_hours=row.gpu_hours,
+                estimated_cost_usd=row.total_cost_usd,
+                job_count=row.job_count,
             )
             for row in result.all()
         ]
@@ -192,8 +214,10 @@ class ResourceUsageQueryImpl(IResourceUsageQuery):
         )
         return [
             UserTrainingStats(
-                user_id=row.owner_id, total_gpu_hours=row.total_gpu_hours,
-                total_cost_usd=row.total_cost_usd, job_count=row.job_count,
+                user_id=row.owner_id,
+                total_gpu_hours=row.total_gpu_hours,
+                total_cost_usd=row.total_cost_usd,
+                job_count=row.job_count,
             )
             for row in (await self._session.execute(stmt)).all()
         ]

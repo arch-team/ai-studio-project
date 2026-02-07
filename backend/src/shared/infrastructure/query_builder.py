@@ -29,34 +29,53 @@ class QueryBuilder(Generic[ModelT]):
         if isinstance(value, Enum):
             return value
 
+        enum_class = self._get_column_enum_class(column_name)
+        if not enum_class or not isinstance(value, str):
+            return value
+
+        return self._string_to_enum(value, enum_class)
+
+    def _get_column_enum_class(self, column_name: str) -> type[Enum] | None:
+        """获取列的枚举类型。"""
         try:
             mapper = inspect(self._model_class)
             if not hasattr(mapper, "columns"):
-                return value
+                return None
+
             columns = getattr(mapper, "columns", None)
-            if columns is None:
-                return value
+            if not columns:
+                return None
+
             column = columns.get(column_name)
-            if column is None:
-                return value
+            if not column:
+                return None
 
             # Check if column type has enum_class (SQLAlchemy Enum type)
             column_type = column.type
-            if hasattr(column_type, "enum_class") and column_type.enum_class is not None:
-                enum_class = column_type.enum_class
-                if isinstance(value, str):
-                    # Try by name first (case-insensitive), then by value
-                    upper_value = value.upper()
-                    try:
-                        return enum_class[upper_value]
-                    except KeyError:
-                        for member in enum_class:
-                            if member.value.upper() == upper_value:
-                                return member
+            if hasattr(column_type, "enum_class") and column_type.enum_class:
+                return column_type.enum_class
         except (AttributeError, KeyError) as e:
-            # 枚举转换失败时记录警告，返回原始值继续处理
-            logger.debug("enum_conversion_skipped", column_name=column_name, error=str(e))
+            logger.debug("enum_class_not_found", column_name=column_name, error=str(e))
 
+        return None
+
+    def _string_to_enum(self, value: str, enum_class: type[Enum]) -> Any:
+        """将字符串转换为枚举值。"""
+        upper_value = value.upper()
+
+        # Try by name first (case-insensitive)
+        try:
+            return enum_class[upper_value]
+        except KeyError:
+            pass
+
+        # Then try by value
+        for member in enum_class:
+            if member.value.upper() == upper_value:
+                return member
+
+        # 转换失败，返回原始值
+        logger.debug("enum_conversion_failed", value=value, enum_class=enum_class.__name__)
         return value
 
     def with_soft_delete_filter(self) -> "QueryBuilder[ModelT]":

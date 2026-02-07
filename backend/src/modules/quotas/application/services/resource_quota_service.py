@@ -104,11 +104,21 @@ class ResourceQuotaService(BaseApplicationService[ResourceQuota, int]):
 
         # 更新字段
         updatable_fields = [
-            "name", "description", "max_cpu_cores", "reserved_cpu_cores",
-            "max_gpu_count", "reserved_gpu_count", "gpu_types",
-            "max_memory_gb", "reserved_memory_gb", "max_storage_gb",
-            "max_concurrent_jobs", "max_total_jobs", "max_spot_instances",
-            "valid_from", "valid_until",
+            "name",
+            "description",
+            "max_cpu_cores",
+            "reserved_cpu_cores",
+            "max_gpu_count",
+            "reserved_gpu_count",
+            "gpu_types",
+            "max_memory_gb",
+            "reserved_memory_gb",
+            "max_storage_gb",
+            "max_concurrent_jobs",
+            "max_total_jobs",
+            "max_spot_instances",
+            "valid_from",
+            "valid_until",
         ]
         for field in updatable_fields:
             if field in data:

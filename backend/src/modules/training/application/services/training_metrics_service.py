@@ -78,46 +78,58 @@ class TrainingMetricsService:
         step: str | None = None,
         is_completed: bool = False,
     ) -> TrainingMetricsResult:
-        """获取训练任务指标.
-
-        Args:
-            job_id: 任务 ID
-            metric_types: 指标类型列表 (loss, accuracy, learning_rate 等)
-            start_time: 查询开始时间
-            end_time: 查询结束时间
-            step: 聚合步长 (如 "5m", "1h")
-            is_completed: 任务是否已完成 (用于缓存策略)
-
-        Returns:
-            训练指标查询结果
-        """
-        # 缓存键
-        cache_key = f"{job_id}:{','.join(sorted(metric_types))}"
-
-        # 对于已完成任务，尝试使用缓存
+        """获取训练任务指标."""
+        # 检查缓存
+        cache_key = self._build_cache_key(job_id, metric_types)
         if is_completed and cache_key in self._cache:
             return self._cache[cache_key]
+
+        # 查询 Prometheus
+        raw_metrics = await self._query_prometheus_metrics(metric_types, start_time, end_time, step)
+
+        # 转换结果
+        result = self._convert_to_training_metrics(job_id, metric_types, raw_metrics)
+
+        # 缓存已完成任务的结果
+        if is_completed:
+            self._cache[cache_key] = result
+
+        return result
+
+    def _build_cache_key(self, job_id: int, metric_types: list[str]) -> str:
+        """构建缓存键."""
+        return f"{job_id}:{','.join(sorted(metric_types))}"
+
+    async def _query_prometheus_metrics(
+        self,
+        metric_types: list[str],
+        start_time: datetime | None,
+        end_time: datetime | None,
+        step: str | None,
+    ) -> dict:
+        """查询 Prometheus 指标."""
+        from datetime import timedelta
+        from src.shared.utils import utc_now
 
         # 转换指标类型为 Prometheus 指标名称
         prometheus_metric_names = [METRIC_TYPE_MAPPING.get(mt, f"training_{mt}") for mt in metric_types]
 
-        # 查询 Prometheus (提供默认值以满足类型要求)
-        from datetime import timedelta
-
-        from src.shared.utils import utc_now
-
+        # 提供默认值
         effective_start_time = start_time if start_time is not None else utc_now() - timedelta(hours=1)
         effective_end_time = end_time if end_time is not None else utc_now()
         effective_step = step if step is not None else "1m"
 
-        raw_metrics = await self._prometheus.query_metrics(
+        return await self._prometheus.query_metrics(
             metric_names=prometheus_metric_names,
             start_time=effective_start_time,
             end_time=effective_end_time,
             step=effective_step,
         )
 
-        # 转换结果
+    def _convert_to_training_metrics(
+        self, job_id: int, metric_types: list[str], raw_metrics: dict
+    ) -> TrainingMetricsResult:
+        """转换 Prometheus 结果为训练指标."""
         result_metrics: dict[str, list[MetricPoint]] = {}
 
         for metric_type in metric_types:
@@ -127,13 +139,7 @@ class TrainingMetricsService:
                     MetricPoint(timestamp=dp.timestamp, value=dp.value) for dp in raw_metrics[prometheus_name]
                 ]
 
-        result = TrainingMetricsResult(job_id=job_id, metrics=result_metrics)
-
-        # 缓存已完成任务的结果
-        if is_completed:
-            self._cache[cache_key] = result
-
-        return result
+        return TrainingMetricsResult(job_id=job_id, metrics=result_metrics)
 
     async def compare_jobs_metrics(
         self,

@@ -90,12 +90,5 @@ class ResourceQuotaExceededError(Problem):
     requested: int
 
 
-# =============================================================================
-# 向后兼容别名 (deprecated)
-# =============================================================================
-
-
 # DomainError 作为 Problem 的别名，用于向后兼容
-# 新代码应直接继承 Problem
 DomainError = Problem
-"""[DEPRECATED] 使用 Problem 替代. 将在下个版本移除."""

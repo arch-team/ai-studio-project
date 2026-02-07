@@ -151,71 +151,76 @@ class PricingModelService:
 
         return self._network_pricing_data.get(key)
 
-    def _initialize_instance_pricing(
-        self,
-    ) -> dict[tuple[str, str], InstancePricing]:
-        """
-        初始化实例定价数据
-
-        Returns:
-            实例定价数据字典 {(instance_type, region): InstancePricing}
-        """
-        # AWS us-east-1 区域定价 (2026-01-27 更新)
+    def _initialize_instance_pricing(self) -> dict[tuple[str, str], InstancePricing]:
+        """初始化实例定价数据."""
         pricing_data = [
-            # p4d.24xlarge (8x A100 40GB)
-            InstancePricing(
-                instance_type="p4d.24xlarge",
-                hourly_rate=Decimal("32.77"),
-                gpu_count=8,
-                gpu_type="A100 40GB",
-                cpu_cores=96,
-                memory_gb=1152,
-                region="us-east-1",
-            ),
-            # p5.48xlarge (8x H100 80GB)
-            InstancePricing(
-                instance_type="p5.48xlarge",
-                hourly_rate=Decimal("98.32"),
-                gpu_count=8,
-                gpu_type="H100 80GB",
-                cpu_cores=192,
-                memory_gb=2048,
-                region="us-east-1",
-            ),
-            # trn1.32xlarge (16x Trainium)
-            InstancePricing(
-                instance_type="trn1.32xlarge",
-                hourly_rate=Decimal("21.50"),
-                gpu_count=16,
-                gpu_type="Trainium",
-                cpu_cores=128,
-                memory_gb=512,
-                region="us-east-1",
-            ),
-            # ml.g5.xlarge (1x A10G)
-            InstancePricing(
-                instance_type="ml.g5.xlarge",
-                hourly_rate=Decimal("1.006"),
-                gpu_count=1,
-                gpu_type="A10G",
-                cpu_cores=4,
-                memory_gb=16,
-                region="us-east-1",
-            ),
-            # ml.g5.2xlarge (1x A10G)
-            InstancePricing(
-                instance_type="ml.g5.2xlarge",
-                hourly_rate=Decimal("1.212"),
-                gpu_count=1,
-                gpu_type="A10G",
-                cpu_cores=8,
-                memory_gb=32,
-                region="us-east-1",
-            ),
+            self._create_p4d_pricing(),
+            self._create_p5_pricing(),
+            self._create_trainium_pricing(),
+            self._create_g5_xlarge_pricing(),
+            self._create_g5_2xlarge_pricing(),
         ]
-
-        # 转换为字典格式
         return {(p.instance_type, p.region): p for p in pricing_data}
+
+    def _create_p4d_pricing(self) -> InstancePricing:
+        """创建 p4d.24xlarge 定价."""
+        return InstancePricing(
+            instance_type="p4d.24xlarge",
+            hourly_rate=Decimal("32.77"),
+            gpu_count=8,
+            gpu_type="A100 40GB",
+            cpu_cores=96,
+            memory_gb=1152,
+            region="us-east-1",
+        )
+
+    def _create_p5_pricing(self) -> InstancePricing:
+        """创建 p5.48xlarge 定价."""
+        return InstancePricing(
+            instance_type="p5.48xlarge",
+            hourly_rate=Decimal("98.32"),
+            gpu_count=8,
+            gpu_type="H100 80GB",
+            cpu_cores=192,
+            memory_gb=2048,
+            region="us-east-1",
+        )
+
+    def _create_trainium_pricing(self) -> InstancePricing:
+        """创建 trn1.32xlarge 定价."""
+        return InstancePricing(
+            instance_type="trn1.32xlarge",
+            hourly_rate=Decimal("21.50"),
+            gpu_count=16,
+            gpu_type="Trainium",
+            cpu_cores=128,
+            memory_gb=512,
+            region="us-east-1",
+        )
+
+    def _create_g5_xlarge_pricing(self) -> InstancePricing:
+        """创建 ml.g5.xlarge 定价."""
+        return InstancePricing(
+            instance_type="ml.g5.xlarge",
+            hourly_rate=Decimal("1.006"),
+            gpu_count=1,
+            gpu_type="A10G",
+            cpu_cores=4,
+            memory_gb=16,
+            region="us-east-1",
+        )
+
+    def _create_g5_2xlarge_pricing(self) -> InstancePricing:
+        """创建 ml.g5.2xlarge 定价."""
+        return InstancePricing(
+            instance_type="ml.g5.2xlarge",
+            hourly_rate=Decimal("1.212"),
+            gpu_count=1,
+            gpu_type="A10G",
+            cpu_cores=8,
+            memory_gb=32,
+            region="us-east-1",
+        )
 
     def _initialize_storage_pricing(
         self,

@@ -69,21 +69,33 @@ class DatasetUploadService:
     ) -> UploadSession:
         """初始化分片上传。
 
-        Args:
-            dataset_id: 数据集 ID
-            filename: 原始文件名
-            content_type: MIME 类型
-            total_size: 文件总大小 (字节)
-            owner_id: 上传者用户 ID
-            part_size: 分片大小 (字节)
-
-        Returns:
-            创建的上传会话
-
         Raises:
             DatasetNotFoundError: 数据集不存在
             UploadSessionActiveError: 数据集已有活跃上传会话
         """
+        # 验证前置条件
+        await self._validate_upload_prerequisites(dataset_id)
+
+        # 创建 S3 分片上传
+        s3_key = f"datasets/{dataset_id}/{filename}"
+        s3_response = await self._create_s3_multipart_upload(s3_key, content_type, dataset_id, filename)
+
+        # 创建上传会话
+        session = self._create_upload_session(
+            upload_id=s3_response["UploadId"],
+            dataset_id=dataset_id,
+            s3_key=s3_key,
+            filename=filename,
+            content_type=content_type,
+            total_size=total_size,
+            part_size=part_size,
+            owner_id=owner_id,
+        )
+
+        return await self._upload_session_repository.add(session)
+
+    async def _validate_upload_prerequisites(self, dataset_id: int) -> None:
+        """验证上传前置条件."""
         # 验证数据集存在
         dataset = await self._dataset_repository.get_by_id(dataset_id)
         if dataset is None:
@@ -94,18 +106,31 @@ class DatasetUploadService:
         if active_session is not None:
             raise UploadSessionActiveError(dataset_id=dataset_id, upload_id=active_session.upload_id)
 
-        # 构建 S3 key 并创建分片上传
-        s3_key = f"datasets/{dataset_id}/{filename}"
-        response = await self._s3_client.create_multipart_upload(
+    async def _create_s3_multipart_upload(
+        self, s3_key: str, content_type: str, dataset_id: int, filename: str
+    ) -> dict:
+        """创建 S3 分片上传."""
+        return await self._s3_client.create_multipart_upload(
             key=s3_key,
             content_type=content_type,
             metadata={"filename": filename, "dataset_id": str(dataset_id)},
         )
 
-        # 创建并持久化会话
+    def _create_upload_session(
+        self,
+        upload_id: str,
+        dataset_id: int,
+        s3_key: str,
+        filename: str,
+        content_type: str,
+        total_size: int,
+        part_size: int,
+        owner_id: int,
+    ) -> UploadSession:
+        """创建上传会话实体."""
         now = utc_now()
-        session = UploadSession(
-            upload_id=response["UploadId"],
+        return UploadSession(
+            upload_id=upload_id,
             dataset_id=dataset_id,
             bucket=self._s3_client._bucket_name,
             key=s3_key,
@@ -118,7 +143,6 @@ class DatasetUploadService:
             created_at=now,
             updated_at=now,
         )
-        return await self._upload_session_repository.add(session)
 
     async def generate_presigned_urls(
         self,
@@ -222,17 +246,8 @@ class DatasetUploadService:
             "updated_at": session.updated_at.isoformat(),
         }
 
-    async def complete_multipart_upload(
-        self,
-        upload_id: str,
-    ) -> dict[str, Any]:
+    async def complete_multipart_upload(self, upload_id: str) -> dict[str, Any]:
         """完成分片上传。
-
-        Args:
-            upload_id: 上传会话 ID
-
-        Returns:
-            完成结果 {etag, location, size}
 
         Raises:
             UploadSessionNotFoundError: 上传会话不存在
@@ -240,47 +255,55 @@ class DatasetUploadService:
         """
         session = await self._get_session_or_raise(upload_id)
 
-        # 验证所有分片都已上传完成
+        # 验证完整性
         if not session.is_complete():
-            raise UploadIncompleteError(
-                upload_id=upload_id,
-                missing_parts=session.missing_parts,
-            )
+            raise UploadIncompleteError(upload_id=upload_id, missing_parts=session.missing_parts)
 
-        # 更新状态为 COMPLETING
-        session.status = UploadStatus.COMPLETING
+        # 标记为正在完成
+        await self._update_session_status(session, UploadStatus.COMPLETING)
+
+        # 完成 S3 上传
+        response = await self._complete_s3_upload(session, upload_id)
+
+        # 标记为已完成
+        await self._update_session_status(session, UploadStatus.COMPLETED)
+
+        # 更新数据集状态
+        await self._update_dataset_status(session)
+
+        return self._build_completion_response(session, response)
+
+    async def _update_session_status(self, session: UploadSession, status: UploadStatus) -> None:
+        """更新上传会话状态."""
+        session.status = status
         await self._upload_session_repository.update(session)
 
-        # 构建分片列表（按分片编号排序）
+    async def _complete_s3_upload(self, session: UploadSession, upload_id: str) -> dict:
+        """完成 S3 分片上传."""
         parts = [
             {"PartNumber": part.part_number, "ETag": part.etag}
-            for part in sorted(
-                session.completed_parts.values(),
-                key=lambda p: p.part_number,
-            )
+            for part in sorted(session.completed_parts.values(), key=lambda p: p.part_number)
         ]
 
-        # 调用 S3 完成上传
-        response = await self._s3_client.complete_multipart_upload(
+        return await self._s3_client.complete_multipart_upload(
             key=session.key,
             upload_id=upload_id,
             parts=parts,
         )
 
-        # 更新会话状态为 COMPLETED
-        session.status = UploadStatus.COMPLETED
-        await self._upload_session_repository.update(session)
-
-        # 更新数据集状态为 AVAILABLE
+    async def _update_dataset_status(self, session: UploadSession) -> None:
+        """更新数据集状态为可用."""
         dataset = await self._dataset_repository.get_by_id(session.dataset_id)
         if dataset and dataset.status == DatasetStatus.PREPARING:
             dataset.status = DatasetStatus.AVAILABLE
             dataset.total_size_bytes = session.total_size
             await self._dataset_repository.update(dataset)
 
+    def _build_completion_response(self, session: UploadSession, s3_response: dict) -> dict[str, Any]:
+        """构建完成响应."""
         return {
-            "etag": response.get("ETag"),
-            "location": response.get("Location"),
+            "etag": s3_response.get("ETag"),
+            "location": s3_response.get("Location"),
             "bucket": session.bucket,
             "key": session.key,
             "size": session.total_size,

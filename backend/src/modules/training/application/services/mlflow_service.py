@@ -16,7 +16,7 @@ import structlog
 from mlflow.exceptions import MlflowException
 from mlflow.tracking import MlflowClient
 
-from src.modules.training.application.interfaces import IMetricsService, MetricPoint
+from src.modules.training.application.interfaces import IMetricsService, MetricData, MetricPoint
 
 logger = structlog.get_logger(__name__)
 
@@ -254,6 +254,73 @@ class MLflowService(IMetricsService):
             return self._client.get_metric_history(run_id, metric_name)
 
         return await asyncio.get_event_loop().run_in_executor(None, _get)
+
+    async def get_multiple_metrics(
+        self,
+        job_id: int,
+        metric_names: list[str],
+        start_time: datetime,
+        end_time: datetime,
+    ) -> list[MetricData]:
+        """批量获取多个指标的历史数据.
+
+        Args:
+            job_id: 训练任务 ID
+            metric_names: 指标名称列表
+            start_time: 查询起始时间
+            end_time: 查询结束时间
+
+        Returns:
+            list[MetricData]: 指标数据列表
+        """
+
+        metrics_data = []
+        for metric_name in metric_names:
+            points = await self.get_metric_history(job_id, metric_name, start_time, end_time)
+            if points:
+                metrics_data.append(
+                    MetricData(
+                        name=metric_name,
+                        points=points,
+                    )
+                )
+        return metrics_data
+
+    async def get_latest_metrics(
+        self,
+        job_id: int,
+        metric_names: list[str] | None = None,
+    ) -> dict[str, float]:
+        """获取最新的指标值.
+
+        Args:
+            job_id: 训练任务 ID
+            metric_names: 指标名称列表，None 表示获取所有指标
+
+        Returns:
+            dict[str, float]: 指标名称到最新值的映射
+        """
+        # 查找 job_id 对应的 MLflow run
+        run = await self._find_run_by_job_id(job_id)
+        if run is None:
+            return {}
+
+        # 如果未指定指标名称，获取所有指标
+        if metric_names is None:
+            metric_names = list(run.data.metrics.keys()) if run.data and run.data.metrics else []
+
+        latest_metrics = {}
+        for metric_name in metric_names:
+            try:
+                history = await self._get_metric_history_with_retry(run.info.run_id, metric_name)
+                if history:
+                    # 取最后一个值作为最新值
+                    latest_metrics[metric_name] = history[-1].value
+            except Exception:
+                # 忽略单个指标的错误，继续获取其他指标
+                continue
+
+        return latest_metrics
 
 
 __all__ = ["MLflowService", "MLflowServiceError"]

@@ -41,42 +41,21 @@ class ReportService:
         page_size: int = 20,
     ) -> dict:
         """获取资源使用报表 (T071)."""
-        if group_by not in _DATE_FORMAT_MAP:
-            raise ValueError(f"Invalid group_by: {group_by}")
+        # 验证分组参数
+        self._validate_group_by(group_by)
 
-        date_format = _DATE_FORMAT_MAP[group_by]
-
-        # 构建查询条件并获取时间序列数据
-        conditions = await self._query.build_training_conditions(start_date, end_date, user_id)
-        stats_list = await self._query.get_training_job_stats_by_period(date_format, conditions)
-
+        # 获取时间序列统计数据
+        stats_list = await self._fetch_time_series_stats(start_date, end_date, user_id, group_by)
         paginated_stats, total_records = _paginate(stats_list, page, page_size)
 
-        # 计算存储 GB 小时数（简化计算，实际需要按时间积分）
-        storage_gb_hours = _ZERO
-        if user_id:
-            storage = await self._query.get_storage_stats_by_user(user_id)
-            # 简化计算: 存储大小 x 时间范围小时数
-            duration_hours = (end_date - start_date).total_seconds() / 3600
-            storage_gb_hours = storage.total_gb * Decimal(str(duration_hours))
+        # 计算存储使用量
+        storage_gb_hours = await self._calculate_storage_usage(user_id, start_date, end_date, len(stats_list))
 
-        # 构建数据点列表
-        data_points = [
-            {
-                "period_start": s.period_start,
-                "period_end": s.period_end,
-                "cpu_hours": s.cpu_hours,
-                "gpu_hours": s.gpu_hours,
-                "storage_gb_hours": storage_gb_hours / len(stats_list) if stats_list else _ZERO,
-                "job_count": s.job_count,
-            }
-            for s in paginated_stats
-        ]
+        # 构建数据点
+        data_points = self._build_data_points(paginated_stats, storage_gb_hours, len(stats_list))
 
-        # 统计汇总
-        total_cpu_hours = sum((dp["cpu_hours"] for dp in data_points), start=_ZERO)
-        total_gpu_hours = sum((dp["gpu_hours"] for dp in data_points), start=_ZERO)
-        total_jobs = sum(dp["job_count"] for dp in data_points)
+        # 计算汇总
+        summary = self._calculate_summary(data_points, storage_gb_hours)
 
         return {
             "user_id": user_id,
@@ -85,13 +64,58 @@ class ReportService:
             "end_date": end_date,
             "group_by": group_by,
             "data_points": data_points,
-            "total_cpu_hours": total_cpu_hours,
-            "total_gpu_hours": total_gpu_hours,
-            "total_storage_gb_hours": storage_gb_hours,
-            "total_jobs": total_jobs,
+            **summary,
             "page": page,
             "page_size": page_size,
             "total_records": total_records,
+        }
+
+    def _validate_group_by(self, group_by: str) -> None:
+        """验证分组参数."""
+        if group_by not in _DATE_FORMAT_MAP:
+            raise ValueError(f"Invalid group_by: {group_by}")
+
+    async def _fetch_time_series_stats(
+        self, start_date: datetime, end_date: datetime, user_id: int | None, group_by: str
+    ) -> list:
+        """获取时间序列统计数据."""
+        date_format = _DATE_FORMAT_MAP[group_by]
+        conditions = await self._query.build_training_conditions(start_date, end_date, user_id)
+        return await self._query.get_training_job_stats_by_period(date_format, conditions)
+
+    async def _calculate_storage_usage(
+        self, user_id: int | None, start_date: datetime, end_date: datetime, periods: int
+    ) -> Decimal:
+        """计算存储 GB 小时数."""
+        if not user_id:
+            return _ZERO
+
+        storage = await self._query.get_storage_stats_by_user(user_id)
+        duration_hours = (end_date - start_date).total_seconds() / 3600
+        return storage.total_gb * Decimal(str(duration_hours))
+
+    def _build_data_points(self, stats: list, storage_gb_hours: Decimal, total_periods: int) -> list[dict]:
+        """构建数据点列表."""
+        avg_storage = storage_gb_hours / total_periods if total_periods else _ZERO
+        return [
+            {
+                "period_start": s.period_start,
+                "period_end": s.period_end,
+                "cpu_hours": s.cpu_hours,
+                "gpu_hours": s.gpu_hours,
+                "storage_gb_hours": avg_storage,
+                "job_count": s.job_count,
+            }
+            for s in stats
+        ]
+
+    def _calculate_summary(self, data_points: list[dict], storage_gb_hours: Decimal) -> dict:
+        """计算汇总数据."""
+        return {
+            "total_cpu_hours": sum((dp["cpu_hours"] for dp in data_points), start=_ZERO),
+            "total_gpu_hours": sum((dp["gpu_hours"] for dp in data_points), start=_ZERO),
+            "total_storage_gb_hours": storage_gb_hours,
+            "total_jobs": sum(dp["job_count"] for dp in data_points),
         }
 
     async def get_cost_analysis_report(
@@ -106,50 +130,19 @@ class ReportService:
         page_size: int = 20,
     ) -> dict:
         """获取成本分析报表 (T072)."""
-        # 构建查询条件
-        conditions = await self._query.build_training_conditions(start_date, end_date, user_id)
+        # 查询成本数据
+        raw_data = await self._fetch_cost_data(start_date, end_date, user_id)
+        paginated_rows, total_records = _paginate(raw_data, page, page_size)
 
-        # 按天分组查询成本数据
-        rows = await self._query.get_training_cost_by_period(
-            date_format="%Y-%m-%d",
-            conditions=conditions,
-            compute_ratio=CostProportions.COMPUTE_RATIO,
-            storage_ratio=CostProportions.STORAGE_RATIO,
-            network_ratio=CostProportions.NETWORK_RATIO,
-        )
+        # 构建数据点
+        data_points = self._build_cost_data_points(paginated_rows, cost_type)
 
-        paginated_rows, total_records = _paginate(rows, page, page_size)
+        # 计算汇总统计
+        summary = self._calculate_cost_summary(data_points)
 
-        # 构建数据点列表（按 cost_type 过滤非目标成本类型）
-        data_points = [
-            {
-                "period_start": row["period_start"],
-                "period_end": row["period_end"],
-                "compute_cost": row["compute_cost"] if not cost_type or cost_type == "compute" else _ZERO,
-                "storage_cost": row["storage_cost"] if not cost_type or cost_type == "storage" else _ZERO,
-                "network_cost": row["network_cost"] if not cost_type or cost_type == "network" else _ZERO,
-                "total_cost": (
-                    row["total_cost"]
-                    if not cost_type
-                    else row["compute_cost"] + row["storage_cost"] + row["network_cost"]
-                ),
-            }
-            for row in paginated_rows
-        ]
-
-        # 统计汇总
-        total_compute_cost = sum((dp["compute_cost"] for dp in data_points), start=_ZERO)
-        total_storage_cost = sum((dp["storage_cost"] for dp in data_points), start=_ZERO)
-        total_network_cost = sum((dp["network_cost"] for dp in data_points), start=_ZERO)
-        grand_total_cost = total_compute_cost + total_storage_cost + total_network_cost
-
-        # 计算成本趋势
+        # 计算趋势和预测
         trend = self._calculate_cost_trend(data_points)
-
-        # 计算成本预测
-        forecast = None
-        if include_forecast and len(data_points) >= 7:
-            forecast = self._calculate_cost_forecast(data_points)
+        forecast = self._calculate_forecast_if_needed(data_points, include_forecast)
 
         return {
             "user_id": user_id,
@@ -158,16 +151,63 @@ class ReportService:
             "end_date": end_date,
             "cost_type": cost_type,
             "data_points": data_points,
-            "total_compute_cost": total_compute_cost,
-            "total_storage_cost": total_storage_cost,
-            "total_network_cost": total_network_cost,
-            "grand_total_cost": grand_total_cost,
+            **summary,
             "trend": trend,
             "forecast": forecast,
             "page": page,
             "page_size": page_size,
             "total_records": total_records,
         }
+
+    async def _fetch_cost_data(self, start_date: datetime, end_date: datetime, user_id: int | None) -> list:
+        """获取成本原始数据。"""
+        conditions = await self._query.build_training_conditions(start_date, end_date, user_id)
+        return await self._query.get_training_cost_by_period(
+            date_format="%Y-%m-%d",
+            conditions=conditions,
+            compute_ratio=CostProportions.COMPUTE_RATIO,
+            storage_ratio=CostProportions.STORAGE_RATIO,
+            network_ratio=CostProportions.NETWORK_RATIO,
+        )
+
+    def _build_cost_data_points(self, rows: list, cost_type: str | None) -> list[dict]:
+        """构建成本数据点。"""
+        return [
+            {
+                "period_start": row["period_start"],
+                "period_end": row["period_end"],
+                "compute_cost": row["compute_cost"] if not cost_type or cost_type == "compute" else _ZERO,
+                "storage_cost": row["storage_cost"] if not cost_type or cost_type == "storage" else _ZERO,
+                "network_cost": row["network_cost"] if not cost_type or cost_type == "network" else _ZERO,
+                "total_cost": self._calculate_row_total(row, cost_type),
+            }
+            for row in rows
+        ]
+
+    def _calculate_row_total(self, row: dict, cost_type: str | None) -> Decimal:
+        """计算单行总成本。"""
+        if not cost_type:
+            return row["total_cost"]
+        return row["compute_cost"] + row["storage_cost"] + row["network_cost"]
+
+    def _calculate_cost_summary(self, data_points: list[dict]) -> dict:
+        """计算成本汇总统计。"""
+        total_compute = sum((dp["compute_cost"] for dp in data_points), start=_ZERO)
+        total_storage = sum((dp["storage_cost"] for dp in data_points), start=_ZERO)
+        total_network = sum((dp["network_cost"] for dp in data_points), start=_ZERO)
+
+        return {
+            "total_compute_cost": total_compute,
+            "total_storage_cost": total_storage,
+            "total_network_cost": total_network,
+            "grand_total_cost": total_compute + total_storage + total_network,
+        }
+
+    def _calculate_forecast_if_needed(self, data_points: list[dict], include_forecast: bool) -> dict | None:
+        """根据条件计算成本预测。"""
+        if include_forecast and len(data_points) >= 7:
+            return self._calculate_cost_forecast(data_points)
+        return None
 
     def _calculate_cost_trend(self, data_points: list[dict]) -> dict | None:
         """计算成本趋势."""

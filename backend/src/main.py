@@ -19,6 +19,7 @@ from src.shared.api.middleware import AuthenticationMiddleware, TracingMiddlewar
 from src.shared.domain.exceptions import DomainError
 from src.shared.domain.problem import Problem
 from src.shared.infrastructure import configure_logging, get_settings
+from src.shared.infrastructure.config import Settings
 from src.shared.infrastructure.database import import_all_models
 from src.shared.infrastructure.security.exceptions import SecurityError
 
@@ -51,7 +52,18 @@ def create_app() -> FastAPI:
     """Create and configure the FastAPI application."""
     settings = get_settings()
 
-    app = FastAPI(
+    app = _create_base_app(settings)
+    _configure_middleware(app, settings)
+    _configure_routing(app)
+    _configure_exception_handlers(app)
+    _configure_health_check(app, settings)
+
+    return app
+
+
+def _create_base_app(settings: Settings) -> FastAPI:
+    """创建基础 FastAPI 应用实例。"""
+    return FastAPI(
         title=settings.app_name,
         version=settings.app_version,
         description="Enterprise AI Training Platform powered by AWS SageMaker HyperPod",
@@ -61,16 +73,15 @@ def create_app() -> FastAPI:
         lifespan=lifespan,
     )
 
-    # Middleware execution order (LIFO - Last In, First Out):
-    # Request:  Tracing → CORS → Auth → Audit
-    # Response: Audit → Auth → CORS → Tracing
-    #
-    # To achieve this, add in reverse order:
-    # 1. Audit   (added first, executes last on request)
-    # 2. Auth    (added second)
-    # 3. CORS    (added third)
-    # 4. Tracing (added last, executes first on request - provides trace_id)
 
+def _configure_middleware(app: FastAPI, settings: Settings) -> None:
+    """配置中间件层。
+
+    执行顺序 (LIFO - Last In, First Out):
+    Request:  Tracing → CORS → Auth → Audit
+    Response: Audit → Auth → CORS → Tracing
+    """
+    # 按逆序添加以实现期望的执行顺序
     app.add_middleware(AuditMiddleware)
     app.add_middleware(AuthenticationMiddleware)
     app.add_middleware(
@@ -78,29 +89,26 @@ def create_app() -> FastAPI:
         allow_origins=settings.cors_origins,
         allow_credentials=True,
         allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-        allow_headers=[
-            "Accept",
-            "Accept-Language",
-            "Authorization",
-            "Content-Type",
-            "X-Request-ID",
-        ],
+        allow_headers=["Accept", "Accept-Language", "Authorization", "Content-Type", "X-Request-ID"],
         expose_headers=["X-Request-ID"],
     )
     app.add_middleware(TracingMiddleware)
 
-    # Register API routers
+
+def _configure_routing(app: FastAPI) -> None:
+    """配置 API 路由。"""
     app.include_router(api_router)
 
-    # Register exception handlers (more specific first)
+
+def _configure_exception_handlers(app: FastAPI) -> None:
+    """配置异常处理器。"""
     # Problem 处理器用于新的 dataclass 异常体系
-    # Starlette 类型签名过于严格，运行时类型匹配是正确的
     app.add_exception_handler(Problem, problem_exception_handler)  # type: ignore[arg-type]
     # 旧的处理器用于向后兼容（迁移完成后移除）
     app.add_exception_handler(DomainError, domain_exception_handler)  # type: ignore[arg-type]
     app.add_exception_handler(SecurityError, security_exception_handler)  # type: ignore[arg-type]
 
-    # Global exception handler for unhandled exceptions
+    # 全局异常处理器
     @app.exception_handler(Exception)
     async def global_exception_handler(request: Request, exc: Exception) -> JSONResponse:
         """Handle unhandled exceptions and return 500 response."""
@@ -113,9 +121,11 @@ def create_app() -> FastAPI:
         }
         if trace_id:
             error_response["error"]["trace_id"] = trace_id
-
         return JSONResponse(status_code=500, content=error_response)
 
+
+def _configure_health_check(app: FastAPI, settings: Settings) -> None:
+    """配置健康检查端点。"""
     @app.get("/health", tags=["Health"])
     async def _health_check() -> dict:
         """Health check endpoint for load balancers and monitoring."""
@@ -124,8 +134,6 @@ def create_app() -> FastAPI:
             "version": settings.app_version,
             "environment": settings.environment,
         }
-
-    return app
 
 
 # Create the application instance

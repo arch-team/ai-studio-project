@@ -1,6 +1,5 @@
 """Shared Infrastructure - Database, config, storage, and security utilities."""
 
-from .base_repository import BaseRepository
 from .config import Settings, get_settings
 from .database import AsyncSessionLocal, Base, engine, get_db
 from .external import CloudWatchLogsClient, ICloudWatchLogsClient, get_cloudwatch_logs_client
@@ -41,7 +40,6 @@ __all__ = [
     # Query
     "QueryBuilder",
     # Repository
-    "BaseRepository",
     "PydanticRepository",
     # Storage
     "IStorageService",

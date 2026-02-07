@@ -74,9 +74,7 @@ class HyperPodClient(IHyperPodClient):
     # 训练任务管理 - 委托 JobClient
     # =========================================================================
 
-    async def submit_training_job(
-        self, cluster_name: str, job_name: str, job_config: dict[str, Any]
-    ) -> dict[str, Any]:
+    async def submit_training_job(self, cluster_name: str, job_name: str, job_config: dict[str, Any]) -> dict[str, Any]:
         """提交训练任务到集群。"""
         return await self._jobs.submit_training_job(cluster_name, job_name, job_config)
 

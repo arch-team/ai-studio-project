@@ -10,14 +10,20 @@ from dataclasses import dataclass
 from src.shared.domain.problem import Problem, problem
 
 
+@problem(400, "SPACE_ERROR")
+@dataclass
+class SpaceError(Problem):
+    """空间模块基础异常."""
+
+    message: str
+
+
 @problem(404, "SPACE_NOT_FOUND", "Space not found: {space_id}")
 @dataclass
 class SpaceNotFoundError(Problem):
     """开发空间未找到."""
 
     space_id: str
-
-
 @problem(
     409,
     "DUPLICATE_SPACE_NAME",
@@ -29,8 +35,6 @@ class DuplicateSpaceNameError(Problem):
 
     space_name: str
     owner_id: int
-
-
 @problem(
     409,
     "INVALID_SPACE_STATE",
@@ -43,8 +47,6 @@ class InvalidSpaceStateError(Problem):
     space_id: str
     current_state: str
     operation: str
-
-
 @problem(
     429,
     "SPACE_QUOTA_EXCEEDED",
@@ -57,11 +59,4 @@ class SpaceQuotaExceededError(Problem):
     resource: str
     required: int
     available: int
-
-
 # =============================================================================
-# 向后兼容别名 (deprecated)
-# =============================================================================
-
-SpaceError = Problem
-"""[DEPRECATED] 使用 Problem 替代."""

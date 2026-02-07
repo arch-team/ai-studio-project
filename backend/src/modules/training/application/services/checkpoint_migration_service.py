@@ -1,17 +1,7 @@
 """Checkpoint Migration Service - 检查点分层迁移服务 (T038b-1).
 
-实现分层存储策略:
-- 热检查点 (NVMe): 保留最近 3 个
-- 温检查点 (FSx): 保留第 4-10 个
-- 冷检查点 (S3): 超过 72 小时或第 10 个以后
-
-迁移策略:
-- 定期迁移: 每 10 分钟执行一次
-- 紧急迁移: 存储使用率 >90% 时立即执行
-- 重试机制: 失败最多重试 3 次
+协调检查点的分层存储迁移流程。
 """
-
-from dataclasses import dataclass
 
 import structlog
 
@@ -20,53 +10,21 @@ from src.modules.training.application.interfaces import (
     INotificationService,
     IStorageService,
 )
+from src.modules.training.application.services.checkpoint_integrity_service import (
+    CheckpointIntegrityService,
+)
+from src.modules.training.application.services.checkpoint_migration_strategy import (
+    CHECKPOINT_MIGRATION_CONFIG,
+    CheckpointMigrationStrategy,
+    MigrationResult,
+    SingleMigrationResult,
+)
 from src.modules.training.domain.entities import Checkpoint
 from src.modules.training.domain.exceptions import CheckpointMigrationError
 from src.modules.training.domain.repositories import ICheckpointRepository
 from src.modules.training.domain.value_objects import StorageTier
 
 logger = structlog.get_logger(__name__)
-
-
-# =============================================================================
-# 配置常量
-# =============================================================================
-
-CHECKPOINT_MIGRATION_CONFIG = {
-    "hot_retention_count": 3,  # NVMe 保留最近 3 个
-    "warm_retention_count": 10,  # FSx 保留 4-10
-    "cold_age_threshold_hours": 72,  # 超过 72 小时归档
-    "migration_interval_minutes": 10,
-    "storage_pressure_threshold": 0.9,  # 90% 触发紧急迁移
-    "max_retry_count": 3,
-}
-
-
-# =============================================================================
-# 结果数据类
-# =============================================================================
-
-
-@dataclass
-class MigrationResult:
-    """迁移结果"""
-
-    migrated_count: int = 0
-    failed_count: int = 0
-    skipped_count: int = 0
-    is_emergency: bool = False
-
-
-@dataclass
-class SingleMigrationResult:
-    """单个检查点迁移结果"""
-
-    success: bool
-    checkpoint_id: int
-    source_tier: StorageTier
-    target_tier: StorageTier
-    new_path: str | None = None
-    error_message: str | None = None
 
 
 # =============================================================================
@@ -86,6 +44,11 @@ class CheckpointMigrationService:
         self._checkpoint_repo = checkpoint_repository
         self._storage = storage_service
         self._notification = notification_service
+        self._strategy = CheckpointMigrationStrategy()
+        self._integrity_service = CheckpointIntegrityService(
+            checkpoint_repository,
+            storage_service,
+        )
 
     # =========================================================================
     # 主入口方法
@@ -101,12 +64,8 @@ class CheckpointMigrationService:
 
         # 检查是否需要紧急迁移
         nvme_usage = await self._storage.get_storage_usage(StorageTier.NVME.value)
-        if nvme_usage >= CHECKPOINT_MIGRATION_CONFIG["storage_pressure_threshold"]:
-            emergency_result = await self.handle_storage_pressure(
-                tier=StorageTier.NVME,
-                usage_percent=nvme_usage,
-            )
-            return emergency_result
+        if self._strategy.is_storage_under_pressure(nvme_usage):
+            return await self.handle_storage_pressure(StorageTier.NVME, nvme_usage)
 
         # 正常迁移流程
         # 1. 获取需要从 NVMe 迁移到 FSx 的检查点
@@ -143,13 +102,13 @@ class CheckpointMigrationService:
         checkpoints = await self._checkpoint_repo.get_by_storage_tier(tier, limit=50)
 
         # 确定目标层
-        target_tier = self._get_next_tier(tier)
+        target_tier = self._strategy.get_next_tier(tier)
         if target_tier is None:
             logger.error("no_target_tier_available", source_tier=tier.value)
             return result
 
         # 迁移所有检查点 (保留最新 3 个)
-        hot_retention = int(CHECKPOINT_MIGRATION_CONFIG["hot_retention_count"])
+        hot_retention = CHECKPOINT_MIGRATION_CONFIG["hot_retention_count"]
         for checkpoint in checkpoints[hot_retention:]:
             migration_result = await self.migrate_checkpoint(checkpoint, target_tier)
             if migration_result.success:
@@ -168,131 +127,138 @@ class CheckpointMigrationService:
         checkpoint: Checkpoint,
         target_tier: StorageTier,
     ) -> SingleMigrationResult:
-        """迁移单个检查点到目标存储层
-
-        Args:
-            checkpoint: 待迁移的检查点
-            target_tier: 目标存储层级
-
-        Returns:
-            SingleMigrationResult: 迁移结果
-        """
+        """迁移单个检查点到目标存储层。"""
         max_retries = int(CHECKPOINT_MIGRATION_CONFIG["max_retry_count"])
         last_error = None
 
         for attempt in range(max_retries):
             try:
-                # 执行迁移
-                new_path = await self._storage.migrate_checkpoint(
-                    source_path=checkpoint.storage_path,
-                    target_tier=target_tier.value,
-                    job_id=checkpoint.training_job_id,
-                )
-
-                # 验证迁移后的完整性
-                assert checkpoint.checksum is not None, "Checkpoint must have checksum for integrity verification"
-                is_valid = await self._storage.verify_integrity(new_path, checkpoint.checksum)
-                if not is_valid:
-                    assert checkpoint.id is not None, "Checkpoint must have ID"
-                    raise CheckpointMigrationError(
-                        checkpoint_id=checkpoint.id,
-                        source_tier=checkpoint.storage_tier.value,
-                        target_tier=target_tier.value,
-                        reason="Integrity verification failed after migration",
-                    )
-
-                # 更新检查点记录
-                checkpoint.migrate_to(target_tier)
-                checkpoint.storage_path = new_path
-                await self._checkpoint_repo.update(checkpoint)
-
-                logger.info(
-                    "checkpoint_migrated",
-                    checkpoint_id=checkpoint.id,
-                    source_tier=checkpoint.storage_tier.value,
-                    target_tier=target_tier.value,
-                )
-
-                assert checkpoint.id is not None, "Checkpoint must have ID"
-                return SingleMigrationResult(
-                    success=True,
-                    checkpoint_id=checkpoint.id,
-                    source_tier=checkpoint.storage_tier,
-                    target_tier=target_tier,
-                    new_path=new_path,
-                )
-
+                result = await self._attempt_migration(checkpoint, target_tier)
+                return result
             except Exception as e:
                 last_error = f"{type(e).__name__}: {e}"
-                logger.warning(
-                    "migration_attempt_failed",
-                    checkpoint_id=checkpoint.id,
-                    attempt=attempt + 1,
-                    max_retries=max_retries,
-                    error_type=type(e).__name__,
-                    error=str(e),
-                )
+                self._log_migration_attempt_failure(checkpoint, attempt + 1, max_retries, e)
                 continue
 
         # 所有重试都失败
         await self._send_migration_failure_alert(checkpoint, target_tier, last_error)
+        return self._create_failure_result(checkpoint, target_tier, last_error)
 
-        assert checkpoint.id is not None, "Checkpoint must have ID"
+    async def _attempt_migration(
+        self,
+        checkpoint: Checkpoint,
+        target_tier: StorageTier,
+    ) -> SingleMigrationResult:
+        """执行单次迁移尝试。"""
+        # 执行迁移
+        new_path = await self._storage.migrate_checkpoint(
+            source_path=checkpoint.storage_path,
+            target_tier=target_tier.value,
+            job_id=checkpoint.training_job_id,
+        )
+
+        # 验证完整性
+        await self._verify_migration_integrity(checkpoint, new_path, target_tier)
+
+        # 更新检查点记录
+        await self._update_checkpoint_after_migration(checkpoint, target_tier, new_path)
+
+        # 记录成功日志
+        self._log_migration_success(checkpoint, target_tier)
+
         return SingleMigrationResult(
-            success=False,
-            checkpoint_id=checkpoint.id,
+            success=True,
+            checkpoint_id=checkpoint.id or 0,
             source_tier=checkpoint.storage_tier,
             target_tier=target_tier,
-            error_message=last_error,
+            new_path=new_path,
+        )
+
+    async def _verify_migration_integrity(
+        self,
+        checkpoint: Checkpoint,
+        new_path: str,
+        target_tier: StorageTier,
+    ) -> None:
+        """验证迁移后的检查点完整性。"""
+        if not checkpoint.checksum:
+            return
+
+        is_valid = await self._storage.verify_integrity(new_path, checkpoint.checksum)
+        if not is_valid:
+            raise CheckpointMigrationError(
+                checkpoint_id=checkpoint.id or 0,
+                source_tier=checkpoint.storage_tier.value,
+                target_tier=target_tier.value,
+                reason="Integrity verification failed after migration",
+            )
+
+    async def _update_checkpoint_after_migration(
+        self,
+        checkpoint: Checkpoint,
+        target_tier: StorageTier,
+        new_path: str,
+    ) -> None:
+        """更新迁移后的检查点记录。"""
+        checkpoint.migrate_to(target_tier)
+        checkpoint.storage_path = new_path
+        await self._checkpoint_repo.update(checkpoint)
+
+    def _log_migration_success(self, checkpoint: Checkpoint, target_tier: StorageTier) -> None:
+        """记录迁移成功日志。"""
+        logger.info(
+            "checkpoint_migrated",
+            checkpoint_id=checkpoint.id,
+            source_tier=checkpoint.storage_tier.value,
+            target_tier=target_tier.value,
+        )
+
+    def _log_migration_attempt_failure(
+        self,
+        checkpoint: Checkpoint,
+        attempt: int,
+        max_retries: int,
+        error: Exception,
+    ) -> None:
+        """记录迁移尝试失败日志。"""
+        logger.warning(
+            "migration_attempt_failed",
+            checkpoint_id=checkpoint.id,
+            attempt=attempt,
+            max_retries=max_retries,
+            error_type=type(error).__name__,
+            error=str(error),
+        )
+
+    def _create_failure_result(
+        self,
+        checkpoint: Checkpoint,
+        target_tier: StorageTier,
+        error_message: str | None,
+    ) -> SingleMigrationResult:
+        """创建失败结果对象。"""
+        return SingleMigrationResult(
+            success=False,
+            checkpoint_id=checkpoint.id or 0,
+            source_tier=checkpoint.storage_tier,
+            target_tier=target_tier,
+            error_message=error_message,
         )
 
     # =========================================================================
-    # 完整性验证
+    # 完整性验证（委托给 CheckpointIntegrityService）
     # =========================================================================
 
     async def verify_checkpoint_integrity(self, checkpoint_id: int) -> bool:
-        """验证检查点完整性
-
-        Args:
-            checkpoint_id: 检查点 ID
-
-        Returns:
-            bool: 是否完整
-        """
-        checkpoint = await self._checkpoint_repo.get_by_id(checkpoint_id)
-        if checkpoint is None:
-            return False
-
-        if checkpoint.checksum is None:
-            return False
-
-        return await self._storage.verify_integrity(checkpoint.storage_path, checkpoint.checksum)
+        """验证检查点完整性"""
+        return await self._integrity_service.verify_checkpoint_integrity(checkpoint_id)
 
     async def get_valid_checkpoint_for_restore(
         self,
         training_job_id: int,
     ) -> Checkpoint | None:
-        """获取用于恢复的有效检查点
-
-        如果最新检查点损坏，回退到上一个有效检查点。
-
-        Args:
-            training_job_id: 训练任务 ID
-
-        Returns:
-            Checkpoint | None: 有效检查点或 None
-        """
-        checkpoints = await self._checkpoint_repo.get_by_training_job_id(training_job_id)
-
-        for checkpoint in checkpoints:
-            if checkpoint.checksum is None:
-                continue
-
-            is_valid = await self._storage.verify_integrity(checkpoint.storage_path, checkpoint.checksum)
-            if is_valid:
-                return checkpoint
-
-        return None
+        """获取用于恢复的有效检查点"""
+        return await self._integrity_service.get_valid_checkpoint_for_restore(training_job_id)
 
     # =========================================================================
     # 私有方法
@@ -300,59 +266,36 @@ class CheckpointMigrationService:
 
     async def _migrate_nvme_to_fsx(self, result: MigrationResult) -> None:
         """从 NVMe 迁移到 FSx"""
-        # 获取所有需要迁移的检查点 (排除最新 3 个)
-        # 这里简化处理，实际需要按 training_job_id 分组
         checkpoints = await self._checkpoint_repo.get_by_storage_tier(StorageTier.NVME, limit=100)
-
-        # 按 training_job_id 分组
-        job_checkpoints: dict[int, list[Checkpoint]] = {}
-        for cp in checkpoints:
-            if cp.training_job_id not in job_checkpoints:
-                job_checkpoints[cp.training_job_id] = []
-            job_checkpoints[cp.training_job_id].append(cp)
+        job_checkpoints = self._strategy.group_checkpoints_by_job(checkpoints)
 
         # 对每个任务，迁移第 4 个及以后的检查点到 FSx
         for job_id, cps in job_checkpoints.items():
-            # 按创建时间排序 (最新在前)
-            sorted_cps = sorted(cps, key=lambda x: x.created_at, reverse=True)
-
-            # 迁移第 4 个及以后的
-            hot_retention_count = int(CHECKPOINT_MIGRATION_CONFIG["hot_retention_count"])
-            for cp in sorted_cps[hot_retention_count:]:
-                migration_result = await self.migrate_checkpoint(cp, StorageTier.FSX)
-                if migration_result.success:
-                    result.migrated_count += 1
-                else:
-                    result.failed_count += 1
-
-    async def _migrate_fsx_to_s3(self, result: MigrationResult) -> None:
-        """从 FSx 迁移到 S3 (归档)"""
-        # 获取超过 72 小时的检查点
-        # 这里需要按 training_job_id 获取
-        checkpoints = await self._checkpoint_repo.get_by_storage_tier(StorageTier.FSX, limit=100)
-
-        for cp in checkpoints:
-            old_checkpoints = await self._checkpoint_repo.get_oldest_checkpoints(
-                cp.training_job_id,
-                hours_threshold=int(CHECKPOINT_MIGRATION_CONFIG["cold_age_threshold_hours"]),
-            )
-
-            for old_cp in old_checkpoints:
-                if old_cp.storage_tier == StorageTier.FSX:
-                    migration_result = await self.migrate_checkpoint(old_cp, StorageTier.S3)
+            for position, cp in enumerate(cps):
+                if self._strategy.should_migrate_from_nvme(cp, position):
+                    migration_result = await self.migrate_checkpoint(cp, StorageTier.FSX)
                     if migration_result.success:
                         result.migrated_count += 1
                     else:
                         result.failed_count += 1
 
-    def _get_next_tier(self, current_tier: StorageTier) -> StorageTier | None:
-        """获取下一个存储层"""
-        tier_order = [StorageTier.NVME, StorageTier.FSX, StorageTier.S3]
-        try:
-            current_index = tier_order.index(current_tier)
-            return tier_order[current_index + 1] if current_index < len(tier_order) - 1 else None
-        except (ValueError, IndexError):
-            return None
+    async def _migrate_fsx_to_s3(self, result: MigrationResult) -> None:
+        """从 FSx 迁移到 S3 (归档)"""
+        cold_threshold_hours = CHECKPOINT_MIGRATION_CONFIG["cold_age_threshold_hours"]
+
+        # 获取超过阈值时间的旧检查点
+        old_checkpoints = await self._checkpoint_repo.get_oldest_checkpoints(
+            training_job_id=None,  # 获取所有任务的旧检查点
+            hours_threshold=cold_threshold_hours,
+        )
+
+        for checkpoint in old_checkpoints:
+            if checkpoint.storage_tier == StorageTier.FSX:
+                migration_result = await self.migrate_checkpoint(checkpoint, StorageTier.S3)
+                if migration_result.success:
+                    result.migrated_count += 1
+                else:
+                    result.failed_count += 1
 
     async def _send_migration_failure_alert(
         self,

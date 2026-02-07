@@ -10,14 +10,20 @@ from dataclasses import dataclass
 from src.shared.domain.problem import Problem, problem
 
 
+@problem(400, "QUOTA_ERROR")
+@dataclass
+class QuotaError(Problem):
+    """配额模块基础异常."""
+
+    message: str
+
+
 @problem(404, "QUOTA_NOT_FOUND", "ResourceLimitConfig '{identifier}' not found")
 @dataclass
 class QuotaNotFoundError(Problem):
     """配额配置未找到."""
 
     identifier: str
-
-
 @problem(429, "QUOTA_EXCEEDED", "{resource} quota exceeded: requested {requested}, limit {limit}")
 @dataclass
 class QuotaExceededError(Problem):
@@ -26,8 +32,6 @@ class QuotaExceededError(Problem):
     resource: str
     requested: int
     limit: int
-
-
 @problem(
     409,
     "DUPLICATE_CONFIG",
@@ -39,8 +43,6 @@ class DuplicateConfigError(Problem):
 
     role: str
     scope: str
-
-
 @problem(
     409,
     "DUPLICATE_QUOTA_NAME",
@@ -51,11 +53,4 @@ class DuplicateQuotaNameError(Problem):
     """配额名称重复."""
 
     name: str
-
-
 # =============================================================================
-# 向后兼容别名 (deprecated)
-# =============================================================================
-
-QuotaError = Problem
-"""[DEPRECATED] 使用 Problem 替代."""

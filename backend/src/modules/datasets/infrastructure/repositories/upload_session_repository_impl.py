@@ -15,11 +15,11 @@ from src.modules.datasets.infrastructure.models import (
     UploadSessionModel,
     UploadSessionStatus,
 )
-from src.shared.infrastructure.base_repository import BaseRepository
+from src.shared.infrastructure.pydantic_repository import PydanticRepository
 
 
 class UploadSessionRepositoryImpl(
-    BaseRepository[UploadSession, UploadSessionModel, int],
+    PydanticRepository[UploadSession, UploadSessionModel, int],
     IUploadSessionRepository,
 ):
     """UploadSession 仓库 SQLAlchemy 实现。"""
@@ -128,7 +128,7 @@ class UploadSessionRepositoryImpl(
     # ========== IUploadSessionRepository 接口方法 ==========
 
     async def add(self, session: UploadSession) -> UploadSession:
-        """添加新上传会话（委托给 BaseRepository.create）。"""
+        """添加新上传会话（委托给 PydanticRepository.create）。"""
         return await self.create(session)
 
     # ========== 领域特定查询方法 ==========

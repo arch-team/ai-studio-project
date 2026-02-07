@@ -38,10 +38,12 @@ class TestHyperPodSDKUnavailableError:
         expected = "HyperPod SDK component 'CustomJob' is not available. " "Please install sagemaker-hyperpod package."
         assert str(error) == expected
 
-    def test_inherits_from_training_error(self) -> None:
-        """Test that exception inherits from TrainingError."""
+    def test_inherits_from_problem(self) -> None:
+        """Test that exception inherits from Problem."""
+        from src.shared.domain.problem import Problem
+
         error = HyperPodSDKUnavailableError()
-        assert isinstance(error, TrainingError)
+        assert isinstance(error, Problem)
 
     def test_can_be_raised_and_caught(self) -> None:
         """Test that exception can be raised and caught."""
@@ -65,10 +67,11 @@ class TestHyperPodPodNotFoundError:
         expected = "Pod 'worker-1' not found in job 'training-job-123'"
         assert str(error) == expected
 
-    def test_inherits_from_training_error(self) -> None:
-        """Test that exception inherits from TrainingError."""
+    def test_inherits_from_problem(self) -> None:
+        """Test that exception inherits from Problem."""
+        from src.shared.domain.problem import Problem
         error = HyperPodPodNotFoundError(job_name="job", pod_name="pod")
-        assert isinstance(error, TrainingError)
+        assert isinstance(error, Problem)
 
     def test_can_be_raised_and_caught(self) -> None:
         """Test that exception can be raised and caught."""
@@ -121,10 +124,11 @@ class TestHyperPodOperationError:
         expected = "HyperPod operation 'pause' on job 'llm-training-v2' failed: job not running"
         assert str(error) == expected
 
-    def test_inherits_from_training_error(self) -> None:
-        """Test that exception inherits from TrainingError."""
+    def test_inherits_from_problem(self) -> None:
+        """Test that exception inherits from Problem."""
+        from src.shared.domain.problem import Problem
         error = HyperPodOperationError(operation="test", reason="test")
-        assert isinstance(error, TrainingError)
+        assert isinstance(error, Problem)
 
     def test_can_be_raised_and_caught(self) -> None:
         """Test that exception can be raised and caught."""
@@ -142,25 +146,29 @@ class TestHyperPodOperationError:
 class TestHyperPodExceptionHierarchy:
     """Tests for HyperPod exception inheritance hierarchy."""
 
-    def test_all_exceptions_inherit_from_training_error(self) -> None:
-        """Test that all HyperPod exceptions inherit from TrainingError."""
+    def test_all_exceptions_inherit_from_problem(self) -> None:
+        """Test that all HyperPod exceptions inherit from Problem."""
+        from src.shared.domain.problem import Problem
+
         exceptions = [
             HyperPodSDKUnavailableError(),
             HyperPodPodNotFoundError(job_name="j", pod_name="p"),
             HyperPodOperationError(operation="op", reason="r"),
         ]
         for exc in exceptions:
-            assert isinstance(exc, TrainingError), f"{type(exc).__name__} should inherit from TrainingError"
+            assert isinstance(exc, Problem), f"{type(exc).__name__} should inherit from Problem"
 
-    def test_catch_by_training_error(self) -> None:
-        """Test that HyperPod exceptions can be caught by TrainingError."""
-        with pytest.raises(TrainingError):
+    def test_catch_by_problem(self) -> None:
+        """Test that HyperPod exceptions can be caught by Problem."""
+        from src.shared.domain.problem import Problem
+
+        with pytest.raises(Problem):
             raise HyperPodSDKUnavailableError()
 
-        with pytest.raises(TrainingError):
+        with pytest.raises(Problem):
             raise HyperPodPodNotFoundError(job_name="j", pod_name="p")
 
-        with pytest.raises(TrainingError):
+        with pytest.raises(Problem):
             raise HyperPodOperationError(operation="op", reason="r")
 
     def test_catch_by_base_exception(self) -> None:

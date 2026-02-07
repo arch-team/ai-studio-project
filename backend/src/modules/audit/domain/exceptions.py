@@ -10,17 +10,17 @@ from dataclasses import dataclass
 from src.shared.domain.problem import Problem, problem
 
 
+@problem(400, "AUDIT_LOG_ERROR")
+@dataclass
+class AuditLogError(Problem):
+    """审计日志基础异常."""
+
+    message: str
+
+
 @problem(404, "AUDIT_LOG_NOT_FOUND", "Audit log with id '{audit_log_id}' not found")
 @dataclass
 class AuditLogNotFoundError(Problem):
     """审计日志未找到."""
 
     audit_log_id: int
-
-
-# =============================================================================
-# 向后兼容别名 (deprecated)
-# =============================================================================
-
-AuditLogError = Problem
-"""[DEPRECATED] 使用 Problem 替代."""

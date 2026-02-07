@@ -20,6 +20,9 @@ from typing import Any
 
 from src.shared.domain.problem import Problem, problem
 
+# SecurityError 作为 Problem 的别名，用于向后兼容
+SecurityError = Problem
+
 # =============================================================================
 # 认证异常
 # =============================================================================
@@ -166,9 +169,3 @@ class SSODegradedModeError(Problem):
     message: str = field(default="SSO service is temporarily unavailable")
 
 
-# =============================================================================
-# 向后兼容别名 (deprecated)
-# =============================================================================
-
-SecurityError = Problem
-"""[DEPRECATED] 使用 Problem 替代. 将在下个版本移除."""

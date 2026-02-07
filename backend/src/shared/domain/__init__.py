@@ -31,7 +31,7 @@ __all__ = [
     # Exceptions (new Problem-based)
     "Problem",
     "problem",
-    # Exceptions (legacy - will be removed after migration)
+    # Exceptions (向后兼容)
     "DomainError",
     "EntityNotFoundError",
     "ValidationError",
