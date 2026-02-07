@@ -88,3 +88,4 @@ Claude Code 生成的计划文件索引。
 | 2026-02-07 | `2026-02-07-claude-code-上下文管理规范迁移分析.md` | Claude Code 上下文管理规范迁移分析 | ⏳ 进行中 |
 | 2026-02-07 | `2026-02-07-从-mvp-到生产可用-ai-training-platform-开发路线图.md` | 从 MVP 到生产可用：AI Training Platform 开发路线图 | ⏳ 进行中 |
 | 2026-02-07 | `2026-02-07-删除-docs-architecture-md-并整合至-rules-architecture-md.md` | 删除 docs/ARCHITECTURE.md 并整合至 rules/architecture.md | ⏳ 进行中 |
+| 2026-02-07 | `2026-02-07-优化-backend-claude-rules-architecture-md.md` | 优化 backend/.claude/rules/architecture.md | ⏳ 进行中 |
