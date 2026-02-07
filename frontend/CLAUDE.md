@@ -45,7 +45,7 @@ src/
 
 **依赖方向**: `pages → components → hooks → api → types`
 
-> 详细规范 → `docs/ARCHITECTURE.md`
+> 详细规范 → `.claude/rules/architecture.md`
 
 ## 核心约束
 
@@ -57,7 +57,7 @@ src/
 | **Query Keys** | 使用 `@lib/query` 的 `queryKeys` 工厂管理缓存键 |
 | **模块通信** | 异步通知通过 `@shared/events` EventBus |
 
-> 设计规范 (组件选择、页面模板、禁止事项) → `DESIGN.md`
+> 组件选择与设计规范 → `.claude/rules/component-design.md`
 
 ## 路径别名
 
@@ -81,13 +81,19 @@ src/
 - **工具**: `tests/__utils__/` (MSW, 渲染包装器, Mock)
 - **别名**: `@tests/` → `tests/`
 
-> 完整测试规范 → `docs/TESTING.md`
+> 完整测试规范 → `.claude/rules/testing.md`
 
 ## 文档导航
 
 | 文档 | 内容 |
 |------|------|
-| `docs/ARCHITECTURE.md` | 分层规则、模块依赖、模块通信、状态管理、错误处理 |
-| `docs/TESTING.md` | 测试分层、目录结构、命名规范、工具使用、命令参考 |
-| `DESIGN.md` | 组件选择、状态反馈、禁止事项、暗色模式、Checklist |
-| `../specs/frontend-design-guide.md` | 完整视觉规范、页面模板、色彩系统、间距系统、响应式、无障碍、国际化 |
+| `.claude/rules/architecture.md` | 分层规则、模块依赖、模块通信、共享内核、错误处理 |
+| `.claude/rules/testing.md` | 测试分层、目录结构、命名规范、工具使用、命令参考 |
+| `.claude/rules/state-management.md` | React Query、Zustand、表单状态、EventBus 联动 |
+| `.claude/rules/code-style.md` | 命名规范、TypeScript 规范、导入排序 |
+| `.claude/rules/component-design.md` | Cloudscape 组件选择、Props 设计、交互模式、暗色模式 |
+| `.claude/rules/security.md` | XSS 防护、敏感数据存储、输入验证、API 安全 |
+| `.claude/rules/performance.md` | 代码分割、Memoization、列表优化、Bundle 优化 |
+| `.claude/rules/accessibility.md` | WCAG 2.1 AA、ARIA 使用、键盘导航 |
+| `.claude/rules/checklist.md` | PR Review 检查清单 (架构、Cloudscape、安全、测试) |
+| `../specs/frontend-design-guide.md` | 完整视觉规范、页面模板、色彩系统、间距系统 |

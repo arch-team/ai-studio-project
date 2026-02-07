@@ -1,23 +1,84 @@
-# AI 训练平台前端架构规范
+> **职责**: 架构规范的单一真实源 - 分层规则、模块依赖、模块通信、共享内核、错误处理
+
+# 前端架构规范 (Frontend Architecture Standards)
 
 > **架构模式**: Feature-Sliced Design + Modular Architecture
->
-> 技术栈、命令、路径别名等基础信息请参见 `CLAUDE.md`
+> **适用范围**: React + TypeScript + AWS Cloudscape 前端项目
 
 ---
 
-## 目录
+## 0. 速查卡片
 
-1. [架构概述](#1-架构概述)
-2. [分层规则](#2-分层规则)
-3. [模块间依赖规范](#3-模块间依赖规范)
-4. [模块间通信方式](#4-模块间通信方式)
-5. [模块结构规范](#5-模块结构规范)
-6. [共享内核规范](#6-共享内核规范)
-7. [状态管理规范](#7-状态管理规范)
-8. [错误处理规范](#8-错误处理规范)
-9. [架构合规检查](#9-架构合规检查)
-10. [附录](#10-附录)
+> Claude 生成代码时优先查阅此章节
+
+### 0.1 模块内分层依赖矩阵
+
+| 从 ↓ 导入 → | types | api | hooks | components | pages |
+|-------------|:-----:|:---:|:-----:|:----------:|:-----:|
+| **pages** | ✅ | ✅ | ✅ | ✅ | - |
+| **components** | ✅ | ✅ | ✅ | - | ❌ |
+| **hooks** | ✅ | ✅ | - | ❌ | ❌ |
+| **api** | ✅ | - | ❌ | ❌ | ❌ |
+| **types** | - | ❌ | ❌ | ❌ | ❌ |
+
+**图例**: ✅ 允许 | ❌ 禁止
+
+**核心规则**: 依赖只能从上层指向下层，Types 层是最底层
+
+### 0.2 跨模块依赖速查
+
+```
+┌────────────────────────────────────────────────────────┐
+│          Feature Module 依赖速查                       │
+├────────────────────────────────────────────────────────┤
+│ ✅ 允许                                                │
+│   • 导入 @shared/* 任意内容                            │
+│   • 导入 @lib/query (queryKeys)                       │
+│   • 导入 @features/auth (useAuthStore) [唯一例外]     │
+│   • 通过 index.ts 导入其他模块公开 API                  │
+│   • 通过 EventBus 发布/订阅事件                        │
+├────────────────────────────────────────────────────────┤
+│ ❌ 禁止                                                │
+│   • Types 层导入任何外部模块                           │
+│   • 直接导入其他模块的内部文件                          │
+│   • 模块间直接依赖实现细节                              │
+│   • features/A 直接导入 features/B 内部                │
+├────────────────────────────────────────────────────────┤
+│ 🔄 模块间通信                                          │
+│   • 优先: EventBus (异步解耦)                          │
+│   • 备选: Query Invalidation (缓存联动)                │
+│   • 禁止: 直接导入其他模块实现                          │
+└────────────────────────────────────────────────────────┘
+```
+
+### 0.3 模块结构模板
+
+```
+features/{module}/
+├── types/
+│   └── index.ts           # 类型定义 + UI Helper Constants
+├── api/
+│   ├── {module}Api.ts     # 原始 fetch 调用
+│   ├── queries.ts         # TanStack Query hooks
+│   └── index.ts           # API 导出
+├── hooks/
+│   └── index.ts           # 业务逻辑 hooks
+├── components/
+│   ├── {Entity}Table.tsx
+│   ├── {Entity}Form.tsx
+│   └── index.ts           # 组件导出
+├── pages/
+│   ├── {Entity}ListPage.tsx
+│   ├── {Entity}DetailPage.tsx
+│   └── index.ts           # 页面导出
+└── index.ts               # 模块公共 API
+```
+
+### 0.4 陷阱 ⚠️
+
+- ❌ Types 层导入外部模块 → ✅ Types 保持零外部依赖
+- ❌ 直接导入 `@features/training/api/trainingJobApi` → ✅ 通过 `@features/training` 导入
+- ❌ 模块间直接调用 → ✅ 使用 EventBus 或 Query Invalidation
 
 ---
 
@@ -239,34 +300,9 @@ export function useDeleteTrainingJob() {
 
 ---
 
-## 5. 模块结构规范
+## 5. 模块导出规则
 
-### 5.1 目录结构模板
-
-```
-features/{module}/
-├── types/
-│   └── index.ts           # 类型定义 + UI Helper Constants
-├── api/
-│   ├── {module}Api.ts     # 原始 fetch 调用
-│   ├── queries.ts         # TanStack Query hooks
-│   └── index.ts           # API 导出
-├── hooks/
-│   └── index.ts           # 业务逻辑 hooks
-├── components/
-│   ├── {Entity}Table.tsx
-│   ├── {Entity}Form.tsx
-│   ├── {Entity}StatusBadge.tsx
-│   └── index.ts           # 组件导出
-├── pages/
-│   ├── {Entity}ListPage.tsx
-│   ├── {Entity}DetailPage.tsx
-│   ├── Create{Entity}Page.tsx
-│   └── index.ts           # 页面导出
-└── index.ts               # 模块公共 API
-```
-
-### 5.2 `index.ts` 导出规则
+### 5.1 `index.ts` 导出规范
 
 ```typescript
 // features/training/index.ts
@@ -296,7 +332,7 @@ export * from './pages';
 export { fetchTrainingJobs } from './api/trainingJobApi';
 ```
 
-### 5.3 类型定义规范
+### 5.2 类型定义规范
 
 ```typescript
 // features/{module}/types/index.ts
@@ -397,82 +433,9 @@ export class AppError extends Error {
 
 ---
 
-## 7. 状态管理规范
+## 7. 错误处理规范
 
-### 7.1 状态分类
-
-| 类型 | 管理方案 | 示例 |
-|------|---------|------|
-| **服务器状态** | TanStack Query | API 数据、缓存 |
-| **客户端状态** | Zustand | UI 状态、用户偏好 |
-| **表单状态** | React Hook Form / useState | 表单输入 |
-| **URL 状态** | React Router | 路由参数、查询参数 |
-
-### 7.2 Query Hook 模板
-
-```typescript
-// features/{module}/api/queries.ts
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { queryKeys } from '@lib/query';
-
-export function use{Entity}s(filters: {Entity}Filters = {}) {
-  return useQuery({
-    queryKey: queryKeys.{entity}s.list(filters),
-    queryFn: () => fetch{Entity}s(filters),
-  });
-}
-
-export function use{Entity}(id: number | undefined) {
-  return useQuery({
-    queryKey: queryKeys.{entity}s.detail(String(id!)),
-    queryFn: () => fetch{Entity}(id!),
-    enabled: id !== undefined,
-  });
-}
-
-export function useCreate{Entity}() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: create{Entity},
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.{entity}s.lists() });
-    },
-  });
-}
-```
-
-### 7.3 Zustand Store 模板
-
-```typescript
-// store/slices/uiSlice.ts
-import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
-
-interface UIState {
-  theme: 'light' | 'dark' | 'system';
-  sidebarCollapsed: boolean;
-  setTheme: (theme: UIState['theme']) => void;
-  toggleSidebar: () => void;
-}
-
-export const useUIStore = create<UIState>()(
-  persist(
-    (set) => ({
-      theme: 'system',
-      sidebarCollapsed: false,
-      setTheme: (theme) => set({ theme }),
-      toggleSidebar: () => set((s) => ({ sidebarCollapsed: !s.sidebarCollapsed })),
-    }),
-    { name: 'ui-storage' }
-  )
-);
-```
-
----
-
-## 8. 错误处理规范
-
-### 8.1 错误处理层级
+### 7.1 错误处理层级
 
 ```
 ┌─────────────────────────────────────────┐
@@ -484,7 +447,7 @@ export const useUIStore = create<UIState>()(
 └─────────────────────────────────────────┘
 ```
 
-### 8.2 API 错误处理
+### 7.2 API 错误处理
 
 ```typescript
 // shared/api/client.ts
@@ -501,7 +464,7 @@ export class ApiClient {
 }
 ```
 
-### 8.3 Query 错误处理
+### 7.3 Query 错误处理
 
 ```typescript
 // app/providers/QueryProvider.tsx
@@ -529,7 +492,7 @@ const queryClient = new QueryClient({
 });
 ```
 
-### 8.4 错误码映射
+### 7.4 错误码映射
 
 | 错误码 | HTTP 状态码 | 场景 |
 |--------|-------------|------|
@@ -542,9 +505,9 @@ const queryClient = new QueryClient({
 
 ---
 
-## 9. 架构合规检查
+## 8. 架构合规检查 (ESLint)
 
-### 9.1 ESLint 规则
+### 8.1 ESLint 规则
 
 `.eslintrc.cjs` 配置了模块边界检查：
 
@@ -568,7 +531,7 @@ rules: {
 }
 ```
 
-### 9.2 运行合规检查
+### 8.2 运行合规检查
 
 ```bash
 npm run lint            # ESLint 检查
@@ -577,34 +540,7 @@ npx tsc --noEmit        # TypeScript 类型检查
 
 ---
 
-## 10. 附录
-
-### 10.1 快速参考卡片
-
-```
-┌────────────────────────────────────────────────────────┐
-│          Feature Module 依赖速查                       │
-├────────────────────────────────────────────────────────┤
-│ ✅ 允许                                                │
-│   • 导入 @shared/* 任意内容                            │
-│   • 导入 @lib/query (queryKeys)                       │
-│   • 导入 @features/auth (useAuthStore)                │
-│   • 通过 index.ts 导入其他模块公开 API                  │
-│   • 通过 EventBus 发布/订阅事件                        │
-├────────────────────────────────────────────────────────┤
-│ ❌ 禁止                                                │
-│   • Types 层导入任何外部模块                           │
-│   • 直接导入其他模块的内部文件                          │
-│   • 模块间直接依赖实现细节                              │
-├────────────────────────────────────────────────────────┤
-│ 🔄 模块间通信                                          │
-│   • 优先: EventBus (异步解耦)                          │
-│   • 备选: Query Invalidation (缓存联动)                │
-│   • 禁止: 直接导入其他模块实现                          │
-└────────────────────────────────────────────────────────┘
-```
-
-### 10.2 与后端对齐对照表
+## 附录: 与后端对齐对照表
 
 | 前端 | 后端 | 说明 |
 |------|------|------|
@@ -613,24 +549,3 @@ npx tsc --noEmit        # TypeScript 类型检查
 | `features/{module}/hooks/` | `modules/{module}/application/services/` | 业务逻辑 |
 | `shared/types/errors.ts` | `shared/domain/exceptions.py` | 错误类型 |
 | `shared/events/eventBus.ts` | `shared/domain/events.py` | 事件机制 |
-
----
-
-## 11. 测试架构
-
-> 完整测试规范请参见 [`TESTING.md`](./TESTING.md)
-
-### 11.1 测试分层
-
-| 层级 | 目录 | 职责 |
-|------|------|------|
-| **Unit** | `tests/unit/` | 组件、Hooks、Store 单元测试 |
-| **Integration** | `tests/integration/` | API 集成 (MSW)、页面集成 |
-| **E2E** | `e2e/` | 完整用户流程 (Playwright) |
-
-### 11.2 测试工具
-
-- **MSW**: API Mock，位于 `tests/__utils__/mocks/handlers/`
-- **test-utils**: 渲染包装器，位于 `tests/__utils__/test-utils.tsx`
-- **Mock Stores**: 状态 Mock，位于 `tests/__utils__/mocks/stores/`
-- **路径别名**: `@tests/` → `tests/`
