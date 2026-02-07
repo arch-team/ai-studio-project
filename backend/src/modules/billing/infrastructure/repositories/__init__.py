@@ -1,3 +1,5 @@
-"""Billing infrastructure repositories (skeleton)."""
+"""Billing infrastructure repositories."""
 
-__all__ = []
+from .resource_usage_query_impl import ResourceUsageQueryImpl
+
+__all__ = ["ResourceUsageQueryImpl"]

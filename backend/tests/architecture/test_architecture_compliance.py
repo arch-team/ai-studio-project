@@ -473,44 +473,43 @@ class TestApiStateTransitionEndpoints:
         current = Path(__file__).parent
         return current.parent.parent / "src"
 
+    def _read_training_endpoints(self, backend_src_path: Path) -> str:
+        """读取 training endpoints 内容（支持单文件和目录两种结构）。"""
+        endpoints_dir = backend_src_path / "modules" / "training" / "api" / "endpoints"
+        if endpoints_dir.is_dir():
+            # 拆分后的目录结构：读取所有子文件
+            content_parts = []
+            for py_file in endpoints_dir.rglob("*.py"):
+                content_parts.append(py_file.read_text(encoding="utf-8"))
+            return "\n".join(content_parts)
+        else:
+            # 旧的单文件结构
+            endpoint_file = backend_src_path / "modules" / "training" / "api" / "endpoints.py"
+            return endpoint_file.read_text(encoding="utf-8")
+
     def test_training_jobs_has_dedicated_pause_endpoint(self, backend_src_path: Path):
         """Training jobs API should have a dedicated POST /pause endpoint."""
-        # Updated path for modular architecture
-        endpoint_file = backend_src_path / "modules" / "training" / "api" / "endpoints.py"
+        content = self._read_training_endpoints(backend_src_path)
 
-        with open(endpoint_file, encoding="utf-8") as f:
-            content = f.read()
-
-        # Check for dedicated pause endpoint
-        assert "/{job_id}/pause" in content or "/{job_id}/pause" in content, (
+        assert "/{job_id}/pause" in content, (
             "Training jobs API should have a dedicated POST /{job_id}/pause endpoint.\n"
             "State transitions should use dedicated action endpoints, not generic PATCH."
         )
 
     def test_training_jobs_has_dedicated_resume_endpoint(self, backend_src_path: Path):
         """Training jobs API should have a dedicated POST /resume endpoint."""
-        # Updated path for modular architecture
-        endpoint_file = backend_src_path / "modules" / "training" / "api" / "endpoints.py"
+        content = self._read_training_endpoints(backend_src_path)
 
-        with open(endpoint_file, encoding="utf-8") as f:
-            content = f.read()
-
-        # Check for dedicated resume endpoint
-        assert "/{job_id}/resume" in content or "/{job_id}/resume" in content, (
+        assert "/{job_id}/resume" in content, (
             "Training jobs API should have a dedicated POST /{job_id}/resume endpoint.\n"
             "State transitions should use dedicated action endpoints, not generic PATCH."
         )
 
     def test_training_jobs_has_dedicated_cancel_endpoint(self, backend_src_path: Path):
         """Training jobs API should have a dedicated POST /cancel endpoint."""
-        # Updated path for modular architecture
-        endpoint_file = backend_src_path / "modules" / "training" / "api" / "endpoints.py"
+        content = self._read_training_endpoints(backend_src_path)
 
-        with open(endpoint_file, encoding="utf-8") as f:
-            content = f.read()
-
-        # Check for dedicated cancel endpoint
-        assert "/{job_id}/cancel" in content or "/{job_id}/cancel" in content, (
+        assert "/{job_id}/cancel" in content, (
             "Training jobs API should have a dedicated POST /{job_id}/cancel endpoint.\n"
             "State transitions should use dedicated action endpoints, not generic PATCH."
         )
@@ -807,10 +806,13 @@ class TestModuleInfrastructureLayerIsolation:
         Each module's infrastructure should be self-contained.
         Shared infrastructure belongs in shared/infrastructure/.
 
-        Exception: ORM model files (*_model.py) are allowed to import other modules'
-        ORM models for SQLAlchemy foreign key relationships. This is a technical
-        necessity for defining database relationships.
-        See: docs/ARCHITECTURE.md Section 3.3
+        Exceptions:
+        1. ORM model files (*_model.py) are allowed to import other modules'
+           ORM models for SQLAlchemy foreign key relationships.
+        2. Cross-module query implementations (*_query_impl.py) are allowed to
+           import other modules' ORM models for aggregation queries, as they
+           implement application-layer interfaces for cross-module data access.
+        See: docs/ARCHITECTURE.md Section 3.3, 4.3
         """
         violations = []
 
@@ -818,9 +820,14 @@ class TestModuleInfrastructureLayerIsolation:
             if file_path.name == "__init__.py":
                 continue
 
-            # Exception: ORM model files can import other modules' models
+            # Exception 1: ORM model files can import other modules' models
             # for SQLAlchemy foreign key relationships
             if file_path.name.endswith("_model.py"):
+                continue
+
+            # Exception 2: Cross-module query implementations can import other
+            # modules' ORM models for aggregation queries
+            if file_path.name.endswith("_query_impl.py"):
                 continue
 
             imports = get_imports_from_file(file_path)

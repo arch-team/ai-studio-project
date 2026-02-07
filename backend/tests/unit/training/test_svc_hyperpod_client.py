@@ -19,6 +19,12 @@ if TYPE_CHECKING:
     from src.modules.training.infrastructure.hyperpod.client import HyperPodClient
 
 
+# 子模块中 HyperPodPytorchJob 的 patch 路径
+_JOB_CLIENT_PYTORCH_JOB = "src.modules.training.infrastructure.hyperpod.job_client.HyperPodPytorchJob"
+_CHECKPOINT_CLIENT_PYTORCH_JOB = "src.modules.training.infrastructure.hyperpod.checkpoint_client.HyperPodPytorchJob"
+_CLUSTER_CLIENT_SET_CONTEXT = "src.modules.training.infrastructure.hyperpod.cluster_client.set_cluster_context"
+
+
 class TestHyperPodClient:
     """Test suite for HyperPodClient implementation."""
 
@@ -62,9 +68,12 @@ class TestHyperPodClient:
 
     @pytest.fixture
     def mock_hyperpod_pytorch_job(self) -> MagicMock:
-        """Mock HyperPodPytorchJob class."""
-        with patch("src.modules.training.infrastructure.hyperpod.client.HyperPodPytorchJob") as mock:
-            yield mock
+        """Mock HyperPodPytorchJob class in both job_client and checkpoint_client."""
+        with (
+            patch(_JOB_CLIENT_PYTORCH_JOB) as mock_job,
+            patch(_CHECKPOINT_CLIENT_PYTORCH_JOB, mock_job),
+        ):
+            yield mock_job
 
     @pytest.fixture
     def hyperpod_client(
@@ -78,6 +87,9 @@ class TestHyperPodClient:
         client = HyperPodClient(region="us-west-2")
         # Replace the internal aioboto3 session with the mock
         client._session = mock_aioboto3_session
+        # 同时替换子客户端中的 session
+        client._cluster._session = mock_aioboto3_session
+        client._checkpoints._session = mock_aioboto3_session
         return client
 
     # ==================== Cluster Operations ====================
@@ -765,13 +777,10 @@ class TestHyperPodClient:
 
     def test_default_region_is_us_east_1(self) -> None:
         """Test that default region is us-east-1."""
-        with patch("boto3.client"):
-            from src.modules.training.infrastructure.hyperpod.client import (
-                HyperPodClient,
-            )
+        from src.modules.training.infrastructure.hyperpod.client import HyperPodClient
 
-            client = HyperPodClient()
-            assert client._region == "us-east-1"
+        client = HyperPodClient()
+        assert client._region == "us-east-1"
 
     # ==================== Cluster Context ====================
 
@@ -786,24 +795,26 @@ class TestHyperPodClient:
     async def test_ensure_cluster_context_called_on_submit(
         self,
         mock_aioboto3_session: MagicMock,
-        mock_hyperpod_pytorch_job: MagicMock,
     ) -> None:
-        """Test that _ensure_cluster_context is called when submitting job."""
-        with patch("src.modules.training.infrastructure.hyperpod.client.set_cluster_context") as mock_set_context:
-            from src.modules.training.infrastructure.hyperpod.client import (
-                HyperPodClient,
-            )
+        """Test that ensure_cluster_context is called when submitting job."""
+        with (
+            patch(_CLUSTER_CLIENT_SET_CONTEXT) as mock_set_context,
+            patch(_JOB_CLIENT_PYTORCH_JOB) as mock_pytorch_job,
+        ):
+            from src.modules.training.infrastructure.hyperpod.client import HyperPodClient
+            from src.modules.training.infrastructure.hyperpod.cluster_client import ClusterClient
 
-            # 清理类级别缓存，确保 set_cluster_context 会被调用
-            HyperPodClient._cluster_contexts.clear()
+            # 清理类级别缓存
+            ClusterClient._cluster_contexts.clear()
 
             client = HyperPodClient()
             client._session = mock_aioboto3_session
+            client._cluster._session = mock_aioboto3_session
 
             # Setup mock job
             mock_job = MagicMock()
             mock_job.status = None
-            mock_hyperpod_pytorch_job.return_value = mock_job
+            mock_pytorch_job.return_value = mock_job
 
             await client.submit_training_job(
                 cluster_name="test-cluster",
@@ -817,23 +828,25 @@ class TestHyperPodClient:
     async def test_ensure_cluster_context_called_on_get_status(
         self,
         mock_aioboto3_session: MagicMock,
-        mock_hyperpod_pytorch_job: MagicMock,
     ) -> None:
-        """Test that _ensure_cluster_context is called when getting job status."""
-        with patch("src.modules.training.infrastructure.hyperpod.client.set_cluster_context") as mock_set_context:
-            from src.modules.training.infrastructure.hyperpod.client import (
-                HyperPodClient,
-            )
+        """Test that ensure_cluster_context is called when getting job status."""
+        with (
+            patch(_CLUSTER_CLIENT_SET_CONTEXT) as mock_set_context,
+            patch(_JOB_CLIENT_PYTORCH_JOB) as mock_pytorch_job,
+        ):
+            from src.modules.training.infrastructure.hyperpod.client import HyperPodClient
+            from src.modules.training.infrastructure.hyperpod.cluster_client import ClusterClient
 
-            # 清理类级别缓存，确保 set_cluster_context 会被调用
-            HyperPodClient._cluster_contexts.clear()
+            # 清理类级别缓存
+            ClusterClient._cluster_contexts.clear()
 
             client = HyperPodClient()
             client._session = mock_aioboto3_session
+            client._cluster._session = mock_aioboto3_session
 
             # Setup mock job with proper structure
             mock_job = self._create_mock_job_with_status("test-job", "Running")
-            mock_hyperpod_pytorch_job.get.return_value = mock_job
+            mock_pytorch_job.get.return_value = mock_job
 
             await client.get_training_job_status(
                 cluster_name="test-cluster",
@@ -846,23 +859,25 @@ class TestHyperPodClient:
     async def test_cluster_context_cached_across_calls(
         self,
         mock_aioboto3_session: MagicMock,
-        mock_hyperpod_pytorch_job: MagicMock,
     ) -> None:
         """Test that cluster context is only set once per cluster."""
-        with patch("src.modules.training.infrastructure.hyperpod.client.set_cluster_context") as mock_set_context:
-            from src.modules.training.infrastructure.hyperpod.client import (
-                HyperPodClient,
-            )
+        with (
+            patch(_CLUSTER_CLIENT_SET_CONTEXT) as mock_set_context,
+            patch(_JOB_CLIENT_PYTORCH_JOB) as mock_pytorch_job,
+        ):
+            from src.modules.training.infrastructure.hyperpod.client import HyperPodClient
+            from src.modules.training.infrastructure.hyperpod.cluster_client import ClusterClient
 
             # 清理类级别缓存
-            HyperPodClient._cluster_contexts.clear()
+            ClusterClient._cluster_contexts.clear()
 
             client = HyperPodClient()
             client._session = mock_aioboto3_session
+            client._cluster._session = mock_aioboto3_session
 
             # Setup mock job
             mock_job = self._create_mock_job_with_status("test-job", "Running")
-            mock_hyperpod_pytorch_job.get.return_value = mock_job
+            mock_pytorch_job.get.return_value = mock_job
 
             # 多次调用，但同一集群
             await client.get_training_job_status("test-cluster", "job-1")
@@ -876,23 +891,25 @@ class TestHyperPodClient:
     async def test_cluster_context_set_for_each_cluster(
         self,
         mock_aioboto3_session: MagicMock,
-        mock_hyperpod_pytorch_job: MagicMock,
     ) -> None:
         """Test that cluster context is set separately for different clusters."""
-        with patch("src.modules.training.infrastructure.hyperpod.client.set_cluster_context") as mock_set_context:
-            from src.modules.training.infrastructure.hyperpod.client import (
-                HyperPodClient,
-            )
+        with (
+            patch(_CLUSTER_CLIENT_SET_CONTEXT) as mock_set_context,
+            patch(_JOB_CLIENT_PYTORCH_JOB) as mock_pytorch_job,
+        ):
+            from src.modules.training.infrastructure.hyperpod.client import HyperPodClient
+            from src.modules.training.infrastructure.hyperpod.cluster_client import ClusterClient
 
             # 清理类级别缓存
-            HyperPodClient._cluster_contexts.clear()
+            ClusterClient._cluster_contexts.clear()
 
             client = HyperPodClient()
             client._session = mock_aioboto3_session
+            client._cluster._session = mock_aioboto3_session
 
             # Setup mock job
             mock_job = self._create_mock_job_with_status("test-job", "Running")
-            mock_hyperpod_pytorch_job.get.return_value = mock_job
+            mock_pytorch_job.get.return_value = mock_job
 
             # 调用不同集群
             await client.get_training_job_status("cluster-a", "job-1")
@@ -903,13 +920,12 @@ class TestHyperPodClient:
 
     def test_ensure_cluster_context_uses_default_if_no_cluster_provided(self) -> None:
         """Test that default cluster is used if no cluster_name provided."""
-        with patch("src.modules.training.infrastructure.hyperpod.client.set_cluster_context") as mock_set_context:
-            from src.modules.training.infrastructure.hyperpod.client import (
-                HyperPodClient,
-            )
+        with patch(_CLUSTER_CLIENT_SET_CONTEXT) as mock_set_context:
+            from src.modules.training.infrastructure.hyperpod.client import HyperPodClient
+            from src.modules.training.infrastructure.hyperpod.cluster_client import ClusterClient
 
             # 清理类级别缓存
-            HyperPodClient._cluster_contexts.clear()
+            ClusterClient._cluster_contexts.clear()
 
             client = HyperPodClient(default_cluster_name="default-cluster")
 

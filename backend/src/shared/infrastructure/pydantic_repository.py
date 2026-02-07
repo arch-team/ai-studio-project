@@ -1,4 +1,4 @@
-"""Pydantic V2 优化的仓库基类 - 自动化 Entity ↔ Model 转换。"""
+"""统一仓库基类 - 支持自动和手动 Entity ↔ Model 转换。"""
 
 from typing import Any, Generic, TypeVar
 
@@ -6,26 +6,18 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.shared.domain.exceptions import EntityNotFoundError
-from src.shared.domain.pydantic_entity import PydanticEntity
 from src.shared.infrastructure.query_builder import QueryBuilder
 from src.shared.utils import utc_now
 
-EntityT = TypeVar("EntityT", bound=PydanticEntity)
+EntityT = TypeVar("EntityT")
 ModelT = TypeVar("ModelT")
 IdT = TypeVar("IdT", int, str)
 
 
 class PydanticRepository(Generic[EntityT, ModelT, IdT]):
-    """Pydantic V2 优化的仓库基类。
+    """统一仓库基类 - 支持自动和手动 Entity ↔ Model 转换。
 
-    利用 PydanticEntity 的 from_orm 和 to_model_dict 实现自动转换。
-
-    子类只需定义类属性：
-    - _entity_class: 实体类型（必须）
-    - _updatable_fields: 允许更新的字段列表（可选，默认自动推断）
-    - _exclude_from_model: 创建模型时排除的字段（可选）
-
-    使用示例:
+    模式一（自动转换）: 设置 _entity_class 为 PydanticEntity 子类
     ```python
     class UserRepository(PydanticRepository[User, UserModel, int]):
         _entity_class = User
@@ -34,35 +26,57 @@ class PydanticRepository(Generic[EntityT, ModelT, IdT]):
         def __init__(self, session: AsyncSession):
             super().__init__(session, UserModel)
     ```
+
+    模式二（手动转换）: 不设置 _entity_class，覆盖 _to_entity/_to_model/_update_model
+    ```python
+    class UploadSessionRepository(PydanticRepository[UploadSession, UploadSessionModel, int]):
+        def __init__(self, session: AsyncSession):
+            super().__init__(session, UploadSessionModel)
+
+        def _to_entity(self, model): ...
+        def _to_model(self, entity): ...
+        def _update_model(self, model, entity): ...
+    ```
     """
 
-    # 子类配置 - 必须定义
-    _entity_class: type[EntityT]
+    # 子类配置 - 可选（设置后启用自动转换）
+    _entity_class: type[EntityT] | None = None
 
     # 子类配置 - 可选
     _updatable_fields: list[str] | None = None
     _exclude_from_model: set[str] = {"created_at", "updated_at"}
 
+    # 默认排除的更新字段
+    _default_exclude_fields: set[str] = {"id", "created_at", "updated_at", "owner_id"}
+
     def __init__(self, session: AsyncSession, model_class: type[ModelT]):
-        """初始化仓库。"""
         self._session = session
         self._model_class = model_class
 
     def _to_entity(self, model: ModelT) -> EntityT:
-        """ORM 模型 → 领域实体（自动转换）。"""
-        return self._entity_class.from_orm(model)
+        """ORM 模型 → 领域实体。子类可覆盖。"""
+        if self._entity_class is not None and hasattr(self._entity_class, "from_orm"):
+            return self._entity_class.from_orm(model)
+        raise NotImplementedError("子类必须实现 _to_entity() 或设置 _entity_class")
 
     def _to_model(self, entity: EntityT) -> ModelT:
-        """领域实体 → ORM 模型（新建时）。"""
-        exclude = self._exclude_from_model.copy()
-        if entity.id is None:
-            exclude.add("id")
+        """领域实体 → ORM 模型。子类可覆盖。"""
+        if self._entity_class is not None and hasattr(entity, "to_model_dict"):
+            exclude = self._exclude_from_model.copy()
+            if getattr(entity, "id", None) is None:
+                exclude.add("id")
+            data = entity.to_model_dict(exclude=exclude)
+            return self._model_class(**data)
+        raise NotImplementedError("子类必须实现 _to_model() 或设置 _entity_class")
 
-        data = entity.to_model_dict(exclude=exclude)
-        return self._model_class(**data)
-
-    # 默认排除的更新字段
-    _default_exclude_fields: set[str] = {"id", "created_at", "updated_at", "owner_id"}
+    def _update_model(self, model: ModelT, entity: EntityT) -> None:
+        """更新 ORM 模型。子类可覆盖。"""
+        if self._entity_class is not None and hasattr(self._entity_class, "model_fields"):
+            for field_name in self._get_updatable_fields():
+                if hasattr(entity, field_name):
+                    setattr(model, field_name, getattr(entity, field_name))
+            return
+        raise NotImplementedError("子类必须实现 _update_model() 或设置 _entity_class")
 
     def _get_updatable_fields(self) -> list[str]:
         """获取可更新的字段列表。"""
@@ -70,19 +84,15 @@ class PydanticRepository(Generic[EntityT, ModelT, IdT]):
             return self._updatable_fields
         return [f for f in self._entity_class.model_fields.keys() if f not in self._default_exclude_fields]
 
-    def _update_model(self, model: ModelT, entity: EntityT) -> None:
-        """更新 ORM 模型（只更新指定字段）。"""
-        for field_name in self._get_updatable_fields():
-            if hasattr(entity, field_name):
-                setattr(model, field_name, getattr(entity, field_name))
-
     def _get_id_column(self) -> Any:
         """获取主键列。"""
         return getattr(self._model_class, "id")
 
     def _get_entity_type_name(self) -> str:
         """获取实体类型名称用于错误消息。"""
-        return self._entity_class.__name__
+        if self._entity_class is not None:
+            return self._entity_class.__name__
+        return self._model_class.__name__.replace("Model", "")
 
     # ========== 基础 CRUD 操作 ==========
 
@@ -110,7 +120,7 @@ class PydanticRepository(Generic[EntityT, ModelT, IdT]):
 
     async def update(self, entity: EntityT) -> EntityT:
         """更新现有实体。"""
-        id_value = entity.id
+        id_value = getattr(entity, "id")
         id_column = self._get_id_column()
 
         result = await self._session.execute(select(self._model_class).where(id_column == id_value))
@@ -154,10 +164,10 @@ class PydanticRepository(Generic[EntityT, ModelT, IdT]):
         if model is None:
             return False
 
-        # 使用 setattr 来设置属性，因为 TypeVar 无法推断具体属性
-        setattr(model, "deleted_at", utc_now())
+        now = utc_now()
+        setattr(model, "deleted_at", now)
         if hasattr(model, "updated_at"):
-            setattr(model, "updated_at", utc_now())
+            setattr(model, "updated_at", now)
 
         await self._session.flush()
         return True
@@ -207,32 +217,20 @@ class PydanticRepository(Generic[EntityT, ModelT, IdT]):
         """带过滤和分页的列表查询。"""
         builder = self._create_query_builder()
 
-        # 应用软删除过滤
         if not include_soft_deleted:
             builder = builder.with_soft_delete_filter()
 
-        # 应用自定义过滤
         if filters:
             for column_name, value in filters.items():
                 if value is not None:
                     builder = builder.with_filter(column_name, value)
 
-        # 应用排序
         builder = builder.with_order_by(sort_by, sort_order)
-
-        # 获取总数
         total = await builder.count(self._session)
-
-        # 应用分页
         builder = builder.with_pagination(page, page_size)
-
-        # 执行查询
         items = await builder.execute(self._session)
 
-        # 转换为实体
-        entities = [self._to_entity(item) for item in items]
-
-        return entities, total
+        return [self._to_entity(item) for item in items], total
 
     # ========== 批量操作 ==========
 

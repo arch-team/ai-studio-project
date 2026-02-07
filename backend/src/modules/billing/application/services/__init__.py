@@ -20,7 +20,6 @@ from .pricing_model import (
 from .report_export_service import ReportExportService
 from .report_service import ReportService
 from .usage_aggregator import (
-    ResourceUsageSummary,
     TimeSeriesUsage,
     UsageAggregatorService,
     UserResourceUsage,
@@ -43,7 +42,6 @@ __all__ = [
     "UsageAggregatorService",
     "UserResourceUsage",
     "TimeSeriesUsage",
-    "ResourceUsageSummary",
     "ReportExportService",
     "ReportService",
 ]
