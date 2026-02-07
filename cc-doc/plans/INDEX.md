@@ -89,3 +89,6 @@ Claude Code 生成的计划文件索引。
 | 2026-02-07 | `2026-02-07-从-mvp-到生产可用-ai-training-platform-开发路线图.md` | 从 MVP 到生产可用：AI Training Platform 开发路线图 | ⏳ 进行中 |
 | 2026-02-07 | `2026-02-07-删除-docs-architecture-md-并整合至-rules-architecture-md.md` | 删除 docs/ARCHITECTURE.md 并整合至 rules/architecture.md | ⏳ 进行中 |
 | 2026-02-07 | `2026-02-07-优化-backend-claude-rules-architecture-md.md` | 优化 backend/.claude/rules/architecture.md | ⏳ 进行中 |
+| 2026-02-07 | `2026-02-07-更新-backend-docs-下-context-guide-md-和-project-confi.md` | 更新 backend/docs/ 下 context-guide.md 和 project-config.template.md | ⏳ 进行中 |
+| 2026-02-07 | `2026-02-07-计划-将-ai-agents-platform-的-claude-上下文管理规范应用到-ai-stu.md` | 计划：将 ai-agents-platform 的 .claude 上下文管理规范应用到 ai-studio-project | ⏳ 进行中 |
+| 2026-02-07 | `2026-02-07-评估-迁移-claude-claude-md-和-claude-rules-common-md.md` | 评估：迁移 .claude/CLAUDE.md 和 .claude/rules/common.md | ⏳ 进行中 |

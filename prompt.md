@@ -441,4 +441,4 @@ Pydantic V2
 
 
 
-请帮我分析一下是否可以将/Users/jinhuasu/Project_Workspace/Anker-Projects/ml-platform-research/llm-platform-solution/ai-agents-platform/.claude下的Claude Code上下文管理的规范应用于/Users/jinhuasu/Project_Workspace/Anker-Projects/ml-platform-research/llm-platform-solution/ai-studio-project/.claude
+请帮我分析一下是否可以将/Users/jinhuasu/Project_Workspace/Anker-Projects/ml-platform-research/llm-platform-solution/ai-agents-platform/.claude下的Claude Code上下文管理的规范应用于/Users/jinhuasu/Project_Workspace/Anker-Projects/ml-platform-research/llm-platform-solution/ai-studio-project/.claude 中
