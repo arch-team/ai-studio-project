@@ -10,7 +10,7 @@
 
 | 原则 | 说明 | 示例 |
 |------|------|------|
-| **单一真实源** | 每个领域有且仅有一个权威文档 | 架构规范只在 `docs/ARCHITECTURE.md` |
+| **单一真实源** | 每个领域有且仅有一个权威文档 | 架构规范只在 `.claude/rules/architecture.md` |
 | **300行黄金法则** | CLAUDE.md 保持 100-300 行 | 超过则拆分或引用 |
 | **层级继承** | 子文档只包含差异性内容 | 继承声明 + 增量规范 |
 | **就近放置** | 规范与代码距离最小化 | `backend/tests/CLAUDE.md` |
@@ -84,7 +84,7 @@ ai-studio-project/
 [1-2 段项目简介]
 
 ## Architecture
-> 详细规范请参见 `backend/CLAUDE.md` → `backend/docs/ARCHITECTURE.md`
+> 详细规范请参见 `backend/.claude/rules/architecture.md`
 [关键架构图或概述]
 
 ## Key Development Principles
@@ -119,8 +119,7 @@ ai-studio-project/
 [常用命令代码块]
 
 ## Architecture
-> **核心规范请参见**: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)
-@docs/ARCHITECTURE.md  # 可选：使用 @ 引用
+> **核心规范请参见**: [`.claude/rules/architecture.md`](.claude/rules/architecture.md)
 
 [架构概览]
 
@@ -273,7 +272,7 @@ paths:
 | 方式 | 语法 | 适用场景 |
 |------|------|---------|
 | 链接引用 | `> 详见 [文档名](路径)` | 详细文档 |
-| @ 引用 | `@docs/ARCHITECTURE.md` | 关键规范内嵌 |
+| @ 引用 | `@.claude/rules/architecture.md` | 关键规范内嵌 |
 | 行内指向 | `(详见 backend/CLAUDE.md)` | 简短提示 |
 
 ### 6.3 去重原则
@@ -387,5 +386,5 @@ paths:
 |------|------|------|
 | 研究报告 | `cc-doc/plans/2026-01-17-claude-code-记忆管理与-rule-机制研究.md` | 机制详解 |
 | 项目宪法 | `.specify/memory/constitution.md` | 核心原则 |
-| 架构规范 | `backend/docs/ARCHITECTURE.md` | 后端架构 |
+| 架构规范 | `backend/.claude/rules/architecture.md` | 后端架构 |
 | 测试规范 | `backend/tests/CLAUDE.md` | 测试单一真实源 |

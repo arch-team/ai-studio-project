@@ -89,7 +89,7 @@ backend/src/
 **每个模块遵循 Clean Architecture 四层结构**:
 - `api/` → `application/` → `domain/` ← `infrastructure/`
 
-> 详细架构规范: [backend/docs/ARCHITECTURE.md](./backend/docs/ARCHITECTURE.md)
+> 详细架构规范: [backend/.claude/rules/architecture.md](./backend/.claude/rules/architecture.md)
 
 ### 前端 (Feature-Based)
 
@@ -268,7 +268,7 @@ pytest -m unit                 # CDK 单元测试
 | 文档 | 位置 | 说明 |
 |------|------|------|
 | 后端开发指南 | [backend/CLAUDE.md](./backend/CLAUDE.md) | TDD 流程、命令、架构 |
-| 后端架构规范 | [backend/docs/ARCHITECTURE.md](./backend/docs/ARCHITECTURE.md) | 模块化单体架构详解 |
+| 后端架构规范 | [backend/.claude/rules/architecture.md](./backend/.claude/rules/architecture.md) | 架构规范单一真实源 |
 | 前端开发指南 | [frontend/CLAUDE.md](./frontend/CLAUDE.md) | React 架构、组件规范 |
 | CDK 部署指南 | [infrastructure/cdk/CLAUDE.md](./infrastructure/cdk/CLAUDE.md) | Stack 分层、部署流程 |
 

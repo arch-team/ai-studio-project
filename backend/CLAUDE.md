@@ -1,93 +1,88 @@
-# CLAUDE.md
+# CLAUDE.md - 后端项目入口
+
+> **职责**: 后端项目的入口规范，定义技术栈、开发命令和核心原则。
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 > **回复语言要求参见根目录 `CLAUDE.md`**
 
-## Project Overview
+---
 
-AI Training Platform 后端服务 - 基于 AWS SageMaker HyperPod 的企业级 AI 训练平台 API。
+## 技术栈
 
-## Tech Stack
+**核心**: Python 3.11 | FastAPI | SQLAlchemy 2.0+ (async) | Pydantic v2 | MySQL 8.0+
 
-- **Runtime**: Python 3.11
-- **Framework**: FastAPI 0.109.0 + Uvicorn 0.27.0
-- **ORM**: SQLAlchemy 2.0.25 (async) + Alembic 1.13.1
-- **Database**: MySQL 8.0 (aiomysql 异步驱动)
-- **Validation**: Pydantic 2.5.3 + pydantic-settings
-- **AWS**: boto3 1.34.14, aioboto3 (异步必须), sagemaker-hyperpod 1.0.0
-- **Auth**: python-jose (JWT), passlib (bcrypt)
+**工具**: black (格式化) | Ruff (lint) | MyPy (类型检查) | pytest + pytest-asyncio
 
-## Common Commands
+**AWS**: boto3, aioboto3 (异步必须), sagemaker-hyperpod
+
+版本矩阵和约束详见 [rules/tech-stack.md](.claude/rules/tech-stack.md)
+
+---
+
+## 开发命令
+
+### 代码质量
 
 ```bash
-# 启动开发服务器
+# 格式化
+black src/ tests/
+
+# Lint
+ruff check src/ tests/
+
+# 类型检查
+mypy src/
+
+# 一键运行所有检查
+black --check src/ && ruff check src/ && mypy src/
+```
+
+### 测试
+
+```bash
+# 运行所有测试
+pytest
+
+# 带覆盖率
+pytest --cov=src --cov-report=term-missing
+
+# 按类型运行
+pytest tests/unit -v              # 单元测试
+pytest tests/integration -v       # 集成测试
+pytest tests/architecture -v      # 架构合规检查
+
+# 按前缀筛选
+pytest -k "test_entity_" -v      # 实体测试
+pytest -k "test_svc_" -v         # 服务测试
+```
+
+### 服务运行
+
+```bash
+# 开发模式
 uvicorn src.main:app --reload
 
 # 数据库迁移
-alembic upgrade head                    # 应用所有迁移
-alembic revision --autogenerate -m "xxx" # 生成迁移
-
-# 运行测试
-pytest                                  # 全部测试
-pytest tests/unit/                      # 单元测试
-pytest tests/integration/               # 集成测试
-pytest -k "test_name"                   # 运行单个测试
-pytest --cov=src                        # 带覆盖率
-
-# 代码质量
-black src/ tests/                       # 格式化
-ruff check src/ tests/                  # Lint
-mypy src/                               # 类型检查
-black src/ && ruff check src/ && mypy src/  # 全部检查
-
-# Docker
-docker build --target development -t backend:dev .
-docker build --target production -t backend:prod .
-
-# 架构合规检查
-pytest tests/architecture -v
+alembic upgrade head
+alembic revision --autogenerate -m "xxx"
 ```
 
-## Architecture
+---
 
-> **核心架构规范请参见**: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)
+## 核心架构
 
-@docs/ARCHITECTURE.md
+**架构模式**: DDD + Modular Monolith + Clean Architecture
 
-项目采用 **DDD + Modular Monolith + Clean Architecture** 架构模式。
+**依赖方向**: `API → Application → Domain ← Infrastructure`
 
-### 目录结构概览
+**核心架构规范**: [`.claude/rules/architecture.md`](.claude/rules/architecture.md) — 架构规范单一真实源
 
-```
-src/
-├── modules/                           # 功能模块 (auth, training, models, quotas, ...)
-│   └── <module>/
-│       ├── api/                       # HTTP 端点、Schema、依赖
-│       ├── application/               # 业务服务
-│       ├── domain/                    # 实体、值对象、仓库接口
-│       └── infrastructure/            # ORM 模型、仓库实现
-├── shared/                            # 共享内核
-│   ├── domain/                        # 基础实体、仓库接口、域事件、跨模块接口
-│   ├── infrastructure/                # 数据库、配置、安全
-│   ├── api/                           # 中间件、异常处理、分页
-│   └── utils/                         # 工具函数
-├── main.py                            # 应用入口
-└── router.py                          # 路由聚合
-```
+---
 
-### 关键规范（详见 docs/ARCHITECTURE.md）
+## 异常处理
 
-- **黄金法则 R1-R4**: 模块间依赖规则
-- **模块间通信**: 事件驱动 + 共享接口
-- **异常处理**: 基于 Problem 基类的统一异常体系
-- **依赖注入**: 5 层依赖注入链
-
-## 异常处理框架
-
-> **详细实现参见**: `.claude/skills/decorator-exception/SKILL.md`
-
-使用 `@problem` 装饰器 + `@dataclass` 简化异常定义（代码量减少 60%）。
+使用 `@problem` 装饰器 + `@dataclass` 简化异常定义（代码量减少 60%）：
 
 ```python
 @problem(404, "TRAINING_JOB_NOT_FOUND", "TrainingJob '{job_id}' not found")
@@ -96,10 +91,13 @@ class TrainingJobNotFoundError(Problem):
     job_id: str
 
 # 使用: raise TrainingJobNotFoundError(job_id="job-123")
-# 自动生成 message, http_status, error_code, get_details()
 ```
 
-## Environment Variables
+> 详细实现参见 `.claude/skills/decorator-exception/SKILL.md`
+
+---
+
+## 环境变量
 
 通过 `.env` 文件或环境变量配置:
 
@@ -111,242 +109,31 @@ class TrainingJobNotFoundError(Problem):
 | `SECRET_KEY` | `change-me-in-production` | JWT 密钥 |
 | `CORS_ORIGINS` | `["http://localhost:3000"]` | 允许的 CORS 源 |
 
-## Testing
+---
 
-> **详细测试规范请参见**: [`tests/CLAUDE.md`](tests/CLAUDE.md)
-
-测试使用 `pytest-asyncio` 进行异步测试，`httpx.AsyncClient` + `ASGITransport` 测试 API 端点。
-
-**快速命令**:
-
-```bash
-pytest tests/unit -v          # 单元测试
-pytest tests/integration -v   # 集成测试
-pytest tests/architecture -v  # 架构合规检查
-pytest --cov=src              # 带覆盖率
-```
-
-## Code Style
-
-### 行长度规范
-
-**规则**: 单行不超过 120 字符才换行。
-
-```python
-# ✅ 120 字符内保持单行
-response = await client.post("/api/v1/training-jobs", json={"name": "test", "config": config, "owner_id": user.id})
-
-# ✅ 超过 120 字符时换行
-response = await client.post(
-    "/api/v1/training-jobs",
-    json={"name": "very-long-training-job-name", "description": "A detailed description", "config": complex_config},
-)
-```
-
-### Docstring 规范
-
-**原则**: 类型签名即文档，Docstring 只补充签名无法表达的信息。
-
-| 规则 | 说明 |
-|------|------|
-| **1 行 docstring** | Module/Class/Method 均为单行中文描述 |
-| **禁止 Args/Returns** | 类型签名已说明，删除冗余描述 |
-| **保留 Raises** | 异常信息无法从签名推断 |
-| **无需 `__init__` docstring** | 构造函数无需文档 |
-
-```python
-# ❌ 冗余
-async def get_by_id(self, id: int) -> Dataset | None:
-    """Get dataset by ID.
-
-    Args:
-        id: Dataset ID
-    Returns:
-        Dataset if found
-    """
-
-# ✅ 简洁
-async def get_by_id(self, id: int) -> Dataset | None:
-    """根据 ID 获取数据集。"""
-
-# ✅ 保留 Raises
-async def create(self, data: dict) -> Dataset:
-    """创建数据集。
-
-    Raises:
-        DuplicateEntityError: 如果 name+version 已存在
-    """
-```
-
-### 行内注释规范
-
-```python
-# ❌ 多余 - 代码已自解释
-app.add_middleware(CORSMiddleware, ...)  # Configure CORS
-
-# ✅ 有价值 - 解释"为什么"
-# Burst decay prevents resource hoarding while allowing spikes
-burst_factor = math.exp(-elapsed / TAU)
-```
-
-### 何时需要详细注释
-
-- 复杂算法或公式
-- 非显而易见的业务规则
-- 临时解决方案 (需包含 TODO + issue 编号)
-- 性能优化的权衡说明
-
-## Design Principles
-
-### 模块化设计
-
-```python
-# ❌ 功能混杂在一起
-class UserService:
-    def authenticate(self, username, password): ...
-    def hash_password(self, password): ...
-    def send_email(self, user, subject, body): ...
-
-# ✅ 按职责拆分模块
-class AuthService:          # 认证逻辑
-    def authenticate(self, credentials: Credentials) -> AuthResult: ...
-
-class PasswordService:      # 密码处理
-    def hash(self, password: str) -> str: ...
-```
-
-**模块边界检查清单**：
-- 每个模块文件 < 300 行（超过则考虑拆分）
-- 每个类 < 10 个公开方法
-- 模块间通过接口通信，不直接依赖实现
-
-### 职责单一
-
-| 层级 | 职责 | 禁止 |
-|------|------|------|
-| **Entity** | 业务规则、状态转换 | 数据库访问、外部调用 |
-| **Service** | 用例编排、事务协调 | HTTP 处理、SQL 语句 |
-| **Repository** | 数据持久化 | 业务逻辑、验证规则 |
-| **Endpoint** | HTTP 转换、参数验证 | 业务逻辑、直接数据库访问 |
-
-## SDK 优先原则
-
-优先使用成熟 SDK，避免重复造轮子。
-
-### 推荐 SDK
-
-| 领域 | 推荐方案 | 替代 | 原因 |
-|------|---------|------|------|
-| **AWS 异步操作** | aioboto3 | boto3 + run_in_executor | 原生异步 I/O，无线程池开销 |
-| **后台任务** | K8s CronJob + Watch API | Celery + Redis | 利用现有 EKS，无需额外组件 |
-| **认证** | Authlib | python-jose 手写 | 完整 OAuth2/OIDC，支持 AWS IAM |
-| **日志** | structlog | 标准 logging | 结构化 JSON，上下文绑定 |
-| **监控** | OpenTelemetry | 厂商特定 SDK | CNCF 标准，可切换后端 |
-
-### AWS 异步操作规范 (强制)
-
-**规则**: 所有 AWS S3/FSx 等需要异步的操作，**必须**使用 `aioboto3`，**禁止**自己封装 `run_in_executor`。
-
-```python
-# ❌ 禁止: 手动封装同步 boto3
-import boto3
-import asyncio
-
-class S3Client:
-    def __init__(self):
-        self._client = boto3.client("s3")
-
-    async def upload_file(self, ...):
-        loop = asyncio.get_event_loop()
-        return await loop.run_in_executor(None, self._sync_upload)
-
-# ✅ 正确: 使用 aioboto3 原生异步
-import aioboto3
-
-class S3Client:
-    def __init__(self):
-        self._session = aioboto3.Session()
-
-    async def upload_file(self, local_path: str, remote_path: str) -> str:
-        async with self._session.client("s3", region_name=self._region) as s3:
-            await s3.upload_file(local_path, self._bucket, remote_path)
-        return remote_path
-```
-
-**原因**:
-- `run_in_executor` 使用线程池，有额外开销
-- aioboto3 提供真正的异步 I/O，性能更好
-- 代码更简洁，减少重复的包装模式
-
-**参考实现**:
-- `shared/infrastructure/storage/s3_client.py` - S3 基础操作
-- `modules/datasets/infrastructure/s3/multipart_upload_client.py` - 分片上传
-
-### 后台任务实现指南
-
-**定时任务 → Kubernetes CronJob**
-- 训练卡住检测（每30分钟）
-- 存储容量告警（每5分钟）
-- 检查点迁移（每30分钟）
-
-**事件驱动 → Kubernetes Watch API**
-- HyperPod/Kueue 状态变化监控
-- 抢占事件检测
-
-### 实现前检查清单
-
-1. 搜索 PyPI 是否有现成方案
-2. 检查 FastAPI 生态集成 (awesome-fastapi)
-3. AWS 功能优先用 boto3 官方 SDK
-4. 复杂功能找专业库，简单功能用标准库
-
-## Module Responsibility Matrix
-
-| 模块 | 职责 | 核心实体 | 外部依赖 |
-|------|------|---------|---------|
-| **auth** | 用户认证、授权、RBAC | User, LoginAttempt | SSO Provider |
-| **training** | 训练任务生命周期管理 | TrainingJob, Checkpoint | HyperPod, Kueue |
-| **models** | 模型版本控制、审批 | Model, ModelVersion | Model Registry |
-| **quotas** | 资源配额配置与管理 | ResourceQuota, ResourceLimitConfig | Kueue ClusterQueue |
-| **spaces** | 在线开发环境管理 | Space | SageMaker Spaces |
-| **audit** | 审计日志记录与查询 | AuditLog | - |
-
-## 待解决问题
-
-### 数据模型一致性问题
-
-#### 问题1: resource_quotas 表与 Kueue 配额重复
-
-| 项目 | 说明 |
-|------|------|
-| **现状** | 应用层存储 `max_gpu_count`, `max_cpu_cores`, `max_memory_gb` |
-| **问题** | Kueue ClusterQueue 已管理这些配额值，存在数据不一致风险 |
-| **待确认** | 应用层是"配置源"同步到 Kueue，还是只存业务元数据？ |
-
-#### 问题2: development_spaces 表与 SageMaker Spaces 状态同步
-
-| 项目 | 说明 |
-|------|------|
-| **现状** | 应用层缓存 `status`, `instance_type` 等字段 |
-| **问题** | SageMaker Spaces API 已提供这些信息，需要同步策略 |
-| **待确认** | 缓存更新机制（轮询/事件驱动） |
-
-### HyperPod Task Governance 集成
-
-> **踩坑记录和诊断清单参见**: `.claude/skills/hyperpod-scheduling/SKILL.md`
-
-已解决的关键问题:
-- TAS 配置问题（Workload Pending）
-- 抢占不生效（Cohort 配置）
-- PriorityClass 双重资源（WorkloadPriorityClass vs PriorityClass）
-- PodsRunning 状态不一致
-- set_cluster_context 必须先调用
-
-## Related Documentation
+## 规范文档索引
 
 | 文档 | 位置 | 说明 |
 |------|------|------|
-| **核心架构规范** | [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | 模块依赖、通信方式、异常处理等 |
+| **架构规范** | [rules/architecture.md](.claude/rules/architecture.md) | 架构规范单一真实源 |
+| **测试规范** | [rules/testing.md](.claude/rules/testing.md) | TDD 工作流、前缀命名、Fixture |
+| **代码风格** | [rules/code-style.md](.claude/rules/code-style.md) | 类型提示、命名、Docstring |
+| **安全规范** | [rules/security.md](.claude/rules/security.md) | 禁止事项、检测命令 |
+| **API 设计** | [rules/api-design.md](.claude/rules/api-design.md) | RESTful 路由、状态码、错误格式 |
+| **SDK 优先** | [rules/sdk-first.md](.claude/rules/sdk-first.md) | SDK 决策流程、aioboto3 规范 |
+| **技术栈** | [rules/tech-stack.md](.claude/rules/tech-stack.md) | 版本矩阵、关键约束 |
+| **日志规范** | [rules/logging.md](.claude/rules/logging.md) | structlog、Correlation ID、脱敏 |
+| **可观测性** | [rules/observability.md](.claude/rules/observability.md) | Metrics、Tracing、Health Check |
+| **项目结构** | [rules/project-structure.md](.claude/rules/project-structure.md) | 目录结构、配置文件 |
+| **检查清单** | [rules/checklist.md](.claude/rules/checklist.md) | PR Review 8 类检查项 |
+| **项目配置** | [.claude/project-config.md](.claude/project-config.md) | 模块清单、事件、导入路径 |
 | **功能规范** | `specs/001-ai-training-platform/spec.md` | 术语标准、功能需求 |
 | **数据模型** | `specs/001-ai-training-platform/data-model.md` | 数据库设计 |
-| **架构合规测试** | `tests/architecture/` | 自动化验证 |
+
+---
+
+## 预提交一键验证
+
+```bash
+black --check src/ && ruff check src/ && mypy src/ && pytest --cov=src --cov-fail-under=85
+```
