@@ -87,10 +87,36 @@ class ModelRepository(PydanticRepository[Model, ModelModel, int], IModelReposito
         sort_order: str = "desc",
     ) -> tuple[list[Model], int]:
         """List models with pagination and filters."""
+        # 构建查询
         query = select(ModelModel).options(selectinload(ModelModel.owner))
         count_query = select(func.count(ModelModel.id))
 
-        # Apply filters
+        # 应用过滤条件
+        query, count_query = self._apply_model_filters(
+            query, count_query, owner_id, training_job_id, status, framework
+        )
+
+        # 获取总数
+        total = await self._get_total_count(count_query)
+
+        # 应用排序和分页
+        query = self._apply_sorting(query, sort_by, sort_order)
+        query = self._apply_pagination(query, page, page_size)
+
+        # 执行查询
+        models = await self._execute_model_query(query)
+        return [self._to_entity(m) for m in models], total
+
+    def _apply_model_filters(
+        self,
+        query,
+        count_query,
+        owner_id: int | None,
+        training_job_id: int | None,
+        status: str | ModelStatus | None,
+        framework: str | ModelFramework | None,
+    ):
+        """应用过滤条件到查询."""
         if owner_id is not None:
             query = query.where(ModelModel.owner_id == owner_id)
             count_query = count_query.where(ModelModel.owner_id == owner_id)
@@ -100,41 +126,36 @@ class ModelRepository(PydanticRepository[Model, ModelModel, int], IModelReposito
             count_query = count_query.where(ModelModel.training_job_id == training_job_id)
 
         if status is not None:
-            if isinstance(status, str):
-                status_enum = ModelStatus[status.upper()]
-            else:
-                status_enum = status
+            status_enum = ModelStatus[status.upper()] if isinstance(status, str) else status
             query = query.where(ModelModel.status == status_enum)
             count_query = count_query.where(ModelModel.status == status_enum)
 
         if framework is not None:
-            if isinstance(framework, str):
-                framework_enum = ModelFramework[framework.upper()]
-            else:
-                framework_enum = framework
+            framework_enum = ModelFramework[framework.upper()] if isinstance(framework, str) else framework
             query = query.where(ModelModel.framework == framework_enum)
             count_query = count_query.where(ModelModel.framework == framework_enum)
 
-        # Get total count
-        total_result = await self._session.execute(count_query)
-        total = total_result.scalar() or 0
+        return query, count_query
 
-        # Apply sorting
+    async def _get_total_count(self, count_query) -> int:
+        """获取总记录数."""
+        result = await self._session.execute(count_query)
+        return result.scalar() or 0
+
+    def _apply_sorting(self, query, sort_by: str, sort_order: str):
+        """应用排序."""
         sort_column = getattr(ModelModel, sort_by, ModelModel.created_at)
-        if sort_order.lower() == "desc":
-            query = query.order_by(sort_column.desc())
-        else:
-            query = query.order_by(sort_column.asc())
+        return query.order_by(sort_column.desc() if sort_order.lower() == "desc" else sort_column.asc())
 
-        # Apply pagination
+    def _apply_pagination(self, query, page: int, page_size: int):
+        """应用分页."""
         offset = (page - 1) * page_size
-        query = query.offset(offset).limit(page_size)
+        return query.offset(offset).limit(page_size)
 
-        # Execute query
+    async def _execute_model_query(self, query):
+        """执行查询并返回模型列表."""
         result = await self._session.execute(query)
-        models = result.scalars().all()
-
-        return [self._to_entity(m) for m in models], total
+        return result.scalars().all()
 
     async def list_versions(self, model_name: str) -> list[Model]:
         """List all versions of a model by name."""
