@@ -377,35 +377,9 @@ export class ApiClient {
 }
 ```
 
-### 7.3 Query 错误处理
+### 7.3 错误码映射
 
-```typescript
-// app/providers/QueryProvider.tsx
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      retry: (failureCount, error) => {
-        if (error instanceof AppError && error.isNotFound()) {
-          return false; // 404 不重试
-        }
-        return failureCount < 3;
-      },
-    },
-    mutations: {
-      onError: (error) => {
-        if (error instanceof AppError) {
-          eventBus.publish('notification:show', {
-            type: 'error',
-            message: getErrorMessage(error),
-          });
-        }
-      },
-    },
-  },
-});
-```
-
-### 7.4 错误码映射
+> Query 层错误处理配置（QueryClient retry 策略、mutation 全局 onError）详见 [state-management.md](state-management.md) §1.4
 
 | 错误码 | HTTP 状态码 | 场景 |
 |--------|-------------|------|
@@ -442,13 +416,6 @@ rules: {
     },
   ],
 }
-```
-
-### 8.2 运行合规检查
-
-```bash
-npm run lint            # ESLint 检查
-npx tsc --noEmit        # TypeScript 类型检查
 ```
 
 ---

@@ -82,11 +82,11 @@ interface ButtonProps {
 
 ### 2.1 类型定义位置
 
+> 模块类型分类（枚举、Entity、Request/Response、Filter、UI Helper Constants）详见 [architecture.md](architecture.md) §5.2
+
 | 类型 | 位置 |
 |------|------|
 | 组件 Props | 组件文件内或同目录 `.types.ts` |
-| 实体类型 | `features/{module}/types/index.ts` |
-| API 响应类型 | `features/{module}/types/index.ts` |
 | 通用类型 | `shared/types/` |
 
 ### 2.2 Interface vs Type 决策

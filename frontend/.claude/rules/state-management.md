@@ -147,6 +147,36 @@ export function useUpdateTrainingJob() {
 }
 ```
 
+### 1.4 全局错误处理配置
+
+> 错误类型体系（ErrorCode, AppError）定义详见 [architecture.md](architecture.md) §6.3
+
+```typescript
+// app/providers/QueryProvider.tsx
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: (failureCount, error) => {
+        if (error instanceof AppError && error.isNotFound()) {
+          return false; // 404 不重试
+        }
+        return failureCount < 3;
+      },
+    },
+    mutations: {
+      onError: (error) => {
+        if (error instanceof AppError) {
+          eventBus.publish('notification:show', {
+            type: 'error',
+            message: getErrorMessage(error),
+          });
+        }
+      },
+    },
+  },
+});
+```
+
 ---
 
 ## 2. Zustand (客户端状态)
