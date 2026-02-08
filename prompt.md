@@ -446,8 +446,23 @@ Pydantic V2
 
 
 
-分析这个前端frontend子项目： /Users/jinhuasu/Project_Workspace/Anker-Projects/ml-platform-research/llm-platform-solution/ai-studio-project/frontend下上下文管理的规范文件，
+分析这个前端frontend子项目： /Users/jinhuasu/Project_Workspace/Anker-Projects/ml-platform-research/llm-platform-solution/ai-studio-project/frontend下上下文管理的规范文件，结合Claude Code 上下文管理的最佳实践在不影响它的作用的情况下分析是否存在冗余信息，是否存在各个规范文件不满足单一职责原则、职责重叠的问题
+
 
 
 分析这个前端frontend子项目的architecture.md规范 /Users/jinhuasu/Project_Workspace/Anker-Projects/ml-platform-research/llm-platform-solution/ai-studio-project/frontend/.claude/rules/architecture.md
 结合Claude Code 上下文管理的最佳实践在不影响它的作用的情况下分析是否存在冗余信息，是否存在各个规范文件不满足单一职责原则、职责重叠的问题
+
+
+❯ 1. 移至 .claude/commands/review.md (推荐)                                                                                                                                                                                                                                  
+     改为按需加载的自定义命令，用户通过 /review 手动触发时才加载，独有内容（Cloudscape 页面/表单/表格必备）移入 component-design.md
+
+
+
+  /Users/jinhuasu/Project_Workspace/Anker-Projects/ml-platform-research/llm-platform-solution/ai-studio-project/frontend/docs这个目录下的context-guide.md和project-config.template.md用于/Users/jinhuasu/Project_Workspace/Ank
+  er-Projects/ml-platform-research/llm-platform-solution/ai-studio-project/frontend/项目的，请根据当前frontend这个项目的实际情况更新这两个文件以保持跟当前frontend项目的一致性  
+
+
+rules/tech-stack.md 
+rules/project-structure.md 
+project-config.md 
