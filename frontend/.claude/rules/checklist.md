@@ -112,7 +112,7 @@
 - [ ] Mock 仅边界依赖（使用 MSW）
 - [ ] 覆盖率达标 (≥80%)
 
-详见 [testing.md](testing.md) §1-4
+详见 [testing.md](testing.md) §0-7
 
 ---
 

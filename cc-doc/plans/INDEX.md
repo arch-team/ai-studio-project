@@ -92,3 +92,11 @@ Claude Code 生成的计划文件索引。
 | 2026-02-07 | `2026-02-07-更新-backend-docs-下-context-guide-md-和-project-confi.md` | 更新 backend/docs/ 下 context-guide.md 和 project-config.template.md | ⏳ 进行中 |
 | 2026-02-07 | `2026-02-07-计划-将-ai-agents-platform-的-claude-上下文管理规范应用到-ai-stu.md` | 计划：将 ai-agents-platform 的 .claude 上下文管理规范应用到 ai-studio-project | ⏳ 进行中 |
 | 2026-02-07 | `2026-02-07-评估-迁移-claude-claude-md-和-claude-rules-common-md.md` | 评估：迁移 .claude/CLAUDE.md 和 .claude/rules/common.md | ⏳ 进行中 |
+| 2026-02-08 | `2026-02-08-前端-claude-code-上下文管理规范迁移计划.md` | 前端 Claude Code 上下文管理规范迁移计划 | ⏳ 进行中 |
+| 2026-02-08 | `2026-02-08-前端-claude-code-上下文管理规范迁移计划-1.md` | 前端 Claude Code 上下文管理规范迁移计划 | ⏳ 进行中 |
+| 2026-02-08 | `2026-02-08-前端-claude-code-上下文管理规范迁移计划-2.md` | 前端 Claude Code 上下文管理规范迁移计划 | ⏳ 进行中 |
+| 2026-02-08 | `2026-02-08-前端-claude-code-上下文管理规范-冗余分析与优化计划.md` | 前端 Claude Code 上下文管理规范 - 冗余分析与优化计划 | ⏳ 进行中 |
+| 2026-02-08 | `2026-02-08-前端-claude-code-上下文管理规范-冗余分析与优化计划-1.md` | 前端 Claude Code 上下文管理规范 - 冗余分析与优化计划 | ⏳ 进行中 |
+| 2026-02-08 | `2026-02-08-优化-state-management-md-claude-code-context-文件.md` | 优化 state-management.md Claude Code Context 文件 | ⏳ 进行中 |
+| 2026-02-08 | `2026-02-08-testing-md-优化计划.md` | testing.md 优化计划 | ⏳ 进行中 |
+| 2026-02-08 | `2026-02-08-testing-md-优化计划-1.md` | testing.md 优化计划 | ⏳ 进行中 |

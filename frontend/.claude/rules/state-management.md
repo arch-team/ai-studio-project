@@ -11,34 +11,12 @@
 | 数据类型 | 推荐方案 | 示例 |
 |---------|---------|------|
 | 服务端数据 | React Query (TanStack Query) | 训练任务列表、数据集详情 |
-| 全局 UI 状态 | Zustand | 主题、侧边栏展开状态 |
+| 全局 UI 状态 | Zustand (⚠️ 禁止持久化敏感数据) | 主题、侧边栏展开状态 |
 | 用户会话 | Zustand (内存，不持久化) | 登录状态、Token |
 | 表单状态 | React Hook Form + Zod | 创建任务表单、配置表单 |
 | URL 状态 | React Router | 路由参数、查询参数 |
 | 组件局部状态 | useState | 下拉菜单开关 |
 | 复杂组件状态 | useReducer | 多步骤向导 |
-
-### 决策流程图
-
-```
-数据来自 API？ ──是──► React Query (TanStack Query)
-      │
-     否
-      ↓
-需要反映在 URL？ ──是──► React Router (searchParams)
-      │
-     否
-      ↓
-需要跨组件共享？ ──是──► Zustand Store
-      │                    ↓
-     否              需要持久化？ ──是──► Zustand + persist (⚠️ 禁止持久化敏感数据)
-      ↓
-组件状态复杂？ ──是──► useReducer
-      │
-     否
-      ↓
-useState
-```
 
 ### 文件位置速查
 
@@ -68,21 +46,7 @@ export const queryKeys = {
     details: () => [...queryKeys.trainingJobs.all, 'detail'] as const,
     detail: (id: string) => [...queryKeys.trainingJobs.details(), id] as const,
   },
-  datasets: {
-    all: ['datasets'] as const,
-    lists: () => [...queryKeys.datasets.all, 'list'] as const,
-    list: (filters: DatasetFilters) => [...queryKeys.datasets.lists(), filters] as const,
-    details: () => [...queryKeys.datasets.all, 'detail'] as const,
-    detail: (id: string) => [...queryKeys.datasets.details(), id] as const,
-  },
-  models: {
-    all: ['models'] as const,
-    lists: () => [...queryKeys.models.all, 'list'] as const,
-    list: (filters: ModelFilters) => [...queryKeys.models.lists(), filters] as const,
-    details: () => [...queryKeys.models.all, 'detail'] as const,
-    detail: (id: string) => [...queryKeys.models.details(), id] as const,
-  },
-  // ... 其他模块
+  // datasets, models 等其他模块遵循相同结构 (all/lists/list/details/detail)
 };
 ```
 
@@ -183,24 +147,20 @@ const queryClient = new QueryClient({
 
 ### 2.1 Auth Store（内存存储 - 安全）
 
-> **安全说明**: Token 等敏感数据**禁止**存入 localStorage（XSS 可读取）。
-> 推荐 httpOnly Cookie（需后端配合）或内存存储。详见 [security.md](security.md) §2。
+> **安全说明**: Token 禁止存入 localStorage，推荐 httpOnly Cookie 或内存存储。详见 [security.md](security.md) §2。
 
 ```typescript
-// features/auth/store/authStore.ts
+// features/auth/store/authStore.ts — Token 仅保存在内存中，刷新页面后需重新认证
 import { create } from 'zustand';
 
-interface AuthState {
+export const useAuthStore = create<{
   user: User | null;
   token: string | null;
   isAuthenticated: boolean;
   setUser: (user: User | null) => void;
   setToken: (token: string | null) => void;
   logout: () => void;
-}
-
-// Token 仅保存在内存中，刷新页面后需重新认证（更安全）
-export const useAuthStore = create<AuthState>()((set) => ({
+}>()((set) => ({
   user: null,
   token: null,
   isAuthenticated: false,
@@ -213,18 +173,16 @@ export const useAuthStore = create<AuthState>()((set) => ({
 ### 2.2 UI Store（持久化非敏感状态）
 
 ```typescript
-// store/slices/uiSlice.ts
+// store/slices/uiSlice.ts — persist 中间件包装模式
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
-interface UIState {
+export const useUIStore = create<{
   theme: 'light' | 'dark' | 'system';
   sidebarCollapsed: boolean;
-  setTheme: (theme: UIState['theme']) => void;
+  setTheme: (theme: 'light' | 'dark' | 'system') => void;
   toggleSidebar: () => void;
-}
-
-export const useUIStore = create<UIState>()(
+}>()(
   persist(
     (set) => ({
       theme: 'system',
@@ -275,23 +233,11 @@ const createJobSchema = z.object({
 
 type CreateJobFormData = z.infer<typeof createJobSchema>;
 
-export function CreateJobForm() {
-  const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<CreateJobFormData>({
-    resolver: zodResolver(createJobSchema),
-  });
-
-  const createJob = useCreateTrainingJob();
-
-  const onSubmit = async (data: CreateJobFormData) => {
-    await createJob.mutateAsync(data);
-  };
-
-  return (
-    <form onSubmit={handleSubmit(onSubmit)}>
-      {/* Cloudscape Form 组件 */}
-    </form>
-  );
-}
+// useForm 配置核心: zodResolver 绑定 + mutateAsync 提交
+const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<CreateJobFormData>({
+  resolver: zodResolver(createJobSchema),
+});
+// JSX: <form onSubmit={handleSubmit(onSubmit)}> + Cloudscape Form 组件
 ```
 
 ---
@@ -305,13 +251,10 @@ export function CreateJobForm() {
 ```typescript
 // shared/events/eventBus.ts
 export interface EventMap {
-  'training-job:created': { jobId: number; jobName: string };
-  'training-job:completed': { jobId: number; duration: number };
-  'training-job:failed': { jobId: number; error: string };
-  'dataset:deleted': { datasetId: number };
-  'auth:logged-in': { userId: number };
-  'auth:logged-out': void;
-  'notification:show': { type: 'success' | 'error'; message: string };
+  'training-job:created': { jobId: number; jobName: string };  // 对象 payload
+  'auth:logged-out': void;                                      // 无 payload
+  'notification:show': { type: 'success' | 'error'; message: string }; // 联合类型 payload
+  // 其他事件 (training-job:completed/failed, dataset:deleted, auth:logged-in) 遵循相同模式
 }
 ```
 
@@ -348,11 +291,7 @@ export function useMonitoringSubscription() {
   useEventSubscription('training-job:completed', () => {
     queryClient.invalidateQueries({ queryKey: queryKeys.trainingJobs.lists() });
   });
-
-  // 数据集删除时，自动刷新相关列表
-  useEventSubscription('dataset:deleted', () => {
-    queryClient.invalidateQueries({ queryKey: queryKeys.datasets.lists() });
-  });
+  // 其他事件 (dataset:deleted 等) 同理: useEventSubscription + invalidateQueries
 }
 ```
 
@@ -376,11 +315,4 @@ const useUIStore = create((set) => ({
 }));
 ```
 
-```typescript
-// ❌ 错误 - 在组件中直接获取整个 store
-const { user, token, theme, sidebar } = useAuthStore();
-
-// ✅ 正确 - 使用细粒度 selector 只订阅需要的字段
-const user = useAuthStore((s) => s.user);
-const theme = useUIStore((s) => s.theme);
-```
+> Zustand 细粒度 Selector 示例见 §2.3

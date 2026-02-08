@@ -55,6 +55,9 @@ npm run test:e2e:debug          # 调试模式
 - ❌ `getByTestId` 优先 → ✅ 可访问性查询优先
 - ❌ 同步期望异步 → ✅ `waitFor` / `findBy`
 - ❌ 硬编码 API 路径 → ✅ 使用 MSW handler 中的常量
+- ❌ Mock 内部实现 → ✅ 只 Mock 外部依赖 (API、第三方库)
+- ❌ 裸渲染 (`render(<Comp />)`) → ✅ 使用 `render` from `@tests/__utils__/test-utils` 确保 Provider 隔离
+- ❌ 跳过 / 注释失败测试 → ✅ 修复根因
 
 ---
 
@@ -327,21 +330,3 @@ renderWithQuery(<MyHookConsumer />);
 | Lines | ≥ 80% |
 
 **关键模块** (shared/, lib/): ≥ 90%
-
----
-
-## 最佳实践
-
-### ✅ 推荐
-
-- 使用 `renderWithProviders` 确保测试隔离
-- 使用 `waitFor` 处理异步状态
-- Mock 外部依赖，不 Mock 内部实现
-- 测试用户行为，而非实现细节
-
-### ❌ 避免
-
-- 测试实现细节（如内部状态）
-- 过度 Mock 导致测试与真实行为偏离
-- 测试文件中硬编码 API 路径
-- 跳过测试而非修复问题
