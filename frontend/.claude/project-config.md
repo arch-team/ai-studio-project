@@ -95,18 +95,7 @@
 
 ### API 客户端配置
 
-```typescript
-// shared/api/client.ts — 基于原生 fetch
-export class ApiClient {
-  async request<T>(path: string, config?: RequestConfig): Promise<T> {
-    const response = await fetch(url, options);
-    if (!response.ok) {
-      throw await AppError.fromResponse(response);
-    }
-    return response.json();
-  }
-}
-```
+> API 客户端实现（基于原生 fetch 的 `ApiClient`）详见 [rules/architecture.md](rules/architecture.md) §7.2
 
 ---
 

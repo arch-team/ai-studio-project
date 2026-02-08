@@ -150,20 +150,10 @@ const queryClient = new QueryClient({
 > **安全说明**: Token 禁止存入 localStorage，推荐 httpOnly Cookie 或内存存储。详见 [security.md](security.md) §2。
 
 ```typescript
-// features/auth/store/authStore.ts — Token 仅保存在内存中，刷新页面后需重新认证
-import { create } from 'zustand';
-
-export const useAuthStore = create<{
-  user: User | null;
-  token: string | null;
-  isAuthenticated: boolean;
-  setUser: (user: User | null) => void;
-  setToken: (token: string | null) => void;
-  logout: () => void;
-}>()((set) => ({
-  user: null,
-  token: null,
-  isAuthenticated: false,
+// features/auth/store/authStore.ts
+// ⚠️ Token 仅保存在内存中，不使用 persist，刷新页面后需重新认证
+export const useAuthStore = create<AuthState>()((set) => ({
+  user: null, token: null, isAuthenticated: false,
   setUser: (user) => set({ user, isAuthenticated: !!user }),
   setToken: (token) => set({ token }),
   logout: () => set({ user: null, token: null, isAuthenticated: false }),
@@ -174,24 +164,9 @@ export const useAuthStore = create<{
 
 ```typescript
 // store/slices/uiSlice.ts — persist 中间件包装模式
-import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
-
-export const useUIStore = create<{
-  theme: 'light' | 'dark' | 'system';
-  sidebarCollapsed: boolean;
-  setTheme: (theme: 'light' | 'dark' | 'system') => void;
-  toggleSidebar: () => void;
-}>()(
-  persist(
-    (set) => ({
-      theme: 'system',
-      sidebarCollapsed: false,
-      setTheme: (theme) => set({ theme }),
-      toggleSidebar: () => set((s) => ({ sidebarCollapsed: !s.sidebarCollapsed })),
-    }),
-    { name: 'ui-storage' }
-  )
+// 非敏感 UI 状态使用 persist 中间件，key 为 'ui-storage'
+export const useUIStore = create<UIState>()(
+  persist((set) => ({ /* theme, sidebarCollapsed, ... */ }), { name: 'ui-storage' })
 );
 ```
 
@@ -199,20 +174,9 @@ export const useUIStore = create<{
 
 ```typescript
 // 细粒度 selector - 避免不必要的重渲染
-export const useAuth = () =>
-  useAuthStore((state) => ({
-    user: state.user,
-    isAuthenticated: state.isAuthenticated,
-  }));
-
-export const useAuthToken = () => useAuthStore((state) => state.token);
-
-export const useAuthActions = () =>
-  useAuthStore((state) => ({
-    setUser: state.setUser,
-    setToken: state.setToken,
-    logout: state.logout,
-  }));
+// 按「数据 / actions」分离，避免 action 变化触发数据消费组件重渲染
+export const useAuth = () => useAuthStore((s) => ({ user: s.user, isAuthenticated: s.isAuthenticated }));
+export const useAuthActions = () => useAuthStore((s) => ({ setUser: s.setUser, logout: s.logout }));
 ```
 
 ---

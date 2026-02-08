@@ -63,40 +63,12 @@ npm run test:e2e:debug          # 调试模式
 
 ## 1. 测试文件位置
 
-> **本项目采用 `tests/` 独立目录**，测试文件镜像 `src/` 结构
+> 完整目录结构详见 [project-structure.md](project-structure.md) §0
 
-```
-project/
-├── src/                        # 生产代码
-├── tests/                      # 单元 + 集成测试 (与 src 平行)
-│   ├── tsconfig.json           # 测试专用 TS 配置
-│   ├── setup.ts                # Vitest 全局配置 + MSW Server
-│   ├── unit/                   # 单元测试 (镜像 src 结构)
-│   │   ├── app/router/         # 路由守卫测试
-│   │   ├── features/           # 功能模块测试
-│   │   │   ├── training/
-│   │   │   ├── datasets/
-│   │   │   └── models/
-│   │   ├── layouts/            # 布局组件测试
-│   │   ├── shared/             # 共享模块测试
-│   │   ├── lib/query/          # Query 配置测试
-│   │   └── store/slices/       # Store 测试
-│   ├── integration/            # 集成测试
-│   │   ├── api/                # API 集成测试 (MSW)
-│   │   └── pages/              # 页面集成测试
-│   └── __utils__/              # 测试工具
-│       ├── test-utils.tsx      # 渲染包装器
-│       ├── server.ts           # MSW Server 配置
-│       └── mocks/
-│           ├── handlers/       # MSW API handlers
-│           ├── data/           # Mock 数据
-│           └── stores/         # Mock Stores
-└── e2e/                        # E2E 测试 (Playwright)
-    ├── pages/                  # Page Objects
-    ├── tests/                  # 测试用例
-    ├── fixtures/               # 测试夹具
-    └── utils/                  # E2E 工具
-```
+**核心约定**:
+- 采用 `tests/` 独立目录，测试文件镜像 `src/` 结构
+- 单元测试: `tests/unit/` | 集成测试: `tests/integration/` | E2E: `e2e/`
+- 测试工具 (MSW Server, 渲染包装器, Mock): `tests/__utils__/`
 
 ---
 
@@ -104,34 +76,18 @@ project/
 
 ### 2.1 基本模板
 
+**约定**: `describe` 按「渲染 / 交互」分组，交互测试必须 `userEvent.setup()` 前置
+
 ```typescript
-import { render, screen } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
-import { describe, it, expect, vi } from 'vitest';
+// 渲染测试
+render(<TrainingJobTable jobs={mockJobs} />);
+expect(screen.getByRole('table')).toBeInTheDocument();
 
-describe('TrainingJobTable', () => {
-  describe('渲染', () => {
-    it('应该显示任务列表', () => {
-      render(<TrainingJobTable jobs={mockJobs} />);
-      expect(screen.getByRole('table')).toBeInTheDocument();
-    });
-
-    it('应该显示空状态提示', () => {
-      render(<TrainingJobTable jobs={[]} />);
-      expect(screen.getByText(/暂无/)).toBeInTheDocument();
-    });
-  });
-
-  describe('交互', () => {
-    it('应该支持行选择', async () => {
-      const handleSelect = vi.fn();
-      const user = userEvent.setup();
-      render(<TrainingJobTable jobs={mockJobs} onSelect={handleSelect} />);
-      await user.click(screen.getByRole('row', { name: /任务1/ }));
-      expect(handleSelect).toHaveBeenCalledTimes(1);
-    });
-  });
-});
+// 交互测试 — userEvent.setup() 必须在 render 之前
+const user = userEvent.setup();
+render(<TrainingJobTable jobs={mockJobs} onSelect={vi.fn()} />);
+await user.click(screen.getByRole('row', { name: /任务1/ }));
+expect(onSelect).toHaveBeenCalledTimes(1);
 ```
 
 ### 2.2 查询优先级
@@ -187,25 +143,17 @@ describe('useDebounce', () => {
 ### 4.1 配置
 
 ```typescript
-// tests/__utils__/mocks/handlers/training.ts
-import { http, HttpResponse } from 'msw';
-
+// --- handlers: tests/__utils__/mocks/handlers/training.ts ---
 export const trainingHandlers = [
-  http.get('/api/v1/training-jobs', () =>
-    HttpResponse.json({ items: [{ id: 1, job_name: 'Job 1' }], total: 1 })
-  ),
-  http.post('/api/v1/training-jobs', async ({ request }) => {
-    const body = await request.json();
-    return HttpResponse.json({ id: 2, ...body }, { status: 201 });
-  }),
+  http.get('/api/v1/training-jobs', () => HttpResponse.json({ items: [...], total: 1 })),
+  http.post('/api/v1/training-jobs', async ({ request }) =>
+    HttpResponse.json({ id: 2, ...(await request.json()) }, { status: 201 })),
 ];
 
-// tests/__utils__/server.ts
-import { setupServer } from 'msw/node';
-import { trainingHandlers } from './mocks/handlers/training';
+// --- server: tests/__utils__/server.ts ---
 export const server = setupServer(...trainingHandlers);
 
-// tests/setup.ts
+// --- setup: tests/setup.ts ---
 beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
 afterEach(() => server.resetHandlers());
 afterAll(() => server.close());
@@ -214,34 +162,16 @@ afterAll(() => server.close());
 ### 4.2 动态覆盖
 
 ```typescript
-import { server } from '@tests/__utils__/server';
-import { http, HttpResponse } from 'msw';
-
-it('应该处理 API 错误', async () => {
-  // 临时覆盖 handler
-  server.use(
-    http.get('/api/v1/training-jobs', () => {
-      return HttpResponse.json({ detail: '服务器错误' }, { status: 500 });
-    })
-  );
-
-  // 测试错误处理逻辑...
-});
+// 单个测试中临时覆盖 handler
+server.use(http.get('/api/v1/training-jobs', () => HttpResponse.json({ detail: '错误' }, { status: 500 })));
 ```
 
 ### 4.3 Mock Store
 
 ```typescript
-import { createMockAuthStore, mockUsers, setMockToken } from '@tests/__utils__/mocks/stores/mockAuthStore';
-
-beforeEach(() => {
-  setMockToken();
-});
-
-it('应该显示管理员功能', () => {
-  const authStore = createMockAuthStore(mockUsers.admin);
-  // ...
-});
+// tests/__utils__/mocks/stores/ 提供 createMockAuthStore, mockUsers, setMockToken
+beforeEach(() => setMockToken());
+const authStore = createMockAuthStore(mockUsers.admin);
 ```
 
 ---

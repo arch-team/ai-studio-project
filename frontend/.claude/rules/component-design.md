@@ -52,83 +52,40 @@
 
 ### 1.1 展示型组件 (Presentational)
 
-**关键模式**: Cloudscape 组件优先 + loading/error/empty 三态
+**关键模式**: Cloudscape 组件优先 + `Record<Status, Config>` 映射
 
 ```tsx
-// features/training/components/TrainingJobStatusBadge.tsx
-import { StatusIndicator } from '@cloudscape-design/components';
-
-interface TrainingJobStatusBadgeProps {
-  status: JobStatus;
-}
-
-export function TrainingJobStatusBadge({ status }: TrainingJobStatusBadgeProps) {
-  const statusMap: Record<JobStatus, { type: string; label: string }> = {
-    submitted: { type: 'pending', label: '已提交' },
-    running: { type: 'in-progress', label: '运行中' },
-    completed: { type: 'success', label: '已完成' },
-    failed: { type: 'error', label: '已失败' },
-  };
-
-  const { type, label } = statusMap[status];
-  return <StatusIndicator type={type}>{label}</StatusIndicator>;
-}
+// 状态映射模式: Record<JobStatus, { type, label }> → <StatusIndicator type={type}>{label}</StatusIndicator>
+const statusMap: Record<JobStatus, { type: string; label: string }> = {
+  submitted: { type: 'pending', label: '已提交' },
+  // ...其他状态
+};
 ```
 
 ### 1.2 容器型组件 (Container)
 
-**关键模式**: React Query 数据获取 + Cloudscape 三态处理
+**关键模式**: React Query 数据获取 + Cloudscape Table 三态处理
 
 ```tsx
-// features/training/components/TrainingJobTable.tsx
-import { Table, Header, Pagination } from '@cloudscape-design/components';
-
-interface TrainingJobTableProps {
-  onSelect?: (job: TrainingJobSummary) => void;
-}
-
-export function TrainingJobTable({ onSelect }: TrainingJobTableProps) {
-  const { data, isLoading, error } = useTrainingJobs();
-
-  return (
-    <Table
-      loading={isLoading}
-      items={data?.items ?? []}
-      header={<Header counter={`(${data?.total ?? 0})`}>训练任务</Header>}
-      empty={<Box textAlign="center">暂无训练任务</Box>}
-      columnDefinitions={[
-        { id: 'name', header: '任务名称', cell: (item) => item.job_name },
-        { id: 'status', header: '状态', cell: (item) => <TrainingJobStatusBadge status={item.status} /> },
-      ]}
-      onSelectionChange={({ detail }) => onSelect?.(detail.selectedItems[0])}
-    />
-  );
-}
+// 必须处理 loading / items / empty 三个状态
+<Table
+  loading={isLoading}
+  items={data?.items ?? []}
+  header={<Header counter={`(${data?.total ?? 0})`}>标题</Header>}
+  empty={<Box textAlign="center">暂无数据</Box>}
+  columnDefinitions={[...]}
+/>
 ```
 
 ### 1.3 复合组件 (Compound)
 
 **关键模式**: Context 共享状态 + `Object.assign` 组合导出
 
-```typescript
-// shared/components/Tabs/Tabs.tsx - 结构骨架
-// 1. Context
-const TabsContext = createContext<TabsContextValue | null>(null);
-
-// 2. Root 组件提供 Context
-function TabsRoot({ defaultValue, children, onChange }: TabsProps) {
-  const [activeTab, setActiveTab] = useState(defaultValue);
-  return (
-    <TabsContext.Provider value={{ activeTab, setActiveTab }}>
-      {children}
-    </TabsContext.Provider>
-  );
-}
-
-// 3. 子组件消费 Context (TabList, Tab, TabPanel 各自实现)
-
-// 4. 组合导出
-export const Tabs = Object.assign(TabsRoot, { List: TabList, Tab, Panel: TabPanel });
+```
+1. createContext<ContextValue | null>(null)
+2. Root 组件提供 Context.Provider
+3. 子组件通过 useContext 消费状态
+4. Object.assign(Root, { SubA, SubB }) 组合导出
 ```
 
 ---

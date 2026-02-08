@@ -111,18 +111,9 @@ features/{module}/
 
 ### 1.3 模块划分
 
-| 模块 | 职责 | 后端对应 |
-|------|------|---------|
-| `auth` | 用户认证与授权 | `modules/auth` |
-| `training` | 训练任务管理 | `modules/training` |
-| `datasets` | 数据集管理 | `modules/datasets` |
-| `models` | 模型管理 | `modules/models` |
-| `resource-quotas` | 资源配额管理 | `modules/quotas` |
-| `spaces` | 开发空间管理 | `modules/spaces` |
-| `audit` | 审计日志（只读） | `modules/audit` |
-| `billing` | 成本统计（只读） | `modules/billing` |
-| `monitoring` | 集群监控 | `modules/monitoring` |
-| `shared` | 共享内核 | `shared/` |
+> 业务模块完整列表及后端对应关系详见 [project-config.md](../project-config.md) §功能模块
+
+**`shared` (共享内核)**: 技术基础设施和跨模块抽象，禁止包含业务逻辑（详见 §6）
 
 ---
 
@@ -130,45 +121,11 @@ features/{module}/
 
 ### 2.1 模块内部分层
 
-每个 feature 模块遵循以下分层结构：
-
-```
-┌─────────────────────────────────────────┐
-│              Pages Layer                 │  ← 页面组件
-│           (pages/*.tsx)                  │
-├─────────────────────────────────────────┤
-│           Components Layer               │  ← UI 组件
-│         (components/*.tsx)               │
-├─────────────────────────────────────────┤
-│             Hooks Layer                  │  ← 业务逻辑 (对应后端 Application)
-│          (hooks/index.ts)                │
-├─────────────────────────────────────────┤
-│              API Layer                   │  ← 数据访问
-│    (api/queries.ts, api/*Api.ts)         │
-├─────────────────────────────────────────┤
-│             Types Layer                  │  ← 类型定义 (对应后端 Domain)
-│          (types/index.ts)                │
-└─────────────────────────────────────────┘
-```
+> 分层结构和依赖矩阵详见 §0.1，模块结构模板详见 §0.3
 
 ### 2.2 依赖方向
 
-```
-┌─────────────────────────────────────────────────────────┐
-│                    模块内部分层                          │
-│                                                         │
-│   pages ──► components ──► hooks ──► api ──► types     │
-│                                                         │
-├─────────────────────────────────────────────────────────┤
-│                    跨模块依赖                            │
-│                                                         │
-│   features/A  ───X───►  features/B   (禁止横向依赖)     │
-│       │                    │                            │
-│       └────────┬───────────┘                            │
-│                ▼                                        │
-│           shared/  (唯一允许的共享依赖)                  │
-└─────────────────────────────────────────────────────────┘
-```
+> 跨模块依赖速查详见 §0.2
 
 **关键规则**:
 - 依赖只能从上层指向下层
@@ -250,33 +207,9 @@ import { DatasetStatus } from '@features/datasets/types';
 
 ### 5.1 `index.ts` 导出规范
 
-```typescript
-// features/training/index.ts
-/**
- * Training module - Public API exports.
- */
+**模式**: 按层级顺序 `export * from './types' | './api' | './hooks' | './components' | './pages'`
 
-// Types
-export * from './types';
-
-// API (Query Hooks)
-export * from './api';
-
-// Hooks (业务逻辑)
-export * from './hooks';
-
-// Components
-export * from './components';
-
-// Pages
-export * from './pages';
-```
-
-**禁止直接导出内部实现细节**:
-```typescript
-// ❌ 禁止
-export { fetchTrainingJobs } from './api/trainingJobApi';
-```
+**禁止**: 直接导出内部实现（如 `export { fetchTrainingJobs } from './api/trainingJobApi'`）
 
 ### 5.2 类型定义规范
 
@@ -298,25 +231,9 @@ export { fetchTrainingJobs } from './api/trainingJobApi';
 
 ### 6.1 共享内核结构
 
-```
-shared/
-├── types/
-│   ├── errors.ts          # 统一错误类型 (对应后端 DomainError)
-│   └── index.ts
-├── api/
-│   ├── client.ts          # API 客户端抽象
-│   └── index.ts
-├── hooks/
-│   ├── usePagination.ts
-│   ├── useDebounce.ts
-│   ├── useLocalStorage.ts
-│   └── index.ts
-├── events/
-│   ├── eventBus.ts        # 事件总线实现
-│   ├── useEvent.ts        # 事件 React hooks
-│   └── index.ts
-└── index.ts
-```
+> 目录结构详见 [project-structure.md](project-structure.md) §0 中 `shared/` 部分
+
+**核心子模块**: `types/`(错误类型) · `api/`(客户端) · `hooks/`(通用 Hooks) · `events/`(事件总线)
 
 ### 6.2 共享内核约束
 
@@ -328,18 +245,10 @@ shared/
 
 ```typescript
 // shared/types/errors.ts
-export enum ErrorCode {
-  UNKNOWN = 'UNKNOWN',
-  VALIDATION_ERROR = 'VALIDATION_ERROR',
-  NOT_FOUND = 'NOT_FOUND',
-  JOB_NOT_FOUND = 'JOB_NOT_FOUND',
-  JOB_QUOTA_EXCEEDED = 'JOB_QUOTA_EXCEEDED',
-}
-
+export enum ErrorCode { UNKNOWN, VALIDATION_ERROR, NOT_FOUND, JOB_NOT_FOUND, /* ... */ }
 export class AppError extends Error {
   readonly code: ErrorCode;
   readonly details?: Record<string, unknown>;
-
   static fromApiResponse(response: ApiErrorResponse): AppError;
 }
 ```

@@ -45,11 +45,29 @@ frontend/                       # 前端项目根目录
 │   ├── lib/                    # 基础设施 (query)
 │   ├── store/                  # Zustand (slices/)
 │   └── types/                  # 全局类型
-├── tests/                      # 单元 + 集成测试
-│   ├── setup.ts
-│   ├── unit/                   # 镜像 src 结构
-│   ├── integration/            # API + 页面集成
-│   └── __utils__/              # 测试工具、MSW、Mock
+├── tests/                      # 单元 + 集成测试 (与 src 平行)
+│   ├── tsconfig.json           # 测试专用 TS 配置
+│   ├── setup.ts                # Vitest 全局配置 + MSW Server
+│   ├── unit/                   # 单元测试 (镜像 src 结构)
+│   │   ├── app/router/         # 路由守卫测试
+│   │   ├── features/           # 功能模块测试
+│   │   │   ├── training/
+│   │   │   ├── datasets/
+│   │   │   └── models/
+│   │   ├── layouts/            # 布局组件测试
+│   │   ├── shared/             # 共享模块测试
+│   │   ├── lib/query/          # Query 配置测试
+│   │   └── store/slices/       # Store 测试
+│   ├── integration/            # 集成测试
+│   │   ├── api/                # API 集成测试 (MSW)
+│   │   └── pages/              # 页面集成测试
+│   └── __utils__/              # 测试工具
+│       ├── test-utils.tsx      # 渲染包装器
+│       ├── server.ts           # MSW Server 配置
+│       └── mocks/
+│           ├── handlers/       # MSW API handlers
+│           ├── data/           # Mock 数据
+│           └── stores/         # Mock Stores
 ├── e2e/                        # E2E 测试 (Playwright)
 │   ├── pages/
 │   ├── tests/
