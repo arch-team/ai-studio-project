@@ -32,11 +32,11 @@
 
 ### Props 设计速查
 
+> Props 类型定义 (interface vs type) 和事件命名规则 (on/handle 前缀) 详见 [code-style.md](code-style.md) §0 和 §1
+
 | 规则 | ✅ 正确 | ❌ 错误 |
 |------|--------|--------|
-| 使用 interface | `interface ButtonProps {}` | `type ButtonProps = {}` |
 | children 类型 | `children: React.ReactNode` | `children: any` |
-| 事件命名 | `onClick`, `onSubmit` | `click`, `handleClick` |
 | 可选属性 | `disabled?: boolean` | `disabled: boolean \| undefined` |
 | 默认值 | 解构默认值 | Props 中定义默认 |
 

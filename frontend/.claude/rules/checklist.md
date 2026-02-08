@@ -13,7 +13,7 @@
 - [ ] 每个模块有 `index.ts` 统一导出
 - [ ] Types 层没有导入任何外部模块
 
-详见 [architecture.md](architecture.md)
+详见 [architecture.md](architecture.md) §2-3
 
 ---
 
@@ -26,7 +26,7 @@
 - [ ] 可选 Props 有合理默认值
 - [ ] 复合组件使用 Context 共享状态
 
-详见 [component-design.md](component-design.md)
+详见 [component-design.md](component-design.md) §1
 
 ---
 
@@ -73,7 +73,7 @@
 - [ ] 导入按规范排序 (React → 第三方 → 内部别名 → 相对 → 类型)
 - [ ] 没有未使用的变量/导入
 
-详见 [code-style.md](code-style.md)
+详见 [code-style.md](code-style.md) §0-2
 
 ---
 
@@ -86,7 +86,7 @@
 - [ ] 敏感数据不存入持久化 Store
 - [ ] URL 相关状态使用 React Router searchParams
 
-详见 [state-management.md](state-management.md)
+详见 [state-management.md](state-management.md) §0-2
 
 ---
 
@@ -100,7 +100,7 @@
 - [ ] 没有硬编码的密钥
 - [ ] 环境变量使用 `VITE_` 前缀
 
-详见 [security.md](security.md)
+详见 [security.md](security.md) §0-4
 
 ---
 
@@ -112,7 +112,7 @@
 - [ ] Mock 仅边界依赖（使用 MSW）
 - [ ] 覆盖率达标 (≥80%)
 
-详见 [testing.md](testing.md)
+详见 [testing.md](testing.md) §1-4
 
 ---
 
@@ -124,7 +124,7 @@
 - [ ] 图片有 `loading="lazy"`
 - [ ] 使用具名导入 (Tree Shaking)
 
-详见 [performance.md](performance.md)
+详见 [performance.md](performance.md) §1-3
 
 ---
 
@@ -137,7 +137,7 @@
 - [ ] 图标按钮有 `aria-label`
 - [ ] 状态展示使用 `<StatusIndicator>`（颜色+图标+文字）
 
-详见 [accessibility.md](accessibility.md)
+详见 [accessibility.md](accessibility.md) §1-4
 
 ---
 

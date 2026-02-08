@@ -238,65 +238,11 @@ import { DatasetStatus } from '@features/datasets/types';
 
 ### 4.2 事件驱动通信
 
-**定义事件类型**:
-```typescript
-// shared/events/eventBus.ts
-export interface EventMap {
-  'training-job:created': { jobId: number; jobName: string };
-  'training-job:completed': { jobId: number; duration: number };
-  'training-job:failed': { jobId: number; error: string };
-  'dataset:deleted': { datasetId: number };
-  'auth:logged-in': { userId: number };
-  'auth:logged-out': void;
-  'notification:show': { type: 'success' | 'error'; message: string };
-}
-```
+事件驱动通信通过 `shared/events/eventBus.ts` 实现，支持类型安全的发布/订阅模式。
 
-**发布事件**:
-```typescript
-// features/training/hooks/useCreateJob.ts
-import { useEventPublisher } from '@shared/events';
+**核心概念**: `EventMap` 接口定义所有事件类型 → `useEventPublisher` 发布事件 → `useEventSubscription` 订阅事件
 
-export function useCreateTrainingJob() {
-  const publish = useEventPublisher();
-  const mutation = useMutation({
-    mutationFn: createTrainingJob,
-    onSuccess: (job) => {
-      publish('training-job:created', { jobId: job.id, jobName: job.name });
-    },
-  });
-  return mutation;
-}
-```
-
-**订阅事件**:
-```typescript
-// features/audit/hooks/useAuditSubscription.ts
-import { useEventSubscription } from '@shared/events';
-
-export function useAuditSubscription() {
-  useEventSubscription('training-job:created', (event) => {
-    console.log('Training job created:', event.payload);
-  });
-}
-```
-
-### 4.3 Query Invalidation 联动
-
-```typescript
-// features/training/api/queries.ts
-export function useDeleteTrainingJob() {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: deleteTrainingJob,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.trainingJobs.lists() });
-      queryClient.invalidateQueries({ queryKey: queryKeys.models.lists() });
-    },
-  });
-}
-```
+> EventBus 完整实现（EventMap 定义、发布/订阅 Hooks、Query Invalidation 联动示例）详见 [state-management.md](state-management.md) §4
 
 ---
 
@@ -334,50 +280,17 @@ export { fetchTrainingJobs } from './api/trainingJobApi';
 
 ### 5.2 类型定义规范
 
-```typescript
-// features/{module}/types/index.ts
+`features/{module}/types/index.ts` 应包含以下类型分类：
 
-// === Enums ===
-export type JobStatus = 'submitted' | 'running' | 'completed' | 'failed';
+| 分类 | 说明 | 命名模式 |
+|------|------|---------|
+| 枚举类型 | 状态、类别等联合类型 | `type JobStatus = 'submitted' \| ...` |
+| Entity Types | 对应后端 Domain Entity | `{Entity}Summary`, `{Entity}Detail` |
+| Request/Response | API 请求和响应 | `Create{Entity}Request`, `{Entity}ListResponse` |
+| Filter Types | 列表查询参数 | `{Entity}Filters` |
+| UI Helper Constants | 状态标签映射等 | `{ENTITY}_STATUS_LABELS` |
 
-// === Entity Types (对应后端 Domain Entity) ===
-export interface TrainingJobSummary {
-  id: number;
-  job_name: string;
-  status: JobStatus;
-}
-
-export interface TrainingJobDetail extends TrainingJobSummary {
-  // 详情特有字段
-}
-
-// === Request/Response Types ===
-export interface CreateTrainingJobRequest {
-  job_name: string;
-}
-
-export interface TrainingJobListResponse {
-  items: TrainingJobSummary[];
-  total: number;
-  page: number;
-  page_size: number;
-}
-
-// === Filter Types ===
-export interface TrainingJobFilters {
-  status?: JobStatus;
-  page?: number;
-  page_size?: number;
-}
-
-// === UI Helper Constants ===
-export const JOB_STATUS_LABELS: Record<JobStatus, string> = {
-  submitted: '已提交',
-  running: '运行中',
-  completed: '已完成',
-  failed: '已失败',
-};
-```
+> `{Entity}Detail` 继承 `{Entity}Summary`，`ListResponse` 包含 `items`, `total`, `page`, `page_size`
 
 ---
 

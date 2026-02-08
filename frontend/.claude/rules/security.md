@@ -28,9 +28,9 @@ grep -rE "(password|secret|token|key)\s*[:=]" src/
 
 ---
 
-## 2. XSS 防护
+## 1. XSS 防护
 
-### 2.1 dangerouslySetInnerHTML（仅在必要时）
+### 1.1 dangerouslySetInnerHTML（仅在必要时）
 
 ```tsx
 // ❌ 危险 - 未经清洗
@@ -46,7 +46,7 @@ const cleanHtml = DOMPurify.sanitize(html, {
 <div dangerouslySetInnerHTML={{ __html: cleanHtml }} />
 ```
 
-### 2.2 URL 安全
+### 1.2 URL 安全
 
 ```tsx
 // ❌ 危险 - javascript: 协议
@@ -67,7 +67,7 @@ const isValidUrl = (url: string): boolean => {
 
 ---
 
-## 3. 敏感数据存储
+## 2. 敏感数据存储
 
 ### Token 存储策略
 
@@ -82,7 +82,7 @@ const isValidUrl = (url: string): boolean => {
 
 ---
 
-## 4. 环境变量安全
+## 3. 环境变量安全
 
 ```bash
 # .env.example
@@ -102,7 +102,7 @@ const apiUrl = import.meta.env.VITE_API_BASE_URL;
 
 ---
 
-## 5. 输入验证
+## 4. 输入验证
 
 | 输入类型 | 验证方式 |
 |---------|---------|
@@ -118,7 +118,7 @@ const isValidId = jobId && /^[a-zA-Z0-9-]+$/.test(jobId);
 
 ---
 
-## 6. API 安全
+## 5. API 安全
 
 ### CSRF 防护
 
@@ -134,7 +134,7 @@ if (csrfToken) {
 
 ---
 
-## 7. 第三方依赖安全
+## 6. 第三方依赖安全
 
 ### SRI 校验
 

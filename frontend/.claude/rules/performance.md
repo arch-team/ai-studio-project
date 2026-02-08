@@ -22,7 +22,7 @@
 | 指标 | 目标 | 说明 |
 |------|------|------|
 | LCP | < 2.5s | 最大内容绘制 |
-| INP | < 200ms | 交互到下次绘制 |
+| INP | < 200ms | 交互到下次绘制 (已取代 FID，2024.03 起为 Core Web Vitals 正式指标) |
 | CLS | < 0.1 | 累积布局偏移 |
 | FCP | < 1.8s | 首次内容绘制 |
 | TTI | < 3.8s | 可交互时间 |
@@ -108,18 +108,9 @@ function Simple({ a, b }: Props) {
 
 ## 4. 状态优化
 
-```typescript
-// ❌ 错误 - 大对象状态 (任何字段变化都导致重渲染)
-const [state, setState] = useState({
-  user: null, settings: {}, notifications: [], sidebarOpen: true,
-});
+避免大对象状态导致不必要的重渲染。拆分 `useState` 和合理使用 Zustand Selector 是关键优化手段。
 
-// ✅ 正确 - 拆分状态
-const [user, setUser] = useState(null);
-const [sidebarOpen, setSidebarOpen] = useState(true);
-```
-
-> Zustand Selector 优化详见 [state-management.md](state-management.md) §2.3
+> 状态拆分最佳实践和 Zustand Selector 优化详见 [state-management.md](state-management.md) §2.3 和 §5
 
 ---
 
@@ -143,19 +134,7 @@ const [sidebarOpen, setSidebarOpen] = useState(true);
 
 ---
 
-## 6. 性能指标目标
-
-| 指标 | 目标 | 说明 |
-|------|------|------|
-| LCP | < 2.5s | 最大内容绘制 |
-| INP | < 200ms | 交互到下次绘制 (已取代 FID，2024.03 成为 Core Web Vitals 正式指标) |
-| CLS | < 0.1 | 累积布局偏移 |
-| FCP | < 1.8s | 首次内容绘制 |
-| TTI | < 3.8s | 可交互时间 |
-
----
-
-## 7. Bundle 优化
+## 6. Bundle 优化
 
 ### Tree Shaking
 

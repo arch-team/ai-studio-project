@@ -154,7 +154,7 @@ export function useUpdateTrainingJob() {
 ### 2.1 Auth Store（内存存储 - 安全）
 
 > **安全说明**: Token 等敏感数据**禁止**存入 localStorage（XSS 可读取）。
-> 推荐 httpOnly Cookie（需后端配合）或内存存储。详见 [security.md](security.md) §3。
+> 推荐 httpOnly Cookie（需后端配合）或内存存储。详见 [security.md](security.md) §2。
 
 ```typescript
 // features/auth/store/authStore.ts
@@ -268,7 +268,42 @@ export function CreateJobForm() {
 
 ## 4. EventBus 联动
 
-### 4.1 EventBus 与状态管理联动
+> 模块间通信模式决策（何时用 EventBus vs Query Invalidation vs Shared Store）详见 [architecture.md](architecture.md) §4.1
+
+### 4.1 EventMap 定义
+
+```typescript
+// shared/events/eventBus.ts
+export interface EventMap {
+  'training-job:created': { jobId: number; jobName: string };
+  'training-job:completed': { jobId: number; duration: number };
+  'training-job:failed': { jobId: number; error: string };
+  'dataset:deleted': { datasetId: number };
+  'auth:logged-in': { userId: number };
+  'auth:logged-out': void;
+  'notification:show': { type: 'success' | 'error'; message: string };
+}
+```
+
+### 4.2 发布事件
+
+```typescript
+// features/training/hooks/useCreateJob.ts
+import { useEventPublisher } from '@shared/events';
+
+export function useCreateTrainingJob() {
+  const publish = useEventPublisher();
+  const mutation = useMutation({
+    mutationFn: createTrainingJob,
+    onSuccess: (job) => {
+      publish('training-job:created', { jobId: job.id, jobName: job.name });
+    },
+  });
+  return mutation;
+}
+```
+
+### 4.3 订阅事件 + Query Invalidation 联动
 
 ```typescript
 // features/monitoring/hooks/useMonitoringSubscription.ts
@@ -290,10 +325,6 @@ export function useMonitoringSubscription() {
   });
 }
 ```
-
-### 4.2 EventBus 定义
-
-> 完整 EventMap 定义参见 [architecture.md](architecture.md) §4.2
 
 ---
 
