@@ -100,3 +100,6 @@ Claude Code 生成的计划文件索引。
 | 2026-02-08 | `2026-02-08-优化-state-management-md-claude-code-context-文件.md` | 优化 state-management.md Claude Code Context 文件 | ⏳ 进行中 |
 | 2026-02-08 | `2026-02-08-testing-md-优化计划.md` | testing.md 优化计划 | ⏳ 进行中 |
 | 2026-02-08 | `2026-02-08-testing-md-优化计划-1.md` | testing.md 优化计划 | ⏳ 进行中 |
+| 2026-02-08 | `2026-02-08-优化根目录-claude-md-压缩低频内容-提升信息密度.md` | 优化根目录 CLAUDE.md — 压缩低频内容，提升信息密度 | ⏳ 进行中 |
+| 2026-02-08 | `2026-02-08-更新-frontend-文档体系-5-个文件与项目实际对齐.md` | 更新 frontend 文档体系：5 个文件与项目实际对齐 | ⏳ 进行中 |
+| 2026-02-08 | `2026-02-08-优化根目录-claude-md-逐项执行计划.md` | 优化根目录 CLAUDE.md — 逐项执行计划 | ⏳ 进行中 |
