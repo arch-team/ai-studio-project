@@ -2,7 +2,7 @@
 
 # Claude Code 上下文管理
 
-本文档位于 `doc/` 目录，用于说明 ./frontend React 前端项目的 Claude Code 的上下文配置文件，不直接作用该项目的规范
+本文档位于 `docs/` 目录，用于说明 ./frontend React 前端项目的 Claude Code 的上下文配置文件，不直接作用该项目的规范
 
 ---
 
@@ -11,12 +11,12 @@
 ```
 .claude/
 ├── CLAUDE.md                              # 项目主规范 (入口)
-├── project-config.md                      # 项目特定配置
+├── project-config.md                      # 项目特定配置 (业务模块、路由、API)
 └── rules/                                 # 专题规范文档
-    ├── tech-stack.md                      # 技术栈版本规范 (单一真实源) ★
-    ├── checklist.md                       # PR Review 检查清单 ★单一真实源
-    ├── architecture.md                    # 架构规范 (FSD) ★核心
+    ├── tech-stack.md                      # 技术栈版本规范 ★单一真实源
     ├── project-structure.md               # 项目目录结构规范
+    ├── architecture.md                    # 架构规范 (FSD) ★核心
+    ├── checklist.md                       # PR Review 检查清单 ★单一真实源
     ├── component-design.md                # 组件设计规范
     ├── state-management.md                # 状态管理规范
     ├── code-style.md                      # 代码风格规范
@@ -40,7 +40,7 @@
 
 | 场景 | 推荐文档 |
 |------|----------|
-| 开发命令 (pnpm, vitest) | `CLAUDE.md` §开发命令 |
+| 开发命令 (npm, vitest) | `CLAUDE.md` §命令速查 |
 | 技术栈版本确认 | `rules/tech-stack.md` |
 | PR Review 检查清单 | `rules/checklist.md` |
 | 项目目录结构 | `rules/project-structure.md` §0 速查卡片 |
@@ -66,22 +66,22 @@
 - 核心原则（组件设计、TDD）
 - 规范文档导航表
 
-### project-config*.md (项目配置)
+### project-config.md (项目配置)
 
-| 文件 | 用途 |
-|------|------|
-| `project-config.md` | 本项目特定配置：功能模块、API 端点、路由配置 |
-| `project-config.template.md` | 新项目配置模板，包含 `{{PLACEHOLDER}}` 占位符（位于 `doc/` 目录） |
+| 文件 | 位置 | 用途 |
+|------|------|------|
+| `project-config.md` | `.claude/` | 本项目特定配置：功能模块 (12个)、API 端点、路由配置 |
+| `project-config.template.md` | `docs/` | 新项目配置模板，包含 `{{PLACEHOLDER}}` 占位符 |
 
 ### rules/ (专题规范)
 
 | 文件 | 主要内容 |
 |------|----------|
 | `tech-stack.md` | **技术栈版本的单一真实源** - 核心依赖版本、测试工具、开发工具、禁止使用清单、升级策略 |
+| `project-structure.md` | 目录结构规范 - 项目根目录结构、配置文件速查、初始化检查清单 |
 | `checklist.md` | **PR Review 检查清单（单一真实源）** - 架构、组件设计、代码风格、安全、测试、性能检查项 |
 | `architecture.md` | FSD 架构规范的单一真实源 - Feature-Sliced Design (FSD)、分层规则、依赖方向 |
-| `project-structure.md` | 目录结构规范 - 项目根目录结构、配置文件速查 |
-| `component-design.md` | 组件设计规范 - 组件类型（展示型/容器型/复合型）、Props 设计、Hooks 规范 |
+| `component-design.md` | 组件设计规范 - 组件类型（展示型/容器型/复合型）、Props 设计、Cloudscape 组件选择 |
 | `state-management.md` | 状态管理规范 - React Query vs Zustand 决策流程、Store 设计 |
 | `code-style.md` | 代码风格规范 - 命名规范、类型定义、导入排序 |
 | `testing.md` | 测试规范 - TDD 循环、测试分层、Mock 规范、MSW 集成 |
@@ -107,7 +107,7 @@ CLAUDE.md (入口)
     ├─→ rules/security.md
     ├─→ rules/performance.md
     ├─→ rules/accessibility.md
-    └─→ project-config.md
+    └─→ project-config.md ──→ rules/tech-stack.md
 ```
 
 **引用原则**:
@@ -146,7 +146,7 @@ CLAUDE.md (入口)
 
 ### 模板化
 
-`project-config.template.md`（位于 `doc/` 目录）中的占位符支持新项目快速初始化。
+`project-config.template.md`（位于 `docs/` 目录）中的占位符支持新项目快速初始化。
 
 ---
 
@@ -156,7 +156,7 @@ CLAUDE.md (入口)
 
 1. 修改规范后，确保更新对应的 §0 速查卡片
 2. 新增引用时，检查是否形成循环依赖
-3. 保持 CLAUDE.md 的"相关规范文档"表格同步
+3. 保持 CLAUDE.md 的"文档导航"表格同步
 4. 更新本文件的目录结构和文件说明
 
 ### 命名规范
@@ -170,7 +170,7 @@ CLAUDE.md (入口)
 ### 新增文件
 
 1. 专题规范放入 `rules/` 目录
-2. 在 CLAUDE.md 的"相关规范文档"表格中添加链接
+2. 在 CLAUDE.md 的"文档导航"表格中添加链接
 3. 在本文件（context-guide.md）的目录结构和文件说明中添加
 4. 添加 §0 速查卡片
 5. 遵循中文优先原则
@@ -180,4 +180,4 @@ CLAUDE.md (入口)
 ## 相关资源
 
 - [Claude Code 官方文档](https://docs.anthropic.com/claude-code)
-- 项目仓库: `ai-agents-platform/frontend`
+- 项目仓库: `ai-studio-project/frontend`

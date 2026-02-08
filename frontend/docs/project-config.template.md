@@ -12,7 +12,7 @@
 
 > **定位**: 本文件是 CLAUDE.md 的补充，包含**项目特定的业务配置**。
 > **原则**: 通用规范放 `rules/`，项目特定信息放此处。
-> 架构规范详见 [rules/architecture.md](rules/architecture.md)
+> 架构规范详见 [../.claude/rules/architecture.md](../.claude/rules/architecture.md)
 
 ---
 
@@ -31,7 +31,7 @@
 
 ## 技术栈补充
 
-> **注意**: 核心技术栈定义在 CLAUDE.md，此处仅列出**项目特有**的技术选型。
+> **注意**: 核心技术栈定义在 CLAUDE.md 和 [../.claude/rules/tech-stack.md](../.claude/rules/tech-stack.md)，此处仅列出**项目特有**的技术选型。
 
 | 类别 | 技术选型 | 用途说明 |
 |------|---------|---------|
@@ -68,12 +68,19 @@
 
 ## API 端点配置
 
-> **位置约定**: 所有 API 调用放在 `src/shared/api/` 下。
+> **位置约定**: 各模块 API 调用放在 `features/{module}/api/`，基础客户端在 `shared/api/client.ts`。
 
 | 端点 | 用途 | 对应后端模块 |
 |------|------|-------------|
 | `/api/v1/auth/*` | 认证相关 | `auth` |
 | `/api/v1/{{RESOURCE}}/*` | {{PURPOSE}} | `{{MODULE}}` |
+
+### API 客户端配置
+
+```typescript
+// src/shared/api/client.ts 或 src/lib/api/client.ts
+// {{API_CLIENT_DESCRIPTION}}
+```
 
 ---
 
@@ -90,13 +97,13 @@
 
 ## 导入路径配置
 
-> 路径别名和导入规范详见 [rules/architecture.md](rules/architecture.md) §3 和 [rules/code-style.md](rules/code-style.md) §3
+> 路径别名和导入规范详见 [../.claude/rules/architecture.md](../.claude/rules/architecture.md) §3 和 [../.claude/rules/code-style.md](../.claude/rules/code-style.md) §3
 
 ---
 
 ## 架构合规规则
 
-> **详细规则**: 见 [rules/architecture.md](rules/architecture.md) §0.1 依赖合法性速查矩阵
+> **详细规则**: 见 [../.claude/rules/architecture.md](../.claude/rules/architecture.md) §0.1 依赖合法性速查矩阵
 
 <!-- 项目特定的架构例外规则可在此处添加 -->
 
