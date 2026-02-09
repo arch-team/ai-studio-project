@@ -935,23 +935,52 @@ frontend/
 └── playwright.config.ts                  # Playwright 配置
 
 infrastructure/                     # 基础设施即代码 (IaC)
-├── cdk/                            # AWS CDK (Python)
-│   ├── stacks/
-│   │   ├── hyperpod_stack.py       # HyperPod 集群 Stack
-│   │   ├── database_stack.py       # Aurora MySQL Stack
-│   │   ├── storage_stack.py        # FSx/S3 Stack
-│   │   └── network_stack.py        # VPC/PrivateLink Stack
+├── cdk/                            # AWS CDK (Python) - 5 层 Stack 分层架构
 │   ├── app.py                      # CDK 应用入口
-│   ├── cdk.json                    # CDK 配置文件
-│   └── requirements.txt            # Python 依赖
+│   ├── stacks/
+│   │   ├── foundation/             # L1: VPC, IAM
+│   │   │   ├── network_stack.py
+│   │   │   └── iam_stack.py
+│   │   ├── data/                   # L2: Aurora MySQL
+│   │   │   └── database_stack.py
+│   │   ├── compute/                # L3: EKS, HyperPod, Add-ons
+│   │   │   ├── eks_stack.py
+│   │   │   ├── sagemaker_hyperpod_stack.py
+│   │   │   └── hyperpod_addons_stack.py
+│   │   ├── storage/                # L4: S3 Buckets, FSx Lustre
+│   │   │   ├── storage_stack.py
+│   │   │   └── fsx_stack.py
+│   │   ├── networking/             # L5: ALB
+│   │   │   └── alb_stack.py
+│   │   ├── observability/          # Observability: AMP + HyperPod Add-on
+│   │   │   └── observability_stack.py
+│   │   └── application/            # Application: ECR
+│   │       └── application_stack.py
+│   ├── cdk_constructs/             # 可复用 L3 Construct
+│   │   ├── gpu_node_group.py
+│   │   └── kms_key.py
+│   ├── config/                     # 环境配置
+│   │   ├── constants.py
+│   │   └── environments.py
+│   ├── utils/                      # 无状态工具函数
+│   └── tests/                      # 单元 + 集成 + Snapshot 测试
+│
+├── k8s/                            # Kubernetes 清单 (Kustomize 管理)
+│   ├── base/                       # 基础配置 (RBAC/PSA/StorageClass)
+│   ├── overlays/{dev,staging,prod}/ # 环境覆盖层
+│   ├── hyperpod-addons/            # HyperPod 附加组件
+│   │   ├── training/               # Kueue + Training Operator 配置
+│   │   ├── ops/                    # 监控 (Prometheus/Grafana)
+│   │   └── spaces/                 # 开发空间
+│   ├── network-policies/           # 网络策略
+│   ├── rbac/                       # RBAC ClusterRole 定义
+│   ├── security/                   # Pod Security Admission
+│   ├── storage/                    # FSx StorageClass
+│   └── scripts/                    # 部署脚本
 │
 └── gitops/                         # GitOps 配置 (ArgoCD)
-    ├── apps/                       # 应用部署配置
-    │   ├── backend.yaml
-    │   └── frontend.yaml
-    └── helm/                       # Helm Charts
-        ├── backend/
-        └── frontend/
+    ├── apps/
+    └── helm/
 ```
 
 **Structure Decision**:
