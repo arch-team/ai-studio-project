@@ -10,7 +10,7 @@
 - [ ] 自定义 Construct 放在 `cdk_constructs/`
 - [ ] 新 Stack 已添加到 `CLAUDE.md` 的 Stack 分层表
 - [ ] 没有跨 Stack 的直接资源引用 (`Fn.import_value` 禁止)
-- [ ] Stack 依赖方向正确 (L5 → L4 → L3 → L2 → L1)
+- [ ] Stack 依赖方向正确 (L6 → L5 → L4 → L3 → L2 → L1)
 - [ ] 通过构造函数参数传递资源 (依赖注入)
 
 详见 [architecture.md](architecture.md)

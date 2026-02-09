@@ -40,38 +40,36 @@ cdk deploy NetworkStack --context env=dev
 
 ## 1. RemovalPolicy 策略
 
-> **SSOT**: 删除策略的单一真实源。`stack-design.md` 引用此处。
+> **SSOT**: 删除策略由 `ProtectionConfig` (config/environments.py) 统一管理。
 
-| 资源类型 | Dev | Staging | Prod |
-|---------|-----|---------|------|
-| 数据库 (Aurora) | DESTROY | SNAPSHOT | RETAIN |
-| S3 Bucket | DESTROY | DESTROY | RETAIN |
-| KMS Key | DESTROY | RETAIN | RETAIN |
-| EKS Cluster | DESTROY | DESTROY | RETAIN |
-| FSx for Lustre | DESTROY | DESTROY | SNAPSHOT |
-| CloudWatch Logs | DESTROY | DESTROY | RETAIN |
+| 配置 | Dev | Staging | Prod |
+|------|-----|---------|------|
+| RemovalPolicy | DESTROY | DESTROY | RETAIN |
+| Deletion Protection | 否 | 是 | 是 |
 
 ```python
-def get_removal_policy(env_name: str) -> cdk.RemovalPolicy:
-    if env_name == "dev":
-        return cdk.RemovalPolicy.DESTROY
-    elif env_name == "staging":
-        return cdk.RemovalPolicy.SNAPSHOT
-    return cdk.RemovalPolicy.RETAIN
+# config/environments.py - ProtectionConfig 工厂方法
+# Dev:     removal_policy=DESTROY, enable_deletion_protection=False
+# Staging: removal_policy=DESTROY, enable_deletion_protection=True
+# Prod:    removal_policy=RETAIN,  enable_deletion_protection=True
+
+# Stack 中使用:
+removal_policy=env_config.protection.removal_policy
 ```
 
 ---
 
 ## 2. 部署顺序
 
-### 标准部署 (L1 → L5)
+### 标准部署 (L1 → L6)
 
 ```
-L1: NetworkStack, IamStack           (并行，无依赖)
-L2: DatabaseStack, StorageStack      (并行，依赖 L1)
-L3: EksStack → SagemakerHyperPodStack → HyperPodAddonsStack (串行)
-L4: FsxLustreStack                   (依赖 L3 的 EKS 集群)
-L5: AlbStack                         (依赖 L3 的 EKS 集群)
+L1: NetworkStack, IamStack                                    (并行，无依赖)
+L2: DatabaseStack, StorageStack                               (并行，依赖 L1)
+L3: EksStack → SagemakerHyperPodStack → HyperPodAddonsStack   (串行)
+L4: ObservabilityStack, FsxLustreStack                        (并行，依赖 L3/L2)
+L5: AlbStack                                                  (依赖 L1/L3)
+L6: ApplicationStack                                          (独立)
 ```
 
 ### HyperPod 部署前置

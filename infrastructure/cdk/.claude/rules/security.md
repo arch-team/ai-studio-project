@@ -69,13 +69,13 @@ alb.add_redirect(source_port=80, target_port=443)  # HTTP→HTTPS
 ## CDK Nag
 
 ```python
-# app.py (staging/prod)
-if not env_config.protection.skip_cdk_nag:
-    cdk.Aspects.of(app).add(AwsSolutionsChecks(verbose=True))
+# app.py - 所有环境无条件启用
+cdk.Aspects.of(app).add(AwsSolutionsChecks(verbose=True))
+apply_nag_suppressions(app)  # 集中管理已知误报的 suppression
 ```
 
 ## 环境安全要求
 
 > 完整的环境差异矩阵见 [configuration.md](configuration.md)
 
-**安全相关要点**: CDK Nag staging/prod 必须启用 | WAF prod 必须 | 删除保护 staging/prod 启用
+**安全相关要点**: CDK Nag 所有环境无条件启用 | WAF prod 必须 | 删除保护 staging/prod 启用

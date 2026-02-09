@@ -1,26 +1,16 @@
 """
 AWS CDK Stacks for AI Training Platform.
 
-This module exports all infrastructure stacks following a layered architecture:
-- Layer 1 (Foundation): VPC, IAM base roles
-- Layer 2 (Data): Aurora MySQL
-- Layer 3a (Compute Foundation): EKS cluster with add-ons + HyperPod Helm Chart
-- Layer 3b (Compute): SageMaker HyperPod cluster
-- Layer 3c (HyperPod Add-ons): Training Operator, Task Governance (Kueue), PriorityClass
-- Layer 4a (Storage): S3 buckets
-- Layer 4b (Storage): FSx for Lustre
-- Layer 5 (Network): ALB Ingress, TLS termination
+This module exports all infrastructure stacks following a 6-layer architecture:
+- L1 (Foundation): NetworkStack, IamStack
+- L2 (Data/Storage): DatabaseStack, StorageStack
+- L3 (Compute): EksStack → SagemakerHyperPodStack → HyperPodAddonsStack
+- L4 (Observability/Storage): ObservabilityStack, FsxLustreStack
+- L5 (Network Ingress): AlbStack
+- L6 (Application): ApplicationStack
 
 Stack dependencies are explicitly managed through CDK's addDependency mechanism.
-
-Deployment Order:
-1. NetworkStack, IamStack (parallel)
-2. DatabaseStack, StorageStack (parallel)
-3. EksStack (includes automatic Helm Chart installation)
-4. SagemakerHyperPodStack
-5. HyperPodAddonsStack (Training Operator, Task Governance, PriorityClass)
-6. FsxLustreStack
-7. AlbStack
+Layer numbering follows app.py as the single source of truth (SSOT).
 """
 
 # Application

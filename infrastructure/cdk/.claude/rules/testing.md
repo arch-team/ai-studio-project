@@ -17,17 +17,45 @@ pytest --cov=stacks             # 覆盖率
 ## 核心 Fixtures (conftest.py)
 
 ```python
-@pytest.fixture
-def cdk_env() -> Environment:
-    return Environment(account="123456789012", region="us-west-2")
-
+# 环境配置
 @pytest.fixture
 def dev_config() -> EnvironmentConfig:
-    return EnvironmentConfig.for_dev("123456789012", "us-west-2")
+    return EnvironmentConfig.for_dev("123456789012", "us-east-1")
 
 @pytest.fixture
 def cdk_app() -> cdk.App:
     return cdk.App()
+
+@pytest.fixture
+def cdk_env() -> Environment:
+    return Environment(account="123456789012", region="us-east-1")
+```
+
+### 共用 Stack 依赖链 Fixtures
+
+需要 EKS 依赖的 Stack (如 HyperPodAddonsStack, ObservabilityStack) 可复用:
+
+```python
+@pytest.fixture
+def network_stack(cdk_app, dev_config, cdk_env) -> NetworkStack:
+    return NetworkStack(cdk_app, "Network", env_config=dev_config, env=cdk_env)
+
+@pytest.fixture
+def eks_stack(cdk_app, dev_config, cdk_env, network_stack, iam_stack) -> EksStack:
+    stack = EksStack(cdk_app, "Eks", env_config=dev_config,
+                     vpc=network_stack.vpc, eks_node_role=iam_stack.eks_node_role, env=cdk_env)
+    return stack
+```
+
+### 轻量级 Fixtures
+
+不需要完整 Stack 依赖链时，使用轻量级 fixture:
+
+```python
+@pytest.fixture
+def lightweight_eks_cluster(cdk_app, dev_config, cdk_env) -> eks.Cluster:
+    """不经过 EksStack，直接创建简化的 EKS 集群。"""
+    # 详见 tests/conftest.py
 ```
 
 ## Stack 测试模板
@@ -46,6 +74,17 @@ class TestNetworkStack:
     def test_vpc_cidr(self, template):
         template.has_resource_properties("AWS::EC2::VPC", {"CidrBlock": "10.0.0.0/16"})
 ```
+
+## Snapshot 测试
+
+> 适用于验证 Stack 输出的 CloudFormation 模板没有意外变更。
+
+```python
+def test_network_stack_snapshot(self, template, snapshot):
+    assert template.to_json() == snapshot
+```
+
+**注意**: Snapshot 仅用于回归检测，不替代细粒度断言。首次运行用 `--snapshot-update` 生成基准。
 
 ## 常用断言
 

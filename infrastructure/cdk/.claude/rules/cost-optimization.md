@@ -19,10 +19,10 @@ paths:
 | 资源 | Dev | Staging | Prod |
 |------|-----|---------|------|
 | NAT Gateway | 1 | 2 | 2 (每 AZ) |
-| Aurora | db.t3.medium, 单 AZ | db.r6g.large, 多 AZ | db.r6g.xlarge, 多 AZ |
+| Aurora | Serverless v2 ACU 0.5-8 | Serverless v2 ACU 1-16 | Serverless v2 ACU 2-16 |
 | EKS 系统节点 | t3.medium | t3.large | t3.xlarge |
 | GPU 节点 | 1 x p4d.24xlarge | 2 x p4d.24xlarge | 4 x p5.48xlarge |
-| FSx Lustre | 1.2 TiB | 2.4 TiB | 4.8+ TiB |
+| FSx Lustre | 10 TiB | 20 TiB | 100 TiB |
 
 ### GPU 实例成本参考
 

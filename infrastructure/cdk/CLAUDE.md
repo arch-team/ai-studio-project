@@ -14,6 +14,11 @@ ruff check . && ruff format .   # Lint + Format
 mypy .                          # 类型检查
 pytest -m unit                  # 单元测试
 
+# Makefile 复合命令
+make lint                       # ruff check + format + mypy
+make test                       # pytest -m unit
+make check                      # lint + test 一键验证
+
 # CDK 操作
 cdk synth                       # 合成模板
 cdk diff --context env=dev      # 查看变更
@@ -34,8 +39,8 @@ cdk deploy --context env=dev    # 部署
 | construct-design | 编辑 `cdk_constructs/**/*.py` |
 | configuration | 编辑 `config/**/*.py` |
 | testing | 编辑 `tests/**/*.py` |
-| security | 编辑安全相关代码 |
-| hyperpod | 编辑 HyperPod 相关代码 |
+| security | 编辑 `stacks/**/*.py`, `utils/nag_suppressions.py`, `utils/iam_helpers.py` |
+| hyperpod | 编辑 `stacks/compute/sagemaker_hyperpod_stack.py`, `stacks/compute/hyperpod_addons_stack.py` |
 | deployment | 编辑 `app.py`, `cdk.json` |
 | cost-optimization | 编辑 `stacks/**/*.py`, `config/environments.py` |
 
@@ -45,3 +50,4 @@ cdk deploy --context env=dev    # 部署
 |------|------|
 | [checklist.md](.claude/rules/checklist.md) | PR Review 检查清单 (SSOT) |
 | [tech-stack.md](.claude/rules/tech-stack.md) | 技术栈版本要求 (SSOT) |
+| [project-config.md](.claude/project-config.md) | 项目信息、Construct 列表 |

@@ -10,7 +10,7 @@
 |--------|-----|
 | **项目名称** | ai-training-platform-cdk |
 | **项目描述** | 基于 SageMaker HyperPod 的企业级训练平台基础设施 |
-| **架构模式** | CDK Stack 5 层分层 (L1 → L5) |
+| **架构模式** | CDK Stack 6 层分层 (L1 → L6) |
 | **命名前缀** | `ai-platform` |
 | **Stack 命名** | `AiPlatform{Resource}Stack-{env}` |
 | **资源命名** | `ai-platform-{env}-{resource}` (kebab-case) |
@@ -24,6 +24,7 @@
 | Construct | 职责 | 组合资源 |
 |-----------|------|---------|
 | `GpuNodeGroupConstruct` | GPU 节点组 | EKS Nodegroup, Launch Template |
+| `PlatformKmsKey` | 平台级 KMS 加密密钥 | KMS Key, Alias |
 | `StandardTaggingAspect` | 标准化标签 | Tags Aspect |
 
 ---

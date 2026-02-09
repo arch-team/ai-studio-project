@@ -2,12 +2,15 @@
 
 ## Stack 依赖规则
 
+> **SSOT**: 层级编号以 `app.py` 为准。
+
 ```
-L1: NetworkStack, IamStack (并行)
-L2: DatabaseStack, StorageStack (并行)
-L3: EksStack → SagemakerHyperPodStack → HyperPodAddonsStack
-L4: FsxLustreStack
-L5: AlbStack
+L1: NetworkStack, IamStack                                    (并行)
+L2: DatabaseStack, StorageStack                               (并行，依赖 L1)
+L3: EksStack → SagemakerHyperPodStack → HyperPodAddonsStack   (串行，依赖 L1)
+L4: ObservabilityStack, FsxLustreStack                        (并行，依赖 L3/L2)
+L5: AlbStack                                                  (依赖 L1/L3)
+L6: ApplicationStack                                          (独立)
 ```
 
 **强制规则**:
@@ -29,11 +32,14 @@ vpc_id = Fn.import_value("NetworkStack-VpcId")
 | 目录 | 职责 | 禁止 |
 |------|------|------|
 | `config/` | 纯配置数据类 | 创建 AWS 资源 |
+| `aspects/` | CDK Aspects (标签等横切关注点) | 创建 Stack |
 | `stacks/foundation/` | L1 基础层 (VPC, IAM) | 依赖上层 Stack |
 | `stacks/data/` | L2 数据层 (Aurora MySQL) | 存储相关资源 |
 | `stacks/compute/` | L3 计算层 (EKS, HyperPod) | 业务逻辑 |
-| `stacks/storage/` | L4 存储层 (S3, FSx Lustre) | 无 |
+| `stacks/storage/` | L2/L4 存储层 (S3, FSx Lustre) | 无 |
+| `stacks/observability/` | L4 可观测性层 (AMP, Observability Add-on) | 无 |
 | `stacks/networking/` | L5 网络接入层 (ALB) | 无 |
+| `stacks/application/` | L6 应用层 (ECR) | 无 |
 | `cdk_constructs/` | 可复用 Construct | 依赖特定 Stack |
 | `utils/` | 无状态工具函数 | 持有状态 |
 

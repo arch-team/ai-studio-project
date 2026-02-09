@@ -68,7 +68,7 @@ cdk deploy --context env=dev
 | 配置 | Dev | Staging | Prod |
 |------|-----|---------|------|
 | NAT | 1 | 2 | 2 |
-| 多 AZ | ❌ | ✅ | ✅ |
+| 部署模式 | MULTI_AZ | MULTI_AZ | HYBRID |
 | WAF | ❌ | ❌ | ✅ |
 | 删除保护 | ❌ | ✅ | ✅ |
-| CDK Nag | 跳过 | 启用 | 启用 |
+| CDK Nag | 启用 | 启用 | 启用 |
