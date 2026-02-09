@@ -125,6 +125,16 @@ STACK_SPECIFIC_SUPPRESSIONS = {
             "reason": "FSx security group allows VPC CIDR access for Lustre client connectivity",
         },
     ],
+    "observability": [
+        {
+            "id": "AwsSolutions-IAM4",
+            "reason": "AWS managed policies used for Prometheus remote write access",
+        },
+        {
+            "id": "AwsSolutions-IAM5",
+            "reason": "Wildcard permissions required for Prometheus and observability operations",
+        },
+    ],
     "alb": [
         {
             "id": "AwsSolutions-ELB2",

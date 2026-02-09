@@ -37,6 +37,9 @@ from .foundation.network_stack import NetworkStack
 # Layer 5: Networking
 from .networking.alb_stack import AlbStack
 
+# Observability
+from .observability.observability_stack import ObservabilityStack
+
 # Layer 4: Storage
 from .storage.fsx_stack import FsxLustreStack
 from .storage.storage_stack import StorageStack
@@ -50,5 +53,6 @@ __all__ = [
     "EksStack",
     "SagemakerHyperPodStack",
     "HyperPodAddonsStack",
+    "ObservabilityStack",
     "AlbStack",
 ]

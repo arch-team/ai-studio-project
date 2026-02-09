@@ -28,6 +28,7 @@ from stacks import (
     HyperPodAddonsStack,
     IamStack,
     NetworkStack,
+    ObservabilityStack,
     SagemakerHyperPodStack,
     StorageStack,
 )
@@ -200,6 +201,21 @@ def create_app() -> cdk.App:
     )
     hyperpod_addons_stack.add_dependency(eks_stack)
     hyperpod_addons_stack.add_dependency(sagemaker_hyperpod_stack)
+
+    # =========================================================================
+    # Layer 4: Observability (AMP + HyperPod Observability Add-on)
+    # =========================================================================
+
+    observability_stack = ObservabilityStack(
+        app,
+        f"{stack_prefix}-observability",
+        env_config=env_config,
+        eks_cluster=eks_stack.eks_cluster,
+        env=env_config.to_cdk_environment(),
+        description="Observability: Amazon Managed Prometheus + HyperPod Observability Add-on",
+    )
+    observability_stack.add_dependency(eks_stack)
+    observability_stack.add_dependency(hyperpod_addons_stack)
 
     # =========================================================================
     # Layer 4: High-Performance Storage (FSx for Lustre)

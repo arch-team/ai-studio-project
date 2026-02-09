@@ -98,11 +98,9 @@ class HyperPodAddonsStack(cdk.Stack):
         # Note: Task Governance automatically configures PriorityClass per spec.md FR-004
         self._task_governance_addon = self._install_task_governance()
 
-        # T008d-2: Install Observability add-on (Prometheus + Grafana)
-        # Note: Observability add-on was already installed and auto-creates its own Pod Identity
-        # Uncomment to manage via CDK after removing existing add-on:
-        # self._observability_addon = self._install_observability()
-        self._observability_addon = None  # Already installed externally
+        # T008d-2: Observability add-on 已迁移到独立的 ObservabilityStack
+        # 包含 AMP Workspace + HyperPod Observability Add-on + Pod Identity
+        self._observability_addon = None
 
         # Create outputs
         self._create_outputs()

@@ -179,6 +179,19 @@ class EksConfig:
 
 
 @dataclass(frozen=True)
+class ObservabilityConfig:
+    """可观测性配置.
+
+    Attributes:
+        enable_amp: 是否启用 Amazon Managed Prometheus
+        amp_retention_days: AMP 指标保留天数
+    """
+
+    enable_amp: bool = True
+    amp_retention_days: int = 150
+
+
+@dataclass(frozen=True)
 class ProtectionConfig:
     """Resource protection configuration for different environments.
 
@@ -235,6 +248,7 @@ class EnvironmentConfig:
     database: DatabaseConfig = field(default_factory=DatabaseConfig)
     storage: StorageConfig = field(default_factory=StorageConfig)
     eks: EksConfig = field(default_factory=EksConfig)
+    observability: ObservabilityConfig = field(default_factory=ObservabilityConfig)
     protection: ProtectionConfig = field(default_factory=ProtectionConfig)
 
     def to_cdk_environment(self) -> cdk.Environment:
