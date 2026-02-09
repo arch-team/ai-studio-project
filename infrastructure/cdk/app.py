@@ -217,10 +217,9 @@ def create_app() -> cdk.App:
     # CDK Nag - Security and best practices checks
     # =========================================================================
 
-    # Apply AWS Solutions security checks (skip for dev to allow faster iteration)
-    # CDK Nag warnings are informational for dev; production should address all warnings
-    if env_config.name.value != "dev":
-        cdk.Aspects.of(app).add(AwsSolutionsChecks(verbose=True))
+    # Apply AWS Solutions security checks for all environments
+    # CDK Nag ensures consistent security posture across dev/staging/prod
+    cdk.Aspects.of(app).add(AwsSolutionsChecks(verbose=True))
 
     # Apply all Nag suppressions (centrally managed in utils/nag_suppressions.py)
     apply_nag_suppressions(app)
