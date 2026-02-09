@@ -14,11 +14,13 @@ from aws_cdk.assertions import Template
 
 from config import get_environment_config
 from stacks import (
+    ApplicationStack,
     DatabaseStack,
     EksStack,
     FsxLustreStack,
     IamStack,
     NetworkStack,
+    ObservabilityStack,
     StorageStack,
 )
 
@@ -66,11 +68,17 @@ class TestFullSynthesis:
             app, "dev-storage", env_config=env_config, env=cdk_env
         )
 
+        # Application
+        application_stack = ApplicationStack(
+            app, "dev-application", env_config=env_config, env=cdk_env
+        )
+
         # Verify synthesis
         Template.from_stack(network_stack)
         Template.from_stack(iam_stack)
         Template.from_stack(database_stack)
         Template.from_stack(storage_stack)
+        Template.from_stack(application_stack)
 
     def test_staging_environment_synthesizes(
         self, test_account: str, test_region: str, cdk_env: cdk.Environment
@@ -332,3 +340,55 @@ class TestResourceCounts:
         template = Template.from_stack(database_stack)
 
         template.resource_count_is("AWS::RDS::DBCluster", 1)
+
+    def test_application_creates_one_ecr_repository(
+        self, test_account: str, test_region: str
+    ) -> None:
+        """Verify application stack creates exactly 1 ECR repository."""
+        app = cdk.App()
+        env_config = get_environment_config("dev", test_account, test_region)
+        cdk_env = cdk.Environment(account=test_account, region=test_region)
+
+        application_stack = ApplicationStack(
+            app, "app-count-application", env_config=env_config, env=cdk_env
+        )
+        template = Template.from_stack(application_stack)
+
+        template.resource_count_is("AWS::ECR::Repository", 1)
+
+    def test_observability_creates_amp_workspace(
+        self, test_account: str, test_region: str
+    ) -> None:
+        """Verify observability stack creates exactly 1 AMP workspace."""
+        from aws_cdk import aws_ec2 as ec2
+        from aws_cdk import aws_eks as eks
+        from aws_cdk.lambda_layer_kubectl_v33 import KubectlV33Layer
+
+        app = cdk.App()
+        env_config = get_environment_config("dev", test_account, test_region)
+        cdk_env = cdk.Environment(account=test_account, region=test_region)
+
+        # ObservabilityStack 需要 EKS cluster
+        vpc_stack = cdk.Stack(app, "obs-vpc-stack", env=cdk_env)
+        vpc = ec2.Vpc(vpc_stack, "Vpc", max_azs=2)
+        eks_stack = cdk.Stack(app, "obs-eks-stack", env=cdk_env)
+        cluster = eks.Cluster(
+            eks_stack,
+            "Cluster",
+            cluster_name="test-cluster",
+            version=eks.KubernetesVersion.of("1.33"),
+            vpc=vpc,
+            default_capacity=0,
+            kubectl_layer=KubectlV33Layer(eks_stack, "KubectlLayer"),
+        )
+
+        observability_stack = ObservabilityStack(
+            app,
+            "obs-count-observability",
+            env_config=env_config,
+            eks_cluster=cluster,
+            env=cdk_env,
+        )
+        template = Template.from_stack(observability_stack)
+
+        template.resource_count_is("AWS::APS::Workspace", 1)
