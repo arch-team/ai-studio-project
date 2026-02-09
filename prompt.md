@@ -201,7 +201,7 @@ code-simplifier:code-simplifier。
 
 
 
-使用code-simplifier:code-simplifier插件帮我优化当前项目中的代码，这个项目(backend)是使用python开发的企业训练平台后端项目
+使用code-simplifier:code-simplifier帮我优化当前项目中的代码，这个项目(backend)是使用python开发的企业训练平台后端项目
 
 
 
@@ -466,3 +466,28 @@ Pydantic V2
 rules/tech-stack.md 
 rules/project-structure.md 
 project-config.md 
+
+
+
+
+
+请帮我分析一下是否可以将/Users/jinhuasu/Project_Workspace/Anker-Projects/ml-platform-research/llm-platform-solution/ai-agents-platform/infra 这项目下的Claude Code上下文管理的规范应用于/Users/jinhuasu/Project_Workspace/Anker-Projects/ml-platform-research/llm-platform-solution/ai-studio-project/infrastructure这个项目 
+
+
+
+分析这个基础设施即代码子项目infrastructure： /Users/jinhuasu/Project_Workspace/Anker-Projects/ml-platform-research/llm-platform-solution/ai-studio-project/infrastructure下的上下文管理的规范文件，
+结合Claude Code 上下文管理的最佳实践在不影响它的作用的情况下分析是否存在冗余信息，是否存在各个规范文件不满足单一职责原则、职责重叠的问题
+
+
+
+/Users/jinhuasu/Project_Workspace/Anker-Projects/ml-platform-research/llm-platform-solution/ai-studio-project/infrastructure是当前项目的基础设施即代码（IaC）的子项目，在重复了解当前ai-stuido-project（企业级 AI 训练平台 - 基于 AWS SageMaker HyperPod 构建）这个项目的背景和IaC最佳实践的基础上。
+对infrastructure的工程目录结构规划，架构设计提出改进方案与优化建议
+
+
+
+帮我分析一下将/Users/jinhuasu/Project_Workspace/Anker-Projects/ml-platform-research/llm-platform-solution/ai-agents-platform/.claude 下的Claude Code上下文管理的规范迁移到/Users/jinhuasu/Project_Workspace/Anker-Projects/hyperpod-issue-agents/.claude下，这个hyperpod-issue-agents项目 
+
+
+
+  对 AI Training Platform 的 infrastructure/ 子项目（AWS CDK + K8s Manifests）进行了 3 个阶段、17 项任务 的系统性改进，覆盖目录结构、架构设计、安全加固、功能补全和工程质量五个维度。
+  
