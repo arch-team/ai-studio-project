@@ -74,6 +74,40 @@ spec:
       operator: Equal
 
 ---
+# NVIDIA A100 GPU Spot Flavor (p4d.24xlarge)
+# 用于非关键训练任务和实验性工作负载，节省成本
+apiVersion: kueue.x-k8s.io/v1beta1
+kind: ResourceFlavor
+metadata:
+  name: nvidia-a100-40gb-spot
+  labels:
+    app.kubernetes.io/name: kueue
+    app.kubernetes.io/component: resource-flavor
+    platform.ai/gpu-type: a100
+    platform.ai/capacity-type: spot
+spec:
+  nodeLabels:
+    node.kubernetes.io/instance-type: p4d.24xlarge
+    nvidia.com/gpu.product: NVIDIA-A100-SXM4-40GB
+    eks.amazonaws.com/capacityType: SPOT
+  nodeTaints:
+    - key: nvidia.com/gpu
+      value: "true"
+      effect: NoSchedule
+    - key: eks.amazonaws.com/spot
+      value: "true"
+      effect: NoSchedule
+  tolerations:
+    - key: nvidia.com/gpu
+      value: "true"
+      effect: NoSchedule
+      operator: Equal
+    - key: eks.amazonaws.com/spot
+      value: "true"
+      effect: NoSchedule
+      operator: Equal
+
+---
 # CPU-only Flavor for preprocessing and auxiliary tasks
 apiVersion: kueue.x-k8s.io/v1beta1
 kind: ResourceFlavor

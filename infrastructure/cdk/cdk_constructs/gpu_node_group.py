@@ -33,6 +33,7 @@ class GpuNodeGroupConfig:
         max_size: Maximum number of nodes
         desired_size: Desired number of nodes
         disk_size: Root volume size in GB
+        capacity_type: 容量类型 (ON_DEMAND 或 SPOT)
         labels: Kubernetes labels for the nodes (immutable mapping)
         taints: Kubernetes taints for the nodes (immutable tuple)
     """
@@ -43,6 +44,7 @@ class GpuNodeGroupConfig:
     max_size: int = 10
     desired_size: int = 0
     disk_size: int = 500
+    capacity_type: str = "ON_DEMAND"
     labels: dict[str, str] = field(default_factory=dict)
     taints: tuple[dict[str, str], ...] = ()
 
@@ -229,7 +231,7 @@ class GpuNodeGroupConstruct(Construct):
             # Instance configuration
             instance_types=list(config.instance_types),
             ami_type="AL2_x86_64_GPU",  # GPU-optimized Amazon Linux 2
-            capacity_type="ON_DEMAND",  # GPU instances are typically on-demand
+            capacity_type=config.capacity_type,
             # Launch template for custom configuration
             launch_template=eks.CfnNodegroup.LaunchTemplateSpecificationProperty(
                 id=self._launch_template.launch_template_id,
