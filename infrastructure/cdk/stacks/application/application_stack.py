@@ -71,15 +71,16 @@ class ApplicationStack(cdk.Stack):
             encryption=ecr.RepositoryEncryption.AES_256,
             lifecycle_rules=[
                 ecr.LifecycleRule(
-                    description="保留最近 30 个镜像",
-                    max_image_count=30,
-                    rule_priority=1,
-                ),
-                ecr.LifecycleRule(
                     description="删除 90 天前的未标记镜像",
                     max_image_age=cdk.Duration.days(90),
                     tag_status=ecr.TagStatus.UNTAGGED,
-                    rule_priority=2,
+                    rule_priority=1,
+                ),
+                ecr.LifecycleRule(
+                    description="保留最近 30 个镜像",
+                    max_image_count=30,
+                    tag_status=ecr.TagStatus.ANY,
+                    rule_priority=10,
                 ),
             ],
         )

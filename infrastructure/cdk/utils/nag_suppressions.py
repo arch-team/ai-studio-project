@@ -125,6 +125,30 @@ STACK_SPECIFIC_SUPPRESSIONS = {
             "reason": "FSx security group allows VPC CIDR access for Lustre client connectivity",
         },
     ],
+    "hyperpod-addons": [
+        {
+            "id": "AwsSolutions-IAM4",
+            "reason": "AWS managed policies used for HyperPod Training Operator Pod Identity",
+        },
+        {
+            "id": "AwsSolutions-IAM5",
+            "reason": "Wildcard permissions required for HyperPod add-on operations",
+        },
+    ],
+    "application": [
+        {
+            "id": "AwsSolutions-IAM5",
+            "reason": "Wildcard permissions required for ECR auto-delete custom resource",
+        },
+        {
+            "id": "AwsSolutions-IAM4",
+            "reason": "AWS managed policies used for ECR custom resource Lambda",
+        },
+        {
+            "id": "AwsSolutions-L1",
+            "reason": "Lambda runtime version is managed by CDK construct library for ECR auto-delete",
+        },
+    ],
     "observability": [
         {
             "id": "AwsSolutions-IAM4",
@@ -170,19 +194,20 @@ def apply_nag_suppressions(app: "cdk.App") -> None:
             continue
 
         stack = node
+        stack_id = stack.node.id.lower()
 
         # 从 Stack ID 中提取 Stack 类型
+        # 格式: "ai-platform-{env}-{stack_type}"
         # 例如: "ai-platform-dev-network" -> "network"
-        stack_id_parts = stack.node.id.split("-")
-        if len(stack_id_parts) < 3:
-            continue
-
-        stack_type = stack_id_parts[-1].lower()
-
-        # 如果有该 Stack 类型的特定抑制规则，则应用
-        if stack_type in STACK_SPECIFIC_SUPPRESSIONS:
-            suppressions = STACK_SPECIFIC_SUPPRESSIONS[stack_type]
-            NagSuppressions.add_stack_suppressions(stack, suppressions)
+        #       "ai-platform-dev-sagemaker-hyperpod" -> "sagemaker-hyperpod"
+        #       "ai-platform-dev-hyperpod-addons" -> "hyperpod-addons"
+        # 方法: 匹配 STACK_SPECIFIC_SUPPRESSIONS 中所有 key，找到 stack_id 以之结尾的
+        for stack_type, suppressions in STACK_SPECIFIC_SUPPRESSIONS.items():
+            if stack_id.endswith(f"-{stack_type}"):
+                NagSuppressions.add_stack_suppressions(
+                    stack, suppressions, apply_to_nested_stacks=True
+                )
+                break
 
 
 def apply_resource_suppression(
