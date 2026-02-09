@@ -14,8 +14,6 @@ Prerequisites:
 Reference: https://docs.aws.amazon.com/sagemaker/latest/dg/sagemaker-hyperpod-eks-install-packages-using-helm-chart.html
 """
 
-from pathlib import Path
-
 import aws_cdk as cdk
 from aws_cdk import aws_ec2 as ec2
 from aws_cdk import aws_eks as eks
@@ -25,19 +23,13 @@ from aws_cdk.lambda_layer_kubectl_v33 import KubectlV33Layer
 
 from cdk_constructs.gpu_node_group import create_default_gpu_node_groups
 from config import EnvironmentConfig
-from config.constants import EKS_ADDON_NAMES
+from config.constants import EKS_ADDON_NAMES, ProjectPaths
 from constructs import Construct
 from utils.iam_helpers import create_irsa_role
 from utils.outputs import create_output
 
-# Path to the HyperPod Helm Chart (relative to this file)
-# File location: stacks/compute/eks_stack.py -> resources/helm_charts/
-HELM_CHART_PATH = (
-    Path(__file__).parent.parent.parent
-    / "resources"
-    / "helm_charts"
-    / "HyperPodHelmChart"
-)
+# Path to the HyperPod Helm Chart (centralized in ProjectPaths)
+HELM_CHART_PATH = ProjectPaths.HYPERPOD_HELM_CHART
 
 
 class EksStack(cdk.Stack):

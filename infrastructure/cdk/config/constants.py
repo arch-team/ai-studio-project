@@ -6,6 +6,8 @@ to improve maintainability and reduce duplication.
 """
 
 from dataclasses import dataclass
+from pathlib import Path
+from typing import ClassVar
 
 
 @dataclass(frozen=True)
@@ -129,6 +131,21 @@ class TagKeys:
     # Kubernetes tags
     K8S_CLUSTER_TYPE: str = "kubernetes.io/cluster-type"
     K8S_CLUSTER_AUTOSCALER: str = "k8s.io/cluster-autoscaler/enabled"
+
+
+@dataclass(frozen=True)
+class ProjectPaths:
+    """项目路径常量.
+
+    集中管理所有硬编码路径，避免各模块使用 Path(__file__) 计算相对路径。
+    """
+
+    CDK_ROOT: ClassVar[Path] = Path(__file__).parent.parent
+    RESOURCES_DIR: ClassVar[Path] = CDK_ROOT / "resources"
+    HELM_CHARTS_DIR: ClassVar[Path] = RESOURCES_DIR / "helm_charts"
+    HYPERPOD_HELM_CHART: ClassVar[Path] = HELM_CHARTS_DIR / "HyperPodHelmChart"
+    SCRIPTS_DIR: ClassVar[Path] = RESOURCES_DIR / "scripts"
+    ASSETS_DIR: ClassVar[Path] = CDK_ROOT / "assets"
 
 
 # Singleton instances for easy access
