@@ -74,11 +74,8 @@ if not env_config.protection.skip_cdk_nag:
     cdk.Aspects.of(app).add(AwsSolutionsChecks(verbose=True))
 ```
 
-## 环境要求
+## 环境安全要求
 
-| 检查项 | Dev | Staging | Prod |
-|--------|-----|---------|------|
-| CDK Nag | 跳过 | 必须 | 必须 |
-| WAF | ❌ | 推荐 | 必须 |
-| 删除保护 | ❌ | ✅ | ✅ |
-| 多 AZ | ❌ | ✅ | ✅ |
+> 完整的环境差异矩阵见 [configuration.md](configuration.md)
+
+**安全相关要点**: CDK Nag staging/prod 必须启用 | WAF prod 必须 | 删除保护 staging/prod 启用

@@ -44,10 +44,7 @@ def __init__(self, ..., vpc: ec2.IVpc, kms_key: kms.IKey | None = None):
 
 ## 删除策略
 
-| 资源 | Dev | Staging/Prod |
-|------|-----|--------------|
-| 数据库/S3/KMS | DESTROY | RETAIN |
-| EKS/FSx | DESTROY | SNAPSHOT |
+> 完整的 RemovalPolicy 策略矩阵见 [deployment.md §1](deployment.md)（单一真实源）
 
 ## 条件创建
 
