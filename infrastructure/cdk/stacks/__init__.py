@@ -25,6 +25,8 @@ Deployment Order:
 
 # Layer 1: Foundation
 # Layer 3: Compute
+# Application
+from .application.application_stack import ApplicationStack
 from .compute.eks_stack import EksStack
 from .compute.hyperpod_addons_stack import HyperPodAddonsStack
 from .compute.sagemaker_hyperpod_stack import SagemakerHyperPodStack
@@ -54,5 +56,6 @@ __all__ = [
     "SagemakerHyperPodStack",
     "HyperPodAddonsStack",
     "ObservabilityStack",
+    "ApplicationStack",
     "AlbStack",
 ]

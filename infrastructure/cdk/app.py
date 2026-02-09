@@ -22,6 +22,7 @@ from cdk_constructs.kms_key import KmsKeyConfig, PlatformKmsKey
 from config import get_environment_config
 from stacks import (
     AlbStack,
+    ApplicationStack,
     DatabaseStack,
     EksStack,
     FsxLustreStack,
@@ -258,6 +259,18 @@ def create_app() -> cdk.App:
     )
     alb_stack.add_dependency(network_stack)
     alb_stack.add_dependency(eks_stack)  # Target groups need EKS services
+
+    # =========================================================================
+    # Layer 6: Application (ECR, Service Discovery)
+    # =========================================================================
+
+    ApplicationStack(
+        app,
+        f"{stack_prefix}-application",
+        env_config=env_config,
+        env=env_config.to_cdk_environment(),
+        description="Application deployment: ECR repository for backend images",
+    )
 
     # =========================================================================
     # CDK Nag - Security and best practices checks
