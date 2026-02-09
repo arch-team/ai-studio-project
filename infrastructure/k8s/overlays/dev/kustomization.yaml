@@ -5,9 +5,7 @@ kind: Kustomization
 resources:
   - ../../base
 
-commonLabels:
-  environment: dev
-
-patches:
-  - path: patches/reduce-replicas.yaml
-  - path: patches/reduce-quotas.yaml
+labels:
+  - pairs:
+      environment: dev
+    includeSelectors: false

@@ -5,9 +5,7 @@ kind: Kustomization
 resources:
   - ../../base
 
-commonLabels:
-  environment: prod
-
-patches:
-  - path: patches/enable-ha.yaml
-  - path: patches/strict-policy.yaml
+labels:
+  - pairs:
+      environment: prod
+    includeSelectors: false

@@ -8,8 +8,6 @@ metadata:
   annotations:
     description: "HyperPod Operations Add-ons including Observability and Elastic Agent"
 
-namespace: hyperpod-monitoring
-
 resources:
   # Monitoring namespace and RBAC
   - monitoring-namespace.yaml
@@ -24,10 +22,8 @@ resources:
   # Alerting rules
   - alerting-rules.yaml
 
-commonLabels:
-  app.kubernetes.io/part-of: ai-training-platform
-  app.kubernetes.io/managed-by: kustomize
-
-commonAnnotations:
-  platform.ai/component: observability
-  platform.ai/version: "1.0.0"
+labels:
+  - pairs:
+      app.kubernetes.io/part-of: ai-training-platform
+      app.kubernetes.io/managed-by: kustomize
+    includeSelectors: false

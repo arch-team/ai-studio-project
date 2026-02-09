@@ -1,0 +1,49 @@
+# Pod Security Admission (PSA) Namespace 标签配置
+# 为各命名空间设置 Pod Security Standards (PSS) enforce 级别
+# 参考: https://kubernetes.io/docs/concepts/security/pod-security-standards/
+---
+# 训练任务命名空间 - baseline 级别 (允许 GPU 设备插件等特权操作)
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: training-jobs
+  labels:
+    app.kubernetes.io/part-of: ai-training-platform
+    # PSA enforce: baseline (允许训练任务所需的设备访问)
+    pod-security.kubernetes.io/enforce: baseline
+    pod-security.kubernetes.io/enforce-version: latest
+    # PSA warn: restricted (提醒潜在安全改进)
+    pod-security.kubernetes.io/warn: restricted
+    pod-security.kubernetes.io/warn-version: latest
+---
+# 监控命名空间 - baseline 级别
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: monitoring
+  labels:
+    app.kubernetes.io/part-of: ai-training-platform
+    pod-security.kubernetes.io/enforce: baseline
+    pod-security.kubernetes.io/enforce-version: latest
+    pod-security.kubernetes.io/warn: restricted
+    pod-security.kubernetes.io/warn-version: latest
+---
+# 开发空间命名空间 - restricted 级别 (最严格)
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: dev-spaces
+  labels:
+    app.kubernetes.io/part-of: ai-training-platform
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/enforce-version: latest
+---
+# HyperPod 系统命名空间 - privileged 级别 (系统组件需要完全权限)
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: aws-hyperpod
+  labels:
+    app.kubernetes.io/part-of: ai-training-platform
+    pod-security.kubernetes.io/enforce: privileged
+    pod-security.kubernetes.io/enforce-version: latest

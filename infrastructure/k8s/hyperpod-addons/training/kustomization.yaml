@@ -8,9 +8,6 @@ metadata:
   annotations:
     description: "HyperPod Training Add-ons including Training Operator and Kueue"
 
-# Namespace for training components
-namespace: hyperpod-system
-
 resources:
   # Kueue configuration
   - kueue-config.yaml
@@ -23,11 +20,8 @@ resources:
   # Local Queues for namespace-level scheduling
   - local-queues.yaml
 
-commonLabels:
-  app.kubernetes.io/part-of: ai-training-platform
-  app.kubernetes.io/managed-by: kustomize
-
-# Common annotations
-commonAnnotations:
-  platform.ai/component: training
-  platform.ai/version: "1.0.0"
+labels:
+  - pairs:
+      app.kubernetes.io/part-of: ai-training-platform
+      app.kubernetes.io/managed-by: kustomize
+    includeSelectors: false

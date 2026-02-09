@@ -20,11 +20,9 @@ resources:
   # QoS and bandwidth configuration
   - qos-config.yaml
 
-commonLabels:
-  app.kubernetes.io/part-of: ai-training-platform
-  app.kubernetes.io/managed-by: kustomize
-  platform.ai/component: network-policies
-
-commonAnnotations:
-  platform.ai/version: "1.0.0"
-  platform.ai/compliance: "FR-021"
+labels:
+  - pairs:
+      app.kubernetes.io/part-of: ai-training-platform
+      app.kubernetes.io/managed-by: kustomize
+      platform.ai/component: network-policies
+    includeSelectors: false

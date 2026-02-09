@@ -1,0 +1,105 @@
+# FSx for Lustre StorageClass for Training Data
+# This StorageClass enables dynamic provisioning of FSx volumes via the FSx CSI Driver
+---
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: fsx-lustre-training-data
+  labels:
+    app.kubernetes.io/name: fsx-storage
+    app.kubernetes.io/component: storage
+    platform.ai/storage-type: fsx-lustre
+    platform.ai/purpose: training-data
+  annotations:
+    description: "FSx for Lustre storage for high-performance training data"
+    storageclass.kubernetes.io/is-default-class: "false"
+provisioner: fsx.csi.aws.com
+parameters:
+  # Subnet ID where FSx file system will be created (injected from CDK)
+  subnetId: "${FSX_SUBNET_ID}"
+  # Security group for FSx access (injected from CDK)
+  securityGroupIds: "${FSX_SECURITY_GROUP_ID}"
+  # Deployment type for persistent storage
+  deploymentType: "PERSISTENT_2"
+  # Throughput per TiB (125, 250, 500, 1000)
+  perUnitStorageThroughput: "${FSX_THROUGHPUT_PER_TIB}"
+  # Storage type (SSD for high performance)
+  storageType: "SSD"
+  # Data compression for cost optimization
+  dataCompressionType: "LZ4"
+reclaimPolicy: Retain
+volumeBindingMode: Immediate
+allowVolumeExpansion: true
+
+---
+# Static PersistentVolume for existing FSx file system
+# This PV is used when connecting to a pre-created FSx file system from CDK
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: fsx-lustre-training-pv
+  labels:
+    app.kubernetes.io/name: fsx-storage
+    platform.ai/storage-type: fsx-lustre
+    platform.ai/purpose: training-data
+spec:
+  capacity:
+    # Capacity is managed by FSx, this is informational only
+    storage: 10Ti
+  volumeMode: Filesystem
+  accessModes:
+    - ReadWriteMany
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: fsx-lustre-training-data
+  csi:
+    driver: fsx.csi.aws.com
+    # FSx file system DNS name (injected from CDK)
+    volumeHandle: "${FSX_FILE_SYSTEM_ID}"
+    volumeAttributes:
+      dnsname: "${FSX_DNS_NAME}"
+      mountname: "${FSX_MOUNT_NAME}"
+
+---
+# PersistentVolumeClaim for training workloads
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: fsx-training-data
+  namespace: training-jobs
+  labels:
+    app.kubernetes.io/name: fsx-storage
+    platform.ai/storage-purpose: training-data
+spec:
+  accessModes:
+    - ReadWriteMany
+  storageClassName: fsx-lustre-training-data
+  volumeName: fsx-lustre-training-pv
+  resources:
+    requests:
+      # Request is informational; actual capacity from FSx
+      storage: 10Ti
+
+---
+# ConfigMap for FSx mount configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: fsx-mount-config
+  namespace: training-jobs
+  labels:
+    app.kubernetes.io/name: fsx-config
+data:
+  # Mount path for training data within pods
+  mount-path: "/fsx"
+  # S3 data repository path (datasets)
+  datasets-path: "/fsx/datasets"
+  # Checkpoints path
+  checkpoints-path: "/fsx/checkpoints"
+  # Mount options for optimal performance
+  mount-options: "noatime,flock"
+  # Lustre client tuning parameters
+  lustre-tuning: |
+    # Increase Lustre stripe count for large files
+    lfs setstripe -c -1 /fsx/datasets
+    # Set stripe size for optimal I/O
+    lfs setstripe -S 4M /fsx/checkpoints
