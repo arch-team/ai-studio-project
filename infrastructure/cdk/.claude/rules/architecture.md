@@ -29,7 +29,11 @@ vpc_id = Fn.import_value("NetworkStack-VpcId")
 | 目录 | 职责 | 禁止 |
 |------|------|------|
 | `config/` | 纯配置数据类 | 创建 AWS 资源 |
-| `stacks/` | Stack 实现 | 业务逻辑 |
+| `stacks/foundation/` | L1 基础层 (VPC, IAM) | 依赖上层 Stack |
+| `stacks/data/` | L2 数据层 (Aurora MySQL) | 存储相关资源 |
+| `stacks/compute/` | L3 计算层 (EKS, HyperPod) | 业务逻辑 |
+| `stacks/storage/` | L4 存储层 (S3, FSx Lustre) | 无 |
+| `stacks/networking/` | L5 网络接入层 (ALB) | 无 |
 | `cdk_constructs/` | 可复用 Construct | 依赖特定 Stack |
 | `utils/` | 无状态工具函数 | 持有状态 |
 

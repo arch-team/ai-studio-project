@@ -51,7 +51,9 @@ class TestGpuNodeGroupConfig:
             desired_size=5,
             disk_size=1000,
             labels={"gpu-type": "h100"},
-            taints=({"key": "nvidia.com/gpu", "value": "true", "effect": "NO_SCHEDULE"},),
+            taints=(
+                {"key": "nvidia.com/gpu", "value": "true", "effect": "NO_SCHEDULE"},
+            ),
         )
         assert config.name == "custom-gpu"
         assert config.min_size == 1
@@ -75,9 +77,7 @@ class TestGpuNodeGroupConstruct:
     """Tests for GpuNodeGroupConstruct."""
 
     @pytest.fixture
-    def stack(
-        self, cdk_app: cdk.App, cdk_env: cdk.Environment
-    ) -> cdk.Stack:
+    def stack(self, cdk_app: cdk.App, cdk_env: cdk.Environment) -> cdk.Stack:
         """创建测试 Stack."""
         return cdk.Stack(cdk_app, "TestStack", env=cdk_env)
 
@@ -316,9 +316,7 @@ class TestCreateDefaultGpuNodeGroups:
     """Tests for create_default_gpu_node_groups factory function."""
 
     @pytest.fixture
-    def stack(
-        self, cdk_app: cdk.App, cdk_env: cdk.Environment
-    ) -> cdk.Stack:
+    def stack(self, cdk_app: cdk.App, cdk_env: cdk.Environment) -> cdk.Stack:
         """创建测试 Stack."""
         return cdk.Stack(cdk_app, "TestStack", env=cdk_env)
 

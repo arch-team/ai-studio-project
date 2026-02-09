@@ -30,9 +30,7 @@ class TestCreateTaggedRole:
     """Tests for create_tagged_role function."""
 
     @pytest.fixture
-    def stack(
-        self, cdk_app: cdk.App, cdk_env: cdk.Environment
-    ) -> cdk.Stack:
+    def stack(self, cdk_app: cdk.App, cdk_env: cdk.Environment) -> cdk.Stack:
         """创建测试 Stack."""
         return cdk.Stack(cdk_app, "TestStack", env=cdk_env)
 
@@ -108,7 +106,9 @@ class TestCreateTaggedRole:
             {
                 "Tags": Match.array_with(
                     [
-                        Match.object_like({"Key": "Name", "Value": "ai-platform-dev-test-role"}),
+                        Match.object_like(
+                            {"Key": "Name", "Value": "ai-platform-dev-test-role"}
+                        ),
                     ]
                 ),
             },
@@ -129,9 +129,7 @@ class TestCreatePodIdentityRole:
     """Tests for create_pod_identity_role function."""
 
     @pytest.fixture
-    def stack(
-        self, cdk_app: cdk.App, cdk_env: cdk.Environment
-    ) -> cdk.Stack:
+    def stack(self, cdk_app: cdk.App, cdk_env: cdk.Environment) -> cdk.Stack:
         """创建测试 Stack."""
         return cdk.Stack(cdk_app, "TestStack", env=cdk_env)
 
@@ -172,9 +170,7 @@ class TestCreateIrsaRole:
     """Tests for create_irsa_role function."""
 
     @pytest.fixture
-    def stack(
-        self, cdk_app: cdk.App, cdk_env: cdk.Environment
-    ) -> cdk.Stack:
+    def stack(self, cdk_app: cdk.App, cdk_env: cdk.Environment) -> cdk.Stack:
         """创建测试 Stack."""
         return cdk.Stack(cdk_app, "TestStack", env=cdk_env)
 
@@ -265,9 +261,7 @@ class TestCreateIrsaConditions:
     """Tests for create_irsa_conditions function."""
 
     @pytest.fixture
-    def stack(
-        self, cdk_app: cdk.App, cdk_env: cdk.Environment
-    ) -> cdk.Stack:
+    def stack(self, cdk_app: cdk.App, cdk_env: cdk.Environment) -> cdk.Stack:
         """创建测试 Stack."""
         return cdk.Stack(cdk_app, "TestStack", env=cdk_env)
 
@@ -287,9 +281,7 @@ class TestAddPolicyStatement:
     """Tests for add_policy_statement function."""
 
     @pytest.fixture
-    def stack(
-        self, cdk_app: cdk.App, cdk_env: cdk.Environment
-    ) -> cdk.Stack:
+    def stack(self, cdk_app: cdk.App, cdk_env: cdk.Environment) -> cdk.Stack:
         """创建测试 Stack."""
         return cdk.Stack(cdk_app, "TestStack", env=cdk_env)
 
