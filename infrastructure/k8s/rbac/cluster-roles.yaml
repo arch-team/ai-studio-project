@@ -1,0 +1,113 @@
+# ClusterRole 定义 - AI Training Platform 多租户 RBAC
+# 参考: spec.md FR-002 (多租户隔离), FR-003 (RBAC 权限模型)
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: platform-admin
+  labels:
+    app.kubernetes.io/part-of: ai-training-platform
+    rbac.platform.ai/tier: admin
+rules:
+  # 集群级别完全管理权限
+  - apiGroups: ["*"]
+    resources: ["*"]
+    verbs: ["*"]
+  # 非资源端点 (如 /healthz, /metrics)
+  - nonResourceURLs: ["*"]
+    verbs: ["*"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: tenant-admin
+  labels:
+    app.kubernetes.io/part-of: ai-training-platform
+    rbac.platform.ai/tier: tenant-admin
+rules:
+  # 训练任务管理 (PyTorchJob, MPIJob)
+  - apiGroups: ["kubeflow.org"]
+    resources: ["pytorchjobs", "mpijobs", "tfjobs"]
+    verbs: ["create", "delete", "get", "list", "patch", "update", "watch"]
+  # Kueue 工作负载管理
+  - apiGroups: ["kueue.x-k8s.io"]
+    resources: ["workloads", "localqueues"]
+    verbs: ["get", "list", "watch"]
+  # Pod 和服务管理
+  - apiGroups: [""]
+    resources: ["pods", "pods/log", "pods/exec", "services", "configmaps", "secrets"]
+    verbs: ["create", "delete", "get", "list", "patch", "update", "watch"]
+  # 持久化卷管理
+  - apiGroups: [""]
+    resources: ["persistentvolumeclaims"]
+    verbs: ["create", "delete", "get", "list", "watch"]
+  # 事件查看
+  - apiGroups: [""]
+    resources: ["events"]
+    verbs: ["get", "list", "watch"]
+  # Namespace 内 RBAC
+  - apiGroups: ["rbac.authorization.k8s.io"]
+    resources: ["roles", "rolebindings"]
+    verbs: ["create", "delete", "get", "list", "watch"]
+  # ResourceQuota 查看
+  - apiGroups: [""]
+    resources: ["resourcequotas"]
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: training-user
+  labels:
+    app.kubernetes.io/part-of: ai-training-platform
+    rbac.platform.ai/tier: user
+rules:
+  # 训练任务提交和管理 (限 PyTorchJob)
+  - apiGroups: ["kubeflow.org"]
+    resources: ["pytorchjobs"]
+    verbs: ["create", "delete", "get", "list", "watch"]
+  # Pod 日志查看
+  - apiGroups: [""]
+    resources: ["pods", "pods/log"]
+    verbs: ["get", "list", "watch"]
+  # 事件查看
+  - apiGroups: [""]
+    resources: ["events"]
+    verbs: ["get", "list", "watch"]
+  # ConfigMap 和 Secret 读取 (训练配置)
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    verbs: ["get", "list", "watch"]
+  # PVC 管理 (数据集挂载)
+  - apiGroups: [""]
+    resources: ["persistentvolumeclaims"]
+    verbs: ["create", "delete", "get", "list", "watch"]
+  # Kueue 工作负载状态查看
+  - apiGroups: ["kueue.x-k8s.io"]
+    resources: ["workloads"]
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: viewer
+  labels:
+    app.kubernetes.io/part-of: ai-training-platform
+    rbac.platform.ai/tier: viewer
+rules:
+  # 只读访问训练任务
+  - apiGroups: ["kubeflow.org"]
+    resources: ["pytorchjobs", "mpijobs", "tfjobs"]
+    verbs: ["get", "list", "watch"]
+  # 只读访问 Pod 和日志
+  - apiGroups: [""]
+    resources: ["pods", "pods/log", "events", "services"]
+    verbs: ["get", "list", "watch"]
+  # 只读访问 Kueue 状态
+  - apiGroups: ["kueue.x-k8s.io"]
+    resources: ["workloads", "localqueues", "clusterqueues"]
+    verbs: ["get", "list", "watch"]
+  # 只读访问 ResourceQuota
+  - apiGroups: [""]
+    resources: ["resourcequotas"]
+    verbs: ["get", "list", "watch"]

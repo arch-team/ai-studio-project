@@ -1,0 +1,40 @@
+# 训练任务执行 Role - 允许训练 Pod 所需的操作
+# 此 Role 绑定到训练任务执行的 ServiceAccount
+# 参考: spec.md FR-001 (训练任务管理)
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: training-job-executor
+  labels:
+    app.kubernetes.io/part-of: ai-training-platform
+    rbac.platform.ai/tier: execution
+rules:
+  # 训练任务 CRD 状态更新
+  - apiGroups: ["kubeflow.org"]
+    resources: ["pytorchjobs/status"]
+    verbs: ["get", "update", "patch"]
+  # Pod 日志访问 (训练日志收集)
+  - apiGroups: [""]
+    resources: ["pods", "pods/log"]
+    verbs: ["get", "list", "watch"]
+  # ConfigMap 读取 (训练超参数配置)
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    verbs: ["get", "list", "watch"]
+  # Secret 读取 (模型仓库凭据)
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["get"]
+  # 事件创建 (训练进度事件)
+  - apiGroups: [""]
+    resources: ["events"]
+    verbs: ["create", "patch"]
+  # PVC 访问 (数据集和检查点存储)
+  - apiGroups: [""]
+    resources: ["persistentvolumeclaims"]
+    verbs: ["get", "list", "watch"]
+  # Node 信息读取 (拓扑感知调度)
+  - apiGroups: [""]
+    resources: ["nodes"]
+    verbs: ["get", "list"]
