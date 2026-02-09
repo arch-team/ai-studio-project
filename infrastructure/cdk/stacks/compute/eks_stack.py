@@ -27,6 +27,7 @@ from cdk_constructs.gpu_node_group import create_default_gpu_node_groups
 from config import EnvironmentConfig
 from config.constants import EKS_ADDON_NAMES
 from constructs import Construct
+from utils.iam_helpers import create_irsa_role
 from utils.outputs import create_output
 
 # Path to the HyperPod Helm Chart (relative to this file)
@@ -158,59 +159,6 @@ class EksStack(cdk.Stack):
 
         return cluster
 
-    def _create_irsa_role(
-        self,
-        role_id: str,
-        role_name: str,
-        service_account: str,
-        managed_policy_name: str,
-        description: str,
-    ) -> iam.Role:
-        """创建 IRSA（IAM Roles for Service Accounts）角色。
-
-        Args:
-            role_id: CDK Construct ID
-            role_name: IAM 角色名称
-            service_account: Kubernetes ServiceAccount 名称
-            managed_policy_name: AWS 托管策略名称
-            description: 角色描述
-
-        Returns:
-            配置好的 IAM Role
-        """
-        oidc_issuer = self._eks_cluster.cluster_open_id_connect_issuer
-
-        # 创建条件
-        conditions = cdk.CfnJson(
-            self,
-            f"{role_id}Conditions",
-            value={
-                f"{oidc_issuer}:aud": "sts.amazonaws.com",
-                f"{oidc_issuer}:sub": f"system:serviceaccount:kube-system:{service_account}",
-            },
-        )
-
-        # 创建角色
-        role = iam.Role(
-            self,
-            role_id,
-            role_name=role_name,
-            assumed_by=iam.FederatedPrincipal(
-                self._eks_cluster.open_id_connect_provider.open_id_connect_provider_arn,
-                conditions={
-                    "StringEquals": conditions,
-                },
-                assume_role_action="sts:AssumeRoleWithWebIdentity",
-            ),
-            description=description,
-        )
-
-        role.add_managed_policy(
-            iam.ManagedPolicy.from_aws_managed_policy_name(managed_policy_name)
-        )
-
-        return role
-
     def _create_system_node_group(self) -> None:
         """Create EC2 node group for system components.
 
@@ -263,21 +211,29 @@ class EksStack(cdk.Stack):
         - https://docs.aws.amazon.com/eks/latest/userguide/community-addons.html
         """
         # 创建 EBS CSI Driver IRSA 角色
-        ebs_csi_role = self._create_irsa_role(
-            role_id="EbsCsiDriverRole",
-            role_name=f"{self.env_config.resource_prefix}-ebs-csi-role",
+        ebs_csi_role = create_irsa_role(
+            scope=self,
+            construct_id="EbsCsiDriverRole",
+            env_config=self.env_config,
+            oidc_provider_arn=self._eks_cluster.open_id_connect_provider.open_id_connect_provider_arn,
+            oidc_issuer=self._eks_cluster.cluster_open_id_connect_issuer,
+            role_name_suffix="ebs-csi-role",
             service_account="ebs-csi-controller-sa",
-            managed_policy_name="service-role/AmazonEBSCSIDriverPolicy",
             description="IAM role for EBS CSI driver",
+            managed_policies=["service-role/AmazonEBSCSIDriverPolicy"],
         )
 
         # 创建 FSx CSI Driver IRSA 角色
-        fsx_csi_role = self._create_irsa_role(
-            role_id="FsxCsiDriverRole",
-            role_name=f"{self.env_config.resource_prefix}-fsx-csi-role",
+        fsx_csi_role = create_irsa_role(
+            scope=self,
+            construct_id="FsxCsiDriverRole",
+            env_config=self.env_config,
+            oidc_provider_arn=self._eks_cluster.open_id_connect_provider.open_id_connect_provider_arn,
+            oidc_issuer=self._eks_cluster.cluster_open_id_connect_issuer,
+            role_name_suffix="fsx-csi-role",
             service_account="fsx-csi-controller-sa",
-            managed_policy_name="AmazonFSxFullAccess",
             description="IAM role for FSx CSI driver",
+            managed_policies=["AmazonFSxFullAccess"],
         )
 
         # 获取插件版本（集中式版本管理）

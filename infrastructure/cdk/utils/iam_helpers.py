@@ -226,3 +226,65 @@ def create_irsa_conditions(
             f"{oidc_issuer}:sub": f"system:serviceaccount:{namespace}:{service_account}",
         },
     )
+
+
+def create_irsa_role(
+    scope: Construct,
+    construct_id: str,
+    env_config: EnvironmentConfig,
+    oidc_provider_arn: str,
+    oidc_issuer: str,
+    role_name_suffix: str,
+    service_account: str,
+    namespace: str = "kube-system",
+    description: str = "",
+    managed_policies: list[str] | None = None,
+) -> iam.Role:
+    """创建 IRSA（IAM Roles for Service Accounts）角色。
+
+    统一的 IRSA 角色创建函数，替代 EksStack 中的内联 _create_irsa_role 方法。
+    使用 OIDC 联合信任策略，允许 K8s ServiceAccount 承担此角色。
+
+    Args:
+        scope: CDK construct scope
+        construct_id: Unique identifier for the construct
+        env_config: Environment configuration
+        oidc_provider_arn: EKS cluster OIDC provider ARN
+        oidc_issuer: OIDC issuer URL (without https://)
+        role_name_suffix: Suffix for the role name
+        service_account: Kubernetes ServiceAccount name
+        namespace: Kubernetes namespace (default: kube-system)
+        description: Role description
+        managed_policies: List of AWS managed policy names to attach
+
+    Returns:
+        配置好的 IAM Role
+    """
+    # 创建 IRSA 条件
+    conditions = create_irsa_conditions(
+        scope=scope,
+        construct_id=f"{construct_id}Conditions",
+        oidc_issuer=oidc_issuer,
+        namespace=namespace,
+        service_account=service_account,
+    )
+
+    # 创建角色
+    role = iam.Role(
+        scope,
+        construct_id,
+        role_name=f"{env_config.resource_prefix}-{role_name_suffix}",
+        assumed_by=iam.FederatedPrincipal(
+            oidc_provider_arn,
+            conditions={
+                "StringEquals": conditions,
+            },
+            assume_role_action="sts:AssumeRoleWithWebIdentity",
+        ),
+        description=description,
+    )
+
+    # 附加托管策略
+    _apply_role_configuration(role, env_config, role_name_suffix, managed_policies)
+
+    return role
