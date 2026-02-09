@@ -15,9 +15,12 @@ from .gpu_node_group import (
     GpuNodeGroupConstruct,
     create_default_gpu_node_groups,
 )
+from .kms_key import KmsKeyConfig, PlatformKmsKey
 
 __all__ = [
     "GpuNodeGroupConfig",
     "GpuNodeGroupConstruct",
+    "KmsKeyConfig",
+    "PlatformKmsKey",
     "create_default_gpu_node_groups",
 ]

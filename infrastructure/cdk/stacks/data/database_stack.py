@@ -12,6 +12,7 @@ This stack creates Aurora MySQL Serverless v2 with:
 import aws_cdk as cdk
 from aws_cdk import Duration
 from aws_cdk import aws_ec2 as ec2
+from aws_cdk import aws_kms as kms
 from aws_cdk import aws_logs as logs
 from aws_cdk import aws_rds as rds
 from aws_cdk import aws_secretsmanager as secretsmanager
@@ -44,6 +45,7 @@ class DatabaseStack(cdk.Stack):
         construct_id: str,
         env_config: EnvironmentConfig,
         vpc: ec2.IVpc,
+        storage_encryption_key: kms.IKey | None = None,
         **kwargs,
     ) -> None:
         """Initialize the Database Stack.
@@ -53,12 +55,14 @@ class DatabaseStack(cdk.Stack):
             construct_id: Stack identifier
             env_config: Environment configuration
             vpc: VPC to deploy database into
+            storage_encryption_key: 自定义 KMS Key 用于存储加密 (None 则使用 AWS managed key)
             **kwargs: Additional stack properties
         """
         super().__init__(scope, construct_id, **kwargs)
 
         self.env_config = env_config
         self._vpc = vpc
+        self._storage_encryption_key = storage_encryption_key
 
         # Create security group for database access
         self._security_group = self._create_security_group()
@@ -233,7 +237,8 @@ class DatabaseStack(cdk.Stack):
                 preferred_window="03:00-04:00",  # UTC
             ),
             # Security configuration
-            storage_encrypted=True,  # Uses AWS managed key by default
+            storage_encrypted=True,
+            storage_encryption_key=self._storage_encryption_key,  # None = AWS managed key
             iam_authentication=True,  # Enable IAM DB authentication
             # Maintenance window
             preferred_maintenance_window="Sun:05:00-Sun:06:00",  # UTC

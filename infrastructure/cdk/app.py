@@ -18,6 +18,7 @@ import aws_cdk as cdk
 from cdk_nag import AwsSolutionsChecks
 
 from aspects import apply_standard_tags
+from cdk_constructs.kms_key import KmsKeyConfig, PlatformKmsKey
 from config import get_environment_config
 from stacks import (
     AlbStack,
@@ -89,6 +90,31 @@ def create_app() -> cdk.App:
     )
 
     # =========================================================================
+    # KMS Keys (集中管理加密密钥)
+    # =========================================================================
+
+    # 在 IAM Stack 中创建 KMS Keys (与 IAM 角色共存)
+    s3_kms_key = PlatformKmsKey(
+        iam_stack,
+        "S3KmsKey",
+        env_config=env_config,
+        config=KmsKeyConfig(
+            alias_suffix="s3",
+            description="KMS key for S3 bucket encryption",
+        ),
+    )
+
+    rds_kms_key = PlatformKmsKey(
+        iam_stack,
+        "RdsKmsKey",
+        env_config=env_config,
+        config=KmsKeyConfig(
+            alias_suffix="rds",
+            description="KMS key for Aurora database encryption",
+        ),
+    )
+
+    # =========================================================================
     # Layer 2: Data Stacks (Aurora, S3, FSx)
     # =========================================================================
 
@@ -99,11 +125,13 @@ def create_app() -> cdk.App:
         f"{stack_prefix}-database",
         env_config=env_config,
         vpc=network_stack.vpc,
+        storage_encryption_key=rds_kms_key.key,
         env=env_config.to_cdk_environment(),
         description="Aurora MySQL Serverless v2 with RDS Proxy",
         termination_protection=env_config.name.value == "prod",
     )
     database_stack.add_dependency(network_stack)
+    database_stack.add_dependency(iam_stack)
 
     # Storage Stack - S3 buckets for datasets, models, checkpoints
     # Enable termination protection for production to prevent accidental deletion
@@ -111,10 +139,12 @@ def create_app() -> cdk.App:
         app,
         f"{stack_prefix}-storage",
         env_config=env_config,
+        encryption_key=s3_kms_key.key,
         env=env_config.to_cdk_environment(),
         description="S3 buckets with lifecycle policies and KMS encryption",
         termination_protection=env_config.name.value == "prod",
     )
+    storage_stack.add_dependency(iam_stack)
 
     # =========================================================================
     # Layer 3a: EKS Foundation Stack

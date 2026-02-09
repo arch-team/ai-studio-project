@@ -16,6 +16,7 @@ All buckets are configured with:
 import aws_cdk as cdk
 from aws_cdk import Duration
 from aws_cdk import aws_iam as iam
+from aws_cdk import aws_kms as kms
 from aws_cdk import aws_s3 as s3
 
 from config import EnvironmentConfig
@@ -49,6 +50,7 @@ class StorageStack(cdk.Stack):
         scope: Construct,
         construct_id: str,
         env_config: EnvironmentConfig,
+        encryption_key: kms.IKey | None = None,
         **kwargs,
     ) -> None:
         """Initialize the Storage Stack.
@@ -57,11 +59,13 @@ class StorageStack(cdk.Stack):
             scope: CDK scope
             construct_id: Stack identifier
             env_config: Environment configuration
+            encryption_key: 自定义 KMS Key 用于 S3 加密 (None 则使用 S3_MANAGED)
             **kwargs: Additional stack properties
         """
         super().__init__(scope, construct_id, **kwargs)
 
         self.env_config = env_config
+        self._encryption_key = encryption_key
 
         # Create S3 buckets
         self._datasets_bucket = self._create_datasets_bucket()
@@ -99,13 +103,22 @@ class StorageStack(cdk.Stack):
         # Use protection config for removal policy
         removal_policy = self.env_config.protection.removal_policy
 
-        # Create bucket with SSE-KMS encryption
+        # 选择加密方式: 自定义 KMS Key > S3 Managed
+        if self._encryption_key:
+            encryption = s3.BucketEncryption.KMS
+            encryption_key_ref = self._encryption_key
+        else:
+            encryption = s3.BucketEncryption.S3_MANAGED
+            encryption_key_ref = None
+
+        # Create bucket with encryption
         bucket = s3.Bucket(
             self,
             bucket_id,
             bucket_name=bucket_name,
-            # Encryption configuration (AWS managed key)
-            encryption=s3.BucketEncryption.S3_MANAGED,
+            # Encryption configuration
+            encryption=encryption,
+            encryption_key=encryption_key_ref,
             # Enable versioning for data protection
             versioned=True,
             # Block all public access (security best practice)
