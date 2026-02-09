@@ -1,0 +1,29 @@
+# Prod 环境: 严格网络策略
+# 生产环境使用更严格的 NetworkPolicy 规则
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: deny-all-egress
+  namespace: training-jobs
+spec:
+  podSelector: {}
+  policyTypes:
+    - Egress
+  egress:
+    # 仅允许 DNS 查询
+    - to: []
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    # 允许同命名空间内通信 (分布式训练)
+    - to:
+        - podSelector: {}
+    # 允许访问 AWS 服务 (通过 VPC Endpoint)
+    - to:
+        - ipBlock:
+            cidr: 10.0.0.0/16
+      ports:
+        - protocol: TCP
+          port: 443

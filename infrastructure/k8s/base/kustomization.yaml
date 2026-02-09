@@ -1,0 +1,23 @@
+# Kustomize Base - AI Training Platform K8s Resources
+# 包含所有环境共享的基础配置
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  # HyperPod Add-ons
+  - ../hyperpod-addons/training/
+  - ../hyperpod-addons/ops/
+  - ../hyperpod-addons/spaces/
+  # Network Policies
+  - ../network-policies/
+  # Storage
+  - ../storage/
+  # RBAC
+  - ../rbac/cluster-roles.yaml
+  - ../rbac/training-job-role.yaml
+  # Security
+  - ../security/namespace-psa-labels.yaml
+
+commonLabels:
+  app.kubernetes.io/managed-by: kustomize
+  platform.ai/version: "1.0"

@@ -1,0 +1,9 @@
+# Dev 环境: 缩减副本数以节省资源
+# 此补丁将 Deployment 副本数设为 1
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: spaces-controller
+  namespace: dev-spaces
+spec:
+  replicas: 1

@@ -1,0 +1,9 @@
+# Prod 环境: 启用高可用配置
+# 生产环境关键服务使用多副本
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: spaces-controller
+  namespace: dev-spaces
+spec:
+  replicas: 3

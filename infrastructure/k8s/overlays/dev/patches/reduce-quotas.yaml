@@ -1,0 +1,18 @@
+# Dev 环境: 缩减资源配额
+# 开发环境使用较少的 GPU 和 CPU 配额
+apiVersion: kueue.x-k8s.io/v1beta1
+kind: ClusterQueue
+metadata:
+  name: training-cluster-queue
+spec:
+  resourceGroups:
+    - coveredResources: ["cpu", "memory", "nvidia.com/gpu"]
+      flavors:
+        - name: nvidia-a100-40gb
+          resources:
+            - name: "cpu"
+              nominalQuota: 48
+            - name: "memory"
+              nominalQuota: 192Gi
+            - name: "nvidia.com/gpu"
+              nominalQuota: 8
