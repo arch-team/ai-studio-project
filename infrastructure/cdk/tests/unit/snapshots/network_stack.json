@@ -1,0 +1,24 @@
+{
+  "OutputCount": 6,
+  "ParameterCount": 1,
+  "ResourceCount": 58,
+  "ResourceTypes": [
+    "AWS::EC2::EIP",
+    "AWS::EC2::FlowLog",
+    "AWS::EC2::InternetGateway",
+    "AWS::EC2::NatGateway",
+    "AWS::EC2::Route",
+    "AWS::EC2::RouteTable",
+    "AWS::EC2::SecurityGroup",
+    "AWS::EC2::Subnet",
+    "AWS::EC2::SubnetRouteTableAssociation",
+    "AWS::EC2::VPC",
+    "AWS::EC2::VPCEndpoint",
+    "AWS::EC2::VPCGatewayAttachment",
+    "AWS::IAM::Policy",
+    "AWS::IAM::Role",
+    "AWS::Lambda::Function",
+    "AWS::Logs::LogGroup",
+    "Custom::VpcRestrictDefaultSG"
+  ]
+}

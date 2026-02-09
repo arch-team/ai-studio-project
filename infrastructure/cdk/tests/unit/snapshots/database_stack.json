@@ -1,0 +1,23 @@
+{
+  "OutputCount": 6,
+  "ParameterCount": 1,
+  "ResourceCount": 23,
+  "ResourceTypes": [
+    "AWS::EC2::SecurityGroup",
+    "AWS::EC2::SecurityGroupEgress",
+    "AWS::EC2::SecurityGroupIngress",
+    "AWS::IAM::Policy",
+    "AWS::IAM::Role",
+    "AWS::Lambda::Function",
+    "AWS::Logs::LogGroup",
+    "AWS::RDS::DBCluster",
+    "AWS::RDS::DBClusterParameterGroup",
+    "AWS::RDS::DBInstance",
+    "AWS::RDS::DBProxy",
+    "AWS::RDS::DBProxyTargetGroup",
+    "AWS::RDS::DBSubnetGroup",
+    "AWS::SecretsManager::Secret",
+    "AWS::SecretsManager::SecretTargetAttachment",
+    "Custom::LogRetention"
+  ]
+}

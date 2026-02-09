@@ -1,0 +1,12 @@
+{
+  "OutputCount": 6,
+  "ParameterCount": 1,
+  "ResourceCount": 11,
+  "ResourceTypes": [
+    "AWS::IAM::Role",
+    "AWS::Lambda::Function",
+    "AWS::S3::Bucket",
+    "AWS::S3::BucketPolicy",
+    "Custom::S3AutoDeleteObjects"
+  ]
+}

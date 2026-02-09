@@ -1,0 +1,8 @@
+{
+  "OutputCount": 2,
+  "ParameterCount": 1,
+  "ResourceCount": 1,
+  "ResourceTypes": [
+    "AWS::ECR::Repository"
+  ]
+}

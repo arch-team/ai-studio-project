@@ -1,0 +1,12 @@
+{
+  "OutputCount": 7,
+  "ParameterCount": 1,
+  "ResourceCount": 9,
+  "ResourceTypes": [
+    "AWS::EC2::SecurityGroup",
+    "AWS::ElasticLoadBalancingV2::Listener",
+    "AWS::ElasticLoadBalancingV2::ListenerRule",
+    "AWS::ElasticLoadBalancingV2::LoadBalancer",
+    "AWS::ElasticLoadBalancingV2::TargetGroup"
+  ]
+}

@@ -1,0 +1,10 @@
+{
+  "OutputCount": 4,
+  "ParameterCount": 1,
+  "ResourceCount": 7,
+  "ResourceTypes": [
+    "AWS::IAM::ManagedPolicy",
+    "AWS::IAM::Policy",
+    "AWS::IAM::Role"
+  ]
+}
