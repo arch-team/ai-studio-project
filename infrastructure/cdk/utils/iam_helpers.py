@@ -11,6 +11,7 @@ import aws_cdk as cdk
 from aws_cdk import aws_iam as iam
 
 from config import EnvironmentConfig
+from config.constants import TAG_KEYS
 from constructs import Construct
 
 
@@ -30,17 +31,16 @@ def _apply_role_configuration(
         managed_policies: List of AWS managed policy names to attach
         additional_tags: Additional tags to apply
     """
-    # Attach managed policies
     if managed_policies:
         for policy_name in managed_policies:
             role.add_managed_policy(
                 iam.ManagedPolicy.from_aws_managed_policy_name(policy_name)
             )
 
-    # Apply standard tags
-    cdk.Tags.of(role).add("Name", f"{env_config.resource_prefix}-{role_name_suffix}")
+    cdk.Tags.of(role).add(
+        TAG_KEYS.NAME, f"{env_config.resource_prefix}-{role_name_suffix}"
+    )
 
-    # Apply additional tags
     if additional_tags:
         for key, value in additional_tags.items():
             cdk.Tags.of(role).add(key, value)

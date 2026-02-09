@@ -1,81 +1,36 @@
 """
-Unit tests for EKS Stack.
+EKS Stack 单元测试.
 
-Tests cover:
-- EKS cluster creation
-- Kubernetes version
-- Cluster endpoint configuration
-- Add-ons installation
-- Node groups configuration
+测试覆盖:
+- EKS 集群创建
+- Kubernetes 版本
+- 集群端点配置
+- Add-ons 安装
+- Node Groups 配置
 """
 
-import aws_cdk as cdk
 import pytest
 from aws_cdk.assertions import Match, Template
 
-from config import EnvironmentConfig
-from stacks import EksStack, IamStack, NetworkStack
+from stacks import EksStack
+
+
+# 使用 conftest 的 network_stack, iam_stack, eks_stack fixtures
+@pytest.fixture
+def template(eks_stack: EksStack) -> Template:
+    """获取 CloudFormation 模板."""
+    return Template.from_stack(eks_stack)
 
 
 class TestEksStackCreation:
-    """Tests for EKS Stack creation."""
-
-    @pytest.fixture
-    def network_stack(
-        self, cdk_app: cdk.App, dev_config: EnvironmentConfig, cdk_env: cdk.Environment
-    ) -> NetworkStack:
-        """Create Network Stack as dependency."""
-        return NetworkStack(
-            cdk_app,
-            "TestNetworkStack",
-            env_config=dev_config,
-            env=cdk_env,
-        )
-
-    @pytest.fixture
-    def iam_stack(
-        self, cdk_app: cdk.App, dev_config: EnvironmentConfig, cdk_env: cdk.Environment
-    ) -> IamStack:
-        """Create IAM Stack as dependency."""
-        return IamStack(
-            cdk_app,
-            "TestIamStack",
-            env_config=dev_config,
-            env=cdk_env,
-        )
-
-    @pytest.fixture
-    def eks_stack(
-        self,
-        cdk_app: cdk.App,
-        dev_config: EnvironmentConfig,
-        cdk_env: cdk.Environment,
-        network_stack: NetworkStack,
-        iam_stack: IamStack,
-    ) -> EksStack:
-        """Create an EKS Stack for testing."""
-        return EksStack(
-            cdk_app,
-            "TestEksStack",
-            env_config=dev_config,
-            vpc=network_stack.vpc,
-            eks_node_role=iam_stack.eks_node_role,
-            env=cdk_env,
-        )
-
-    @pytest.fixture
-    def template(self, eks_stack: EksStack) -> Template:
-        """Get CloudFormation template from the stack."""
-        return Template.from_stack(eks_stack)
+    """EKS Stack 创建测试."""
 
     def test_stack_synthesizes(self, eks_stack: EksStack) -> None:
-        """Verify the stack synthesizes without errors."""
+        """验证 Stack 可以成功合成."""
         assert eks_stack is not None
 
     def test_eks_cluster_created(self, template: Template) -> None:
-        """Verify EKS cluster is created."""
-        # CDK creates a custom resource for EKS clusters
-        # Check for the cluster role which is always present
+        """验证 EKS 集群创建 (通过集群角色)."""
         template.has_resource_properties(
             "AWS::IAM::Role",
             {
@@ -84,9 +39,7 @@ class TestEksStackCreation:
                         "Statement": Match.array_with(
                             [
                                 Match.object_like(
-                                    {
-                                        "Principal": {"Service": "eks.amazonaws.com"},
-                                    }
+                                    {"Principal": {"Service": "eks.amazonaws.com"}}
                                 )
                             ]
                         )
@@ -97,153 +50,38 @@ class TestEksStackCreation:
 
 
 class TestClusterConfiguration:
-    """Tests for EKS cluster configuration."""
-
-    @pytest.fixture
-    def template(
-        self, cdk_app: cdk.App, dev_config: EnvironmentConfig, cdk_env: cdk.Environment
-    ) -> Template:
-        """Create template for cluster configuration testing."""
-        network_stack = NetworkStack(
-            cdk_app,
-            "ConfigNetworkStack",
-            env_config=dev_config,
-            env=cdk_env,
-        )
-        iam_stack = IamStack(
-            cdk_app,
-            "ConfigIamStack",
-            env_config=dev_config,
-            env=cdk_env,
-        )
-        eks_stack = EksStack(
-            cdk_app,
-            "ConfigEksStack",
-            env_config=dev_config,
-            vpc=network_stack.vpc,
-            eks_node_role=iam_stack.eks_node_role,
-            env=cdk_env,
-        )
-        return Template.from_stack(eks_stack)
+    """EKS 集群配置测试."""
 
     def test_cluster_security_group_created(self, template: Template) -> None:
-        """Verify cluster security group is created."""
-        # EKS creates security groups for cluster communication
+        """验证集群安全组创建."""
         security_groups = template.find_resources("AWS::EC2::SecurityGroup")
         assert len(security_groups) >= 1
 
 
 class TestEksStackOutputs:
-    """Tests for EKS Stack outputs."""
-
-    @pytest.fixture
-    def eks_stack(
-        self, cdk_app: cdk.App, dev_config: EnvironmentConfig, cdk_env: cdk.Environment
-    ) -> EksStack:
-        """Create EKS Stack for output testing."""
-        network_stack = NetworkStack(
-            cdk_app,
-            "OutputNetworkStack",
-            env_config=dev_config,
-            env=cdk_env,
-        )
-        iam_stack = IamStack(
-            cdk_app,
-            "OutputIamStack",
-            env_config=dev_config,
-            env=cdk_env,
-        )
-        return EksStack(
-            cdk_app,
-            "OutputEksStack",
-            env_config=dev_config,
-            vpc=network_stack.vpc,
-            eks_node_role=iam_stack.eks_node_role,
-            env=cdk_env,
-        )
+    """EKS Stack 输出属性测试."""
 
     def test_eks_cluster_accessible(self, eks_stack: EksStack) -> None:
-        """Verify EKS cluster is accessible from the stack."""
+        """验证 EKS 集群可访问."""
         assert eks_stack.eks_cluster is not None
 
 
 class TestEksAddOns:
-    """Tests for EKS add-ons configuration."""
-
-    @pytest.fixture
-    def template(
-        self, cdk_app: cdk.App, dev_config: EnvironmentConfig, cdk_env: cdk.Environment
-    ) -> Template:
-        """Create template for add-ons testing."""
-        network_stack = NetworkStack(
-            cdk_app,
-            "AddonsNetworkStack",
-            env_config=dev_config,
-            env=cdk_env,
-        )
-        iam_stack = IamStack(
-            cdk_app,
-            "AddonsIamStack",
-            env_config=dev_config,
-            env=cdk_env,
-        )
-        eks_stack = EksStack(
-            cdk_app,
-            "AddonsEksStack",
-            env_config=dev_config,
-            vpc=network_stack.vpc,
-            eks_node_role=iam_stack.eks_node_role,
-            env=cdk_env,
-        )
-        return Template.from_stack(eks_stack)
+    """EKS Add-ons 配置测试."""
 
     def test_vpc_cni_addon(self, template: Template) -> None:
-        """Verify VPC CNI add-on is configured."""
-        # CDK EKS creates Lambda for kubectl operations
-        # The add-ons are typically installed via Helm or kubectl
-        # We verify Lambda functions are created for cluster management
+        """验证 VPC CNI add-on 配置 (通过 Lambda 函数验证)."""
         lambdas = template.find_resources("AWS::Lambda::Function")
         assert len(lambdas) >= 1
 
 
 class TestClusterTags:
-    """Tests for EKS cluster tagging."""
-
-    @pytest.fixture
-    def template(
-        self, cdk_app: cdk.App, dev_config: EnvironmentConfig, cdk_env: cdk.Environment
-    ) -> Template:
-        """Create template for tag testing."""
-        network_stack = NetworkStack(
-            cdk_app,
-            "TagNetworkStack",
-            env_config=dev_config,
-            env=cdk_env,
-        )
-        iam_stack = IamStack(
-            cdk_app,
-            "TagIamStack",
-            env_config=dev_config,
-            env=cdk_env,
-        )
-        eks_stack = EksStack(
-            cdk_app,
-            "TagEksStack",
-            env_config=dev_config,
-            vpc=network_stack.vpc,
-            eks_node_role=iam_stack.eks_node_role,
-            env=cdk_env,
-        )
-        return Template.from_stack(eks_stack)
+    """EKS 集群标签测试."""
 
     def test_eks_resources_created(self, template: Template) -> None:
-        """Verify EKS resources are created."""
-        # Note: Project tags are applied at app level in app.py via cdk.Tags.of(app).add()
-        # Individual stack tests won't have these tags applied
-        # Verify IAM roles are created for EKS
+        """验证 EKS 相关资源创建."""
         roles = template.find_resources("AWS::IAM::Role")
         assert len(roles) >= 1, "Expected at least 1 IAM role for EKS"
 
-        # Verify Lambda functions are created for cluster management
         lambdas = template.find_resources("AWS::Lambda::Function")
         assert len(lambdas) >= 1, "Expected at least 1 Lambda for EKS management"

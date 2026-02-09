@@ -1,7 +1,7 @@
 """
-Unit tests for HyperPod Add-ons Stack.
+HyperPod Add-ons Stack 单元测试.
 
-Tests cover:
+测试覆盖:
 - Stack 合成
 - Training Operator EKS Add-on 安装
 - Task Governance EKS Add-on 安装
@@ -13,61 +13,39 @@ Tests cover:
 
 import aws_cdk as cdk
 import pytest
-from aws_cdk import aws_ec2 as ec2
 from aws_cdk import aws_eks as eks
 from aws_cdk.assertions import Match, Template
-from aws_cdk.lambda_layer_kubectl_v33 import KubectlV33Layer
 
 from config import EnvironmentConfig
 from stacks import HyperPodAddonsStack
 
 
+# 使用 conftest 的 lightweight_vpc 和 lightweight_eks_cluster fixtures
+@pytest.fixture
+def hyperpod_addons_stack(
+    cdk_app: cdk.App,
+    dev_config: EnvironmentConfig,
+    cdk_env: cdk.Environment,
+    lightweight_eks_cluster: eks.Cluster,
+) -> HyperPodAddonsStack:
+    """创建 HyperPod Add-ons Stack."""
+    return HyperPodAddonsStack(
+        cdk_app,
+        "TestHyperPodAddonsStack",
+        env_config=dev_config,
+        eks_cluster=lightweight_eks_cluster,
+        env=cdk_env,
+    )
+
+
+@pytest.fixture
+def template(hyperpod_addons_stack: HyperPodAddonsStack) -> Template:
+    """获取 CloudFormation 模板."""
+    return Template.from_stack(hyperpod_addons_stack)
+
+
 class TestHyperPodAddonsStack:
     """HyperPod Add-ons Stack 单元测试."""
-
-    @pytest.fixture
-    def vpc(self, cdk_app: cdk.App, cdk_env: cdk.Environment) -> ec2.Vpc:
-        """创建测试 VPC."""
-        stack = cdk.Stack(cdk_app, "VpcStack", env=cdk_env)
-        return ec2.Vpc(stack, "Vpc", max_azs=2)
-
-    @pytest.fixture
-    def eks_cluster(
-        self, cdk_app: cdk.App, cdk_env: cdk.Environment, vpc: ec2.Vpc
-    ) -> eks.Cluster:
-        """创建测试 EKS 集群."""
-        stack = cdk.Stack(cdk_app, "EksStack", env=cdk_env)
-        return eks.Cluster(
-            stack,
-            "TestCluster",
-            cluster_name="test-cluster",
-            version=eks.KubernetesVersion.of("1.33"),
-            vpc=vpc,
-            default_capacity=0,
-            kubectl_layer=KubectlV33Layer(stack, "KubectlLayer"),
-        )
-
-    @pytest.fixture
-    def hyperpod_addons_stack(
-        self,
-        cdk_app: cdk.App,
-        dev_config: EnvironmentConfig,
-        cdk_env: cdk.Environment,
-        eks_cluster: eks.Cluster,
-    ) -> HyperPodAddonsStack:
-        """创建 HyperPod Add-ons Stack for testing."""
-        return HyperPodAddonsStack(
-            cdk_app,
-            "TestHyperPodAddonsStack",
-            env_config=dev_config,
-            eks_cluster=eks_cluster,
-            env=cdk_env,
-        )
-
-    @pytest.fixture
-    def template(self, hyperpod_addons_stack: HyperPodAddonsStack) -> Template:
-        """获取 CloudFormation 模板."""
-        return Template.from_stack(hyperpod_addons_stack)
 
     def test_stack_synthesizes(
         self, hyperpod_addons_stack: HyperPodAddonsStack
@@ -107,10 +85,7 @@ class TestHyperPodAddonsStack:
                                 Match.object_like(
                                     {
                                         "Action": Match.array_with(
-                                            [
-                                                "sts:AssumeRole",
-                                                "sts:TagSession",
-                                            ]
+                                            ["sts:AssumeRole", "sts:TagSession"]
                                         ),
                                         "Effect": "Allow",
                                         "Principal": {

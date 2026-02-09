@@ -264,6 +264,64 @@ class GpuNodeGroupConstruct(Construct):
         return self._launch_template
 
 
+def _default_node_group_definitions(
+    max_nodes: int,
+) -> list[tuple[str, GpuNodeGroupConfig]]:
+    """返回默认 GPU 节点组的 (construct_id, config) 定义列表。"""
+    max_per_group = max_nodes // 3
+    return [
+        # P4d: NVIDIA A100 GPUs (8x 40GB)
+        (
+            "P4dNodeGroup",
+            GpuNodeGroupConfig(
+                name="p4d-gpu",
+                instance_types=("p4d.24xlarge",),
+                max_size=max_per_group,
+                disk_size=500,
+                labels={
+                    "nvidia.com/gpu.product": "NVIDIA-A100-SXM4-40GB",
+                    "nvidia.com/gpu.memory": "40960",
+                },
+            ),
+        ),
+        # P5: NVIDIA H100 GPUs (8x 80GB)
+        (
+            "P5NodeGroup",
+            GpuNodeGroupConfig(
+                name="p5-gpu",
+                instance_types=("p5.48xlarge",),
+                max_size=max_per_group,
+                disk_size=1000,
+                labels={
+                    "nvidia.com/gpu.product": "NVIDIA-H100-80GB-HBM3",
+                    "nvidia.com/gpu.memory": "81920",
+                },
+            ),
+        ),
+        # Trn1: AWS Trainium chips
+        (
+            "Trn1NodeGroup",
+            GpuNodeGroupConfig(
+                name="trn1-neuron",
+                instance_types=("trn1.32xlarge",),
+                max_size=max_per_group,
+                disk_size=500,
+                labels={
+                    "aws.amazon.com/neuron": "true",
+                    "node.kubernetes.io/instance-type": "trn1.32xlarge",
+                },
+                taints=(
+                    {
+                        "key": "aws.amazon.com/neuron",
+                        "value": "true",
+                        "effect": "NO_SCHEDULE",
+                    },
+                ),
+            ),
+        ),
+    ]
+
+
 def create_default_gpu_node_groups(
     scope: Construct,
     env_config: EnvironmentConfig,
@@ -274,7 +332,7 @@ def create_default_gpu_node_groups(
 ) -> list[GpuNodeGroupConstruct]:
     """Create default GPU node groups for the platform.
 
-    Creates node groups for different GPU instance types:
+    Creates node groups for different accelerator types:
     - p4d: NVIDIA A100 GPUs (8x 40GB)
     - p5: NVIDIA H100 GPUs (8x 80GB)
     - trn1: AWS Trainium chips
@@ -290,92 +348,17 @@ def create_default_gpu_node_groups(
     Returns:
         List of created node group constructs
     """
-    eks_config = env_config.eks
-    node_groups = []
-
-    # P4d node group (NVIDIA A100)
-    p4d_config = GpuNodeGroupConfig(
-        name="p4d-gpu",
-        instance_types=("p4d.24xlarge",),
-        min_size=0,
-        max_size=eks_config.max_nodes // 3,
-        desired_size=0,
-        disk_size=500,
-        labels={
-            "nvidia.com/gpu.product": "NVIDIA-A100-SXM4-40GB",
-            "nvidia.com/gpu.memory": "40960",
-        },
-    )
-    node_groups.append(
+    definitions = _default_node_group_definitions(env_config.eks.max_nodes)
+    return [
         GpuNodeGroupConstruct(
             scope,
-            "P4dNodeGroup",
+            construct_id,
             env_config=env_config,
             eks_cluster=eks_cluster,
             node_role=node_role,
-            node_group_config=p4d_config,
+            node_group_config=config,
             subnets=subnets,
             vpc=vpc,
         )
-    )
-
-    # P5 node group (NVIDIA H100)
-    p5_config = GpuNodeGroupConfig(
-        name="p5-gpu",
-        instance_types=("p5.48xlarge",),
-        min_size=0,
-        max_size=eks_config.max_nodes // 3,
-        desired_size=0,
-        disk_size=1000,
-        labels={
-            "nvidia.com/gpu.product": "NVIDIA-H100-80GB-HBM3",
-            "nvidia.com/gpu.memory": "81920",
-        },
-    )
-    node_groups.append(
-        GpuNodeGroupConstruct(
-            scope,
-            "P5NodeGroup",
-            env_config=env_config,
-            eks_cluster=eks_cluster,
-            node_role=node_role,
-            node_group_config=p5_config,
-            subnets=subnets,
-            vpc=vpc,
-        )
-    )
-
-    # Trn1 node group (AWS Trainium)
-    trn1_config = GpuNodeGroupConfig(
-        name="trn1-neuron",
-        instance_types=("trn1.32xlarge",),
-        min_size=0,
-        max_size=eks_config.max_nodes // 3,
-        desired_size=0,
-        disk_size=500,
-        labels={
-            "aws.amazon.com/neuron": "true",
-            "node.kubernetes.io/instance-type": "trn1.32xlarge",
-        },
-        taints=(
-            {
-                "key": "aws.amazon.com/neuron",
-                "value": "true",
-                "effect": "NO_SCHEDULE",
-            },
-        ),
-    )
-    node_groups.append(
-        GpuNodeGroupConstruct(
-            scope,
-            "Trn1NodeGroup",
-            env_config=env_config,
-            eks_cluster=eks_cluster,
-            node_role=node_role,
-            node_group_config=trn1_config,
-            subnets=subnets,
-            vpc=vpc,
-        )
-    )
-
-    return node_groups
+        for construct_id, config in definitions
+    ]

@@ -23,15 +23,15 @@ Deployment Order:
 7. AlbStack
 """
 
-# Layer 1: Foundation
-# Layer 3: Compute
 # Application
 from .application.application_stack import ApplicationStack
+
+# Layer 3: Compute
 from .compute.eks_stack import EksStack
 from .compute.hyperpod_addons_stack import HyperPodAddonsStack
 from .compute.sagemaker_hyperpod_stack import SagemakerHyperPodStack
 
-# Layer 2: Data
+# Layer 2: Data + Layer 1: Foundation
 from .data.database_stack import DatabaseStack
 from .foundation.iam_stack import IamStack
 from .foundation.network_stack import NetworkStack

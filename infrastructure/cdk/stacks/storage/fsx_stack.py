@@ -316,41 +316,41 @@ class FsxLustreStack(cdk.Stack):
 
     def _create_outputs(self) -> None:
         """Create CloudFormation outputs for cross-stack references."""
-        create_output(
-            self, "FileSystemId", self._file_system.ref, "FSx for Lustre file system ID"
-        )
-        dns_name = f"{self._file_system.ref}.fsx.{self.region}.amazonaws.com"
-        create_output(
-            self, "FileSystemDnsName", dns_name, "FSx for Lustre DNS name for mounting"
-        )
-        create_output(
-            self,
-            "FileSystemMountName",
-            self._file_system.attr_lustre_mount_name,
-            "FSx for Lustre mount name",
-        )
-        create_output(
-            self,
-            "SecurityGroupId",
-            self._security_group.security_group_id,
-            "FSx security group ID",
-        )
         storage_capacity = self._get_validated_storage_capacity()
-        create_output(
-            self,
-            "StorageCapacityGiB",
-            str(storage_capacity),
-            "FSx storage capacity in GiB",
-        )
         throughput_mbps = (
             storage_capacity // 1024
         ) * self.env_config.storage.fsx_throughput_per_tb
-        create_output(
-            self,
-            "TotalThroughputMBps",
-            str(throughput_mbps),
-            "FSx total throughput in MB/s",
-        )
+
+        outputs = [
+            ("FileSystemId", self._file_system.ref, "FSx for Lustre file system ID"),
+            (
+                "FileSystemDnsName",
+                self.dns_name,
+                "FSx for Lustre DNS name for mounting",
+            ),
+            (
+                "FileSystemMountName",
+                self._file_system.attr_lustre_mount_name,
+                "FSx for Lustre mount name",
+            ),
+            (
+                "SecurityGroupId",
+                self._security_group.security_group_id,
+                "FSx security group ID",
+            ),
+            (
+                "StorageCapacityGiB",
+                str(storage_capacity),
+                "FSx storage capacity in GiB",
+            ),
+            (
+                "TotalThroughputMBps",
+                str(throughput_mbps),
+                "FSx total throughput in MB/s",
+            ),
+        ]
+        for output_id, value, description in outputs:
+            create_output(self, output_id, value, description)
 
     @property
     def file_system(self) -> fsx.CfnFileSystem:

@@ -12,20 +12,26 @@ import aws_cdk as cdk
 def to_kebab_case(name: str) -> str:
     """将 PascalCase/camelCase 转换为 kebab-case。
 
+    正确处理连续大写字母（缩写词），例如 "EKS" 保持为 "eks"。
+
     Args:
         name: 输入名称 (如 "ClusterEndpoint", "vpcId")
 
     Returns:
-        转换后的 kebab-case 字符串 (如 "cluster-endpoint", "vpc-id")
+        转换后的 kebab-case 字符串
 
     Example:
         ```python
         to_kebab_case("ClusterEndpoint")  # "cluster-endpoint"
-        to_kebab_case("vpcId")  # "vpc-id"
-        to_kebab_case("EKSClusterARN")  # "e-k-s-cluster-a-r-n"
+        to_kebab_case("vpcId")            # "vpc-id"
+        to_kebab_case("EKSClusterARN")    # "eks-cluster-arn"
         ```
     """
-    return re.sub(r"(?<!^)(?=[A-Z])", "-", name).lower()
+    # 在连续大写字母与小写字母之间插入分隔符 (EKSCluster -> EKS-Cluster)
+    result = re.sub(r"([A-Z]+)([A-Z][a-z])", r"\1-\2", name)
+    # 在小写字母/数字与大写字母之间插入分隔符 (clusterEndpoint -> cluster-Endpoint)
+    result = re.sub(r"([a-z0-9])([A-Z])", r"\1-\2", result)
+    return result.lower()
 
 
 def create_output(

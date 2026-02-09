@@ -14,6 +14,7 @@ Reference:
 import aws_cdk as cdk
 from aws_cdk import aws_aps as aps
 from aws_cdk import aws_eks as eks
+from aws_cdk import aws_iam as iam
 
 from config import EnvironmentConfig
 from config.constants import EKS_ADDON_NAMES
@@ -96,7 +97,7 @@ class ObservabilityStack(cdk.Stack):
 
         return workspace
 
-    def _create_collector_role(self) -> None:
+    def _create_collector_role(self) -> iam.Role:
         """创建 Observability 收集器的 IAM Role (Pod Identity).
 
         此角色允许 Observability 收集器 Pod 通过 Pod Identity

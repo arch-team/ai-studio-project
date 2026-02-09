@@ -278,45 +278,24 @@ class StorageStack(cdk.Stack):
 
     def _create_outputs(self) -> None:
         """创建 CloudFormation 输出用于跨 Stack 引用。"""
-        # Datasets bucket
-        create_output(
-            self,
-            "DatasetsBucketName",
-            self._datasets_bucket.bucket_name,
-            "S3 bucket name for training datasets",
-        )
-        create_output(
-            self,
-            "DatasetsBucketArn",
-            self._datasets_bucket.bucket_arn,
-            "S3 bucket ARN for training datasets",
-        )
-        # Models bucket
-        create_output(
-            self,
-            "ModelsBucketName",
-            self._models_bucket.bucket_name,
-            "S3 bucket name for model artifacts",
-        )
-        create_output(
-            self,
-            "ModelsBucketArn",
-            self._models_bucket.bucket_arn,
-            "S3 bucket ARN for model artifacts",
-        )
-        # Checkpoints bucket
-        create_output(
-            self,
-            "CheckpointsBucketName",
-            self._checkpoints_bucket.bucket_name,
-            "S3 bucket name for training checkpoints",
-        )
-        create_output(
-            self,
-            "CheckpointsBucketArn",
-            self._checkpoints_bucket.bucket_arn,
-            "S3 bucket ARN for training checkpoints",
-        )
+        bucket_outputs = [
+            ("Datasets", self._datasets_bucket, "training datasets"),
+            ("Models", self._models_bucket, "model artifacts"),
+            ("Checkpoints", self._checkpoints_bucket, "training checkpoints"),
+        ]
+        for label, bucket, description in bucket_outputs:
+            create_output(
+                self,
+                f"{label}BucketName",
+                bucket.bucket_name,
+                f"S3 bucket name for {description}",
+            )
+            create_output(
+                self,
+                f"{label}BucketArn",
+                bucket.bucket_arn,
+                f"S3 bucket ARN for {description}",
+            )
 
     @property
     def datasets_bucket(self) -> s3.Bucket:

@@ -148,6 +148,22 @@ class IamStack(cdk.Stack):
 
         return role
 
+    def _s3_bucket_arns(self, *bucket_suffixes: str) -> list[str]:
+        """生成 S3 bucket 和 object 的 ARN 列表。
+
+        Args:
+            *bucket_suffixes: bucket 名称后缀列表 (如 "datasets", "models")
+
+        Returns:
+            包含 bucket ARN 和 object ARN 的列表
+        """
+        arns: list[str] = []
+        for suffix in bucket_suffixes:
+            bucket_name = f"{self.env_config.resource_prefix}-{suffix}"
+            arns.append(f"arn:aws:s3:::{bucket_name}")
+            arns.append(f"arn:aws:s3:::{bucket_name}/*")
+        return arns
+
     def _create_training_execution_role(self) -> iam.Role:
         """Create IAM role for training job execution.
 
@@ -189,14 +205,7 @@ class IamStack(cdk.Stack):
                     "s3:PutObject",
                     "s3:DeleteObject",
                 ],
-                resources=[
-                    f"arn:aws:s3:::{self.env_config.resource_prefix}-datasets/*",
-                    f"arn:aws:s3:::{self.env_config.resource_prefix}-datasets",
-                    f"arn:aws:s3:::{self.env_config.resource_prefix}-models/*",
-                    f"arn:aws:s3:::{self.env_config.resource_prefix}-models",
-                    f"arn:aws:s3:::{self.env_config.resource_prefix}-checkpoints/*",
-                    f"arn:aws:s3:::{self.env_config.resource_prefix}-checkpoints",
-                ],
+                resources=self._s3_bucket_arns("datasets", "models", "checkpoints"),
             )
         )
 
@@ -311,12 +320,7 @@ class IamStack(cdk.Stack):
                     "s3:GetObjectAttributes",
                     "s3:HeadObject",
                 ],
-                resources=[
-                    f"arn:aws:s3:::{self.env_config.resource_prefix}-datasets",
-                    f"arn:aws:s3:::{self.env_config.resource_prefix}-datasets/*",
-                    f"arn:aws:s3:::{self.env_config.resource_prefix}-models",
-                    f"arn:aws:s3:::{self.env_config.resource_prefix}-models/*",
-                ],
+                resources=self._s3_bucket_arns("datasets", "models"),
             )
         )
 
@@ -329,11 +333,7 @@ class IamStack(cdk.Stack):
                     "s3:GetObject",
                     "s3:PutObject",
                 ],
-                resources=[
-                    f"arn:aws:s3:::{self.env_config.resource_prefix}-datasets/*",
-                    f"arn:aws:s3:::{self.env_config.resource_prefix}-models/*",
-                    f"arn:aws:s3:::{self.env_config.resource_prefix}-checkpoints/*",
-                ],
+                resources=self._s3_bucket_arns("datasets", "models", "checkpoints"),
             )
         )
 

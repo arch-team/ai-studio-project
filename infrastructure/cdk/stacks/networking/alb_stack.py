@@ -284,6 +284,43 @@ class AlbStack(cdk.Stack):
 
         return listener
 
+    def _create_target_group(
+        self,
+        construct_id: str,
+        port: int,
+        health_check_path: str,
+        name_suffix: str,
+    ) -> elbv2.ApplicationTargetGroup:
+        """创建标准化的 target group。
+
+        Args:
+            construct_id: CDK 构造 ID
+            port: 目标端口
+            health_check_path: 健康检查路径
+            name_suffix: target group 名称后缀
+
+        Returns:
+            配置好的 ApplicationTargetGroup
+        """
+        return elbv2.ApplicationTargetGroup(
+            self,
+            construct_id,
+            vpc=self._vpc,
+            port=port,
+            protocol=elbv2.ApplicationProtocol.HTTP,
+            target_type=elbv2.TargetType.IP,
+            health_check=elbv2.HealthCheck(
+                path=health_check_path,
+                port=str(port),
+                protocol=elbv2.Protocol.HTTP,
+                healthy_threshold_count=2,
+                unhealthy_threshold_count=3,
+                interval=Duration.seconds(30),
+                timeout=Duration.seconds(5),
+            ),
+            target_group_name=f"{self.env_config.resource_prefix}-{name_suffix}",
+        )
+
     def _create_target_groups(self) -> None:
         """Create target groups for different services.
 
@@ -298,105 +335,85 @@ class AlbStack(cdk.Stack):
         )
 
         # Backend API target group
-        self._backend_target_group = elbv2.ApplicationTargetGroup(
-            self,
+        self._backend_target_group = self._create_target_group(
             "BackendTargetGroup",
-            vpc=self._vpc,
             port=8000,
-            protocol=elbv2.ApplicationProtocol.HTTP,
-            target_type=elbv2.TargetType.IP,
-            health_check=elbv2.HealthCheck(
-                path="/health",
-                port="8000",
-                protocol=elbv2.Protocol.HTTP,
-                healthy_threshold_count=2,
-                unhealthy_threshold_count=3,
-                interval=Duration.seconds(30),
-                timeout=Duration.seconds(5),
-            ),
-            target_group_name=f"{self.env_config.resource_prefix}-api",
+            health_check_path="/health",
+            name_suffix="api",
         )
-
-        # Add backend API rule
         active_listener.add_action(
             "BackendApiRule",
             priority=10,
-            conditions=[
-                elbv2.ListenerCondition.path_patterns(["/api/*", "/health"]),
-            ],
+            conditions=[elbv2.ListenerCondition.path_patterns(["/api/*", "/health"])],
             action=elbv2.ListenerAction.forward([self._backend_target_group]),
         )
 
-        # Frontend target group
-        self._frontend_target_group = elbv2.ApplicationTargetGroup(
-            self,
-            "FrontendTargetGroup",
-            vpc=self._vpc,
-            port=3000,
-            protocol=elbv2.ApplicationProtocol.HTTP,
-            target_type=elbv2.TargetType.IP,
-            health_check=elbv2.HealthCheck(
-                path="/",
-                port="3000",
-                protocol=elbv2.Protocol.HTTP,
-                healthy_threshold_count=2,
-                unhealthy_threshold_count=3,
-                interval=Duration.seconds(30),
-                timeout=Duration.seconds(5),
-            ),
-            target_group_name=f"{self.env_config.resource_prefix}-frontend",
-        )
-
-        # Add frontend rule (default)
-        active_listener.add_action(
-            "FrontendRule",
-            priority=100,
-            conditions=[
-                elbv2.ListenerCondition.path_patterns(["/*"]),
-            ],
-            action=elbv2.ListenerAction.forward([self._frontend_target_group]),
-        )
-
-        # Grafana target group
-        self._grafana_target_group = elbv2.ApplicationTargetGroup(
-            self,
+        # Grafana target group (priority 20, before frontend catch-all)
+        self._grafana_target_group = self._create_target_group(
             "GrafanaTargetGroup",
-            vpc=self._vpc,
             port=3000,
-            protocol=elbv2.ApplicationProtocol.HTTP,
-            target_type=elbv2.TargetType.IP,
-            health_check=elbv2.HealthCheck(
-                path="/api/health",
-                port="3000",
-                protocol=elbv2.Protocol.HTTP,
-                healthy_threshold_count=2,
-                unhealthy_threshold_count=3,
-                interval=Duration.seconds(30),
-                timeout=Duration.seconds(5),
-            ),
-            target_group_name=f"{self.env_config.resource_prefix}-grafana",
+            health_check_path="/api/health",
+            name_suffix="grafana",
         )
-
-        # Add Grafana rule
         active_listener.add_action(
             "GrafanaRule",
             priority=20,
-            conditions=[
-                elbv2.ListenerCondition.path_patterns(["/grafana/*"]),
-            ],
+            conditions=[elbv2.ListenerCondition.path_patterns(["/grafana/*"])],
             action=elbv2.ListenerAction.forward([self._grafana_target_group]),
+        )
+
+        # Frontend target group (catch-all, lowest priority)
+        self._frontend_target_group = self._create_target_group(
+            "FrontendTargetGroup",
+            port=3000,
+            health_check_path="/",
+            name_suffix="frontend",
+        )
+        active_listener.add_action(
+            "FrontendRule",
+            priority=100,
+            conditions=[elbv2.ListenerCondition.path_patterns(["/*"])],
+            action=elbv2.ListenerAction.forward([self._frontend_target_group]),
+        )
+
+    @staticmethod
+    def _waf_visibility_config(
+        metric_name: str,
+    ) -> wafv2.CfnWebACL.VisibilityConfigProperty:
+        """创建 WAF 可见性配置。"""
+        return wafv2.CfnWebACL.VisibilityConfigProperty(
+            cloud_watch_metrics_enabled=True,
+            metric_name=metric_name,
+            sampled_requests_enabled=True,
+        )
+
+    @staticmethod
+    def _waf_managed_rule(
+        name: str,
+        priority: int,
+    ) -> wafv2.CfnWebACL.RuleProperty:
+        """创建 AWS 托管规则组引用。"""
+        return wafv2.CfnWebACL.RuleProperty(
+            name=name,
+            priority=priority,
+            override_action=wafv2.CfnWebACL.OverrideActionProperty(none={}),
+            statement=wafv2.CfnWebACL.StatementProperty(
+                managed_rule_group_statement=wafv2.CfnWebACL.ManagedRuleGroupStatementProperty(
+                    vendor_name="AWS",
+                    name=name,
+                ),
+            ),
+            visibility_config=AlbStack._waf_visibility_config(name),
         )
 
     def _create_waf(self) -> None:
         """Create AWS WAF WebACL for protection.
 
         Implements:
-        - Rate limiting
+        - Rate limiting (2000 req / 5min per IP)
         - AWS Managed Rules (common threats)
         - SQL injection protection
-        - XSS protection
         """
-        # Create WAF WebACL
         web_acl = wafv2.CfnWebACL(
             self,
             "WafWebAcl",
@@ -405,13 +422,11 @@ class AlbStack(cdk.Stack):
             default_action=wafv2.CfnWebACL.DefaultActionProperty(
                 allow=wafv2.CfnWebACL.AllowActionProperty(),
             ),
-            visibility_config=wafv2.CfnWebACL.VisibilityConfigProperty(
-                cloud_watch_metrics_enabled=True,
-                metric_name=f"{self.env_config.resource_prefix}-waf",
-                sampled_requests_enabled=True,
+            visibility_config=self._waf_visibility_config(
+                f"{self.env_config.resource_prefix}-waf"
             ),
             rules=[
-                # Rate limiting rule
+                # 速率限制规则
                 wafv2.CfnWebACL.RuleProperty(
                     name="RateLimitRule",
                     priority=1,
@@ -420,54 +435,15 @@ class AlbStack(cdk.Stack):
                     ),
                     statement=wafv2.CfnWebACL.StatementProperty(
                         rate_based_statement=wafv2.CfnWebACL.RateBasedStatementProperty(
-                            limit=2000,  # 2000 requests per 5 minutes per IP
+                            limit=2000,
                             aggregate_key_type="IP",
                         ),
                     ),
-                    visibility_config=wafv2.CfnWebACL.VisibilityConfigProperty(
-                        cloud_watch_metrics_enabled=True,
-                        metric_name="RateLimitRule",
-                        sampled_requests_enabled=True,
-                    ),
+                    visibility_config=self._waf_visibility_config("RateLimitRule"),
                 ),
-                # AWS Managed Core Rule Set
-                wafv2.CfnWebACL.RuleProperty(
-                    name="AWSManagedRulesCommonRuleSet",
-                    priority=2,
-                    override_action=wafv2.CfnWebACL.OverrideActionProperty(
-                        none={},
-                    ),
-                    statement=wafv2.CfnWebACL.StatementProperty(
-                        managed_rule_group_statement=wafv2.CfnWebACL.ManagedRuleGroupStatementProperty(
-                            vendor_name="AWS",
-                            name="AWSManagedRulesCommonRuleSet",
-                        ),
-                    ),
-                    visibility_config=wafv2.CfnWebACL.VisibilityConfigProperty(
-                        cloud_watch_metrics_enabled=True,
-                        metric_name="AWSManagedRulesCommonRuleSet",
-                        sampled_requests_enabled=True,
-                    ),
-                ),
-                # SQL Injection protection
-                wafv2.CfnWebACL.RuleProperty(
-                    name="AWSManagedRulesSQLiRuleSet",
-                    priority=3,
-                    override_action=wafv2.CfnWebACL.OverrideActionProperty(
-                        none={},
-                    ),
-                    statement=wafv2.CfnWebACL.StatementProperty(
-                        managed_rule_group_statement=wafv2.CfnWebACL.ManagedRuleGroupStatementProperty(
-                            vendor_name="AWS",
-                            name="AWSManagedRulesSQLiRuleSet",
-                        ),
-                    ),
-                    visibility_config=wafv2.CfnWebACL.VisibilityConfigProperty(
-                        cloud_watch_metrics_enabled=True,
-                        metric_name="AWSManagedRulesSQLiRuleSet",
-                        sampled_requests_enabled=True,
-                    ),
-                ),
+                # AWS 托管规则组
+                self._waf_managed_rule("AWSManagedRulesCommonRuleSet", priority=2),
+                self._waf_managed_rule("AWSManagedRulesSQLiRuleSet", priority=3),
             ],
         )
 

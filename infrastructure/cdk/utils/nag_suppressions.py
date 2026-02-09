@@ -14,13 +14,6 @@ if TYPE_CHECKING:
     import aws_cdk as cdk
 
 
-# 通用抑制规则 - 适用于多个 Stack
-COMMON_SUPPRESSIONS = {
-    "AwsSolutions-IAM4": "AWS managed policies are used following AWS best practices",
-    "AwsSolutions-IAM5": "Wildcard permissions are scoped to specific resources and conditions",
-    "AwsSolutions-L1": "Lambda runtime version is managed by CDK construct library",
-}
-
 # 各 Stack 特定的抑制规则
 STACK_SPECIFIC_SUPPRESSIONS = {
     "network": [
@@ -187,25 +180,18 @@ def apply_nag_suppressions(app: "cdk.App") -> None:
         apply_nag_suppressions(app)
         ```
     """
-    # 遍历 App 中的所有节点
     for node in app.node.find_all():
-        # 只处理 Stack 类型的节点
         if not hasattr(node, "stack_name"):
             continue
 
-        stack = node
-        stack_id = stack.node.id.lower()
+        stack_id = node.node.id.lower()
 
-        # 从 Stack ID 中提取 Stack 类型
-        # 格式: "ai-platform-{env}-{stack_type}"
-        # 例如: "ai-platform-dev-network" -> "network"
-        #       "ai-platform-dev-sagemaker-hyperpod" -> "sagemaker-hyperpod"
-        #       "ai-platform-dev-hyperpod-addons" -> "hyperpod-addons"
-        # 方法: 匹配 STACK_SPECIFIC_SUPPRESSIONS 中所有 key，找到 stack_id 以之结尾的
+        # 匹配 Stack ID 后缀与抑制规则 key
+        # 例如: "ai-platform-dev-network" 匹配 "network"
         for stack_type, suppressions in STACK_SPECIFIC_SUPPRESSIONS.items():
             if stack_id.endswith(f"-{stack_type}"):
                 NagSuppressions.add_stack_suppressions(
-                    stack, suppressions, apply_to_nested_stacks=True
+                    node, suppressions, apply_to_nested_stacks=True
                 )
                 break
 

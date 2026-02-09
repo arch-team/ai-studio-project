@@ -66,14 +66,14 @@ def create_app() -> cdk.App:
     # This includes: Project, Environment, ManagedBy, CostCenter
     apply_standard_tags(app, env_config)
 
-    # Stack naming convention: ai-platform-{env}-{stack-name}
+    # 通用变量
     stack_prefix = env_config.resource_prefix
+    is_prod = env_config.name.value == "prod"
 
     # =========================================================================
     # Layer 1: Foundation Stacks (VPC, IAM base)
     # =========================================================================
 
-    # Network Stack - VPC with 3-tier subnet isolation
     network_stack = NetworkStack(
         app,
         f"{stack_prefix}-network",
@@ -82,7 +82,6 @@ def create_app() -> cdk.App:
         description="VPC with public/private subnets, NAT Gateways, and VPC endpoints",
     )
 
-    # IAM Stack - Base IAM roles and policies
     iam_stack = IamStack(
         app,
         f"{stack_prefix}-iam",
@@ -95,7 +94,6 @@ def create_app() -> cdk.App:
     # KMS Keys (集中管理加密密钥)
     # =========================================================================
 
-    # 在 IAM Stack 中创建 KMS Keys (与 IAM 角色共存)
     s3_kms_key = PlatformKmsKey(
         iam_stack,
         "S3KmsKey",
@@ -120,8 +118,6 @@ def create_app() -> cdk.App:
     # Layer 2: Data Stacks (Aurora, S3, FSx)
     # =========================================================================
 
-    # Database Stack - Aurora MySQL Serverless v2
-    # Enable termination protection for production to prevent accidental deletion
     database_stack = DatabaseStack(
         app,
         f"{stack_prefix}-database",
@@ -130,13 +126,11 @@ def create_app() -> cdk.App:
         storage_encryption_key=rds_kms_key.key,
         env=env_config.to_cdk_environment(),
         description="Aurora MySQL Serverless v2 with RDS Proxy",
-        termination_protection=env_config.name.value == "prod",
+        termination_protection=is_prod,
     )
     database_stack.add_dependency(network_stack)
     database_stack.add_dependency(iam_stack)
 
-    # Storage Stack - S3 buckets for datasets, models, checkpoints
-    # Enable termination protection for production to prevent accidental deletion
     storage_stack = StorageStack(
         app,
         f"{stack_prefix}-storage",
@@ -144,7 +138,7 @@ def create_app() -> cdk.App:
         encryption_key=s3_kms_key.key,
         env=env_config.to_cdk_environment(),
         description="S3 buckets with lifecycle policies and KMS encryption",
-        termination_protection=env_config.name.value == "prod",
+        termination_protection=is_prod,
     )
     storage_stack.add_dependency(iam_stack)
 
@@ -152,9 +146,6 @@ def create_app() -> cdk.App:
     # Layer 3a: EKS Foundation Stack
     # =========================================================================
 
-    # EKS Stack - EKS cluster foundation for HyperPod
-    # This stack creates the EKS cluster and add-ons
-    # After deployment, you need to install HyperPod Helm Chart before deploying HyperPod
     eks_stack = EksStack(
         app,
         f"{stack_prefix}-eks",
@@ -171,9 +162,6 @@ def create_app() -> cdk.App:
     # Layer 3b: SageMaker HyperPod Stack
     # =========================================================================
 
-    # SageMaker HyperPod Stack - HyperPod cluster attached to EKS
-    # Note: EksStack automatically installs HyperPod Helm Chart via addHelmChart()
-    # Prerequisites: Run ./scripts/setup_helm_chart.sh before first deployment
     sagemaker_hyperpod_stack = SagemakerHyperPodStack(
         app,
         f"{stack_prefix}-sagemaker-hyperpod",
@@ -189,9 +177,6 @@ def create_app() -> cdk.App:
     # Layer 3c: HyperPod Add-ons (Training Operator, Task Governance, Observability)
     # =========================================================================
 
-    # HyperPod Add-ons Stack - EKS add-ons for distributed training
-    # T008d-1: Training Operator (PyTorchJob/TFJob CRD) + Task Governance (Kueue)
-    # T008d-2: Observability (Prometheus + Grafana via Amazon Managed Service)
     hyperpod_addons_stack = HyperPodAddonsStack(
         app,
         f"{stack_prefix}-hyperpod-addons",
@@ -222,8 +207,6 @@ def create_app() -> cdk.App:
     # Layer 4: High-Performance Storage (FSx for Lustre)
     # =========================================================================
 
-    # FSx for Lustre Stack - High-performance training data storage
-    # Enable termination protection for production to prevent accidental deletion
     fsx_stack = FsxLustreStack(
         app,
         f"{stack_prefix}-fsx",
@@ -232,7 +215,7 @@ def create_app() -> cdk.App:
         datasets_bucket=storage_stack.datasets_bucket,
         env=env_config.to_cdk_environment(),
         description="FSx for Lustre with S3 Data Repository Association",
-        termination_protection=env_config.name.value == "prod",
+        termination_protection=is_prod,
     )
     fsx_stack.add_dependency(network_stack)
     fsx_stack.add_dependency(storage_stack)
@@ -242,10 +225,8 @@ def create_app() -> cdk.App:
     # Layer 5: Network Ingress (ALB with TLS termination)
     # =========================================================================
 
-    # ALB Stack - Application Load Balancer with HTTPS and WAF
-    # Note: certificate_arn should be provided via context for production
     certificate_arn = app.node.try_get_context("certificate_arn")
-    enable_waf = env_config.name.value == "prod"  # WAF enabled in production
+    enable_waf = is_prod
 
     alb_stack = AlbStack(
         app,
@@ -276,11 +257,7 @@ def create_app() -> cdk.App:
     # CDK Nag - Security and best practices checks
     # =========================================================================
 
-    # Apply AWS Solutions security checks for all environments
-    # CDK Nag ensures consistent security posture across dev/staging/prod
     cdk.Aspects.of(app).add(AwsSolutionsChecks(verbose=True))
-
-    # Apply all Nag suppressions (centrally managed in utils/nag_suppressions.py)
     apply_nag_suppressions(app)
 
     return app

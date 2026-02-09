@@ -7,12 +7,8 @@ deployments (dev, staging, prod) following AWS Well-Architected Framework best p
 
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import TYPE_CHECKING
 
 import aws_cdk as cdk
-
-if TYPE_CHECKING:
-    pass
 
 
 class DeploymentMode(str, Enum):
@@ -113,14 +109,11 @@ class EksAddonVersions:
 
     @classmethod
     def for_k8s_1_33(cls) -> "EksAddonVersions":
-        """Factory method for Kubernetes 1.33 compatible versions."""
-        return cls(
-            ebs_csi="v1.54.0-eksbuild.1",
-            fsx_csi="v1.8.0-eksbuild.1",
-            vpc_cni="v1.21.1-eksbuild.1",
-            coredns="v1.12.4-eksbuild.1",
-            kube_proxy="v1.33.5-eksbuild.2",
-        )
+        """Factory method for Kubernetes 1.33 compatible versions.
+
+        注意: 版本号与类默认值保持一致，更新时需同步修改。
+        """
+        return cls()
 
     @classmethod
     def for_k8s_1_32(cls) -> "EksAddonVersions":

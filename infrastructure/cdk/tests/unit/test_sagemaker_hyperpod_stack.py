@@ -1,15 +1,15 @@
 """
-Unit tests for SageMaker HyperPod Stack.
+SageMaker HyperPod Stack 单元测试.
 
-Tests cover:
-- HyperPod cluster creation with EKS orchestration
-- Lifecycle scripts S3 bucket configuration
-- IAM execution role with comprehensive permissions
-- VPC and subnet configuration
-- EKS cluster integration
-- Automatic node recovery
-- CloudFormation outputs
-- Security configuration
+测试覆盖:
+- HyperPod 集群创建 (EKS 编排)
+- 生命周期脚本 S3 Bucket 配置
+- IAM 执行角色 (综合权限)
+- VPC 和子网配置
+- EKS 集群集成
+- 自动节点恢复
+- CloudFormation 输出
+- 安全配置
 """
 
 import aws_cdk as cdk
@@ -19,139 +19,103 @@ from aws_cdk.assertions import Match, Template
 from config import EnvironmentConfig
 from stacks import EksStack, IamStack, NetworkStack, SagemakerHyperPodStack
 
+# =============================================================================
+# 共用 Fixtures - 使用 conftest 的 network_stack, iam_stack, eks_stack
+# =============================================================================
+
+
+@pytest.fixture
+def hyperpod_stack(
+    cdk_app: cdk.App,
+    dev_config: EnvironmentConfig,
+    cdk_env: cdk.Environment,
+    network_stack: NetworkStack,
+    eks_stack: EksStack,
+) -> SagemakerHyperPodStack:
+    """创建 HyperPod Stack."""
+    return SagemakerHyperPodStack(
+        cdk_app,
+        "TestHyperPodStack",
+        env_config=dev_config,
+        vpc=network_stack.vpc,
+        eks_cluster=eks_stack.eks_cluster,
+        env=cdk_env,
+    )
+
+
+@pytest.fixture
+def template(hyperpod_stack: SagemakerHyperPodStack) -> Template:
+    """获取 CloudFormation 模板."""
+    return Template.from_stack(hyperpod_stack)
+
+
+def _create_hyperpod_template(
+    cdk_app: cdk.App,
+    env_config: EnvironmentConfig,
+    cdk_env: cdk.Environment,
+    prefix: str,
+) -> Template:
+    """辅助函数: 为指定环境创建 HyperPod 模板."""
+    network = NetworkStack(
+        cdk_app, f"{prefix}Network", env_config=env_config, env=cdk_env
+    )
+    iam = IamStack(cdk_app, f"{prefix}Iam", env_config=env_config, env=cdk_env)
+    eks = EksStack(
+        cdk_app,
+        f"{prefix}Eks",
+        env_config=env_config,
+        vpc=network.vpc,
+        eks_node_role=iam.eks_node_role,
+        env=cdk_env,
+    )
+    stack = SagemakerHyperPodStack(
+        cdk_app,
+        f"{prefix}HyperPod",
+        env_config=env_config,
+        vpc=network.vpc,
+        eks_cluster=eks.eks_cluster,
+        env=cdk_env,
+    )
+    return Template.from_stack(stack)
+
+
+# =============================================================================
+# 测试类
+# =============================================================================
+
 
 class TestSagemakerHyperPodStackCreation:
-    """Tests for HyperPod Stack creation."""
-
-    @pytest.fixture
-    def network_stack(
-        self, cdk_app: cdk.App, dev_config: EnvironmentConfig, cdk_env: cdk.Environment
-    ) -> NetworkStack:
-        """Create a Network Stack for testing."""
-        return NetworkStack(
-            cdk_app,
-            "TestNetworkStack",
-            env_config=dev_config,
-            env=cdk_env,
-        )
-
-    @pytest.fixture
-    def iam_stack(
-        self, cdk_app: cdk.App, dev_config: EnvironmentConfig, cdk_env: cdk.Environment
-    ) -> IamStack:
-        """Create an IAM Stack for testing."""
-        return IamStack(
-            cdk_app,
-            "TestIamStack",
-            env_config=dev_config,
-            env=cdk_env,
-        )
-
-    @pytest.fixture
-    def eks_stack(
-        self,
-        cdk_app: cdk.App,
-        dev_config: EnvironmentConfig,
-        cdk_env: cdk.Environment,
-        network_stack: NetworkStack,
-        iam_stack: IamStack,
-    ) -> EksStack:
-        """Create an EKS Stack for testing."""
-        return EksStack(
-            cdk_app,
-            "TestEksStack",
-            env_config=dev_config,
-            vpc=network_stack.vpc,
-            eks_node_role=iam_stack.eks_node_role,
-            env=cdk_env,
-        )
-
-    @pytest.fixture
-    def hyperpod_stack(
-        self,
-        cdk_app: cdk.App,
-        dev_config: EnvironmentConfig,
-        cdk_env: cdk.Environment,
-        network_stack: NetworkStack,
-        eks_stack: EksStack,
-    ) -> SagemakerHyperPodStack:
-        """Create a HyperPod Stack for testing."""
-        return SagemakerHyperPodStack(
-            cdk_app,
-            "TestHyperPodStack",
-            env_config=dev_config,
-            vpc=network_stack.vpc,
-            eks_cluster=eks_stack.eks_cluster,
-            env=cdk_env,
-        )
-
-    @pytest.fixture
-    def template(self, hyperpod_stack: SagemakerHyperPodStack) -> Template:
-        """Get CloudFormation template from the stack."""
-        return Template.from_stack(hyperpod_stack)
+    """HyperPod Stack 创建测试."""
 
     def test_stack_synthesizes(self, hyperpod_stack: SagemakerHyperPodStack) -> None:
-        """Verify the stack synthesizes without errors."""
+        """验证 Stack 可以成功合成."""
         assert hyperpod_stack is not None
 
     def test_hyperpod_cluster_created(self, template: Template) -> None:
-        """Verify HyperPod cluster resource is created."""
+        """验证 HyperPod 集群资源创建."""
         template.resource_count_is("AWS::SageMaker::Cluster", 1)
 
     def test_cluster_has_eks_orchestrator(self, template: Template) -> None:
-        """Verify HyperPod cluster uses EKS orchestration."""
+        """验证 HyperPod 集群使用 EKS 编排."""
         template.has_resource_properties(
             "AWS::SageMaker::Cluster",
             {
                 "Orchestrator": {
-                    "Eks": Match.object_like(
-                        {
-                            "ClusterArn": Match.any_value(),
-                        }
-                    )
+                    "Eks": Match.object_like({"ClusterArn": Match.any_value()})
                 }
             },
         )
 
 
 class TestLifecycleScriptsBucket:
-    """Tests for lifecycle scripts S3 bucket."""
-
-    @pytest.fixture
-    def template(
-        self, cdk_app: cdk.App, dev_config: EnvironmentConfig, cdk_env: cdk.Environment
-    ) -> Template:
-        """Create template for lifecycle scripts bucket testing."""
-        network_stack = NetworkStack(
-            cdk_app, "TestNetworkStack", env_config=dev_config, env=cdk_env
-        )
-        iam_stack = IamStack(
-            cdk_app, "TestIamStack", env_config=dev_config, env=cdk_env
-        )
-        eks_stack = EksStack(
-            cdk_app,
-            "TestEksStack",
-            env_config=dev_config,
-            vpc=network_stack.vpc,
-            eks_node_role=iam_stack.eks_node_role,
-            env=cdk_env,
-        )
-        stack = SagemakerHyperPodStack(
-            cdk_app,
-            "LifecycleScriptsTestStack",
-            env_config=dev_config,
-            vpc=network_stack.vpc,
-            eks_cluster=eks_stack.eks_cluster,
-            env=cdk_env,
-        )
-        return Template.from_stack(stack)
+    """生命周期脚本 S3 Bucket 测试."""
 
     def test_lifecycle_bucket_created(self, template: Template) -> None:
-        """Verify lifecycle scripts bucket is created."""
+        """验证生命周期脚本 Bucket 创建."""
         template.resource_count_is("AWS::S3::Bucket", 1)
 
     def test_bucket_encrypted(self, template: Template) -> None:
-        """Verify bucket uses S3-managed encryption."""
+        """验证 Bucket 使用 S3 托管加密."""
         template.has_resource_properties(
             "AWS::S3::Bucket",
             {
@@ -164,14 +128,14 @@ class TestLifecycleScriptsBucket:
         )
 
     def test_bucket_versioned(self, template: Template) -> None:
-        """Verify bucket has versioning enabled."""
+        """验证 Bucket 启用版本控制."""
         template.has_resource_properties(
             "AWS::S3::Bucket",
             {"VersioningConfiguration": {"Status": "Enabled"}},
         )
 
     def test_public_access_blocked(self, template: Template) -> None:
-        """Verify public access is completely blocked."""
+        """验证完全阻止公共访问."""
         template.has_resource_properties(
             "AWS::S3::Bucket",
             {
@@ -185,7 +149,7 @@ class TestLifecycleScriptsBucket:
         )
 
     def test_ssl_enforced(self, template: Template) -> None:
-        """Verify SSL is enforced via bucket policy."""
+        """验证通过 Bucket 策略强制 SSL."""
         template.has_resource_properties(
             "AWS::S3::BucketPolicy",
             {
@@ -208,39 +172,10 @@ class TestLifecycleScriptsBucket:
 
 
 class TestHyperPodExecutionRole:
-    """Tests for HyperPod execution IAM role."""
-
-    @pytest.fixture
-    def template(
-        self, cdk_app: cdk.App, dev_config: EnvironmentConfig, cdk_env: cdk.Environment
-    ) -> Template:
-        """Create template for execution role testing."""
-        network_stack = NetworkStack(
-            cdk_app, "TestNetworkStack", env_config=dev_config, env=cdk_env
-        )
-        iam_stack = IamStack(
-            cdk_app, "TestIamStack", env_config=dev_config, env=cdk_env
-        )
-        eks_stack = EksStack(
-            cdk_app,
-            "TestEksStack",
-            env_config=dev_config,
-            vpc=network_stack.vpc,
-            eks_node_role=iam_stack.eks_node_role,
-            env=cdk_env,
-        )
-        stack = SagemakerHyperPodStack(
-            cdk_app,
-            "ExecutionRoleTestStack",
-            env_config=dev_config,
-            vpc=network_stack.vpc,
-            eks_cluster=eks_stack.eks_cluster,
-            env=cdk_env,
-        )
-        return Template.from_stack(stack)
+    """HyperPod 执行 IAM 角色测试."""
 
     def test_execution_role_created(self, template: Template) -> None:
-        """Verify HyperPod execution role is created."""
+        """验证执行角色创建."""
         template.has_resource_properties(
             "AWS::IAM::Role",
             {
@@ -257,7 +192,7 @@ class TestHyperPodExecutionRole:
         )
 
     def test_managed_policy_attached(self, template: Template) -> None:
-        """Verify AWS managed HyperPod policy is attached."""
+        """验证 AWS 托管 HyperPod 策略附加."""
         template.has_resource_properties(
             "AWS::IAM::Role",
             {
@@ -284,7 +219,7 @@ class TestHyperPodExecutionRole:
         )
 
     def test_eks_cluster_access_policy(self, template: Template) -> None:
-        """Verify EKS cluster access permissions."""
+        """验证 EKS 集群访问权限."""
         template.has_resource_properties(
             "AWS::IAM::Policy",
             {
@@ -308,7 +243,7 @@ class TestHyperPodExecutionRole:
         )
 
     def test_ec2_network_access_policy(self, template: Template) -> None:
-        """Verify EC2 network permissions for VPC integration."""
+        """验证 EC2 网络权限 (VPC 集成)."""
         template.has_resource_properties(
             "AWS::IAM::Policy",
             {
@@ -335,7 +270,7 @@ class TestHyperPodExecutionRole:
         )
 
     def test_ecr_access_policy(self, template: Template) -> None:
-        """Verify ECR permissions for container image pulling."""
+        """验证 ECR 容器镜像拉取权限."""
         template.has_resource_properties(
             "AWS::IAM::Policy",
             {
@@ -361,7 +296,7 @@ class TestHyperPodExecutionRole:
         )
 
     def test_s3_bucket_access_granted(self, template: Template) -> None:
-        """Verify S3 bucket read access for lifecycle scripts."""
+        """验证 S3 Bucket 读取权限 (生命周期脚本)."""
         template.has_resource_properties(
             "AWS::IAM::Policy",
             {
@@ -371,11 +306,7 @@ class TestHyperPodExecutionRole:
                             Match.object_like(
                                 {
                                     "Action": Match.array_with(
-                                        [
-                                            "s3:GetObject*",
-                                            "s3:GetBucket*",
-                                            "s3:List*",
-                                        ]
+                                        ["s3:GetObject*", "s3:GetBucket*", "s3:List*"]
                                     )
                                 }
                             )
@@ -387,39 +318,10 @@ class TestHyperPodExecutionRole:
 
 
 class TestHyperPodClusterConfiguration:
-    """Tests for HyperPod cluster configuration."""
-
-    @pytest.fixture
-    def template(
-        self, cdk_app: cdk.App, dev_config: EnvironmentConfig, cdk_env: cdk.Environment
-    ) -> Template:
-        """Create template for cluster configuration testing."""
-        network_stack = NetworkStack(
-            cdk_app, "TestNetworkStack", env_config=dev_config, env=cdk_env
-        )
-        iam_stack = IamStack(
-            cdk_app, "TestIamStack", env_config=dev_config, env=cdk_env
-        )
-        eks_stack = EksStack(
-            cdk_app,
-            "TestEksStack",
-            env_config=dev_config,
-            vpc=network_stack.vpc,
-            eks_node_role=iam_stack.eks_node_role,
-            env=cdk_env,
-        )
-        stack = SagemakerHyperPodStack(
-            cdk_app,
-            "ClusterConfigTestStack",
-            env_config=dev_config,
-            vpc=network_stack.vpc,
-            eks_cluster=eks_stack.eks_cluster,
-            env=cdk_env,
-        )
-        return Template.from_stack(stack)
+    """HyperPod 集群配置测试."""
 
     def test_vpc_configuration(self, template: Template) -> None:
-        """Verify HyperPod cluster uses correct VPC configuration."""
+        """验证 VPC 配置."""
         template.has_resource_properties(
             "AWS::SageMaker::Cluster",
             {
@@ -431,14 +333,14 @@ class TestHyperPodClusterConfiguration:
         )
 
     def test_automatic_node_recovery(self, template: Template) -> None:
-        """Verify automatic node recovery is enabled."""
+        """验证自动节点恢复已启用."""
         template.has_resource_properties(
             "AWS::SageMaker::Cluster",
             {"NodeRecovery": "Automatic"},
         )
 
     def test_instance_group_configured(self, template: Template) -> None:
-        """Verify at least one instance group is configured."""
+        """验证至少一个实例组已配置."""
         template.has_resource_properties(
             "AWS::SageMaker::Cluster",
             {
@@ -457,7 +359,7 @@ class TestHyperPodClusterConfiguration:
         )
 
     def test_lifecycle_config_specified(self, template: Template) -> None:
-        """Verify lifecycle configuration is specified."""
+        """验证生命周期配置."""
         template.has_resource_properties(
             "AWS::SageMaker::Cluster",
             {
@@ -478,96 +380,38 @@ class TestHyperPodClusterConfiguration:
 
 
 class TestRemovalPolicies:
-    """Tests for removal policies per environment."""
+    """各环境删除策略测试."""
 
-    @pytest.fixture
-    def dev_template(self, cdk_app: cdk.App, cdk_env: cdk.Environment) -> Template:
-        """Create template for dev environment."""
-        dev_config = EnvironmentConfig.for_dev(
-            account="123456789012", region="us-east-1"
-        )
-        network_stack = NetworkStack(
-            cdk_app, "DevNetworkStack", env_config=dev_config, env=cdk_env
-        )
-        iam_stack = IamStack(cdk_app, "DevIamStack", env_config=dev_config, env=cdk_env)
-        eks_stack = EksStack(
-            cdk_app,
-            "DevEksStack",
-            env_config=dev_config,
-            vpc=network_stack.vpc,
-            eks_node_role=iam_stack.eks_node_role,
-            env=cdk_env,
-        )
-        stack = SagemakerHyperPodStack(
-            cdk_app,
-            "DevHyperPodStack",
-            env_config=dev_config,
-            vpc=network_stack.vpc,
-            eks_cluster=eks_stack.eks_cluster,
-            env=cdk_env,
-        )
-        return Template.from_stack(stack)
-
-    @pytest.fixture
-    def prod_template(self, cdk_app: cdk.App, cdk_env: cdk.Environment) -> Template:
-        """Create template for prod environment."""
-        prod_config = EnvironmentConfig.for_prod(
-            account="123456789012", region="us-east-1"
-        )
-        network_stack = NetworkStack(
-            cdk_app, "ProdNetworkStack", env_config=prod_config, env=cdk_env
-        )
-        iam_stack = IamStack(
-            cdk_app, "ProdIamStack", env_config=prod_config, env=cdk_env
-        )
-        eks_stack = EksStack(
-            cdk_app,
-            "ProdEksStack",
-            env_config=prod_config,
-            vpc=network_stack.vpc,
-            eks_node_role=iam_stack.eks_node_role,
-            env=cdk_env,
-        )
-        stack = SagemakerHyperPodStack(
-            cdk_app,
-            "ProdHyperPodStack",
-            env_config=prod_config,
-            vpc=network_stack.vpc,
-            eks_cluster=eks_stack.eks_cluster,
-            env=cdk_env,
-        )
-        return Template.from_stack(stack)
-
-    def test_dev_bucket_destroyable(self, dev_template: Template) -> None:
-        """Verify dev lifecycle bucket can be deleted."""
-        dev_template.has_resource_properties(
+    def test_dev_bucket_destroyable(
+        self, cdk_app: cdk.App, dev_config: EnvironmentConfig, cdk_env: cdk.Environment
+    ) -> None:
+        """验证开发环境生命周期 Bucket 可删除."""
+        template = _create_hyperpod_template(cdk_app, dev_config, cdk_env, "Dev")
+        template.has_resource_properties(
             "AWS::S3::Bucket",
             {
                 "Tags": Match.array_with(
                     [
                         Match.object_like(
-                            {
-                                "Key": "Purpose",
-                                "Value": "hyperpod-lifecycle-scripts",
-                            }
+                            {"Key": "Purpose", "Value": "hyperpod-lifecycle-scripts"}
                         )
                     ]
                 )
             },
         )
 
-    def test_prod_bucket_retained(self, prod_template: Template) -> None:
-        """Verify prod lifecycle bucket is retained on deletion."""
-        prod_template.has_resource_properties(
+    def test_prod_bucket_retained(
+        self, cdk_app: cdk.App, prod_config: EnvironmentConfig, cdk_env: cdk.Environment
+    ) -> None:
+        """验证生产环境生命周期 Bucket 被保留."""
+        template = _create_hyperpod_template(cdk_app, prod_config, cdk_env, "Prod")
+        template.has_resource_properties(
             "AWS::S3::Bucket",
             {
                 "Tags": Match.array_with(
                     [
                         Match.object_like(
-                            {
-                                "Key": "Purpose",
-                                "Value": "hyperpod-lifecycle-scripts",
-                            }
+                            {"Key": "Purpose", "Value": "hyperpod-lifecycle-scripts"}
                         )
                     ]
                 )
@@ -576,120 +420,50 @@ class TestRemovalPolicies:
 
 
 class TestHyperPodStackOutputs:
-    """Tests for HyperPod Stack CloudFormation outputs."""
-
-    @pytest.fixture
-    def hyperpod_stack(
-        self,
-        cdk_app: cdk.App,
-        dev_config: EnvironmentConfig,
-        cdk_env: cdk.Environment,
-    ) -> SagemakerHyperPodStack:
-        """Create HyperPod Stack for outputs testing."""
-        network_stack = NetworkStack(
-            cdk_app, "TestNetworkStack", env_config=dev_config, env=cdk_env
-        )
-        iam_stack = IamStack(
-            cdk_app, "TestIamStack", env_config=dev_config, env=cdk_env
-        )
-        eks_stack = EksStack(
-            cdk_app,
-            "TestEksStack",
-            env_config=dev_config,
-            vpc=network_stack.vpc,
-            eks_node_role=iam_stack.eks_node_role,
-            env=cdk_env,
-        )
-        return SagemakerHyperPodStack(
-            cdk_app,
-            "OutputTestStack",
-            env_config=dev_config,
-            vpc=network_stack.vpc,
-            eks_cluster=eks_stack.eks_cluster,
-            env=cdk_env,
-        )
+    """HyperPod Stack 输出属性测试."""
 
     def test_hyperpod_cluster_accessible(
         self, hyperpod_stack: SagemakerHyperPodStack
     ) -> None:
-        """Verify HyperPod cluster is accessible via property."""
+        """验证 HyperPod 集群可访问."""
         assert hyperpod_stack.hyperpod_cluster is not None
 
     def test_lifecycle_bucket_accessible(
         self, hyperpod_stack: SagemakerHyperPodStack
     ) -> None:
-        """Verify lifecycle scripts bucket is accessible."""
+        """验证生命周期脚本 Bucket 可访问."""
         assert hyperpod_stack.lifecycle_scripts_bucket is not None
 
     def test_execution_role_accessible(
         self, hyperpod_stack: SagemakerHyperPodStack
     ) -> None:
-        """Verify execution role is accessible."""
+        """验证执行角色可访问."""
         assert hyperpod_stack.hyperpod_execution_role is not None
 
 
 class TestHyperPodStackTags:
-    """Tests for HyperPod Stack resource tagging."""
-
-    @pytest.fixture
-    def template(
-        self, cdk_app: cdk.App, dev_config: EnvironmentConfig, cdk_env: cdk.Environment
-    ) -> Template:
-        """Create template for tag testing."""
-        network_stack = NetworkStack(
-            cdk_app, "TestNetworkStack", env_config=dev_config, env=cdk_env
-        )
-        iam_stack = IamStack(
-            cdk_app, "TestIamStack", env_config=dev_config, env=cdk_env
-        )
-        eks_stack = EksStack(
-            cdk_app,
-            "TestEksStack",
-            env_config=dev_config,
-            vpc=network_stack.vpc,
-            eks_node_role=iam_stack.eks_node_role,
-            env=cdk_env,
-        )
-        stack = SagemakerHyperPodStack(
-            cdk_app,
-            "TagTestStack",
-            env_config=dev_config,
-            vpc=network_stack.vpc,
-            eks_cluster=eks_stack.eks_cluster,
-            env=cdk_env,
-        )
-        return Template.from_stack(stack)
+    """HyperPod Stack 标签测试."""
 
     def test_cluster_has_name_tag(self, template: Template) -> None:
-        """Verify HyperPod cluster has Name tag."""
+        """验证集群有 Name 标签."""
         template.has_resource_properties(
             "AWS::SageMaker::Cluster",
             {
                 "Tags": Match.array_with(
-                    [
-                        Match.object_like(
-                            {
-                                "Key": "Name",
-                                "Value": Match.any_value(),
-                            }
-                        )
-                    ]
+                    [Match.object_like({"Key": "Name", "Value": Match.any_value()})]
                 )
             },
         )
 
     def test_cluster_has_environment_tag(self, template: Template) -> None:
-        """Verify HyperPod cluster has Environment tag."""
+        """验证集群有 Environment 标签."""
         template.has_resource_properties(
             "AWS::SageMaker::Cluster",
             {
                 "Tags": Match.array_with(
                     [
                         Match.object_like(
-                            {
-                                "Key": "Environment",
-                                "Value": Match.any_value(),
-                            }
+                            {"Key": "Environment", "Value": Match.any_value()}
                         )
                     ]
                 )
@@ -697,17 +471,14 @@ class TestHyperPodStackTags:
         )
 
     def test_bucket_has_purpose_tag(self, template: Template) -> None:
-        """Verify lifecycle bucket has Purpose tag."""
+        """验证生命周期 Bucket 有 Purpose 标签."""
         template.has_resource_properties(
             "AWS::S3::Bucket",
             {
                 "Tags": Match.array_with(
                     [
                         Match.object_like(
-                            {
-                                "Key": "Purpose",
-                                "Value": "hyperpod-lifecycle-scripts",
-                            }
+                            {"Key": "Purpose", "Value": "hyperpod-lifecycle-scripts"}
                         )
                     ]
                 )
@@ -716,39 +487,10 @@ class TestHyperPodStackTags:
 
 
 class TestGpuInstanceGroup:
-    """Tests for GPU instance group configuration."""
-
-    @pytest.fixture
-    def template(
-        self, cdk_app: cdk.App, dev_config: EnvironmentConfig, cdk_env: cdk.Environment
-    ) -> Template:
-        """Create template for GPU instance group testing."""
-        network_stack = NetworkStack(
-            cdk_app, "TestNetworkStack", env_config=dev_config, env=cdk_env
-        )
-        iam_stack = IamStack(
-            cdk_app, "TestIamStack", env_config=dev_config, env=cdk_env
-        )
-        eks_stack = EksStack(
-            cdk_app,
-            "TestEksStack",
-            env_config=dev_config,
-            vpc=network_stack.vpc,
-            eks_node_role=iam_stack.eks_node_role,
-            env=cdk_env,
-        )
-        stack = SagemakerHyperPodStack(
-            cdk_app,
-            "GpuInstanceGroupTestStack",
-            env_config=dev_config,
-            vpc=network_stack.vpc,
-            eks_cluster=eks_stack.eks_cluster,
-            env=cdk_env,
-        )
-        return Template.from_stack(stack)
+    """GPU 实例组配置测试."""
 
     def test_gpu_instance_group_created(self, template: Template) -> None:
-        """Verify GPU training instance group is created."""
+        """验证 GPU 训练实例组创建."""
         template.has_resource_properties(
             "AWS::SageMaker::Cluster",
             {
@@ -766,7 +508,7 @@ class TestGpuInstanceGroup:
         )
 
     def test_gpu_instance_count_matches_config(self, template: Template) -> None:
-        """Verify GPU instance count matches environment config (dev=1)."""
+        """验证 GPU 实例数匹配环境配置 (dev=1)."""
         template.has_resource_properties(
             "AWS::SageMaker::Cluster",
             {
@@ -784,7 +526,7 @@ class TestGpuInstanceGroup:
         )
 
     def test_gpu_instance_has_lifecycle_config(self, template: Template) -> None:
-        """Verify GPU instance group has lifecycle configuration."""
+        """验证 GPU 实例组有生命周期配置."""
         template.has_resource_properties(
             "AWS::SageMaker::Cluster",
             {
@@ -805,8 +547,7 @@ class TestGpuInstanceGroup:
         )
 
     def test_three_instance_groups_total(self, template: Template) -> None:
-        """Verify total of 3 instance groups (controller, system, gpu-training)."""
-        # Check that we have at least 3 instance groups
+        """验证共 3 个实例组 (controller, system, gpu-training)."""
         template.has_resource_properties(
             "AWS::SageMaker::Cluster",
             {

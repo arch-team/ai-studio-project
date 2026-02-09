@@ -20,6 +20,27 @@ from constructs import IConstruct
 if TYPE_CHECKING:
     from config import EnvironmentConfig
 
+# 项目级标签常量（与 config/constants.py 中的资源级标签区分）
+_PROJECT_NAME = "ai-training-platform"
+_MANAGED_BY = "cdk"
+
+
+def _build_standard_tags(env_config: "EnvironmentConfig") -> dict[str, str]:
+    """构建标准标签字典（内部辅助函数）。
+
+    Args:
+        env_config: 环境配置
+
+    Returns:
+        标准标签键值对字典
+    """
+    return {
+        "Project": _PROJECT_NAME,
+        "Environment": env_config.name.value,
+        "ManagedBy": _MANAGED_BY,
+        "CostCenter": f"ai-platform-{env_config.name.value}",
+    }
+
 
 def apply_standard_tags(
     scope: IConstruct,
@@ -27,35 +48,13 @@ def apply_standard_tags(
 ) -> None:
     """Apply standard tags to all resources in a CDK scope.
 
-    This function applies mandatory tags that should be present on all
-    resources for cost tracking, compliance, and operational management.
-
-    Tags applied:
-    - Project: ai-training-platform
-    - Environment: dev/staging/prod
-    - ManagedBy: cdk
-    - CostCenter: ai-platform-{environment}
+    Tags applied: Project, Environment, ManagedBy, CostCenter
 
     Args:
         scope: CDK scope to apply tags to (usually the App)
         env_config: Environment configuration
-
-    Example:
-        ```python
-        app = cdk.App()
-        apply_standard_tags(app, env_config)
-        ```
     """
-    # Standard tags for all resources
-    standard_tags = {
-        "Project": "ai-training-platform",
-        "Environment": env_config.name.value,
-        "ManagedBy": "cdk",
-        "CostCenter": f"ai-platform-{env_config.name.value}",
-    }
-
-    # Apply tags to all resources in scope
-    for key, value in standard_tags.items():
+    for key, value in _build_standard_tags(env_config).items():
         cdk.Tags.of(scope).add(key, value)
 
 
@@ -70,20 +69,8 @@ def get_standard_tags(env_config: "EnvironmentConfig") -> dict[str, str]:
 
     Returns:
         Dictionary of standard tag key-value pairs
-
-    Example:
-        ```python
-        tags = get_standard_tags(env_config)
-        # Use with CloudFormation native resources
-        cfn_resource.tags = [CfnTag(key=k, value=v) for k, v in tags.items()]
-        ```
     """
-    return {
-        "Project": "ai-training-platform",
-        "Environment": env_config.name.value,
-        "ManagedBy": "cdk",
-        "CostCenter": f"ai-platform-{env_config.name.value}",
-    }
+    return _build_standard_tags(env_config)
 
 
 def get_data_classification_tag(

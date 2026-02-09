@@ -13,6 +13,7 @@ import aws_cdk as cdk
 from aws_cdk import aws_kms as kms
 
 from config import EnvironmentConfig
+from config.constants import TAG_KEYS
 from constructs import Construct
 
 
@@ -72,9 +73,9 @@ class PlatformKmsKey(Construct):
             removal_policy=env_config.protection.removal_policy,
         )
 
-        cdk.Tags.of(self._key).add("Name", alias_name)
-        cdk.Tags.of(self._key).add("Environment", env_config.name.value)
-        cdk.Tags.of(self._key).add("ManagedBy", "CDK")
+        cdk.Tags.of(self._key).add(TAG_KEYS.NAME, alias_name)
+        cdk.Tags.of(self._key).add(TAG_KEYS.ENVIRONMENT, env_config.name.value)
+        cdk.Tags.of(self._key).add(TAG_KEYS.MANAGED_BY, "CDK")
 
     @property
     def key(self) -> kms.IKey:

@@ -185,6 +185,37 @@ class EksStack(cdk.Stack):
             ],
         )
 
+    def _create_addon(
+        self,
+        construct_id: str,
+        addon_name: str,
+        addon_version: str | None = None,
+        service_account_role_arn: str | None = None,
+        configuration_values: str | None = None,
+    ) -> eks.CfnAddon:
+        """创建 EKS add-on 的统一辅助方法。
+
+        Args:
+            construct_id: CDK 构造 ID
+            addon_name: EKS 插件名称
+            addon_version: 插件版本（可选）
+            service_account_role_arn: IRSA 角色 ARN（可选）
+            configuration_values: JSON 配置字符串（可选）
+
+        Returns:
+            创建的 CfnAddon
+        """
+        return eks.CfnAddon(
+            self,
+            construct_id,
+            addon_name=addon_name,
+            cluster_name=self._eks_cluster.cluster_name,
+            addon_version=addon_version,
+            service_account_role_arn=service_account_role_arn,
+            configuration_values=configuration_values,
+            resolve_conflicts="OVERWRITE",
+        )
+
     def _install_eks_addons(self) -> None:
         """安装 EKS 必需的插件（含 cert-manager community add-on）。
 
@@ -202,13 +233,18 @@ class EksStack(cdk.Stack):
         Reference:
         - https://docs.aws.amazon.com/eks/latest/userguide/community-addons.html
         """
+        oidc_arn = (
+            self._eks_cluster.open_id_connect_provider.open_id_connect_provider_arn
+        )
+        oidc_issuer = self._eks_cluster.cluster_open_id_connect_issuer
+
         # 创建 EBS CSI Driver IRSA 角色
         ebs_csi_role = create_irsa_role(
             scope=self,
             construct_id="EbsCsiDriverRole",
             env_config=self.env_config,
-            oidc_provider_arn=self._eks_cluster.open_id_connect_provider.open_id_connect_provider_arn,
-            oidc_issuer=self._eks_cluster.cluster_open_id_connect_issuer,
+            oidc_provider_arn=oidc_arn,
+            oidc_issuer=oidc_issuer,
             role_name_suffix="ebs-csi-role",
             service_account="ebs-csi-controller-sa",
             description="IAM role for EBS CSI driver",
@@ -220,8 +256,8 @@ class EksStack(cdk.Stack):
             scope=self,
             construct_id="FsxCsiDriverRole",
             env_config=self.env_config,
-            oidc_provider_arn=self._eks_cluster.open_id_connect_provider.open_id_connect_provider_arn,
-            oidc_issuer=self._eks_cluster.cluster_open_id_connect_issuer,
+            oidc_provider_arn=oidc_arn,
+            oidc_issuer=oidc_issuer,
             role_name_suffix="fsx-csi-role",
             service_account="fsx-csi-controller-sa",
             description="IAM role for FSx CSI driver",
@@ -231,42 +267,28 @@ class EksStack(cdk.Stack):
         # 获取插件版本（集中式版本管理）
         addon_versions = self.env_config.eks.addon_versions
 
-        # Install EBS CSI Driver add-on
-        # The add-on will create the ServiceAccount automatically
-        eks.CfnAddon(
-            self,
+        # 存储驱动插件（需要 IRSA 角色）
+        self._create_addon(
             "EbsCsiAddon",
-            addon_name=EKS_ADDON_NAMES.EBS_CSI_DRIVER,
-            cluster_name=self._eks_cluster.cluster_name,
+            EKS_ADDON_NAMES.EBS_CSI_DRIVER,
             addon_version=addon_versions.ebs_csi,
             service_account_role_arn=ebs_csi_role.role_arn,
-            resolve_conflicts="OVERWRITE",
         )
-
-        # Install FSx CSI Driver add-on
-        # The add-on will create the ServiceAccount automatically
-        eks.CfnAddon(
-            self,
+        self._create_addon(
             "FsxCsiAddon",
-            addon_name=EKS_ADDON_NAMES.FSX_CSI_DRIVER,
-            cluster_name=self._eks_cluster.cluster_name,
+            EKS_ADDON_NAMES.FSX_CSI_DRIVER,
             addon_version=addon_versions.fsx_csi,
             service_account_role_arn=fsx_csi_role.role_arn,
-            resolve_conflicts="OVERWRITE",
         )
 
-        # Install VPC CNI add-on
-        eks.CfnAddon(
-            self,
+        # 网络插件（VPC CNI 需要额外配置）
+        self._create_addon(
             "VpcCniAddon",
-            addon_name=EKS_ADDON_NAMES.VPC_CNI,
-            cluster_name=self._eks_cluster.cluster_name,
+            EKS_ADDON_NAMES.VPC_CNI,
             addon_version=addon_versions.vpc_cni,
-            resolve_conflicts="OVERWRITE",
             configuration_values=cdk.Fn.to_json_string(
                 {
                     "env": {
-                        # Enable prefix delegation for more IPs per node
                         "ENABLE_PREFIX_DELEGATION": "true",
                         "WARM_PREFIX_TARGET": "1",
                     }
@@ -274,45 +296,24 @@ class EksStack(cdk.Stack):
             ),
         )
 
-        # Install CoreDNS add-on
-        eks.CfnAddon(
-            self,
+        # 核心系统插件
+        self._create_addon(
             "CoreDnsAddon",
-            addon_name=EKS_ADDON_NAMES.COREDNS,
-            cluster_name=self._eks_cluster.cluster_name,
+            EKS_ADDON_NAMES.COREDNS,
             addon_version=addon_versions.coredns,
-            resolve_conflicts="OVERWRITE",
         )
-
-        # Install kube-proxy add-on
-        eks.CfnAddon(
-            self,
+        self._create_addon(
             "KubeProxyAddon",
-            addon_name=EKS_ADDON_NAMES.KUBE_PROXY,
-            cluster_name=self._eks_cluster.cluster_name,
+            EKS_ADDON_NAMES.KUBE_PROXY,
             addon_version=addon_versions.kube_proxy,
-            resolve_conflicts="OVERWRITE",
         )
 
-        # Install EKS Pod Identity Agent add-on
-        # Required by HyperPod Training Operator for IAM authentication
-        eks.CfnAddon(
-            self,
-            "PodIdentityAgentAddon",
-            addon_name=EKS_ADDON_NAMES.POD_IDENTITY_AGENT,
-            cluster_name=self._eks_cluster.cluster_name,
-            resolve_conflicts="OVERWRITE",
-        )
+        # EKS Pod Identity Agent（HyperPod Training Operator IAM 认证前置条件）
+        self._create_addon("PodIdentityAgentAddon", EKS_ADDON_NAMES.POD_IDENTITY_AGENT)
 
-        # Install cert-manager community add-on
-        # Required by HyperPod Training Operator for webhook certificates
-        # Reference: https://docs.aws.amazon.com/eks/latest/userguide/community-addons.html
-        self._cert_manager_addon = eks.CfnAddon(
-            self,
-            "CertManagerAddon",
-            addon_name=EKS_ADDON_NAMES.CERT_MANAGER,
-            cluster_name=self._eks_cluster.cluster_name,
-            resolve_conflicts="OVERWRITE",
+        # cert-manager community add-on（HyperPod Training Operator webhook 证书前置条件）
+        self._cert_manager_addon = self._create_addon(
+            "CertManagerAddon", EKS_ADDON_NAMES.CERT_MANAGER
         )
 
     def _install_hyperpod_helm_chart(self) -> None:

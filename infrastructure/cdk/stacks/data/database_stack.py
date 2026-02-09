@@ -299,41 +299,41 @@ class DatabaseStack(cdk.Stack):
 
     def _create_outputs(self) -> None:
         """创建 CloudFormation 输出用于跨 Stack 引用。"""
-        create_output(
-            self,
-            "ClusterEndpoint",
-            self._cluster.cluster_endpoint.hostname,
-            "Aurora cluster writer endpoint",
-        )
-        create_output(
-            self,
-            "ReaderEndpoint",
-            self._cluster.cluster_read_endpoint.hostname,
-            "Aurora cluster reader endpoint",
-        )
-        create_output(
-            self,
-            "Port",
-            str(self._cluster.cluster_endpoint.port),
-            "Aurora cluster port",
-        )
+        outputs: list[tuple[str, str, str]] = [
+            (
+                "ClusterEndpoint",
+                self._cluster.cluster_endpoint.hostname,
+                "Aurora cluster writer endpoint",
+            ),
+            (
+                "ReaderEndpoint",
+                self._cluster.cluster_read_endpoint.hostname,
+                "Aurora cluster reader endpoint",
+            ),
+            ("Port", str(self._cluster.cluster_endpoint.port), "Aurora cluster port"),
+        ]
         if self._secret:
-            create_output(
-                self,
-                "SecretArn",
-                self._secret.secret_arn,
-                "Secrets Manager secret ARN for database credentials",
+            outputs.append(
+                (
+                    "SecretArn",
+                    self._secret.secret_arn,
+                    "Secrets Manager secret ARN for database credentials",
+                )
             )
         if self._proxy:
-            create_output(
-                self, "ProxyEndpoint", self._proxy.endpoint, "RDS Proxy endpoint"
+            outputs.append(
+                ("ProxyEndpoint", self._proxy.endpoint, "RDS Proxy endpoint")
             )
-        create_output(
-            self,
-            "SecurityGroupId",
-            self._security_group.security_group_id,
-            "Aurora security group ID",
+        outputs.append(
+            (
+                "SecurityGroupId",
+                self._security_group.security_group_id,
+                "Aurora security group ID",
+            )
         )
+
+        for output_id, value, description in outputs:
+            create_output(self, output_id, value, description)
 
     @property
     def cluster(self) -> rds.DatabaseCluster:
