@@ -166,7 +166,9 @@ class NetworkStack(cdk.Stack):
     def _create_vpc_endpoint_security_group(self) -> ec2.SecurityGroup:
         """Create security group for VPC endpoints.
 
-        Allows HTTPS (443) traffic from VPC CIDR for interface endpoints.
+        Allows HTTPS (443) traffic only from Private and Isolated subnets,
+        following least-privilege principle. Public subnets access AWS services
+        via NAT Gateway → Internet, so they don't need VPC Endpoint access.
         """
         sg = ec2.SecurityGroup(
             self,
@@ -177,12 +179,13 @@ class NetworkStack(cdk.Stack):
             allow_all_outbound=False,
         )
 
-        # Allow HTTPS from within VPC
-        sg.add_ingress_rule(
-            peer=ec2.Peer.ipv4(self.env_config.vpc.cidr),
-            connection=ec2.Port.tcp(443),
-            description="Allow HTTPS from VPC CIDR",
-        )
+        # Allow HTTPS only from Private and Isolated subnets (least-privilege)
+        for subnet in self.vpc.private_subnets + self.vpc.isolated_subnets:
+            sg.add_ingress_rule(
+                peer=ec2.Peer.ipv4(subnet.ipv4_cidr_block),
+                connection=ec2.Port.tcp(443),
+                description=f"Allow HTTPS from {subnet.node.id}",
+            )
 
         cdk.Tags.of(sg).add("Name", f"{self.env_config.resource_prefix}-vpce-sg")
 
