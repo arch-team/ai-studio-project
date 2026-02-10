@@ -145,6 +145,7 @@ class ProjectPaths:
     HYPERPOD_HELM_CHART: Path = HELM_CHARTS_DIR / "HyperPodHelmChart"
     SCRIPTS_DIR: Path = RESOURCES_DIR / "scripts"
     ASSETS_DIR: Path = CDK_ROOT / "assets"
+    LIFECYCLE_SCRIPTS_DIR: Path = ASSETS_DIR / "lifecycle-scripts"
 
 
 # Singleton instances for easy access

@@ -268,6 +268,7 @@ class NetworkStack(cdk.Stack):
             "VpcEndpointSecurityGroupId",
             self._vpc_endpoint_sg.security_group_id,
             "VPC endpoint security group ID",
+            export_name=f"{self.env_config.resource_prefix}-vpce-sg-id",
         )
 
     @property

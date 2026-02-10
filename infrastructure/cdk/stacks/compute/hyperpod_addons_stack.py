@@ -54,7 +54,6 @@ class HyperPodAddonsStack(cdk.Stack):
     Attributes:
         training_operator_addon: The Training Operator EKS add-on
         task_governance_addon: The Task Governance (Kueue) EKS add-on
-        observability_addon: The Observability add-on (None, 已迁移到 ObservabilityStack)
     """
 
     def __init__(
@@ -93,10 +92,6 @@ class HyperPodAddonsStack(cdk.Stack):
         # T008d-1: Install Task Governance (Kueue) add-on
         # Note: Task Governance automatically configures PriorityClass per spec.md FR-004
         self._task_governance_addon = self._install_task_governance()
-
-        # T008d-2: Observability add-on 已迁移到独立的 ObservabilityStack
-        # 包含 AMP Workspace + HyperPod Observability Add-on + Pod Identity
-        self._observability_addon = None
 
         # Create outputs
         self._create_outputs()
@@ -238,24 +233,6 @@ class HyperPodAddonsStack(cdk.Stack):
             export_name=f"{self.env_config.resource_prefix}-task-governance-addon",
         )
 
-        # T008d-2 outputs (only if Observability is enabled)
-        if self._observability_addon is not None:
-            create_output(
-                self,
-                "ObservabilityAddonName",
-                self._observability_addon.addon_name,
-                "HyperPod Observability add-on name - Amazon Managed Prometheus and Grafana",
-                export_name=f"{self.env_config.resource_prefix}-observability-addon",
-            )
-        else:
-            create_output(
-                self,
-                "ObservabilityAddonStatus",
-                "Disabled - requires Amazon Managed Service for Prometheus workspace",
-                "Observability add-on status",
-                export_name=None,  # No export needed for status message
-            )
-
     @property
     def training_operator_addon(self) -> eks.CfnAddon:
         """Get Training Operator add-on."""
@@ -265,8 +242,3 @@ class HyperPodAddonsStack(cdk.Stack):
     def task_governance_addon(self) -> eks.CfnAddon:
         """Get Task Governance add-on."""
         return self._task_governance_addon
-
-    @property
-    def observability_addon(self) -> eks.CfnAddon | None:
-        """Get Observability add-on (may be None if managed externally)."""
-        return self._observability_addon

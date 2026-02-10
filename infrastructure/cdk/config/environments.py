@@ -333,7 +333,7 @@ class EnvironmentConfig:
             db_min_acu=0.5,  # 可暂停节省成本
             db_max_acu=8.0,
             db_backup_days=7,
-            fsx_storage_gib=1200,  # 1.2 TiB (FSx PERSISTENT_2 最小值，dev 够用)
+            fsx_storage_gib=12000,  # ~11.7 TiB (匹配已部署 dev 环境容量，避免缩容触发 replacement)
             fsx_throughput=500,
             eks_min_nodes=1,
             eks_max_nodes=10,

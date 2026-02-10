@@ -104,7 +104,9 @@ def create_app() -> cdk.App:
         ),
     )
 
-    rds_kms_key = PlatformKmsKey(
+    # RDS KMS key 预创建，但暂不绑定到已部署的 Aurora 集群
+    # 未来迁移到 customer-managed key 需要手动操作 (快照 → 恢复)
+    PlatformKmsKey(
         iam_stack,
         "RdsKmsKey",
         env_config=env_config,
@@ -123,7 +125,10 @@ def create_app() -> cdk.App:
         f"{stack_prefix}-database",
         env_config=env_config,
         vpc=network_stack.vpc,
-        storage_encryption_key=rds_kms_key.key,
+        # 注意: 不传 customer-managed KMS key，避免对已部署集群触发 replacement
+        # Aurora 仍通过 storage_encrypted=True 使用 AWS managed key 加密
+        # 未来迁移到 customer-managed key 需要手动操作 (快照 → 恢复)
+        # storage_encryption_key=rds_kms_key.key,
         env=env_config.to_cdk_environment(),
         description="Aurora MySQL Serverless v2 with RDS Proxy",
         termination_protection=is_prod,

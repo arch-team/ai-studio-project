@@ -17,11 +17,11 @@ from aws_cdk import aws_eks as eks
 from aws_cdk import aws_iam as iam
 
 from config import EnvironmentConfig
-from config.constants import EKS_ADDON_NAMES
+from config.constants import EKS_ADDON_NAMES, K8S_NAMESPACES, SERVICE_ACCOUNTS
 from constructs import Construct
 from utils.iam_helpers import create_pod_identity_role
 from utils.outputs import create_output
-from utils.tagging import apply_component_tag, create_addon_tags
+from utils.tagging import apply_component_tag, create_addon_tags, create_cfn_tags
 
 
 class ObservabilityStack(cdk.Stack):
@@ -88,11 +88,11 @@ class ObservabilityStack(cdk.Stack):
             self,
             "AmpWorkspace",
             alias=f"{self.env_config.resource_prefix}-amp",
-            tags=[
-                cdk.CfnTag(key="Name", value=f"{self.env_config.resource_prefix}-amp"),
-                cdk.CfnTag(key="Environment", value=self.env_config.name.value),
-                cdk.CfnTag(key="Component", value="observability"),
-            ],
+            tags=create_cfn_tags(
+                self.env_config,
+                "amp",
+                additional_tags={"Component": "observability"},
+            ),
         )
 
         return workspace
@@ -122,11 +122,18 @@ class ObservabilityStack(cdk.Stack):
         - EFA Exporter (网络指标)
         - 指标转发到 Amazon Managed Prometheus
         """
-        # 构建 add-on 配置
+        # 构建 add-on 配置 (schema 要求 ampWorkspace 嵌套对象)
         configuration: dict = {}
         if self._amp_workspace:
+            amp_endpoint = (
+                f"https://aps-workspaces.{self.env_config.region}.amazonaws.com"
+                f"/workspaces/{self._amp_workspace.attr_workspace_id}"
+            )
             configuration = {
-                "ampWorkspaceArn": self._amp_workspace.attr_arn,
+                "ampWorkspace": {
+                    "arn": self._amp_workspace.attr_arn,
+                    "prometheusEndpoint": amp_endpoint,
+                },
             }
 
         addon = eks.CfnAddon(
@@ -154,13 +161,14 @@ class ObservabilityStack(cdk.Stack):
             self,
             "ObservabilityCollectorPodIdentity",
             cluster_name=self._eks_cluster.cluster_name,
-            namespace="hyperpod-observability",
-            service_account="hyperpod-observability-operator-otel-collector",
+            namespace=K8S_NAMESPACES.HYPERPOD_OBSERVABILITY,
+            service_account=SERVICE_ACCOUNTS.OBSERVABILITY_COLLECTOR,
             role_arn=self._collector_role.role_arn,
         )
 
-        # 确保 association 在 add-on 之后创建
-        association.add_dependency(self._observability_addon)
+        # 注意: 不添加对 addon 的依赖，避免循环等待:
+        # addon 等待 collector healthy → collector 需要 PodIdentity 凭证 → PodIdentity 等待 addon
+        # PodIdentityAssociation 与 addon 并行创建，确保 collector 启动时能获取凭证
 
         apply_component_tag(association, "observability")
 

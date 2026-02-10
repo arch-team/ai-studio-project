@@ -127,15 +127,9 @@ class TestHyperPodAddonsStack:
             },
         )
 
-    def test_observability_addon_is_none(
-        self, hyperpod_addons_stack: HyperPodAddonsStack
-    ) -> None:
-        """验证 observability_addon 为 None (已迁移到 ObservabilityStack)."""
-        assert hyperpod_addons_stack.observability_addon is None
-
     def test_outputs_exported(self, hyperpod_addons_stack: HyperPodAddonsStack) -> None:
         """验证 Stack 输出包含 Training Operator 和 Task Governance."""
         template = Template.from_stack(hyperpod_addons_stack)
         outputs = template.to_json().get("Outputs", {})
-        # 至少包含: TrainingOperatorAddonName, TaskGovernanceAddonName, ObservabilityAddonStatus
-        assert len(outputs) >= 3
+        # 至少包含: TrainingOperatorAddonName, TaskGovernanceAddonName
+        assert len(outputs) >= 2

@@ -3,7 +3,7 @@
     "ClusterEndpoint": {
       "Description": "Aurora cluster writer endpoint",
       "Export": {
-        "Name": "ai-platform-dev-cluster-endpoint"
+        "Name": "ai-platform-dev-aurora-endpoint"
       },
       "Value": {
         "Fn::GetAtt": [
@@ -15,7 +15,7 @@
     "Port": {
       "Description": "Aurora cluster port",
       "Export": {
-        "Name": "ai-platform-dev-port"
+        "Name": "ai-platform-dev-aurora-port"
       },
       "Value": {
         "Fn::GetAtt": [
@@ -27,7 +27,7 @@
     "ProxyEndpoint": {
       "Description": "RDS Proxy endpoint",
       "Export": {
-        "Name": "ai-platform-dev-proxy-endpoint"
+        "Name": "ai-platform-dev-aurora-proxy-endpoint"
       },
       "Value": {
         "Fn::GetAtt": [
@@ -39,7 +39,7 @@
     "ReaderEndpoint": {
       "Description": "Aurora cluster reader endpoint",
       "Export": {
-        "Name": "ai-platform-dev-reader-endpoint"
+        "Name": "ai-platform-dev-aurora-reader-endpoint"
       },
       "Value": {
         "Fn::GetAtt": [
@@ -51,7 +51,7 @@
     "SecretArn": {
       "Description": "Secrets Manager secret ARN for database credentials",
       "Export": {
-        "Name": "ai-platform-dev-secret-arn"
+        "Name": "ai-platform-dev-aurora-secret-arn"
       },
       "Value": {
         "Ref": "AuroraClusterSecretAttachment<TOKEN>"
@@ -60,7 +60,7 @@
     "SecurityGroupId": {
       "Description": "Aurora security group ID",
       "Export": {
-        "Name": "ai-platform-dev-security-group-id"
+        "Name": "ai-platform-dev-aurora-sg-id"
       },
       "Value": {
         "Fn::GetAtt": [

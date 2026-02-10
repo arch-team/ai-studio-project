@@ -15,7 +15,7 @@
     "CheckpointsBucketName": {
       "Description": "S3 bucket name for training checkpoints",
       "Export": {
-        "Name": "ai-platform-dev-checkpoints-bucket-name"
+        "Name": "ai-platform-dev-checkpoints-bucket"
       },
       "Value": {
         "Ref": "CheckpointsBucket<TOKEN>"
@@ -36,7 +36,7 @@
     "DatasetsBucketName": {
       "Description": "S3 bucket name for training datasets",
       "Export": {
-        "Name": "ai-platform-dev-datasets-bucket-name"
+        "Name": "ai-platform-dev-datasets-bucket"
       },
       "Value": {
         "Ref": "DatasetsBucket<TOKEN>"
@@ -57,7 +57,7 @@
     "ModelsBucketName": {
       "Description": "S3 bucket name for model artifacts",
       "Export": {
-        "Name": "ai-platform-dev-models-bucket-name"
+        "Name": "ai-platform-dev-models-bucket"
       },
       "Value": {
         "Ref": "ModelsBucket<TOKEN>"

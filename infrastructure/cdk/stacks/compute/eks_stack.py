@@ -169,7 +169,7 @@ class EksStack(cdk.Stack):
         self._eks_cluster.add_nodegroup_capacity(
             "SystemNodeGroup",
             nodegroup_name=f"{self.env_config.resource_prefix}-system-nodes",
-            instance_types=[ec2.InstanceType("t3.medium")],
+            instance_types=[ec2.InstanceType("m5.4xlarge")],
             min_size=1,
             max_size=2,
             desired_size=1,
@@ -441,6 +441,7 @@ class EksStack(cdk.Stack):
 
     def _create_outputs(self) -> None:
         """创建 CloudFormation 输出用于跨 Stack 引用。"""
+        prefix = self.env_config.resource_prefix
         create_output(
             self, "EksClusterName", self._eks_cluster.cluster_name, "EKS cluster name"
         )
@@ -452,18 +453,21 @@ class EksStack(cdk.Stack):
             "EksClusterEndpoint",
             self._eks_cluster.cluster_endpoint,
             "EKS cluster API endpoint",
+            export_name=f"{prefix}-eks-endpoint",
         )
         create_output(
             self,
             "EksClusterSecurityGroupId",
             self._eks_cluster.cluster_security_group_id,
             "EKS cluster security group ID",
+            export_name=f"{prefix}-eks-sg-id",
         )
         create_output(
             self,
             "EksOidcProviderArn",
             self._eks_cluster.open_id_connect_provider.open_id_connect_provider_arn,
             "EKS OIDC provider ARN for IRSA",
+            export_name=f"{prefix}-eks-oidc-arn",
         )
         # Informational outputs (no export_name needed)
         cdk.CfnOutput(
@@ -477,6 +481,7 @@ class EksStack(cdk.Stack):
             "CertManagerAddonName",
             EKS_ADDON_NAMES.CERT_MANAGER,
             "cert-manager EKS add-on name",
+            export_name=f"{prefix}-cert-manager-addon",
         )
         cdk.CfnOutput(
             self,

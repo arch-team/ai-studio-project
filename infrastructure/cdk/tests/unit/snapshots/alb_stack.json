@@ -12,7 +12,7 @@
     "AlbDnsName": {
       "Description": "ALB DNS name for frontend access",
       "Export": {
-        "Name": "ai-platform-dev-alb-dns-name"
+        "Name": "ai-platform-dev-alb-dns"
       },
       "Value": {
         "Fn::GetAtt": [
@@ -24,7 +24,7 @@
     "BackendTargetGroupArn": {
       "Description": "Backend API Target Group ARN",
       "Export": {
-        "Name": "ai-platform-dev-backend-target-group-arn"
+        "Name": "ai-platform-dev-backend-tg-arn"
       },
       "Value": {
         "Ref": "BackendTargetGroup<TOKEN>"
@@ -33,7 +33,7 @@
     "FrontendTargetGroupArn": {
       "Description": "Frontend Target Group ARN",
       "Export": {
-        "Name": "ai-platform-dev-frontend-target-group-arn"
+        "Name": "ai-platform-dev-frontend-tg-arn"
       },
       "Value": {
         "Ref": "FrontendTargetGroup<TOKEN>"
@@ -55,7 +55,7 @@
     "SecurityGroupId": {
       "Description": "ALB Security Group ID",
       "Export": {
-        "Name": "ai-platform-dev-security-group-id"
+        "Name": "ai-platform-dev-alb-sg-id"
       },
       "Value": {
         "Fn::GetAtt": [

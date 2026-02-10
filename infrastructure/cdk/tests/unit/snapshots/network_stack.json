@@ -87,7 +87,7 @@
     "VpcEndpointSecurityGroupId": {
       "Description": "VPC endpoint security group ID",
       "Export": {
-        "Name": "ai-platform-dev-vpc-endpoint-security-group-id"
+        "Name": "ai-platform-dev-vpce-sg-id"
       },
       "Value": {
         "Fn::GetAtt": [

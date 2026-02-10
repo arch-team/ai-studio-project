@@ -24,6 +24,7 @@ from aws_cdk import aws_s3 as s3
 from config import EnvironmentConfig
 from constructs import Construct
 from utils.outputs import create_output
+from utils.tagging import create_cfn_tags
 
 
 class FsxLustreStack(cdk.Stack):
@@ -247,14 +248,14 @@ class FsxLustreStack(cdk.Stack):
                 weekly_maintenance_start_time=weekly_maintenance_start_time,
                 # Auto import policy will be configured via Data Repository Association
             ),
-            tags=[
-                cdk.CfnTag(
-                    key="Name", value=f"{self.env_config.resource_prefix}-fsx-lustre"
-                ),
-                cdk.CfnTag(key="Environment", value=self.env_config.name.value),
-                cdk.CfnTag(key="StorageCapacityGiB", value=str(storage_capacity)),
-                cdk.CfnTag(key="ThroughputPerTiB", value=str(throughput_per_tib)),
-            ],
+            tags=create_cfn_tags(
+                self.env_config,
+                "fsx-lustre",
+                additional_tags={
+                    "StorageCapacityGiB": str(storage_capacity),
+                    "ThroughputPerTiB": str(throughput_per_tib),
+                },
+            ),
         )
 
         # Apply removal policy from protection config
@@ -290,12 +291,7 @@ class FsxLustreStack(cdk.Stack):
                     events=["NEW", "CHANGED", "DELETED"],
                 ),
             ),
-            tags=[
-                cdk.CfnTag(
-                    key="Name", value=f"{self.env_config.resource_prefix}-fsx-dra"
-                ),
-                cdk.CfnTag(key="Environment", value=self.env_config.name.value),
-            ],
+            tags=create_cfn_tags(self.env_config, "fsx-dra"),
         )
 
         # DRA depends on file system
@@ -322,41 +318,48 @@ class FsxLustreStack(cdk.Stack):
 
     def _create_outputs(self) -> None:
         """Create CloudFormation outputs for cross-stack references."""
+        prefix = self.env_config.resource_prefix
         storage_capacity = self._get_validated_storage_capacity()
         throughput_mbps = (
             storage_capacity // 1024
         ) * self.env_config.storage.fsx_throughput_per_tb
 
+        # (output_id, value, description, export_name)
         outputs = [
-            ("FileSystemId", self._file_system.ref, "FSx for Lustre file system ID"),
+            ("FileSystemId", self._file_system.ref, "FSx for Lustre file system ID", f"{prefix}-fsx-id"),
             (
                 "FileSystemDnsName",
                 self.dns_name,
                 "FSx for Lustre DNS name for mounting",
+                f"{prefix}-fsx-dns",
             ),
             (
                 "FileSystemMountName",
                 self._file_system.attr_lustre_mount_name,
                 "FSx for Lustre mount name",
+                f"{prefix}-fsx-mount",
             ),
             (
                 "SecurityGroupId",
                 self._security_group.security_group_id,
                 "FSx security group ID",
+                f"{prefix}-fsx-sg-id",
             ),
             (
                 "StorageCapacityGiB",
                 str(storage_capacity),
                 "FSx storage capacity in GiB",
+                f"{prefix}-fsx-capacity",
             ),
             (
                 "TotalThroughputMBps",
                 str(throughput_mbps),
                 "FSx total throughput in MB/s",
+                f"{prefix}-fsx-throughput",
             ),
         ]
-        for output_id, value, description in outputs:
-            create_output(self, output_id, value, description)
+        for output_id, value, description, export_name in outputs:
+            create_output(self, output_id, value, description, export_name=export_name)
 
     @property
     def file_system(self) -> fsx.CfnFileSystem:

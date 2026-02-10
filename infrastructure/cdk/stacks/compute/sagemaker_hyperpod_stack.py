@@ -12,8 +12,6 @@ Prerequisites:
    Reference: https://docs.aws.amazon.com/sagemaker/latest/dg/sagemaker-hyperpod-eks-install-packages-using-helm-chart.html
 """
 
-import os
-
 import aws_cdk as cdk
 from aws_cdk import aws_ec2 as ec2
 from aws_cdk import aws_eks as eks
@@ -28,6 +26,7 @@ from config.constants import (
     MANAGED_POLICIES,
     SAGEMAKER_INSTANCES,
     TAG_KEYS,
+    ProjectPaths,
 )
 from constructs import Construct
 from utils.iam_helpers import (
@@ -117,14 +116,10 @@ class SagemakerHyperPodStack(cdk.Stack):
         cdk.Tags.of(bucket).add("Purpose", "hyperpod-lifecycle-scripts")
 
         # Deploy lifecycle scripts to S3
-        # File location: stacks/compute/ -> assets/ (at cdk root)
-        assets_path = os.path.join(
-            os.path.dirname(__file__), "..", "..", "assets", "lifecycle-scripts"
-        )
         s3deploy.BucketDeployment(
             self,
             "DeployLifecycleScripts",
-            sources=[s3deploy.Source.asset(assets_path)],
+            sources=[s3deploy.Source.asset(str(ProjectPaths.LIFECYCLE_SCRIPTS_DIR))],
             destination_bucket=bucket,
             destination_key_prefix="lifecycle-scripts",
         )

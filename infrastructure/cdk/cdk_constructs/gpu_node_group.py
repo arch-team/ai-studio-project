@@ -100,46 +100,22 @@ class GpuNodeGroupConstruct(Construct):
         # Create node group
         self._node_group = self._create_node_group(eks_cluster, node_role, subnets)
 
-    def _create_launch_template(self, eks_cluster: eks.ICluster) -> ec2.LaunchTemplate:
+    def _create_launch_template(self, _eks_cluster: eks.ICluster) -> ec2.LaunchTemplate:
         """Create EC2 launch template for GPU nodes.
 
         Configures:
-        - GPU-optimized AMI
-        - NVMe local storage optimization
-        - EFA support for distributed training
-        - CloudWatch agent for monitoring
-        """
-        # User data script for GPU nodes
-        user_data = ec2.UserData.for_linux()
-        user_data.add_commands(
-            "#!/bin/bash",
-            "set -o xtrace",
-            "",
-            "# Enable NVMe optimization for local storage",
-            "if [ -e /dev/nvme1n1 ]; then",
-            "    mkfs.xfs /dev/nvme1n1",
-            "    mkdir -p /mnt/nvme",
-            "    mount /dev/nvme1n1 /mnt/nvme",
-            "    chmod 1777 /mnt/nvme",
-            "fi",
-            "",
-            "# Configure GPU settings",
-            "nvidia-smi -pm 1",
-            "",
-            "# Set up environment for distributed training",
-            "export FI_EFA_FORK_SAFE=1",
-            "export FI_LOG_LEVEL=1",
-            "export FI_EFA_USE_DEVICE_RDMA=1",
-            "export NCCL_DEBUG=INFO",
-            "",
-            f"/etc/eks/bootstrap.sh {eks_cluster.cluster_name}",
-        )
+        - EBS root volume with GP3 encryption
+        - Detailed monitoring
+        - IMDSv2 enforcement
 
+        注意: AL2023 EKS 管理节点组使用 nodeadm 自动引导，
+        不再需要自定义 user data 或 /etc/eks/bootstrap.sh。
+        NVMe、NVIDIA、EFA 配置由 AL2023 AMI 和 EKS 插件自动处理。
+        """
         launch_template = ec2.LaunchTemplate(
             self,
             f"LaunchTemplate-{self._node_group_config.name}",
             launch_template_name=f"{self.env_config.resource_prefix}-{self._node_group_config.name}-lt",
-            user_data=user_data,
             # Block device mappings for root volume
             block_devices=[
                 ec2.BlockDevice(
@@ -165,6 +141,24 @@ class GpuNodeGroupConstruct(Construct):
         )
 
         return launch_template
+
+    @staticmethod
+    def _get_ami_type(config: GpuNodeGroupConfig) -> str:
+        """根据实例类型选择兼容 K8s 1.33+ 的 AMI 类型。
+
+        K8s 1.33 不再支持 AL2_x86_64_GPU，需使用 AL2023 系列:
+        - NVIDIA GPU 实例 → AL2023_x86_64_NVIDIA
+        - Neuron 实例 (trn1/inf2) → AL2023_x86_64_NEURON
+
+        Returns:
+            EKS AMI 类型字符串
+        """
+        neuron_prefixes = ("trn1", "inf1", "inf2")
+        if any(
+            inst.startswith(neuron_prefixes) for inst in config.instance_types
+        ):
+            return "AL2023_x86_64_NEURON"
+        return "AL2023_x86_64_NVIDIA"
 
     def _create_node_group(
         self,
@@ -230,7 +224,7 @@ class GpuNodeGroupConstruct(Construct):
             ),
             # Instance configuration
             instance_types=list(config.instance_types),
-            ami_type="AL2_x86_64_GPU",  # GPU-optimized Amazon Linux 2
+            ami_type=self._get_ami_type(config),  # AL2023 系列，兼容 K8s 1.33+
             capacity_type=config.capacity_type,
             # Launch template for custom configuration
             launch_template=eks.CfnNodegroup.LaunchTemplateSpecificationProperty(

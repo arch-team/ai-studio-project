@@ -457,11 +457,13 @@ class AlbStack(cdk.Stack):
 
     def _create_outputs(self) -> None:
         """Create CloudFormation outputs for cross-stack references."""
+        prefix = self.env_config.resource_prefix
         create_output(
             self,
             "AlbDnsName",
             self._alb.load_balancer_dns_name,
             "ALB DNS name for frontend access",
+            export_name=f"{prefix}-alb-dns",
         )
         create_output(
             self, "AlbArn", self._alb.load_balancer_arn, "ALB ARN for reference"
@@ -494,18 +496,21 @@ class AlbStack(cdk.Stack):
             "BackendTargetGroupArn",
             self._backend_target_group.target_group_arn,
             "Backend API Target Group ARN",
+            export_name=f"{prefix}-backend-tg-arn",
         )
         create_output(
             self,
             "FrontendTargetGroupArn",
             self._frontend_target_group.target_group_arn,
             "Frontend Target Group ARN",
+            export_name=f"{prefix}-frontend-tg-arn",
         )
         create_output(
             self,
             "SecurityGroupId",
             self._security_group.security_group_id,
             "ALB Security Group ID",
+            export_name=f"{prefix}-alb-sg-id",
         )
 
     @property
