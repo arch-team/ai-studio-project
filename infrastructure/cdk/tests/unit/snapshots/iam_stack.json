@@ -1,10 +1,508 @@
 {
-  "OutputCount": 4,
-  "ParameterCount": 1,
-  "ResourceCount": 7,
-  "ResourceTypes": [
-    "AWS::IAM::ManagedPolicy",
-    "AWS::IAM::Policy",
-    "AWS::IAM::Role"
-  ]
+  "Outputs": {
+    "BackendServiceRoleArn": {
+      "Description": "ARN of backend service role",
+      "Export": {
+        "Name": "ai-platform-dev-backend-service-role-arn"
+      },
+      "Value": {
+        "Fn::GetAtt": [
+          "BackendServiceRole<TOKEN>",
+          "Arn"
+        ]
+      }
+    },
+    "EksNodeRoleArn": {
+      "Description": "ARN of EKS node instance role",
+      "Export": {
+        "Name": "ai-platform-dev-eks-node-role-arn"
+      },
+      "Value": {
+        "Fn::GetAtt": [
+          "EksNodeRole<TOKEN>",
+          "Arn"
+        ]
+      }
+    },
+    "EksNodeRoleName": {
+      "Description": "Name of EKS node instance role",
+      "Export": {
+        "Name": "ai-platform-dev-eks-node-role-name"
+      },
+      "Value": {
+        "Ref": "EksNodeRole<TOKEN>"
+      }
+    },
+    "TrainingExecutionRoleArn": {
+      "Description": "ARN of training job execution role",
+      "Export": {
+        "Name": "ai-platform-dev-training-execution-role-arn"
+      },
+      "Value": {
+        "Fn::GetAtt": [
+          "TrainingExecutionRole<TOKEN>",
+          "Arn"
+        ]
+      }
+    }
+  },
+  "Parameters": {
+    "BootstrapVersion": {
+      "Default": "/cdk-bootstrap/hnb659fds/version",
+      "Description": "Version of the CDK Bootstrap resources in this environment, automatically retrieved from SSM Parameter Store. [cdk:skip]",
+      "Type": "AWS::SSM::Parameter::Value<String>"
+    }
+  },
+  "Resources": {
+    "BackendServiceRole<TOKEN>": {
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Statement": [
+            {
+              "Action": "sts:AssumeRoleWithWebIdentity",
+              "Condition": {
+                "StringEquals": {
+                  "oidc.eks.us-east-1.amazonaws.com:aud": "sts.amazonaws.com",
+                  "oidc.eks.us-east-1.amazonaws.com:sub": "system:serviceaccount:backend:backend-service-sa"
+                }
+              },
+              "Effect": "Allow",
+              "Principal": {
+                "Federated": "arn:aws:iam::<TOKEN>:oidc-provider/oidc.eks.us-east-1.amazonaws.com"
+              }
+            }
+          ],
+          "Version": "2012-10-17"
+        },
+        "Description": "IAM role for backend FastAPI application",
+        "ManagedPolicyArns": [
+          {
+            "Ref": "KmsUsagePolicy<TOKEN>"
+          }
+        ],
+        "MaxSessionDuration": 43200,
+        "RoleName": "ai-platform-dev-backend-service-role",
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": "ai-platform-dev-backend-service-role"
+          }
+        ]
+      },
+      "Type": "AWS::IAM::Role"
+    },
+    "BackendServiceRoleDefaultPolicy<TOKEN>": {
+      "Properties": {
+        "PolicyDocument": {
+          "Statement": [
+            {
+              "Action": [
+                "sagemaker:DescribeCluster",
+                "sagemaker:ListClusterNodes",
+                "sagemaker:DescribeTrainingJob",
+                "sagemaker:ListTrainingJobs"
+              ],
+              "Effect": "Allow",
+              "Resource": [
+                "arn:aws:sagemaker:us-east-1:<TOKEN>:cluster/*",
+                "arn:aws:sagemaker:us-east-1:<TOKEN>:training-job/*"
+              ],
+              "Sid": "SageMakerReadAccess"
+            },
+            {
+              "Action": [
+                "s3:ListBucket",
+                "s3:GetBucketLocation",
+                "s3:GetObject",
+                "s3:GetObjectAttributes",
+                "s3:HeadObject"
+              ],
+              "Effect": "Allow",
+              "Resource": [
+                "arn:aws:s3:::ai-platform-dev-datasets",
+                "arn:aws:s3:::ai-platform-dev-datasets/*",
+                "arn:aws:s3:::ai-platform-dev-models",
+                "arn:aws:s3:::ai-platform-dev-models/*"
+              ],
+              "Sid": "S3MetadataAccess"
+            },
+            {
+              "Action": [
+                "s3:GetObject",
+                "s3:PutObject"
+              ],
+              "Effect": "Allow",
+              "Resource": [
+                "arn:aws:s3:::ai-platform-dev-datasets",
+                "arn:aws:s3:::ai-platform-dev-datasets/*",
+                "arn:aws:s3:::ai-platform-dev-models",
+                "arn:aws:s3:::ai-platform-dev-models/*",
+                "arn:aws:s3:::ai-platform-dev-checkpoints",
+                "arn:aws:s3:::ai-platform-dev-checkpoints/*"
+              ],
+              "Sid": "S3PresignedUrlAccess"
+            },
+            {
+              "Action": [
+                "secretsmanager:GetSecretValue",
+                "secretsmanager:DescribeSecret"
+              ],
+              "Effect": "Allow",
+              "Resource": "arn:aws:secretsmanager:us-east-1:<TOKEN>:secret:ai-platform-dev/*",
+              "Sid": "SecretsManagerAccess"
+            },
+            {
+              "Action": [
+                "logs:CreateLogStream",
+                "logs:PutLogEvents"
+              ],
+              "Effect": "Allow",
+              "Resource": "arn:aws:logs:us-east-1:<TOKEN>:log-group:/ai-platform/backend:*",
+              "Sid": "CloudWatchLogsAccess"
+            }
+          ],
+          "Version": "2012-10-17"
+        },
+        "PolicyName": "BackendServiceRoleDefaultPolicy<TOKEN>",
+        "Roles": [
+          {
+            "Ref": "BackendServiceRole<TOKEN>"
+          }
+        ]
+      },
+      "Type": "AWS::IAM::Policy"
+    },
+    "EksNodeRole<TOKEN>": {
+      "Metadata": {
+        "cdk_nag": {
+          "rules_to_suppress": [
+            {
+              "id": "AwsSolutions-IAM5",
+              "reason": "CloudWatch PutMetricData requires resources=[*], scoped by cloudwatch:namespace condition"
+            }
+          ]
+        }
+      },
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Statement": [
+            {
+              "Action": "sts:AssumeRole",
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "ec2.amazonaws.com"
+              }
+            }
+          ],
+          "Version": "2012-10-17"
+        },
+        "Description": "IAM role for EKS worker nodes",
+        "ManagedPolicyArns": [
+          {
+            "Fn::Join": [
+              "",
+              [
+                "arn:",
+                {
+                  "Ref": "AWS::Partition"
+                },
+                ":iam::aws:policy/AmazonEKSWorkerNodePolicy"
+              ]
+            ]
+          },
+          {
+            "Fn::Join": [
+              "",
+              [
+                "arn:",
+                {
+                  "Ref": "AWS::Partition"
+                },
+                ":iam::aws:policy/AmazonEKS_CNI_Policy"
+              ]
+            ]
+          },
+          {
+            "Fn::Join": [
+              "",
+              [
+                "arn:",
+                {
+                  "Ref": "AWS::Partition"
+                },
+                ":iam::aws:policy/AmazonEC2ContainerRegistryReadOnly"
+              ]
+            ]
+          },
+          {
+            "Fn::Join": [
+              "",
+              [
+                "arn:",
+                {
+                  "Ref": "AWS::Partition"
+                },
+                ":iam::aws:policy/AmazonSSMManagedInstanceCore"
+              ]
+            ]
+          }
+        ],
+        "MaxSessionDuration": 43200,
+        "RoleName": "ai-platform-dev-eks-node-role",
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": "ai-platform-dev-eks-node-role"
+          }
+        ]
+      },
+      "Type": "AWS::IAM::Role"
+    },
+    "EksNodeRoleDefaultPolicy<TOKEN>": {
+      "Properties": {
+        "PolicyDocument": {
+          "Statement": [
+            {
+              "Action": [
+                "logs:CreateLogGroup",
+                "logs:CreateLogStream",
+                "logs:PutLogEvents",
+                "logs:DescribeLogGroups",
+                "logs:DescribeLogStreams"
+              ],
+              "Effect": "Allow",
+              "Resource": [
+                "arn:aws:logs:us-east-1:<TOKEN>:log-group:/aws/eks/*",
+                "arn:aws:logs:us-east-1:<TOKEN>:log-group:/ai-platform/*"
+              ],
+              "Sid": "CloudWatchLogsPermissions"
+            },
+            {
+              "Action": [
+                "cloudwatch:PutMetricData",
+                "cloudwatch:GetMetricData",
+                "cloudwatch:GetMetricStatistics"
+              ],
+              "Condition": {
+                "StringEquals": {
+                  "cloudwatch:namespace": [
+                    "AWS/EKS",
+                    "ContainerInsights",
+                    "AI-Platform"
+                  ]
+                }
+              },
+              "Effect": "Allow",
+              "Resource": "*",
+              "Sid": "CloudWatchMetricsPermissions"
+            }
+          ],
+          "Version": "2012-10-17"
+        },
+        "PolicyName": "EksNodeRoleDefaultPolicy<TOKEN>",
+        "Roles": [
+          {
+            "Ref": "EksNodeRole<TOKEN>"
+          }
+        ]
+      },
+      "Type": "AWS::IAM::Policy"
+    },
+    "KmsUsagePolicy<TOKEN>": {
+      "Metadata": {
+        "cdk_nag": {
+          "rules_to_suppress": [
+            {
+              "id": "AwsSolutions-IAM5",
+              "reason": "KMS key ARN pattern limited to current account, scoped by kms:ViaService condition for S3"
+            }
+          ]
+        }
+      },
+      "Properties": {
+        "Description": "Policy for using KMS keys for S3 encryption",
+        "ManagedPolicyName": "ai-platform-dev-kms-usage-policy",
+        "Path": "/",
+        "PolicyDocument": {
+          "Statement": [
+            {
+              "Action": [
+                "kms:Decrypt",
+                "kms:GenerateDataKey",
+                "kms:DescribeKey"
+              ],
+              "Condition": {
+                "StringEquals": {
+                  "kms:ViaService": [
+                    "s3.us-east-1.amazonaws.com"
+                  ]
+                }
+              },
+              "Effect": "Allow",
+              "Resource": "arn:aws:kms:us-east-1:<TOKEN>:key/*",
+              "Sid": "KmsKeyUsage"
+            }
+          ],
+          "Version": "2012-10-17"
+        }
+      },
+      "Type": "AWS::IAM::ManagedPolicy"
+    },
+    "TrainingExecutionRole<TOKEN>": {
+      "Metadata": {
+        "cdk_nag": {
+          "rules_to_suppress": [
+            {
+              "id": "AwsSolutions-IAM5",
+              "reason": "CloudWatch PutMetricData requires resources=[*], scoped by cloudwatch:namespace condition"
+            }
+          ]
+        }
+      },
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Statement": [
+            {
+              "Action": "sts:AssumeRoleWithWebIdentity",
+              "Condition": {
+                "StringEquals": {
+                  "oidc.eks.us-east-1.amazonaws.com:aud": "sts.amazonaws.com",
+                  "oidc.eks.us-east-1.amazonaws.com:sub": "system:serviceaccount:training-jobs:training-execution-sa"
+                }
+              },
+              "Effect": "Allow",
+              "Principal": {
+                "Federated": "arn:aws:iam::<TOKEN>:oidc-provider/oidc.eks.us-east-1.amazonaws.com"
+              }
+            },
+            {
+              "Action": "sts:AssumeRole",
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "sagemaker.amazonaws.com"
+              }
+            }
+          ],
+          "Version": "2012-10-17"
+        },
+        "Description": "IAM role for HyperPod training job execution",
+        "ManagedPolicyArns": [
+          {
+            "Ref": "KmsUsagePolicy<TOKEN>"
+          }
+        ],
+        "MaxSessionDuration": 43200,
+        "RoleName": "ai-platform-dev-training-execution-role",
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": "ai-platform-dev-training-execution-role"
+          }
+        ]
+      },
+      "Type": "AWS::IAM::Role"
+    },
+    "TrainingExecutionRoleDefaultPolicy<TOKEN>": {
+      "Properties": {
+        "PolicyDocument": {
+          "Statement": [
+            {
+              "Action": [
+                "s3:GetObject",
+                "s3:GetObjectVersion",
+                "s3:ListBucket",
+                "s3:ListBucketVersions",
+                "s3:PutObject",
+                "s3:DeleteObject"
+              ],
+              "Effect": "Allow",
+              "Resource": [
+                "arn:aws:s3:::ai-platform-dev-datasets",
+                "arn:aws:s3:::ai-platform-dev-datasets/*",
+                "arn:aws:s3:::ai-platform-dev-models",
+                "arn:aws:s3:::ai-platform-dev-models/*",
+                "arn:aws:s3:::ai-platform-dev-checkpoints",
+                "arn:aws:s3:::ai-platform-dev-checkpoints/*"
+              ],
+              "Sid": "S3TrainingDataAccess"
+            },
+            {
+              "Action": [
+                "sagemaker:DescribeCluster",
+                "sagemaker:ListClusterNodes",
+                "sagemaker:UpdateCluster",
+                "sagemaker:CreateTrainingJob",
+                "sagemaker:DescribeTrainingJob",
+                "sagemaker:StopTrainingJob",
+                "sagemaker:ListTrainingJobs"
+              ],
+              "Effect": "Allow",
+              "Resource": [
+                "arn:aws:sagemaker:us-east-1:<TOKEN>:cluster/*",
+                "arn:aws:sagemaker:us-east-1:<TOKEN>:training-job/*"
+              ],
+              "Sid": "SageMakerHyperPodAccess"
+            },
+            {
+              "Action": "cloudwatch:PutMetricData",
+              "Condition": {
+                "StringEquals": {
+                  "cloudwatch:namespace": [
+                    "AI-Platform/Training"
+                  ]
+                }
+              },
+              "Effect": "Allow",
+              "Resource": "*",
+              "Sid": "CloudWatchMetricsTraining"
+            },
+            {
+              "Action": [
+                "fsx:DescribeFileSystems",
+                "fsx:DescribeDataRepositoryAssociations"
+              ],
+              "Effect": "Allow",
+              "Resource": "arn:aws:fsx:us-east-1:<TOKEN>:file-system/*",
+              "Sid": "FSxLustreAccess"
+            }
+          ],
+          "Version": "2012-10-17"
+        },
+        "PolicyName": "TrainingExecutionRoleDefaultPolicy<TOKEN>",
+        "Roles": [
+          {
+            "Ref": "TrainingExecutionRole<TOKEN>"
+          }
+        ]
+      },
+      "Type": "AWS::IAM::Policy"
+    }
+  },
+  "Rules": {
+    "CheckBootstrapVersion": {
+      "Assertions": [
+        {
+          "Assert": {
+            "Fn::Not": [
+              {
+                "Fn::Contains": [
+                  [
+                    "1",
+                    "2",
+                    "3",
+                    "4",
+                    "5"
+                  ],
+                  {
+                    "Ref": "BootstrapVersion"
+                  }
+                ]
+              }
+            ]
+          },
+          "AssertDescription": "CDK bootstrap stack version 6 required. Please run 'cdk bootstrap' with a recent version of the CDK CLI."
+        }
+      ]
+    }
+  }
 }

@@ -264,8 +264,8 @@ class TestEnvironmentFactoryMethods:
         assert config.database.min_acu == 2.0
         # Prod has longer backup retention
         assert config.database.backup_retention_days == 14
-        # Prod has largest storage
-        assert config.storage.fsx_storage_capacity_gib == 100 * 1024  # 100 TiB
+        # Prod has largest storage (初始 20 TiB，支持在线扩容)
+        assert config.storage.fsx_storage_capacity_gib == 20 * 1024  # 20 TiB
         # Prod has highest node limits
         assert config.eks.max_nodes == 100
 

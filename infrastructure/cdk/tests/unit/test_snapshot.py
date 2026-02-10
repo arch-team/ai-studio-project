@@ -11,10 +11,12 @@ Snapshot tests for CDK Stacks.
 """
 
 import json
+import re
 from pathlib import Path
 
 import aws_cdk as cdk
 import pytest
+from aws_cdk import aws_kms as kms
 from aws_cdk.assertions import Template
 
 from config import EnvironmentConfig
@@ -33,24 +35,17 @@ SNAPSHOT_DIR = Path(__file__).parent / "snapshots"
 def _normalize_template(template: Template) -> dict:
     """移除模板中的动态值 (hash, 时间戳等) 以确保快照稳定性。
 
-    仅保留 Resources 和 Outputs 的结构和类型，去除具体属性值中的
-    CDK 生成的 hash 后缀。
+    保留完整资源结构（类型+属性），仅替换 CDK 生成的动态 hash/token。
+    这样可以检测到资源属性变更，而非仅检测数量变化。
     """
     raw = template.to_json()
-    # 提取资源类型摘要 (不含具体属性值，避免 hash 差异)
-    summary = {
-        "ResourceTypes": sorted(
-            {
-                props.get("Type", "Unknown")
-                for props in raw.get("Resources", {}).values()
-                if isinstance(props, dict)
-            }
-        ),
-        "ResourceCount": len(raw.get("Resources", {})),
-        "OutputCount": len(raw.get("Outputs", {})),
-        "ParameterCount": len(raw.get("Parameters", {})),
-    }
-    return summary
+    # 保留完整结构，仅移除动态 hash 和 token
+    normalized = json.dumps(raw, sort_keys=True)
+    # 替换 64 位十六进制 hash (CDK asset hash)
+    normalized = re.sub(r"[a-f0-9]{64}", "<HASH>", normalized)
+    # 替换 8+ 位大写十六进制 token (CDK 逻辑 ID 后缀)
+    normalized = re.sub(r"[A-F0-9]{8,}", "<TOKEN>", normalized)
+    return json.loads(normalized)
 
 
 def _save_snapshot(name: str, data: dict) -> None:
@@ -166,9 +161,10 @@ class TestStorageStackSnapshot:
         dev_config: EnvironmentConfig,
         cdk_env: cdk.Environment,
         snapshot_update: bool,
+        test_kms_key: kms.Key,
     ) -> None:
         stack = StorageStack(
-            cdk_app, "SnapshotStorage", env_config=dev_config, env=cdk_env
+            cdk_app, "SnapshotStorage", env_config=dev_config, encryption_key=test_kms_key, env=cdk_env
         )
         _assert_snapshot("storage_stack", Template.from_stack(stack), snapshot_update)
 

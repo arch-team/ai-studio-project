@@ -1,23 +1,661 @@
 {
-  "OutputCount": 6,
-  "ParameterCount": 1,
-  "ResourceCount": 23,
-  "ResourceTypes": [
-    "AWS::EC2::SecurityGroup",
-    "AWS::EC2::SecurityGroupEgress",
-    "AWS::EC2::SecurityGroupIngress",
-    "AWS::IAM::Policy",
-    "AWS::IAM::Role",
-    "AWS::Lambda::Function",
-    "AWS::Logs::LogGroup",
-    "AWS::RDS::DBCluster",
-    "AWS::RDS::DBClusterParameterGroup",
-    "AWS::RDS::DBInstance",
-    "AWS::RDS::DBProxy",
-    "AWS::RDS::DBProxyTargetGroup",
-    "AWS::RDS::DBSubnetGroup",
-    "AWS::SecretsManager::Secret",
-    "AWS::SecretsManager::SecretTargetAttachment",
-    "Custom::LogRetention"
-  ]
+  "Outputs": {
+    "ClusterEndpoint": {
+      "Description": "Aurora cluster writer endpoint",
+      "Export": {
+        "Name": "ai-platform-dev-cluster-endpoint"
+      },
+      "Value": {
+        "Fn::GetAtt": [
+          "AuroraCluster<TOKEN>",
+          "Endpoint.Address"
+        ]
+      }
+    },
+    "Port": {
+      "Description": "Aurora cluster port",
+      "Export": {
+        "Name": "ai-platform-dev-port"
+      },
+      "Value": {
+        "Fn::GetAtt": [
+          "AuroraCluster<TOKEN>",
+          "Endpoint.Port"
+        ]
+      }
+    },
+    "ProxyEndpoint": {
+      "Description": "RDS Proxy endpoint",
+      "Export": {
+        "Name": "ai-platform-dev-proxy-endpoint"
+      },
+      "Value": {
+        "Fn::GetAtt": [
+          "RdsProxy<TOKEN>",
+          "Endpoint"
+        ]
+      }
+    },
+    "ReaderEndpoint": {
+      "Description": "Aurora cluster reader endpoint",
+      "Export": {
+        "Name": "ai-platform-dev-reader-endpoint"
+      },
+      "Value": {
+        "Fn::GetAtt": [
+          "AuroraCluster<TOKEN>",
+          "ReadEndpoint.Address"
+        ]
+      }
+    },
+    "SecretArn": {
+      "Description": "Secrets Manager secret ARN for database credentials",
+      "Export": {
+        "Name": "ai-platform-dev-secret-arn"
+      },
+      "Value": {
+        "Ref": "AuroraClusterSecretAttachment<TOKEN>"
+      }
+    },
+    "SecurityGroupId": {
+      "Description": "Aurora security group ID",
+      "Export": {
+        "Name": "ai-platform-dev-security-group-id"
+      },
+      "Value": {
+        "Fn::GetAtt": [
+          "DatabaseSg<TOKEN>",
+          "GroupId"
+        ]
+      }
+    }
+  },
+  "Parameters": {
+    "BootstrapVersion": {
+      "Default": "/cdk-bootstrap/hnb659fds/version",
+      "Description": "Version of the CDK Bootstrap resources in this environment, automatically retrieved from SSM Parameter Store. [cdk:skip]",
+      "Type": "AWS::SSM::Parameter::Value<String>"
+    }
+  },
+  "Resources": {
+    "AuditLogGroup<TOKEN>": {
+      "DeletionPolicy": "Delete",
+      "Properties": {
+        "LogGroupName": "/aws/rds/ai-platform-dev/aurora/audit",
+        "RetentionInDays": 30
+      },
+      "Type": "AWS::Logs::LogGroup",
+      "UpdateReplacePolicy": "Delete"
+    },
+    "AuroraCluster<TOKEN>": {
+      "DeletionPolicy": "Delete",
+      "Properties": {
+        "BackupRetentionPeriod": 7,
+        "CopyTagsToSnapshot": true,
+        "DBClusterIdentifier": "ai-platform-dev-aurora",
+        "DBClusterParameterGroupName": {
+          "Ref": "ParameterGroup<TOKEN>"
+        },
+        "DBSubnetGroupName": {
+          "Ref": "SubnetGroup"
+        },
+        "DatabaseName": "ai_platform",
+        "DeletionProtection": false,
+        "EnableCloudwatchLogsExports": [
+          "audit",
+          "error",
+          "slowquery"
+        ],
+        "EnableIAMDatabaseAuthentication": true,
+        "Engine": "aurora-mysql",
+        "EngineVersion": "8.0.mysql_aurora.3.04.0",
+        "MasterUserPassword": {
+          "Fn::Join": [
+            "",
+            [
+              "{{resolve:secretsmanager:",
+              {
+                "Ref": "SnapshotDatabaseAuroraClusterSecret<TOKEN>fdaad7efa858a3daf9490cf0a702aeb"
+              },
+              ":SecretString:password::}}"
+            ]
+          ]
+        },
+        "MasterUsername": "admin",
+        "PreferredBackupWindow": "03:00-04:00",
+        "PreferredMaintenanceWindow": "Sun:05:00-Sun:06:00",
+        "ServerlessV2ScalingConfiguration": {
+          "MaxCapacity": 8,
+          "MinCapacity": 0.5
+        },
+        "StorageEncrypted": true,
+        "VpcSecurityGroupIds": [
+          {
+            "Fn::GetAtt": [
+              "DatabaseSg<TOKEN>",
+              "GroupId"
+            ]
+          }
+        ]
+      },
+      "Type": "AWS::RDS::DBCluster",
+      "UpdateReplacePolicy": "Delete"
+    },
+    "AuroraClusterLogRetentionaudit<TOKEN>": {
+      "Properties": {
+        "LogGroupName": {
+          "Fn::Join": [
+            "",
+            [
+              "/aws/rds/cluster/",
+              {
+                "Ref": "AuroraCluster<TOKEN>"
+              },
+              "/audit"
+            ]
+          ]
+        },
+        "RetentionInDays": 30,
+        "ServiceToken": {
+          "Fn::GetAtt": [
+            "LogRetentionaae0aa3c5b4d4f87b02d85b201efdd8a<TOKEN>",
+            "Arn"
+          ]
+        }
+      },
+      "Type": "Custom::LogRetention"
+    },
+    "AuroraClusterLogRetentionerror<TOKEN>": {
+      "Properties": {
+        "LogGroupName": {
+          "Fn::Join": [
+            "",
+            [
+              "/aws/rds/cluster/",
+              {
+                "Ref": "AuroraCluster<TOKEN>"
+              },
+              "/error"
+            ]
+          ]
+        },
+        "RetentionInDays": 30,
+        "ServiceToken": {
+          "Fn::GetAtt": [
+            "LogRetentionaae0aa3c5b4d4f87b02d85b201efdd8a<TOKEN>",
+            "Arn"
+          ]
+        }
+      },
+      "Type": "Custom::LogRetention"
+    },
+    "AuroraClusterLogRetentionslowquery<TOKEN>": {
+      "Properties": {
+        "LogGroupName": {
+          "Fn::Join": [
+            "",
+            [
+              "/aws/rds/cluster/",
+              {
+                "Ref": "AuroraCluster<TOKEN>"
+              },
+              "/slowquery"
+            ]
+          ]
+        },
+        "RetentionInDays": 30,
+        "ServiceToken": {
+          "Fn::GetAtt": [
+            "LogRetentionaae0aa3c5b4d4f87b02d85b201efdd8a<TOKEN>",
+            "Arn"
+          ]
+        }
+      },
+      "Type": "Custom::LogRetention"
+    },
+    "AuroraClusterSecretAttachment<TOKEN>": {
+      "Properties": {
+        "SecretId": {
+          "Ref": "SnapshotDatabaseAuroraClusterSecret<TOKEN>fdaad7efa858a3daf9490cf0a702aeb"
+        },
+        "TargetId": {
+          "Ref": "AuroraCluster<TOKEN>"
+        },
+        "TargetType": "AWS::RDS::DBCluster"
+      },
+      "Type": "AWS::SecretsManager::SecretTargetAttachment"
+    },
+    "AuroraClusterWriter<TOKEN>": {
+      "DeletionPolicy": "Delete",
+      "Properties": {
+        "DBClusterIdentifier": {
+          "Ref": "AuroraCluster<TOKEN>"
+        },
+        "DBInstanceClass": "db.serverless",
+        "DBInstanceIdentifier": "ai-platform-dev-aurora-writer",
+        "Engine": "aurora-mysql",
+        "PromotionTier": 0,
+        "PubliclyAccessible": false
+      },
+      "Type": "AWS::RDS::DBInstance",
+      "UpdateReplacePolicy": "Delete"
+    },
+    "DatabaseSg<TOKEN>": {
+      "Properties": {
+        "GroupDescription": "Security group for Aurora MySQL",
+        "GroupName": "ai-platform-dev-aurora-sg",
+        "SecurityGroupIngress": [
+          {
+            "CidrIp": "10.0.64.0/19",
+            "Description": "MySQL from PrivateAppSubnet1",
+            "FromPort": 3306,
+            "IpProtocol": "tcp",
+            "ToPort": 3306
+          },
+          {
+            "CidrIp": "10.0.96.0/19",
+            "Description": "MySQL from PrivateAppSubnet2",
+            "FromPort": 3306,
+            "IpProtocol": "tcp",
+            "ToPort": 3306
+          },
+          {
+            "CidrIp": "10.0.128.0/19",
+            "Description": "MySQL from PrivateAppSubnet3",
+            "FromPort": 3306,
+            "IpProtocol": "tcp",
+            "ToPort": 3306
+          }
+        ],
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": "ai-platform-dev-aurora-sg"
+          }
+        ],
+        "VpcId": {
+          "Fn::ImportValue": "SnapshotVpc:ExportsOutputRefVpc<TOKEN>"
+        }
+      },
+      "Type": "AWS::EC2::SecurityGroup"
+    },
+    "DatabaseSgfromSnapshotDatabaseDatabaseSg<TOKEN>": {
+      "Properties": {
+        "Description": "Allow RDS Proxy to connect to Aurora",
+        "FromPort": 3306,
+        "GroupId": {
+          "Fn::GetAtt": [
+            "DatabaseSg<TOKEN>",
+            "GroupId"
+          ]
+        },
+        "IpProtocol": "tcp",
+        "SourceSecurityGroupId": {
+          "Fn::GetAtt": [
+            "DatabaseSg<TOKEN>",
+            "GroupId"
+          ]
+        },
+        "ToPort": 3306
+      },
+      "Type": "AWS::EC2::SecurityGroupIngress"
+    },
+    "DatabaseSgfromSnapshotDatabaseDatabaseSg<TOKEN>IndirectPort<TOKEN>": {
+      "Properties": {
+        "Description": "Allow connections to the database Cluster from the Proxy",
+        "FromPort": {
+          "Fn::GetAtt": [
+            "AuroraCluster<TOKEN>",
+            "Endpoint.Port"
+          ]
+        },
+        "GroupId": {
+          "Fn::GetAtt": [
+            "DatabaseSg<TOKEN>",
+            "GroupId"
+          ]
+        },
+        "IpProtocol": "tcp",
+        "SourceSecurityGroupId": {
+          "Fn::GetAtt": [
+            "DatabaseSg<TOKEN>",
+            "GroupId"
+          ]
+        },
+        "ToPort": {
+          "Fn::GetAtt": [
+            "AuroraCluster<TOKEN>",
+            "Endpoint.Port"
+          ]
+        }
+      },
+      "Type": "AWS::EC2::SecurityGroupIngress"
+    },
+    "DatabaseSgtoSnapshotDatabaseDatabaseSg<TOKEN>": {
+      "Properties": {
+        "Description": "Allow RDS Proxy to connect to Aurora",
+        "DestinationSecurityGroupId": {
+          "Fn::GetAtt": [
+            "DatabaseSg<TOKEN>",
+            "GroupId"
+          ]
+        },
+        "FromPort": 3306,
+        "GroupId": {
+          "Fn::GetAtt": [
+            "DatabaseSg<TOKEN>",
+            "GroupId"
+          ]
+        },
+        "IpProtocol": "tcp",
+        "ToPort": 3306
+      },
+      "Type": "AWS::EC2::SecurityGroupEgress"
+    },
+    "DatabaseSgtoSnapshotDatabaseDatabaseSg<TOKEN>IndirectPort<TOKEN>": {
+      "Properties": {
+        "Description": "Allow connections to the database Cluster from the Proxy",
+        "DestinationSecurityGroupId": {
+          "Fn::GetAtt": [
+            "DatabaseSg<TOKEN>",
+            "GroupId"
+          ]
+        },
+        "FromPort": {
+          "Fn::GetAtt": [
+            "AuroraCluster<TOKEN>",
+            "Endpoint.Port"
+          ]
+        },
+        "GroupId": {
+          "Fn::GetAtt": [
+            "DatabaseSg<TOKEN>",
+            "GroupId"
+          ]
+        },
+        "IpProtocol": "tcp",
+        "ToPort": {
+          "Fn::GetAtt": [
+            "AuroraCluster<TOKEN>",
+            "Endpoint.Port"
+          ]
+        }
+      },
+      "Type": "AWS::EC2::SecurityGroupEgress"
+    },
+    "LogRetentionaae0aa3c5b4d4f87b02d85b201efdd8a<TOKEN>": {
+      "DependsOn": [
+        "LogRetentionaae0aa3c5b4d4f87b02d85b201efdd8aServiceRoleDefaultPolicy<TOKEN>",
+        "LogRetentionaae0aa3c5b4d4f87b02d85b201efdd8aServiceRole<TOKEN>"
+      ],
+      "Properties": {
+        "Code": {
+          "S3Bucket": "cdk-hnb659fds-assets-<TOKEN>-us-east-1",
+          "S3Key": "<HASH>.zip"
+        },
+        "Handler": "index.handler",
+        "Role": {
+          "Fn::GetAtt": [
+            "LogRetentionaae0aa3c5b4d4f87b02d85b201efdd8aServiceRole<TOKEN>",
+            "Arn"
+          ]
+        },
+        "Runtime": "nodejs22.x",
+        "Timeout": 900
+      },
+      "Type": "AWS::Lambda::Function"
+    },
+    "LogRetentionaae0aa3c5b4d4f87b02d85b201efdd8aServiceRole<TOKEN>": {
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Statement": [
+            {
+              "Action": "sts:AssumeRole",
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "lambda.amazonaws.com"
+              }
+            }
+          ],
+          "Version": "2012-10-17"
+        },
+        "ManagedPolicyArns": [
+          {
+            "Fn::Join": [
+              "",
+              [
+                "arn:",
+                {
+                  "Ref": "AWS::Partition"
+                },
+                ":iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+              ]
+            ]
+          }
+        ]
+      },
+      "Type": "AWS::IAM::Role"
+    },
+    "LogRetentionaae0aa3c5b4d4f87b02d85b201efdd8aServiceRoleDefaultPolicy<TOKEN>": {
+      "Properties": {
+        "PolicyDocument": {
+          "Statement": [
+            {
+              "Action": [
+                "logs:PutRetentionPolicy",
+                "logs:DeleteRetentionPolicy"
+              ],
+              "Effect": "Allow",
+              "Resource": "*"
+            }
+          ],
+          "Version": "2012-10-17"
+        },
+        "PolicyName": "LogRetentionaae0aa3c5b4d4f87b02d85b201efdd8aServiceRoleDefaultPolicy<TOKEN>",
+        "Roles": [
+          {
+            "Ref": "LogRetentionaae0aa3c5b4d4f87b02d85b201efdd8aServiceRole<TOKEN>"
+          }
+        ]
+      },
+      "Type": "AWS::IAM::Policy"
+    },
+    "ParameterGroup<TOKEN>": {
+      "Properties": {
+        "Description": "Parameter group for AI Training Platform Aurora MySQL",
+        "Family": "aurora-mysql8.0",
+        "Parameters": {
+          "character_set_client": "utf8mb4",
+          "character_set_server": "utf8mb4",
+          "collation_server": "utf8mb4_unicode_ci",
+          "innodb_buffer_pool_size": "{DBInstanceClassMemory*3/4}",
+          "long_query_time": "2",
+          "max_connections": "LEAST({DBInstanceClassMemory/9531392},5000)",
+          "slow_query_log": "1",
+          "time_zone": "UTC"
+        }
+      },
+      "Type": "AWS::RDS::DBClusterParameterGroup"
+    },
+    "RdsProxy<TOKEN>": {
+      "Properties": {
+        "Auth": [
+          {
+            "AuthScheme": "SECRETS",
+            "IAMAuth": "REQUIRED",
+            "SecretArn": {
+              "Ref": "AuroraClusterSecretAttachment<TOKEN>"
+            }
+          }
+        ],
+        "DBProxyName": "ai-platform-dev-aurora-proxy",
+        "DebugLogging": true,
+        "EngineFamily": "MYSQL",
+        "IdleClientTimeout": 1800,
+        "RequireTLS": true,
+        "RoleArn": {
+          "Fn::GetAtt": [
+            "RdsProxyIAMRole<TOKEN>",
+            "Arn"
+          ]
+        },
+        "VpcSecurityGroupIds": [
+          {
+            "Fn::GetAtt": [
+              "DatabaseSg<TOKEN>",
+              "GroupId"
+            ]
+          }
+        ],
+        "VpcSubnetIds": [
+          {
+            "Fn::ImportValue": "SnapshotVpc:ExportsOutputRefVpcPrivateDataSubnet1Subnet<TOKEN>"
+          },
+          {
+            "Fn::ImportValue": "SnapshotVpc:ExportsOutputRefVpcPrivateDataSubnet2Subnet<TOKEN>"
+          },
+          {
+            "Fn::ImportValue": "SnapshotVpc:ExportsOutputRefVpcPrivateDataSubnet3Subnet<TOKEN>"
+          }
+        ]
+      },
+      "Type": "AWS::RDS::DBProxy"
+    },
+    "RdsProxyIAMRole<TOKEN>": {
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Statement": [
+            {
+              "Action": "sts:AssumeRole",
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "rds.amazonaws.com"
+              }
+            }
+          ],
+          "Version": "2012-10-17"
+        }
+      },
+      "Type": "AWS::IAM::Role"
+    },
+    "RdsProxyIAMRoleDefaultPolicy<TOKEN>": {
+      "Properties": {
+        "PolicyDocument": {
+          "Statement": [
+            {
+              "Action": [
+                "secretsmanager:GetSecretValue",
+                "secretsmanager:DescribeSecret"
+              ],
+              "Effect": "Allow",
+              "Resource": {
+                "Ref": "AuroraClusterSecretAttachment<TOKEN>"
+              }
+            }
+          ],
+          "Version": "2012-10-17"
+        },
+        "PolicyName": "RdsProxyIAMRoleDefaultPolicy<TOKEN>",
+        "Roles": [
+          {
+            "Ref": "RdsProxyIAMRole<TOKEN>"
+          }
+        ]
+      },
+      "Type": "AWS::IAM::Policy"
+    },
+    "RdsProxyProxyTargetGroup<TOKEN>": {
+      "DependsOn": [
+        "AuroraCluster<TOKEN>",
+        "AuroraClusterWriter<TOKEN>"
+      ],
+      "Properties": {
+        "ConnectionPoolConfigurationInfo": {
+          "ConnectionBorrowTimeout": 120,
+          "MaxConnectionsPercent": 100,
+          "MaxIdleConnectionsPercent": 50
+        },
+        "DBClusterIdentifiers": [
+          {
+            "Ref": "AuroraCluster<TOKEN>"
+          }
+        ],
+        "DBProxyName": {
+          "Ref": "RdsProxy<TOKEN>"
+        },
+        "TargetGroupName": "default"
+      },
+      "Type": "AWS::RDS::DBProxyTargetGroup"
+    },
+    "SnapshotDatabaseAuroraClusterSecret<TOKEN>fdaad7efa858a3daf9490cf0a702aeb": {
+      "DeletionPolicy": "Delete",
+      "Properties": {
+        "Description": {
+          "Fn::Join": [
+            "",
+            [
+              "Generated by the CDK for stack: ",
+              {
+                "Ref": "AWS::StackName"
+              }
+            ]
+          ]
+        },
+        "GenerateSecretString": {
+          "ExcludeCharacters": " %+~`#$&*()|[]{}:;<>?!'/@\"\\",
+          "GenerateStringKey": "password",
+          "PasswordLength": 30,
+          "SecretStringTemplate": "{\"username\":\"admin\"}"
+        },
+        "Name": "ai-platform-dev/aurora/credentials"
+      },
+      "Type": "AWS::SecretsManager::Secret",
+      "UpdateReplacePolicy": "Delete"
+    },
+    "SubnetGroup": {
+      "Properties": {
+        "DBSubnetGroupDescription": "Subnet group for Aurora MySQL in private data layer",
+        "DBSubnetGroupName": "ai-platform-dev-aurora-subnet-group",
+        "SubnetIds": [
+          {
+            "Fn::ImportValue": "SnapshotVpc:ExportsOutputRefVpcPrivateDataSubnet1Subnet<TOKEN>"
+          },
+          {
+            "Fn::ImportValue": "SnapshotVpc:ExportsOutputRefVpcPrivateDataSubnet2Subnet<TOKEN>"
+          },
+          {
+            "Fn::ImportValue": "SnapshotVpc:ExportsOutputRefVpcPrivateDataSubnet3Subnet<TOKEN>"
+          }
+        ]
+      },
+      "Type": "AWS::RDS::DBSubnetGroup"
+    }
+  },
+  "Rules": {
+    "CheckBootstrapVersion": {
+      "Assertions": [
+        {
+          "Assert": {
+            "Fn::Not": [
+              {
+                "Fn::Contains": [
+                  [
+                    "1",
+                    "2",
+                    "3",
+                    "4",
+                    "5"
+                  ],
+                  {
+                    "Ref": "BootstrapVersion"
+                  }
+                ]
+              }
+            ]
+          },
+          "AssertDescription": "CDK bootstrap stack version 6 required. Please run 'cdk bootstrap' with a recent version of the CDK CLI."
+        }
+      ]
+    }
+  }
 }

@@ -4,15 +4,10 @@ CDK Nag 抑制规则的集中管理。
 此模块提供统一的接口来管理所有 Stack 的 Nag 抑制规则。
 """
 
-from typing import TYPE_CHECKING
-
+import aws_cdk as cdk
 from cdk_nag import NagSuppressions
 
 from constructs import IConstruct
-
-if TYPE_CHECKING:
-    import aws_cdk as cdk
-
 
 # 各 Stack 特定的抑制规则
 STACK_SPECIFIC_SUPPRESSIONS = {
@@ -33,7 +28,9 @@ STACK_SPECIFIC_SUPPRESSIONS = {
         },
         {
             "id": "AwsSolutions-IAM5",
-            "reason": "Wildcard permissions are scoped to specific resources and conditions",
+            "reason": "S3 object-level wildcards (bucket/*), SageMaker resource wildcards (cluster/*, training-job/*), "
+            "CloudWatch metrics (resources=[*] with namespace condition), "
+            "and KMS key pattern (account-scoped with kms:ViaService condition) are intentional least-privilege scoping",
         },
     ],
     "database": [
@@ -165,7 +162,7 @@ STACK_SPECIFIC_SUPPRESSIONS = {
 }
 
 
-def apply_nag_suppressions(app: "cdk.App") -> None:
+def apply_nag_suppressions(app: cdk.App) -> None:
     """应用 CDK Nag 抑制规则到所有 Stack。
 
     此函数会遍历 App 中的所有 Stack，并根据 Stack 名称应用相应的抑制规则。
@@ -181,7 +178,7 @@ def apply_nag_suppressions(app: "cdk.App") -> None:
         ```
     """
     for node in app.node.find_all():
-        if not hasattr(node, "stack_name"):
+        if not isinstance(node, cdk.Stack):
             continue
 
         stack_id = node.node.id.lower()

@@ -139,6 +139,34 @@ class FsxLustreStack(cdk.Stack):
         ) // self.STORAGE_CAPACITY_INCREMENT_GIB
         return increments * self.STORAGE_CAPACITY_INCREMENT_GIB
 
+    @staticmethod
+    def _add_lustre_ingress_rules(
+        sg: ec2.SecurityGroup,
+        peer: ec2.IPeer,
+        description_prefix: str,
+    ) -> None:
+        """为指定 peer 添加 Lustre 所需端口的入站规则。
+
+        FSx for Lustre 需要:
+        - TCP 988: Lustre client-server 通信
+        - TCP 1021-1023: Lustre 节点间通信
+
+        Args:
+            sg: 安全组
+            peer: 入站规则的来源 peer
+            description_prefix: 规则描述的前缀
+        """
+        sg.add_ingress_rule(
+            peer=peer,
+            connection=ec2.Port.tcp(988),
+            description=f"{description_prefix} - Lustre client-server",
+        )
+        sg.add_ingress_rule(
+            peer=peer,
+            connection=ec2.Port.tcp_range(1021, 1023),
+            description=f"{description_prefix} - Lustre inter-node",
+        )
+
     def _create_security_group(self) -> ec2.SecurityGroup:
         """Create security group for FSx for Lustre.
 
@@ -157,42 +185,20 @@ class FsxLustreStack(cdk.Stack):
             allow_all_outbound=True,
         )
 
-        # Add self-referencing rules for Lustre inter-node communication
-        sg.add_ingress_rule(
-            peer=sg,
-            connection=ec2.Port.tcp(988),
-            description="Lustre client-server communication",
-        )
-        sg.add_ingress_rule(
-            peer=sg,
-            connection=ec2.Port.tcp_range(1021, 1023),
-            description="Lustre inter-node communication",
-        )
+        # 自引用规则: Lustre 节点间通信
+        self._add_lustre_ingress_rules(sg, sg, "Self-reference")
 
-        # Allow EKS nodes to access FSx
+        # 允许 EKS 节点访问 FSx
         if self._eks_security_group:
-            sg.add_ingress_rule(
-                peer=self._eks_security_group,
-                connection=ec2.Port.tcp(988),
-                description="EKS nodes - Lustre client-server",
-            )
-            sg.add_ingress_rule(
-                peer=self._eks_security_group,
-                connection=ec2.Port.tcp_range(1021, 1023),
-                description="EKS nodes - Lustre inter-node",
-            )
+            self._add_lustre_ingress_rules(sg, self._eks_security_group, "EKS nodes")
 
-        # Allow access from VPC CIDR (for nodes without explicit security group)
-        sg.add_ingress_rule(
-            peer=ec2.Peer.ipv4(self._vpc.vpc_cidr_block),
-            connection=ec2.Port.tcp(988),
-            description="VPC internal - Lustre client-server",
-        )
-        sg.add_ingress_rule(
-            peer=ec2.Peer.ipv4(self._vpc.vpc_cidr_block),
-            connection=ec2.Port.tcp_range(1021, 1023),
-            description="VPC internal - Lustre inter-node",
-        )
+        # 仅允许 Private 子网访问 (收窄原 VPC CIDR 全范围规则)
+        for subnet in self._vpc.private_subnets:
+            self._add_lustre_ingress_rules(
+                sg,
+                ec2.Peer.ipv4(subnet.ipv4_cidr_block),
+                f"Subnet {subnet.node.id}",
+            )
 
         cdk.Tags.of(sg).add("Name", f"{self.env_config.resource_prefix}-fsx-sg")
 

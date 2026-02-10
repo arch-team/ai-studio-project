@@ -333,7 +333,7 @@ class EnvironmentConfig:
             db_min_acu=0.5,  # 可暂停节省成本
             db_max_acu=8.0,
             db_backup_days=7,
-            fsx_storage_gib=10 * 1024,  # 10 TiB 最小值
+            fsx_storage_gib=1200,  # 1.2 TiB (FSx PERSISTENT_2 最小值，dev 够用)
             fsx_throughput=500,
             eks_min_nodes=1,
             eks_max_nodes=10,
@@ -373,7 +373,7 @@ class EnvironmentConfig:
             db_min_acu=2.0,  # 始终保持温暖，无冷启动
             db_max_acu=16.0,
             db_backup_days=14,
-            fsx_storage_gib=100 * 1024,  # 100 TiB
+            fsx_storage_gib=20 * 1024,  # 20 TiB (初始容量，FSx 支持在线扩容)
             fsx_throughput=500,  # 可根据需要升级到 1000
             eks_min_nodes=2,
             eks_max_nodes=100,

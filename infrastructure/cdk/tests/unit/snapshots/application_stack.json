@@ -1,8 +1,128 @@
 {
-  "OutputCount": 2,
-  "ParameterCount": 1,
-  "ResourceCount": 1,
-  "ResourceTypes": [
-    "AWS::ECR::Repository"
-  ]
+  "Outputs": {
+    "BackendRepositoryArn": {
+      "Description": "ECR repository ARN for backend Docker images",
+      "Export": {
+        "Name": "ai-platform-dev-backend-repository-arn"
+      },
+      "Value": {
+        "Fn::GetAtt": [
+          "BackendRepository<TOKEN>",
+          "Arn"
+        ]
+      }
+    },
+    "BackendRepositoryUri": {
+      "Description": "ECR repository URI for backend Docker images",
+      "Export": {
+        "Name": "ai-platform-dev-backend-repository-uri"
+      },
+      "Value": {
+        "Fn::Join": [
+          "",
+          [
+            {
+              "Fn::Select": [
+                4,
+                {
+                  "Fn::Split": [
+                    ":",
+                    {
+                      "Fn::GetAtt": [
+                        "BackendRepository<TOKEN>",
+                        "Arn"
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            ".dkr.ecr.",
+            {
+              "Fn::Select": [
+                3,
+                {
+                  "Fn::Split": [
+                    ":",
+                    {
+                      "Fn::GetAtt": [
+                        "BackendRepository<TOKEN>",
+                        "Arn"
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            ".",
+            {
+              "Ref": "AWS::URLSuffix"
+            },
+            "/",
+            {
+              "Ref": "BackendRepository<TOKEN>"
+            }
+          ]
+        ]
+      }
+    }
+  },
+  "Parameters": {
+    "BootstrapVersion": {
+      "Default": "/cdk-bootstrap/hnb659fds/version",
+      "Description": "Version of the CDK Bootstrap resources in this environment, automatically retrieved from SSM Parameter Store. [cdk:skip]",
+      "Type": "AWS::SSM::Parameter::Value<String>"
+    }
+  },
+  "Resources": {
+    "BackendRepository<TOKEN>": {
+      "DeletionPolicy": "Delete",
+      "Properties": {
+        "EmptyOnDelete": true,
+        "ImageScanningConfiguration": {
+          "ScanOnPush": true
+        },
+        "ImageTagMutability": "IMMUTABLE",
+        "LifecyclePolicy": {
+          "LifecyclePolicyText": "{\"rules\":[{\"rulePriority\":1,\"description\":\"\u5220\u9664 90 \u5929\u524d\u7684\u672a\u6807\u8bb0\u955c\u50cf\",\"selection\":{\"tagStatus\":\"untagged\",\"countType\":\"sinceImagePushed\",\"countNumber\":90,\"countUnit\":\"days\"},\"action\":{\"type\":\"expire\"}},{\"rulePriority\":10,\"description\":\"\u4fdd\u7559\u6700\u8fd1 30 \u4e2a\u955c\u50cf\",\"selection\":{\"tagStatus\":\"any\",\"countType\":\"imageCountMoreThan\",\"countNumber\":30},\"action\":{\"type\":\"expire\"}}]}"
+        },
+        "RepositoryName": "ai-platform-dev-backend",
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": "ai-platform-dev-backend"
+          }
+        ]
+      },
+      "Type": "AWS::ECR::Repository",
+      "UpdateReplacePolicy": "Delete"
+    }
+  },
+  "Rules": {
+    "CheckBootstrapVersion": {
+      "Assertions": [
+        {
+          "Assert": {
+            "Fn::Not": [
+              {
+                "Fn::Contains": [
+                  [
+                    "1",
+                    "2",
+                    "3",
+                    "4",
+                    "5"
+                  ],
+                  {
+                    "Ref": "BootstrapVersion"
+                  }
+                ]
+              }
+            ]
+          },
+          "AssertDescription": "CDK bootstrap stack version 6 required. Please run 'cdk bootstrap' with a recent version of the CDK CLI."
+        }
+      ]
+    }
+  }
 }

@@ -4,21 +4,17 @@ HyperPod Add-ons Stack for AI Training Platform.
 This stack installs HyperPod-specific EKS add-ons using CDK eks.Addon:
 - T008d-1: Training Operator (amazon-sagemaker-hyperpod-training-operator)
 - T008d-1: Task Governance / Kueue (amazon-sagemaker-hyperpod-taskgovernance)
-- T008d-2: Observability (amazon-sagemaker-hyperpod-observability)
 
+Note: Observability (T008d-2) 已迁移到独立的 ObservabilityStack。
 Note: PriorityClass configuration is automatically provided by the Task Governance
 add-on, so no manual PriorityClass creation is needed.
-
 Note: Elastic Agent (checkpoint management, auto-resume) is NOT an EKS add-on.
 It is a Python package installed in training container images via:
   pip install hyperpod-elastic-agent
-See: https://docs.aws.amazon.com/sagemaker/latest/dg/sagemaker-eks-operator-install.html
 
 Reference:
 - T008d-1: Training core components installation
-- T008d-2: Monitoring components installation
 - spec.md FR-004: Priority level numerical mapping (managed by Task Governance)
-- spec.md FR-007/FR-016: Observability (Prometheus + Grafana via Amazon Managed Prometheus/Grafana)
 - https://docs.aws.amazon.com/eks/latest/userguide/workloads-add-ons-available-eks.html
 """
 
@@ -46,8 +42,8 @@ class HyperPodAddonsStack(cdk.Stack):
     - Training Operator: Manages PyTorchJob, TensorFlowJob CRDs for distributed training
     - Task Governance: Kueue-based workload scheduling with Gang Scheduling support
       (includes automatic PriorityClass configuration per spec.md FR-004)
-    - Observability: Prometheus + Grafana for cluster monitoring (spec.md FR-007/FR-016)
 
+    Note: Observability (Prometheus + Grafana) 已迁移到独立的 ObservabilityStack。
     Note: Elastic Agent is NOT an EKS add-on. It must be installed in training
     container images via `pip install hyperpod-elastic-agent`.
 
@@ -58,7 +54,7 @@ class HyperPodAddonsStack(cdk.Stack):
     Attributes:
         training_operator_addon: The Training Operator EKS add-on
         task_governance_addon: The Task Governance (Kueue) EKS add-on
-        observability_addon: The Observability (Prometheus + Grafana) EKS add-on
+        observability_addon: The Observability add-on (None, 已迁移到 ObservabilityStack)
     """
 
     def __init__(
@@ -111,6 +107,7 @@ class HyperPodAddonsStack(cdk.Stack):
         addon_name: str,
         component: str,
         description: str,
+        addon_version: str | None = None,
     ) -> eks.CfnAddon:
         """Create an EKS add-on with standard configuration.
 
@@ -119,6 +116,9 @@ class HyperPodAddonsStack(cdk.Stack):
             addon_name: Name of the EKS add-on
             component: Component name for tagging
             description: Description for the add-on
+            addon_version: 插件版本（可选，None 则使用 AWS 默认版本）。
+                建议在生产环境中锁定版本以确保可重复部署。
+                查询可用版本: aws eks describe-addon-versions --addon-name <name>
 
         Returns:
             The created CfnAddon
@@ -127,6 +127,7 @@ class HyperPodAddonsStack(cdk.Stack):
             self,
             construct_id,
             addon_name=addon_name,
+            addon_version=addon_version,
             cluster_name=self._eks_cluster.cluster_name,
             resolve_conflicts="OVERWRITE",
             tags=create_addon_tags(self.env_config, component, component),
@@ -214,34 +215,6 @@ class HyperPodAddonsStack(cdk.Stack):
 
         # Ensure Task Governance is installed after Training Operator
         # for proper CRD dependency resolution
-        addon.add_dependency(self._training_operator_addon)
-
-        return addon
-
-    def _install_observability(self) -> eks.CfnAddon:
-        """Install HyperPod Observability add-on (T008d-2).
-
-        Observability provides:
-        - Node Exporter for system metrics
-        - DCGM Exporter for GPU metrics
-        - kube-state-metrics for K8s resource metrics
-        - EFA Exporter for network metrics
-        - Metrics forwarded to Amazon Managed Prometheus
-        - Dashboards in Amazon Managed Grafana
-
-        Reference:
-        - spec.md FR-007/FR-016: Observability requirements
-        - https://docs.aws.amazon.com/sagemaker/latest/dg/hyperpod-observability-addon-setup.html
-        """
-        addon = self._create_addon(
-            construct_id="ObservabilityAddon",
-            addon_name=EKS_ADDON_NAMES.OBSERVABILITY,
-            component="observability",
-            description="HyperPod Observability for cluster monitoring via Amazon Managed Prometheus/Grafana",
-        )
-
-        # Ensure Observability is installed after Training Operator
-        # for proper training job metrics collection
         addon.add_dependency(self._training_operator_addon)
 
         return addon

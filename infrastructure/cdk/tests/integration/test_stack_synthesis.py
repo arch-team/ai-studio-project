@@ -10,6 +10,7 @@
 
 import aws_cdk as cdk
 import pytest
+from aws_cdk import aws_kms as kms
 from aws_cdk.assertions import Template
 
 from config import get_environment_config
@@ -53,8 +54,10 @@ def _synthesize_foundation_stacks(
         vpc=network_stack.vpc,
         env=cdk_env,
     )
+    kms_stack = cdk.Stack(app, f"{env_name}-kms", env=cdk_env)
+    test_key = kms.Key(kms_stack, "TestKey")
     storage_stack = StorageStack(
-        app, f"{env_name}-storage", env_config=env_config, env=cdk_env
+        app, f"{env_name}-storage", env_config=env_config, encryption_key=test_key, env=cdk_env
     )
 
     # Application (仅 dev 需要验证)
@@ -136,8 +139,10 @@ class TestStackDependencies:
             vpc=stacks["network"].vpc,
             env=cdk_env,
         )
+        kms_stack = cdk.Stack(app, "test-kms", env=cdk_env)
+        test_key = kms.Key(kms_stack, "TestKey")
         stacks["storage"] = StorageStack(
-            app, "test-storage", env_config=env_config, env=cdk_env
+            app, "test-storage", env_config=env_config, encryption_key=test_key, env=cdk_env
         )
         stacks["eks"] = EksStack(
             app,
@@ -204,8 +209,10 @@ class TestCrossStackReferences:
         network_stack = NetworkStack(
             app, "fsx-network", env_config=env_config, env=cdk_env
         )
+        kms_stack = cdk.Stack(app, "fsx-kms", env=cdk_env)
+        test_key = kms.Key(kms_stack, "TestKey")
         storage_stack = StorageStack(
-            app, "fsx-storage", env_config=env_config, env=cdk_env
+            app, "fsx-storage", env_config=env_config, encryption_key=test_key, env=cdk_env
         )
         fsx_stack = FsxLustreStack(
             app,
@@ -242,9 +249,15 @@ class TestResourceCounts:
         self, test_account: str, test_region: str
     ) -> None:
         """验证 Storage Stack 创建 3 个 S3 Bucket."""
-        template = self._make_template(
-            test_account, test_region, StorageStack, "count-storage"
+        app = cdk.App()
+        env_config = get_environment_config("dev", test_account, test_region)
+        cdk_env = cdk.Environment(account=test_account, region=test_region)
+        kms_stack = cdk.Stack(app, "kms-stack", env=cdk_env)
+        test_key = kms.Key(kms_stack, "TestKey")
+        stack = StorageStack(
+            app, "count-storage-stack", env_config=env_config, encryption_key=test_key, env=cdk_env
         )
+        template = Template.from_stack(stack)
         template.resource_count_is("AWS::S3::Bucket", 3)
 
     def test_network_creates_one_vpc(self, test_account: str, test_region: str) -> None:

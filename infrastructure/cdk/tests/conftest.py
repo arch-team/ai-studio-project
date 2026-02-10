@@ -12,6 +12,7 @@ import aws_cdk as cdk
 import pytest
 from aws_cdk import aws_ec2 as ec2
 from aws_cdk import aws_eks as eks
+from aws_cdk import aws_kms as kms
 from aws_cdk.lambda_layer_kubectl_v33 import KubectlV33Layer
 
 from config import EnvironmentConfig
@@ -138,3 +139,15 @@ def lightweight_eks_cluster(
         default_capacity=0,
         kubectl_layer=KubectlV33Layer(stack, "KubectlLayer"),
     )
+
+
+# =============================================================================
+# KMS Key Fixtures (用于 StorageStack 等需要加密密钥的测试)
+# =============================================================================
+
+
+@pytest.fixture
+def test_kms_key(cdk_app: cdk.App, cdk_env: cdk.Environment) -> kms.Key:
+    """测试用 KMS Key."""
+    stack = cdk.Stack(cdk_app, "KmsStack", env=cdk_env)
+    return kms.Key(stack, "TestKey", description="Test KMS key")

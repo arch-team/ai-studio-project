@@ -20,6 +20,7 @@ T038b-2 测试用例:
 
 import aws_cdk as cdk
 import pytest
+from aws_cdk import aws_kms as kms
 from aws_cdk.assertions import Match, Template
 
 from config import EnvironmentConfig
@@ -31,13 +32,18 @@ class TestStorageStackCreation:
 
     @pytest.fixture
     def storage_stack(
-        self, cdk_app: cdk.App, dev_config: EnvironmentConfig, cdk_env: cdk.Environment
+        self,
+        cdk_app: cdk.App,
+        dev_config: EnvironmentConfig,
+        cdk_env: cdk.Environment,
+        test_kms_key: kms.Key,
     ) -> StorageStack:
         """Create a Storage Stack for testing."""
         return StorageStack(
             cdk_app,
             "TestStorageStack",
             env_config=dev_config,
+            encryption_key=test_kms_key,
             env=cdk_env,
         )
 
@@ -60,13 +66,18 @@ class TestBucketSecurity:
 
     @pytest.fixture
     def template(
-        self, cdk_app: cdk.App, dev_config: EnvironmentConfig, cdk_env: cdk.Environment
+        self,
+        cdk_app: cdk.App,
+        dev_config: EnvironmentConfig,
+        cdk_env: cdk.Environment,
+        test_kms_key: kms.Key,
     ) -> Template:
         """Create template for security testing."""
         stack = StorageStack(
             cdk_app,
             "SecurityTestStack",
             env_config=dev_config,
+            encryption_key=test_kms_key,
             env=cdk_env,
         )
         return Template.from_stack(stack)
@@ -110,13 +121,18 @@ class TestRemovalPolicies:
     """Tests for removal policies per environment."""
 
     def test_dev_buckets_destroyable(
-        self, cdk_app: cdk.App, dev_config: EnvironmentConfig, cdk_env: cdk.Environment
+        self,
+        cdk_app: cdk.App,
+        dev_config: EnvironmentConfig,
+        cdk_env: cdk.Environment,
+        test_kms_key: kms.Key,
     ) -> None:
         """Verify dev buckets can be destroyed."""
         stack = StorageStack(
             cdk_app,
             "DevRemovalStack",
             env_config=dev_config,
+            encryption_key=test_kms_key,
             env=cdk_env,
         )
         template = Template.from_stack(stack)
@@ -131,13 +147,18 @@ class TestRemovalPolicies:
         )
 
     def test_prod_buckets_retained(
-        self, cdk_app: cdk.App, prod_config: EnvironmentConfig, cdk_env: cdk.Environment
+        self,
+        cdk_app: cdk.App,
+        prod_config: EnvironmentConfig,
+        cdk_env: cdk.Environment,
+        test_kms_key: kms.Key,
     ) -> None:
         """Verify prod buckets are retained on deletion."""
         stack = StorageStack(
             cdk_app,
             "ProdRemovalStack",
             env_config=prod_config,
+            encryption_key=test_kms_key,
             env=cdk_env,
         )
         template = Template.from_stack(stack)
@@ -157,13 +178,18 @@ class TestLifecyclePolicies:
 
     @pytest.fixture
     def template(
-        self, cdk_app: cdk.App, dev_config: EnvironmentConfig, cdk_env: cdk.Environment
+        self,
+        cdk_app: cdk.App,
+        dev_config: EnvironmentConfig,
+        cdk_env: cdk.Environment,
+        test_kms_key: kms.Key,
     ) -> Template:
         """Create template for lifecycle testing."""
         stack = StorageStack(
             cdk_app,
             "LifecycleTestStack",
             env_config=dev_config,
+            encryption_key=test_kms_key,
             env=cdk_env,
         )
         return Template.from_stack(stack)
@@ -186,13 +212,18 @@ class TestStorageStackOutputs:
 
     @pytest.fixture
     def storage_stack(
-        self, cdk_app: cdk.App, dev_config: EnvironmentConfig, cdk_env: cdk.Environment
+        self,
+        cdk_app: cdk.App,
+        dev_config: EnvironmentConfig,
+        cdk_env: cdk.Environment,
+        test_kms_key: kms.Key,
     ) -> StorageStack:
         """Create Storage Stack for output testing."""
         return StorageStack(
             cdk_app,
             "OutputTestStack",
             env_config=dev_config,
+            encryption_key=test_kms_key,
             env=cdk_env,
         )
 
@@ -214,13 +245,18 @@ class TestBucketTags:
 
     @pytest.fixture
     def template(
-        self, cdk_app: cdk.App, dev_config: EnvironmentConfig, cdk_env: cdk.Environment
+        self,
+        cdk_app: cdk.App,
+        dev_config: EnvironmentConfig,
+        cdk_env: cdk.Environment,
+        test_kms_key: kms.Key,
     ) -> Template:
         """Create template for tag testing."""
         stack = StorageStack(
             cdk_app,
             "TagTestStack",
             env_config=dev_config,
+            encryption_key=test_kms_key,
             env=cdk_env,
         )
         return Template.from_stack(stack)
@@ -267,13 +303,18 @@ class TestCheckpointLifecyclePolicies:
 
     @pytest.fixture
     def storage_stack(
-        self, cdk_app: cdk.App, dev_config: EnvironmentConfig, cdk_env: cdk.Environment
+        self,
+        cdk_app: cdk.App,
+        dev_config: EnvironmentConfig,
+        cdk_env: cdk.Environment,
+        test_kms_key: kms.Key,
     ) -> StorageStack:
         """Create Storage Stack for lifecycle testing."""
         return StorageStack(
             cdk_app,
             "CheckpointLifecycleStack",
             env_config=dev_config,
+            encryption_key=test_kms_key,
             env=cdk_env,
         )
 
@@ -446,6 +487,7 @@ class TestCheckpointLifecycleParameterization:
         test_account: str,
         test_region: str,
         cdk_env: cdk.Environment,
+        test_kms_key: kms.Key,
     ) -> None:
         """验证可自定义冷检查点保留天数.
 
@@ -469,6 +511,7 @@ class TestCheckpointLifecycleParameterization:
             cdk_app,
             "CustomRetentionStack",
             env_config=custom_config,
+            encryption_key=test_kms_key,
             env=cdk_env,
         )
         template = Template.from_stack(stack)
@@ -497,6 +540,7 @@ class TestCheckpointLifecycleParameterization:
         test_account: str,
         test_region: str,
         cdk_env: cdk.Environment,
+        test_kms_key: kms.Key,
     ) -> None:
         """验证可自定义 Standard-IA 转换天数.
 
@@ -520,6 +564,7 @@ class TestCheckpointLifecycleParameterization:
             cdk_app,
             "CustomIATransitionStack",
             env_config=custom_config,
+            encryption_key=test_kms_key,
             env=cdk_env,
         )
         template = Template.from_stack(stack)

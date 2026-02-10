@@ -1,12 +1,752 @@
 {
-  "OutputCount": 6,
-  "ParameterCount": 1,
-  "ResourceCount": 11,
-  "ResourceTypes": [
-    "AWS::IAM::Role",
-    "AWS::Lambda::Function",
-    "AWS::S3::Bucket",
-    "AWS::S3::BucketPolicy",
-    "Custom::S3AutoDeleteObjects"
-  ]
+  "Outputs": {
+    "CheckpointsBucketArn": {
+      "Description": "S3 bucket ARN for training checkpoints",
+      "Export": {
+        "Name": "ai-platform-dev-checkpoints-bucket-arn"
+      },
+      "Value": {
+        "Fn::GetAtt": [
+          "CheckpointsBucket<TOKEN>",
+          "Arn"
+        ]
+      }
+    },
+    "CheckpointsBucketName": {
+      "Description": "S3 bucket name for training checkpoints",
+      "Export": {
+        "Name": "ai-platform-dev-checkpoints-bucket-name"
+      },
+      "Value": {
+        "Ref": "CheckpointsBucket<TOKEN>"
+      }
+    },
+    "DatasetsBucketArn": {
+      "Description": "S3 bucket ARN for training datasets",
+      "Export": {
+        "Name": "ai-platform-dev-datasets-bucket-arn"
+      },
+      "Value": {
+        "Fn::GetAtt": [
+          "DatasetsBucket<TOKEN>",
+          "Arn"
+        ]
+      }
+    },
+    "DatasetsBucketName": {
+      "Description": "S3 bucket name for training datasets",
+      "Export": {
+        "Name": "ai-platform-dev-datasets-bucket-name"
+      },
+      "Value": {
+        "Ref": "DatasetsBucket<TOKEN>"
+      }
+    },
+    "ModelsBucketArn": {
+      "Description": "S3 bucket ARN for model artifacts",
+      "Export": {
+        "Name": "ai-platform-dev-models-bucket-arn"
+      },
+      "Value": {
+        "Fn::GetAtt": [
+          "ModelsBucket<TOKEN>",
+          "Arn"
+        ]
+      }
+    },
+    "ModelsBucketName": {
+      "Description": "S3 bucket name for model artifacts",
+      "Export": {
+        "Name": "ai-platform-dev-models-bucket-name"
+      },
+      "Value": {
+        "Ref": "ModelsBucket<TOKEN>"
+      }
+    }
+  },
+  "Parameters": {
+    "BootstrapVersion": {
+      "Default": "/cdk-bootstrap/hnb659fds/version",
+      "Description": "Version of the CDK Bootstrap resources in this environment, automatically retrieved from SSM Parameter Store. [cdk:skip]",
+      "Type": "AWS::SSM::Parameter::Value<String>"
+    }
+  },
+  "Resources": {
+    "CheckpointsBucket<TOKEN>": {
+      "DeletionPolicy": "Delete",
+      "Properties": {
+        "BucketEncryption": {
+          "ServerSideEncryptionConfiguration": [
+            {
+              "ServerSideEncryptionByDefault": {
+                "KMSMasterKeyID": {
+                  "Fn::ImportValue": "KmsStack:ExportsOutputFnGetAttTestKey<TOKEN>rn<TOKEN>"
+                },
+                "SSEAlgorithm": "aws:kms"
+              }
+            }
+          ]
+        },
+        "BucketName": "ai-platform-dev-checkpoints",
+        "LifecycleConfiguration": {
+          "Rules": [
+            {
+              "Id": "TransitionToIA",
+              "Status": "Enabled",
+              "Transitions": [
+                {
+                  "StorageClass": "STANDARD_IA",
+                  "TransitionInDays": 30
+                }
+              ]
+            },
+            {
+              "ExpirationInDays": 90,
+              "Id": "ExpireCheckpoints",
+              "Prefix": "cold/",
+              "Status": "Enabled"
+            },
+            {
+              "AbortIncompleteMultipartUpload": {
+                "DaysAfterInitiation": 3
+              },
+              "Id": "AbortIncompleteMultipartUpload",
+              "Status": "Enabled"
+            },
+            {
+              "Id": "ExpireOldVersions",
+              "NoncurrentVersionExpiration": {
+                "NoncurrentDays": 7
+              },
+              "Status": "Enabled"
+            }
+          ]
+        },
+        "OwnershipControls": {
+          "Rules": [
+            {
+              "ObjectOwnership": "BucketOwnerEnforced"
+            }
+          ]
+        },
+        "PublicAccessBlockConfiguration": {
+          "BlockPublicAcls": true,
+          "BlockPublicPolicy": true,
+          "IgnorePublicAcls": true,
+          "RestrictPublicBuckets": true
+        },
+        "Tags": [
+          {
+            "Key": "aws-cdk:auto-delete-objects",
+            "Value": "true"
+          },
+          {
+            "Key": "DataClassification",
+            "Value": "internal"
+          },
+          {
+            "Key": "Name",
+            "Value": "ai-platform-dev-checkpoints"
+          }
+        ],
+        "VersioningConfiguration": {
+          "Status": "Enabled"
+        }
+      },
+      "Type": "AWS::S3::Bucket",
+      "UpdateReplacePolicy": "Delete"
+    },
+    "CheckpointsBucketAutoDeleteObjectsCustomResource<TOKEN>": {
+      "DeletionPolicy": "Delete",
+      "DependsOn": [
+        "CheckpointsBucketPolicy<TOKEN>"
+      ],
+      "Properties": {
+        "BucketName": {
+          "Ref": "CheckpointsBucket<TOKEN>"
+        },
+        "ServiceToken": {
+          "Fn::GetAtt": [
+            "CustomS3AutoDeleteObjectsCustomResourceProviderHandler<TOKEN>",
+            "Arn"
+          ]
+        }
+      },
+      "Type": "Custom::S3AutoDeleteObjects",
+      "UpdateReplacePolicy": "Delete"
+    },
+    "CheckpointsBucketPolicy<TOKEN>": {
+      "Properties": {
+        "Bucket": {
+          "Ref": "CheckpointsBucket<TOKEN>"
+        },
+        "PolicyDocument": {
+          "Statement": [
+            {
+              "Action": "s3:*",
+              "Condition": {
+                "Bool": {
+                  "aws:SecureTransport": "false"
+                }
+              },
+              "Effect": "Deny",
+              "Principal": {
+                "AWS": "*"
+              },
+              "Resource": [
+                {
+                  "Fn::GetAtt": [
+                    "CheckpointsBucket<TOKEN>",
+                    "Arn"
+                  ]
+                },
+                {
+                  "Fn::Join": [
+                    "",
+                    [
+                      {
+                        "Fn::GetAtt": [
+                          "CheckpointsBucket<TOKEN>",
+                          "Arn"
+                        ]
+                      },
+                      "/*"
+                    ]
+                  ]
+                }
+              ]
+            },
+            {
+              "Action": [
+                "s3:PutBucketPolicy",
+                "s3:GetBucket*",
+                "s3:List*",
+                "s3:DeleteObject*"
+              ],
+              "Effect": "Allow",
+              "Principal": {
+                "AWS": {
+                  "Fn::GetAtt": [
+                    "CustomS3AutoDeleteObjectsCustomResourceProviderRole<TOKEN>",
+                    "Arn"
+                  ]
+                }
+              },
+              "Resource": [
+                {
+                  "Fn::GetAtt": [
+                    "CheckpointsBucket<TOKEN>",
+                    "Arn"
+                  ]
+                },
+                {
+                  "Fn::Join": [
+                    "",
+                    [
+                      {
+                        "Fn::GetAtt": [
+                          "CheckpointsBucket<TOKEN>",
+                          "Arn"
+                        ]
+                      },
+                      "/*"
+                    ]
+                  ]
+                }
+              ]
+            }
+          ],
+          "Version": "2012-10-17"
+        }
+      },
+      "Type": "AWS::S3::BucketPolicy"
+    },
+    "CustomS3AutoDeleteObjectsCustomResourceProviderHandler<TOKEN>": {
+      "DependsOn": [
+        "CustomS3AutoDeleteObjectsCustomResourceProviderRole<TOKEN>"
+      ],
+      "Properties": {
+        "Code": {
+          "S3Bucket": "cdk-hnb659fds-assets-<TOKEN>-us-east-1",
+          "S3Key": "<HASH>.zip"
+        },
+        "Description": {
+          "Fn::Join": [
+            "",
+            [
+              "Lambda function for auto-deleting objects in ",
+              {
+                "Ref": "DatasetsBucket<TOKEN>"
+              },
+              " S3 bucket."
+            ]
+          ]
+        },
+        "Handler": "index.handler",
+        "MemorySize": 128,
+        "Role": {
+          "Fn::GetAtt": [
+            "CustomS3AutoDeleteObjectsCustomResourceProviderRole<TOKEN>",
+            "Arn"
+          ]
+        },
+        "Runtime": "nodejs22.x",
+        "Timeout": 900
+      },
+      "Type": "AWS::Lambda::Function"
+    },
+    "CustomS3AutoDeleteObjectsCustomResourceProviderRole<TOKEN>": {
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Statement": [
+            {
+              "Action": "sts:AssumeRole",
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "lambda.amazonaws.com"
+              }
+            }
+          ],
+          "Version": "2012-10-17"
+        },
+        "ManagedPolicyArns": [
+          {
+            "Fn::Sub": "arn:${AWS::Partition}:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+          }
+        ]
+      },
+      "Type": "AWS::IAM::Role"
+    },
+    "DatasetsBucket<TOKEN>": {
+      "DeletionPolicy": "Delete",
+      "Properties": {
+        "BucketEncryption": {
+          "ServerSideEncryptionConfiguration": [
+            {
+              "ServerSideEncryptionByDefault": {
+                "KMSMasterKeyID": {
+                  "Fn::ImportValue": "KmsStack:ExportsOutputFnGetAttTestKey<TOKEN>rn<TOKEN>"
+                },
+                "SSEAlgorithm": "aws:kms"
+              }
+            }
+          ]
+        },
+        "BucketName": "ai-platform-dev-datasets",
+        "CorsConfiguration": {
+          "CorsRules": [
+            {
+              "AllowedHeaders": [
+                "*"
+              ],
+              "AllowedMethods": [
+                "GET",
+                "PUT",
+                "POST"
+              ],
+              "AllowedOrigins": [
+                "*"
+              ],
+              "MaxAge": 3000
+            }
+          ]
+        },
+        "IntelligentTieringConfigurations": [
+          {
+            "Id": "AutoTiering",
+            "Status": "Enabled",
+            "Tierings": [
+              {
+                "AccessTier": "ARCHIVE_ACCESS",
+                "Days": 90
+              },
+              {
+                "AccessTier": "DEEP_ARCHIVE_ACCESS",
+                "Days": 180
+              }
+            ]
+          }
+        ],
+        "LifecycleConfiguration": {
+          "Rules": [
+            {
+              "Id": "TransitionToIA",
+              "Status": "Enabled",
+              "Transitions": [
+                {
+                  "StorageClass": "STANDARD_IA",
+                  "TransitionInDays": 90
+                },
+                {
+                  "StorageClass": "GLACIER",
+                  "TransitionInDays": 365
+                }
+              ]
+            },
+            {
+              "AbortIncompleteMultipartUpload": {
+                "DaysAfterInitiation": 7
+              },
+              "Id": "AbortIncompleteMultipartUpload",
+              "Status": "Enabled"
+            },
+            {
+              "Id": "ExpireOldVersions",
+              "NoncurrentVersionExpiration": {
+                "NoncurrentDays": 90
+              },
+              "Status": "Enabled"
+            }
+          ]
+        },
+        "OwnershipControls": {
+          "Rules": [
+            {
+              "ObjectOwnership": "BucketOwnerEnforced"
+            }
+          ]
+        },
+        "PublicAccessBlockConfiguration": {
+          "BlockPublicAcls": true,
+          "BlockPublicPolicy": true,
+          "IgnorePublicAcls": true,
+          "RestrictPublicBuckets": true
+        },
+        "Tags": [
+          {
+            "Key": "aws-cdk:auto-delete-objects",
+            "Value": "true"
+          },
+          {
+            "Key": "DataClassification",
+            "Value": "internal"
+          },
+          {
+            "Key": "Name",
+            "Value": "ai-platform-dev-datasets"
+          }
+        ],
+        "VersioningConfiguration": {
+          "Status": "Enabled"
+        }
+      },
+      "Type": "AWS::S3::Bucket",
+      "UpdateReplacePolicy": "Delete"
+    },
+    "DatasetsBucketAutoDeleteObjectsCustomResource<TOKEN>": {
+      "DeletionPolicy": "Delete",
+      "DependsOn": [
+        "DatasetsBucketPolicy<TOKEN>"
+      ],
+      "Properties": {
+        "BucketName": {
+          "Ref": "DatasetsBucket<TOKEN>"
+        },
+        "ServiceToken": {
+          "Fn::GetAtt": [
+            "CustomS3AutoDeleteObjectsCustomResourceProviderHandler<TOKEN>",
+            "Arn"
+          ]
+        }
+      },
+      "Type": "Custom::S3AutoDeleteObjects",
+      "UpdateReplacePolicy": "Delete"
+    },
+    "DatasetsBucketPolicy<TOKEN>": {
+      "Properties": {
+        "Bucket": {
+          "Ref": "DatasetsBucket<TOKEN>"
+        },
+        "PolicyDocument": {
+          "Statement": [
+            {
+              "Action": "s3:*",
+              "Condition": {
+                "Bool": {
+                  "aws:SecureTransport": "false"
+                }
+              },
+              "Effect": "Deny",
+              "Principal": {
+                "AWS": "*"
+              },
+              "Resource": [
+                {
+                  "Fn::GetAtt": [
+                    "DatasetsBucket<TOKEN>",
+                    "Arn"
+                  ]
+                },
+                {
+                  "Fn::Join": [
+                    "",
+                    [
+                      {
+                        "Fn::GetAtt": [
+                          "DatasetsBucket<TOKEN>",
+                          "Arn"
+                        ]
+                      },
+                      "/*"
+                    ]
+                  ]
+                }
+              ]
+            },
+            {
+              "Action": [
+                "s3:PutBucketPolicy",
+                "s3:GetBucket*",
+                "s3:List*",
+                "s3:DeleteObject*"
+              ],
+              "Effect": "Allow",
+              "Principal": {
+                "AWS": {
+                  "Fn::GetAtt": [
+                    "CustomS3AutoDeleteObjectsCustomResourceProviderRole<TOKEN>",
+                    "Arn"
+                  ]
+                }
+              },
+              "Resource": [
+                {
+                  "Fn::GetAtt": [
+                    "DatasetsBucket<TOKEN>",
+                    "Arn"
+                  ]
+                },
+                {
+                  "Fn::Join": [
+                    "",
+                    [
+                      {
+                        "Fn::GetAtt": [
+                          "DatasetsBucket<TOKEN>",
+                          "Arn"
+                        ]
+                      },
+                      "/*"
+                    ]
+                  ]
+                }
+              ]
+            }
+          ],
+          "Version": "2012-10-17"
+        }
+      },
+      "Type": "AWS::S3::BucketPolicy"
+    },
+    "ModelsBucket<TOKEN>": {
+      "DeletionPolicy": "Delete",
+      "Properties": {
+        "BucketEncryption": {
+          "ServerSideEncryptionConfiguration": [
+            {
+              "ServerSideEncryptionByDefault": {
+                "KMSMasterKeyID": {
+                  "Fn::ImportValue": "KmsStack:ExportsOutputFnGetAttTestKey<TOKEN>rn<TOKEN>"
+                },
+                "SSEAlgorithm": "aws:kms"
+              }
+            }
+          ]
+        },
+        "BucketName": "ai-platform-dev-models",
+        "LifecycleConfiguration": {
+          "Rules": [
+            {
+              "Id": "TransitionToIA",
+              "Status": "Enabled",
+              "Transitions": [
+                {
+                  "StorageClass": "STANDARD_IA",
+                  "TransitionInDays": 180
+                }
+              ]
+            },
+            {
+              "AbortIncompleteMultipartUpload": {
+                "DaysAfterInitiation": 7
+              },
+              "Id": "AbortIncompleteMultipartUpload",
+              "Status": "Enabled"
+            },
+            {
+              "Id": "ExpireOldVersions",
+              "NoncurrentVersionExpiration": {
+                "NoncurrentDays": 365
+              },
+              "Status": "Enabled"
+            }
+          ]
+        },
+        "OwnershipControls": {
+          "Rules": [
+            {
+              "ObjectOwnership": "BucketOwnerEnforced"
+            }
+          ]
+        },
+        "PublicAccessBlockConfiguration": {
+          "BlockPublicAcls": true,
+          "BlockPublicPolicy": true,
+          "IgnorePublicAcls": true,
+          "RestrictPublicBuckets": true
+        },
+        "Tags": [
+          {
+            "Key": "aws-cdk:auto-delete-objects",
+            "Value": "true"
+          },
+          {
+            "Key": "DataClassification",
+            "Value": "internal"
+          },
+          {
+            "Key": "Name",
+            "Value": "ai-platform-dev-models"
+          }
+        ],
+        "VersioningConfiguration": {
+          "Status": "Enabled"
+        }
+      },
+      "Type": "AWS::S3::Bucket",
+      "UpdateReplacePolicy": "Delete"
+    },
+    "ModelsBucketAutoDeleteObjectsCustomResource<TOKEN>": {
+      "DeletionPolicy": "Delete",
+      "DependsOn": [
+        "ModelsBucketPolicy<TOKEN>"
+      ],
+      "Properties": {
+        "BucketName": {
+          "Ref": "ModelsBucket<TOKEN>"
+        },
+        "ServiceToken": {
+          "Fn::GetAtt": [
+            "CustomS3AutoDeleteObjectsCustomResourceProviderHandler<TOKEN>",
+            "Arn"
+          ]
+        }
+      },
+      "Type": "Custom::S3AutoDeleteObjects",
+      "UpdateReplacePolicy": "Delete"
+    },
+    "ModelsBucketPolicy<TOKEN>": {
+      "Properties": {
+        "Bucket": {
+          "Ref": "ModelsBucket<TOKEN>"
+        },
+        "PolicyDocument": {
+          "Statement": [
+            {
+              "Action": "s3:*",
+              "Condition": {
+                "Bool": {
+                  "aws:SecureTransport": "false"
+                }
+              },
+              "Effect": "Deny",
+              "Principal": {
+                "AWS": "*"
+              },
+              "Resource": [
+                {
+                  "Fn::GetAtt": [
+                    "ModelsBucket<TOKEN>",
+                    "Arn"
+                  ]
+                },
+                {
+                  "Fn::Join": [
+                    "",
+                    [
+                      {
+                        "Fn::GetAtt": [
+                          "ModelsBucket<TOKEN>",
+                          "Arn"
+                        ]
+                      },
+                      "/*"
+                    ]
+                  ]
+                }
+              ]
+            },
+            {
+              "Action": [
+                "s3:PutBucketPolicy",
+                "s3:GetBucket*",
+                "s3:List*",
+                "s3:DeleteObject*"
+              ],
+              "Effect": "Allow",
+              "Principal": {
+                "AWS": {
+                  "Fn::GetAtt": [
+                    "CustomS3AutoDeleteObjectsCustomResourceProviderRole<TOKEN>",
+                    "Arn"
+                  ]
+                }
+              },
+              "Resource": [
+                {
+                  "Fn::GetAtt": [
+                    "ModelsBucket<TOKEN>",
+                    "Arn"
+                  ]
+                },
+                {
+                  "Fn::Join": [
+                    "",
+                    [
+                      {
+                        "Fn::GetAtt": [
+                          "ModelsBucket<TOKEN>",
+                          "Arn"
+                        ]
+                      },
+                      "/*"
+                    ]
+                  ]
+                }
+              ]
+            }
+          ],
+          "Version": "2012-10-17"
+        }
+      },
+      "Type": "AWS::S3::BucketPolicy"
+    }
+  },
+  "Rules": {
+    "CheckBootstrapVersion": {
+      "Assertions": [
+        {
+          "Assert": {
+            "Fn::Not": [
+              {
+                "Fn::Contains": [
+                  [
+                    "1",
+                    "2",
+                    "3",
+                    "4",
+                    "5"
+                  ],
+                  {
+                    "Ref": "BootstrapVersion"
+                  }
+                ]
+              }
+            ]
+          },
+          "AssertDescription": "CDK bootstrap stack version 6 required. Please run 'cdk bootstrap' with a recent version of the CDK CLI."
+        }
+      ]
+    }
+  }
 }

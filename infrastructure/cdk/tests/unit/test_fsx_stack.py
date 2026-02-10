@@ -12,6 +12,7 @@ FSx for Lustre Stack 单元测试.
 
 import aws_cdk as cdk
 import pytest
+from aws_cdk import aws_kms as kms
 from aws_cdk.assertions import Match, Template
 
 from config import EnvironmentConfig
@@ -24,10 +25,15 @@ from stacks import FsxLustreStack, NetworkStack, StorageStack
 
 @pytest.fixture
 def storage_stack(
-    cdk_app: cdk.App, dev_config: EnvironmentConfig, cdk_env: cdk.Environment
+    cdk_app: cdk.App,
+    dev_config: EnvironmentConfig,
+    cdk_env: cdk.Environment,
+    test_kms_key: kms.Key,
 ) -> StorageStack:
     """创建 Storage Stack 依赖."""
-    return StorageStack(cdk_app, "TestStorageStack", env_config=dev_config, env=cdk_env)
+    return StorageStack(
+        cdk_app, "TestStorageStack", env_config=dev_config, encryption_key=test_kms_key, env=cdk_env
+    )
 
 
 @pytest.fixture
@@ -140,8 +146,10 @@ class TestEnvironmentSpecificConfiguration:
         network = NetworkStack(
             cdk_app, f"{prefix}Network", env_config=env_config, env=cdk_env
         )
+        kms_stack = cdk.Stack(cdk_app, f"{prefix}Kms", env=cdk_env)
+        test_key = kms.Key(kms_stack, "TestKey")
         storage = StorageStack(
-            cdk_app, f"{prefix}Storage", env_config=env_config, env=cdk_env
+            cdk_app, f"{prefix}Storage", env_config=env_config, encryption_key=test_key, env=cdk_env
         )
         fsx = FsxLustreStack(
             cdk_app,
@@ -166,15 +174,15 @@ class TestEnvironmentSpecificConfiguration:
     def test_dev_storage_capacity(
         self, cdk_app: cdk.App, dev_config: EnvironmentConfig, cdk_env: cdk.Environment
     ) -> None:
-        """验证开发环境存储容量 (>= 10 TiB)."""
+        """验证开发环境存储容量 (>= 1.2 TiB 最小值)."""
         template = self._create_fsx_template(cdk_app, dev_config, cdk_env, "DevCap")
         capacity = self._get_storage_capacity(template)
-        assert capacity >= 10240, f"Dev storage capacity {capacity} < 10240"
+        assert capacity >= 1200, f"Dev storage capacity {capacity} < 1200"
 
     def test_prod_storage_capacity(
         self, cdk_app: cdk.App, prod_config: EnvironmentConfig, cdk_env: cdk.Environment
     ) -> None:
-        """验证生产环境存储容量 (>= 100 TiB)."""
+        """验证生产环境存储容量 (>= 20 TiB)."""
         template = self._create_fsx_template(cdk_app, prod_config, cdk_env, "ProdCap")
         capacity = self._get_storage_capacity(template)
-        assert capacity >= 102400, f"Prod storage capacity {capacity} < 102400"
+        assert capacity >= 20480, f"Prod storage capacity {capacity} < 20480"

@@ -1,24 +1,1632 @@
 {
-  "OutputCount": 6,
-  "ParameterCount": 1,
-  "ResourceCount": 58,
-  "ResourceTypes": [
-    "AWS::EC2::EIP",
-    "AWS::EC2::FlowLog",
-    "AWS::EC2::InternetGateway",
-    "AWS::EC2::NatGateway",
-    "AWS::EC2::Route",
-    "AWS::EC2::RouteTable",
-    "AWS::EC2::SecurityGroup",
-    "AWS::EC2::Subnet",
-    "AWS::EC2::SubnetRouteTableAssociation",
-    "AWS::EC2::VPC",
-    "AWS::EC2::VPCEndpoint",
-    "AWS::EC2::VPCGatewayAttachment",
-    "AWS::IAM::Policy",
-    "AWS::IAM::Role",
-    "AWS::Lambda::Function",
-    "AWS::Logs::LogGroup",
-    "Custom::VpcRestrictDefaultSG"
-  ]
+  "Outputs": {
+    "PrivateAppSubnetIds": {
+      "Description": "Private app layer subnet IDs",
+      "Export": {
+        "Name": "ai-platform-dev-private-app-subnet-ids"
+      },
+      "Value": {
+        "Fn::Join": [
+          "",
+          [
+            {
+              "Ref": "VpcPrivateAppSubnet1Subnet<TOKEN>"
+            },
+            ",",
+            {
+              "Ref": "VpcPrivateAppSubnet2Subnet<TOKEN>"
+            },
+            ",",
+            {
+              "Ref": "VpcPrivateAppSubnet3Subnet<TOKEN>"
+            }
+          ]
+        ]
+      }
+    },
+    "PrivateDataSubnetIds": {
+      "Description": "Private data layer subnet IDs",
+      "Export": {
+        "Name": "ai-platform-dev-private-data-subnet-ids"
+      },
+      "Value": {
+        "Fn::Join": [
+          "",
+          [
+            {
+              "Ref": "VpcPrivateDataSubnet1Subnet<TOKEN>"
+            },
+            ",",
+            {
+              "Ref": "VpcPrivateDataSubnet2Subnet<TOKEN>"
+            },
+            ",",
+            {
+              "Ref": "VpcPrivateDataSubnet3Subnet<TOKEN>"
+            }
+          ]
+        ]
+      }
+    },
+    "PublicSubnetIds": {
+      "Description": "Public subnet IDs",
+      "Export": {
+        "Name": "ai-platform-dev-public-subnet-ids"
+      },
+      "Value": {
+        "Fn::Join": [
+          "",
+          [
+            {
+              "Ref": "VpcPublicSubnet1Subnet<TOKEN>"
+            },
+            ",",
+            {
+              "Ref": "VpcPublicSubnet2Subnet<TOKEN>"
+            },
+            ",",
+            {
+              "Ref": "VpcPublicSubnet3Subnet<TOKEN>"
+            }
+          ]
+        ]
+      }
+    },
+    "VpcCidr": {
+      "Description": "VPC CIDR block",
+      "Export": {
+        "Name": "ai-platform-dev-vpc-cidr"
+      },
+      "Value": {
+        "Fn::GetAtt": [
+          "Vpc<TOKEN>",
+          "CidrBlock"
+        ]
+      }
+    },
+    "VpcEndpointSecurityGroupId": {
+      "Description": "VPC endpoint security group ID",
+      "Export": {
+        "Name": "ai-platform-dev-vpc-endpoint-security-group-id"
+      },
+      "Value": {
+        "Fn::GetAtt": [
+          "VpcEndpointSg<TOKEN>",
+          "GroupId"
+        ]
+      }
+    },
+    "VpcId": {
+      "Description": "VPC ID",
+      "Export": {
+        "Name": "ai-platform-dev-vpc-id"
+      },
+      "Value": {
+        "Ref": "Vpc<TOKEN>"
+      }
+    }
+  },
+  "Parameters": {
+    "BootstrapVersion": {
+      "Default": "/cdk-bootstrap/hnb659fds/version",
+      "Description": "Version of the CDK Bootstrap resources in this environment, automatically retrieved from SSM Parameter Store. [cdk:skip]",
+      "Type": "AWS::SSM::Parameter::Value<String>"
+    }
+  },
+  "Resources": {
+    "CustomVpcRestrictDefaultSGCustomResourceProviderHandler<TOKEN>": {
+      "DependsOn": [
+        "CustomVpcRestrictDefaultSGCustomResourceProviderRole<TOKEN>"
+      ],
+      "Properties": {
+        "Code": {
+          "S3Bucket": "cdk-hnb659fds-assets-<TOKEN>-us-east-1",
+          "S3Key": "<HASH>.zip"
+        },
+        "Description": "Lambda function for removing all inbound/outbound rules from the VPC default security group",
+        "Handler": "__entrypoint__.handler",
+        "MemorySize": 128,
+        "Role": {
+          "Fn::GetAtt": [
+            "CustomVpcRestrictDefaultSGCustomResourceProviderRole<TOKEN>",
+            "Arn"
+          ]
+        },
+        "Runtime": "nodejs22.x",
+        "Timeout": 900
+      },
+      "Type": "AWS::Lambda::Function"
+    },
+    "CustomVpcRestrictDefaultSGCustomResourceProviderRole<TOKEN>": {
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Statement": [
+            {
+              "Action": "sts:AssumeRole",
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "lambda.amazonaws.com"
+              }
+            }
+          ],
+          "Version": "2012-10-17"
+        },
+        "ManagedPolicyArns": [
+          {
+            "Fn::Sub": "arn:${AWS::Partition}:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+          }
+        ],
+        "Policies": [
+          {
+            "PolicyDocument": {
+              "Statement": [
+                {
+                  "Action": [
+                    "ec2:AuthorizeSecurityGroupIngress",
+                    "ec2:AuthorizeSecurityGroupEgress",
+                    "ec2:RevokeSecurityGroupIngress",
+                    "ec2:RevokeSecurityGroupEgress"
+                  ],
+                  "Effect": "Allow",
+                  "Resource": [
+                    {
+                      "Fn::Join": [
+                        "",
+                        [
+                          "arn:",
+                          {
+                            "Ref": "AWS::Partition"
+                          },
+                          ":ec2:us-east-1:<TOKEN>:security-group/",
+                          {
+                            "Fn::GetAtt": [
+                              "Vpc<TOKEN>",
+                              "DefaultSecurityGroup"
+                            ]
+                          }
+                        ]
+                      ]
+                    }
+                  ]
+                }
+              ],
+              "Version": "2012-10-17"
+            },
+            "PolicyName": "Inline"
+          }
+        ]
+      },
+      "Type": "AWS::IAM::Role"
+    },
+    "Vpc<TOKEN>": {
+      "Properties": {
+        "CidrBlock": "10.0.0.0/16",
+        "EnableDnsHostnames": true,
+        "EnableDnsSupport": true,
+        "InstanceTenancy": "default",
+        "Tags": [
+          {
+            "Key": "DeploymentMode",
+            "Value": "multi-az"
+          },
+          {
+            "Key": "Name",
+            "Value": "ai-platform-dev-vpc"
+          }
+        ]
+      },
+      "Type": "AWS::EC2::VPC"
+    },
+    "VpcCloudWatchLogs<TOKEN>": {
+      "Properties": {
+        "PrivateDnsEnabled": true,
+        "SecurityGroupIds": [
+          {
+            "Fn::GetAtt": [
+              "VpcEndpointSg<TOKEN>",
+              "GroupId"
+            ]
+          }
+        ],
+        "ServiceName": "com.amazonaws.us-east-1.logs",
+        "SubnetIds": [
+          {
+            "Ref": "VpcPrivateAppSubnet1Subnet<TOKEN>"
+          },
+          {
+            "Ref": "VpcPrivateAppSubnet2Subnet<TOKEN>"
+          },
+          {
+            "Ref": "VpcPrivateAppSubnet3Subnet<TOKEN>"
+          }
+        ],
+        "Tags": [
+          {
+            "Key": "DeploymentMode",
+            "Value": "multi-az"
+          },
+          {
+            "Key": "Name",
+            "Value": "ai-platform-dev-vpc"
+          }
+        ],
+        "VpcEndpointType": "Interface",
+        "VpcId": {
+          "Ref": "Vpc<TOKEN>"
+        }
+      },
+      "Type": "AWS::EC2::VPCEndpoint"
+    },
+    "VpcCloudWatchMonitoring<TOKEN>": {
+      "Properties": {
+        "PrivateDnsEnabled": true,
+        "SecurityGroupIds": [
+          {
+            "Fn::GetAtt": [
+              "VpcEndpointSg<TOKEN>",
+              "GroupId"
+            ]
+          }
+        ],
+        "ServiceName": "com.amazonaws.us-east-1.monitoring",
+        "SubnetIds": [
+          {
+            "Ref": "VpcPrivateAppSubnet1Subnet<TOKEN>"
+          },
+          {
+            "Ref": "VpcPrivateAppSubnet2Subnet<TOKEN>"
+          },
+          {
+            "Ref": "VpcPrivateAppSubnet3Subnet<TOKEN>"
+          }
+        ],
+        "Tags": [
+          {
+            "Key": "DeploymentMode",
+            "Value": "multi-az"
+          },
+          {
+            "Key": "Name",
+            "Value": "ai-platform-dev-vpc"
+          }
+        ],
+        "VpcEndpointType": "Interface",
+        "VpcId": {
+          "Ref": "Vpc<TOKEN>"
+        }
+      },
+      "Type": "AWS::EC2::VPCEndpoint"
+    },
+    "VpcEc2Messages<TOKEN>": {
+      "Properties": {
+        "PrivateDnsEnabled": true,
+        "SecurityGroupIds": [
+          {
+            "Fn::GetAtt": [
+              "VpcEndpointSg<TOKEN>",
+              "GroupId"
+            ]
+          }
+        ],
+        "ServiceName": "com.amazonaws.us-east-1.ec2messages",
+        "SubnetIds": [
+          {
+            "Ref": "VpcPrivateAppSubnet1Subnet<TOKEN>"
+          },
+          {
+            "Ref": "VpcPrivateAppSubnet2Subnet<TOKEN>"
+          },
+          {
+            "Ref": "VpcPrivateAppSubnet3Subnet<TOKEN>"
+          }
+        ],
+        "Tags": [
+          {
+            "Key": "DeploymentMode",
+            "Value": "multi-az"
+          },
+          {
+            "Key": "Name",
+            "Value": "ai-platform-dev-vpc"
+          }
+        ],
+        "VpcEndpointType": "Interface",
+        "VpcId": {
+          "Ref": "Vpc<TOKEN>"
+        }
+      },
+      "Type": "AWS::EC2::VPCEndpoint"
+    },
+    "VpcEcrApi<TOKEN>": {
+      "Properties": {
+        "PrivateDnsEnabled": true,
+        "SecurityGroupIds": [
+          {
+            "Fn::GetAtt": [
+              "VpcEndpointSg<TOKEN>",
+              "GroupId"
+            ]
+          }
+        ],
+        "ServiceName": "com.amazonaws.us-east-1.ecr.api",
+        "SubnetIds": [
+          {
+            "Ref": "VpcPrivateAppSubnet1Subnet<TOKEN>"
+          },
+          {
+            "Ref": "VpcPrivateAppSubnet2Subnet<TOKEN>"
+          },
+          {
+            "Ref": "VpcPrivateAppSubnet3Subnet<TOKEN>"
+          }
+        ],
+        "Tags": [
+          {
+            "Key": "DeploymentMode",
+            "Value": "multi-az"
+          },
+          {
+            "Key": "Name",
+            "Value": "ai-platform-dev-vpc"
+          }
+        ],
+        "VpcEndpointType": "Interface",
+        "VpcId": {
+          "Ref": "Vpc<TOKEN>"
+        }
+      },
+      "Type": "AWS::EC2::VPCEndpoint"
+    },
+    "VpcEcrDkr<TOKEN>": {
+      "Properties": {
+        "PrivateDnsEnabled": true,
+        "SecurityGroupIds": [
+          {
+            "Fn::GetAtt": [
+              "VpcEndpointSg<TOKEN>",
+              "GroupId"
+            ]
+          }
+        ],
+        "ServiceName": "com.amazonaws.us-east-1.ecr.dkr",
+        "SubnetIds": [
+          {
+            "Ref": "VpcPrivateAppSubnet1Subnet<TOKEN>"
+          },
+          {
+            "Ref": "VpcPrivateAppSubnet2Subnet<TOKEN>"
+          },
+          {
+            "Ref": "VpcPrivateAppSubnet3Subnet<TOKEN>"
+          }
+        ],
+        "Tags": [
+          {
+            "Key": "DeploymentMode",
+            "Value": "multi-az"
+          },
+          {
+            "Key": "Name",
+            "Value": "ai-platform-dev-vpc"
+          }
+        ],
+        "VpcEndpointType": "Interface",
+        "VpcId": {
+          "Ref": "Vpc<TOKEN>"
+        }
+      },
+      "Type": "AWS::EC2::VPCEndpoint"
+    },
+    "VpcEfs<TOKEN>": {
+      "Properties": {
+        "PrivateDnsEnabled": true,
+        "SecurityGroupIds": [
+          {
+            "Fn::GetAtt": [
+              "VpcEndpointSg<TOKEN>",
+              "GroupId"
+            ]
+          }
+        ],
+        "ServiceName": "com.amazonaws.us-east-1.elasticfilesystem",
+        "SubnetIds": [
+          {
+            "Ref": "VpcPrivateAppSubnet1Subnet<TOKEN>"
+          },
+          {
+            "Ref": "VpcPrivateAppSubnet2Subnet<TOKEN>"
+          },
+          {
+            "Ref": "VpcPrivateAppSubnet3Subnet<TOKEN>"
+          }
+        ],
+        "Tags": [
+          {
+            "Key": "DeploymentMode",
+            "Value": "multi-az"
+          },
+          {
+            "Key": "Name",
+            "Value": "ai-platform-dev-vpc"
+          }
+        ],
+        "VpcEndpointType": "Interface",
+        "VpcId": {
+          "Ref": "Vpc<TOKEN>"
+        }
+      },
+      "Type": "AWS::EC2::VPCEndpoint"
+    },
+    "VpcEndpointSg<TOKEN>": {
+      "Properties": {
+        "GroupDescription": "Security group for VPC endpoints",
+        "GroupName": "ai-platform-dev-vpce-sg",
+        "SecurityGroupEgress": [
+          {
+            "CidrIp": "255.255.255.255/32",
+            "Description": "Disallow all traffic",
+            "FromPort": 252,
+            "IpProtocol": "icmp",
+            "ToPort": 86
+          }
+        ],
+        "SecurityGroupIngress": [
+          {
+            "CidrIp": "10.0.64.0/19",
+            "Description": "Allow HTTPS from PrivateAppSubnet1",
+            "FromPort": 443,
+            "IpProtocol": "tcp",
+            "ToPort": 443
+          },
+          {
+            "CidrIp": "10.0.96.0/19",
+            "Description": "Allow HTTPS from PrivateAppSubnet2",
+            "FromPort": 443,
+            "IpProtocol": "tcp",
+            "ToPort": 443
+          },
+          {
+            "CidrIp": "10.0.128.0/19",
+            "Description": "Allow HTTPS from PrivateAppSubnet3",
+            "FromPort": 443,
+            "IpProtocol": "tcp",
+            "ToPort": 443
+          },
+          {
+            "CidrIp": "10.0.160.0/20",
+            "Description": "Allow HTTPS from PrivateDataSubnet1",
+            "FromPort": 443,
+            "IpProtocol": "tcp",
+            "ToPort": 443
+          },
+          {
+            "CidrIp": "10.0.176.0/20",
+            "Description": "Allow HTTPS from PrivateDataSubnet2",
+            "FromPort": 443,
+            "IpProtocol": "tcp",
+            "ToPort": 443
+          },
+          {
+            "CidrIp": "10.0.192.0/20",
+            "Description": "Allow HTTPS from PrivateDataSubnet3",
+            "FromPort": 443,
+            "IpProtocol": "tcp",
+            "ToPort": 443
+          },
+          {
+            "CidrIp": {
+              "Fn::GetAtt": [
+                "Vpc<TOKEN>",
+                "CidrBlock"
+              ]
+            },
+            "Description": {
+              "Fn::Join": [
+                "",
+                [
+                  "from ",
+                  {
+                    "Fn::GetAtt": [
+                      "Vpc<TOKEN>",
+                      "CidrBlock"
+                    ]
+                  },
+                  ":443"
+                ]
+              ]
+            },
+            "FromPort": 443,
+            "IpProtocol": "tcp",
+            "ToPort": 443
+          }
+        ],
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": "ai-platform-dev-vpce-sg"
+          }
+        ],
+        "VpcId": {
+          "Ref": "Vpc<TOKEN>"
+        }
+      },
+      "Type": "AWS::EC2::SecurityGroup"
+    },
+    "VpcFlowLog<TOKEN>": {
+      "Properties": {
+        "DeliverLogsPermissionArn": {
+          "Fn::GetAtt": [
+            "VpcFlowLogIAMRole<TOKEN>",
+            "Arn"
+          ]
+        },
+        "LogDestinationType": "cloud-watch-logs",
+        "LogGroupName": {
+          "Ref": "VpcFlowLogLogGroup<TOKEN>"
+        },
+        "ResourceId": {
+          "Ref": "Vpc<TOKEN>"
+        },
+        "ResourceType": "VPC",
+        "Tags": [
+          {
+            "Key": "DeploymentMode",
+            "Value": "multi-az"
+          },
+          {
+            "Key": "Name",
+            "Value": "SnapshotNetwork/Vpc/FlowLog"
+          }
+        ],
+        "TrafficType": "ALL"
+      },
+      "Type": "AWS::EC2::FlowLog"
+    },
+    "VpcFlowLogIAMRole<TOKEN>": {
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Statement": [
+            {
+              "Action": "sts:AssumeRole",
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "vpc-flow-logs.amazonaws.com"
+              }
+            }
+          ],
+          "Version": "2012-10-17"
+        },
+        "Tags": [
+          {
+            "Key": "DeploymentMode",
+            "Value": "multi-az"
+          },
+          {
+            "Key": "Name",
+            "Value": "SnapshotNetwork/Vpc/FlowLog"
+          }
+        ]
+      },
+      "Type": "AWS::IAM::Role"
+    },
+    "VpcFlowLogIAMRoleDefaultPolicy<TOKEN>": {
+      "Properties": {
+        "PolicyDocument": {
+          "Statement": [
+            {
+              "Action": [
+                "logs:CreateLogStream",
+                "logs:PutLogEvents",
+                "logs:DescribeLogStreams"
+              ],
+              "Effect": "Allow",
+              "Resource": {
+                "Fn::GetAtt": [
+                  "VpcFlowLogLogGroup<TOKEN>",
+                  "Arn"
+                ]
+              }
+            }
+          ],
+          "Version": "2012-10-17"
+        },
+        "PolicyName": "VpcFlowLogIAMRoleDefaultPolicy<TOKEN>",
+        "Roles": [
+          {
+            "Ref": "VpcFlowLogIAMRole<TOKEN>"
+          }
+        ]
+      },
+      "Type": "AWS::IAM::Policy"
+    },
+    "VpcFlowLogLogGroup<TOKEN>": {
+      "DeletionPolicy": "Retain",
+      "Properties": {
+        "RetentionInDays": 731,
+        "Tags": [
+          {
+            "Key": "DeploymentMode",
+            "Value": "multi-az"
+          },
+          {
+            "Key": "Name",
+            "Value": "SnapshotNetwork/Vpc/FlowLog"
+          }
+        ]
+      },
+      "Type": "AWS::Logs::LogGroup",
+      "UpdateReplacePolicy": "Retain"
+    },
+    "VpcIGW<TOKEN>": {
+      "Properties": {
+        "Tags": [
+          {
+            "Key": "DeploymentMode",
+            "Value": "multi-az"
+          },
+          {
+            "Key": "Name",
+            "Value": "ai-platform-dev-vpc"
+          }
+        ]
+      },
+      "Type": "AWS::EC2::InternetGateway"
+    },
+    "VpcPrivateAppSubnet1DefaultRoute<TOKEN>": {
+      "Properties": {
+        "DestinationCidrBlock": "0.0.0.0/0",
+        "NatGatewayId": {
+          "Ref": "VpcPublicSubnet1NATGateway<TOKEN>"
+        },
+        "RouteTableId": {
+          "Ref": "VpcPrivateAppSubnet1RouteTable<TOKEN>"
+        }
+      },
+      "Type": "AWS::EC2::Route"
+    },
+    "VpcPrivateAppSubnet1RouteTable<TOKEN>": {
+      "Properties": {
+        "Tags": [
+          {
+            "Key": "DeploymentMode",
+            "Value": "multi-az"
+          },
+          {
+            "Key": "Name",
+            "Value": "SnapshotNetwork/Vpc/PrivateAppSubnet1"
+          }
+        ],
+        "VpcId": {
+          "Ref": "Vpc<TOKEN>"
+        }
+      },
+      "Type": "AWS::EC2::RouteTable"
+    },
+    "VpcPrivateAppSubnet1RouteTableAssociation<TOKEN>": {
+      "Properties": {
+        "RouteTableId": {
+          "Ref": "VpcPrivateAppSubnet1RouteTable<TOKEN>"
+        },
+        "SubnetId": {
+          "Ref": "VpcPrivateAppSubnet1Subnet<TOKEN>"
+        }
+      },
+      "Type": "AWS::EC2::SubnetRouteTableAssociation"
+    },
+    "VpcPrivateAppSubnet1Subnet<TOKEN>": {
+      "Properties": {
+        "AvailabilityZone": "dummy1a",
+        "CidrBlock": "10.0.64.0/19",
+        "MapPublicIpOnLaunch": false,
+        "Tags": [
+          {
+            "Key": "aws-cdk:subnet-name",
+            "Value": "PrivateApp"
+          },
+          {
+            "Key": "aws-cdk:subnet-type",
+            "Value": "Private"
+          },
+          {
+            "Key": "DeploymentMode",
+            "Value": "multi-az"
+          },
+          {
+            "Key": "Name",
+            "Value": "SnapshotNetwork/Vpc/PrivateAppSubnet1"
+          }
+        ],
+        "VpcId": {
+          "Ref": "Vpc<TOKEN>"
+        }
+      },
+      "Type": "AWS::EC2::Subnet"
+    },
+    "VpcPrivateAppSubnet2DefaultRoute<TOKEN>": {
+      "Properties": {
+        "DestinationCidrBlock": "0.0.0.0/0",
+        "NatGatewayId": {
+          "Ref": "VpcPublicSubnet1NATGateway<TOKEN>"
+        },
+        "RouteTableId": {
+          "Ref": "VpcPrivateAppSubnet2RouteTable<TOKEN>"
+        }
+      },
+      "Type": "AWS::EC2::Route"
+    },
+    "VpcPrivateAppSubnet2RouteTable<TOKEN>": {
+      "Properties": {
+        "Tags": [
+          {
+            "Key": "DeploymentMode",
+            "Value": "multi-az"
+          },
+          {
+            "Key": "Name",
+            "Value": "SnapshotNetwork/Vpc/PrivateAppSubnet2"
+          }
+        ],
+        "VpcId": {
+          "Ref": "Vpc<TOKEN>"
+        }
+      },
+      "Type": "AWS::EC2::RouteTable"
+    },
+    "VpcPrivateAppSubnet2RouteTableAssociation<TOKEN>": {
+      "Properties": {
+        "RouteTableId": {
+          "Ref": "VpcPrivateAppSubnet2RouteTable<TOKEN>"
+        },
+        "SubnetId": {
+          "Ref": "VpcPrivateAppSubnet2Subnet<TOKEN>"
+        }
+      },
+      "Type": "AWS::EC2::SubnetRouteTableAssociation"
+    },
+    "VpcPrivateAppSubnet2Subnet<TOKEN>": {
+      "Properties": {
+        "AvailabilityZone": "dummy1b",
+        "CidrBlock": "10.0.96.0/19",
+        "MapPublicIpOnLaunch": false,
+        "Tags": [
+          {
+            "Key": "aws-cdk:subnet-name",
+            "Value": "PrivateApp"
+          },
+          {
+            "Key": "aws-cdk:subnet-type",
+            "Value": "Private"
+          },
+          {
+            "Key": "DeploymentMode",
+            "Value": "multi-az"
+          },
+          {
+            "Key": "Name",
+            "Value": "SnapshotNetwork/Vpc/PrivateAppSubnet2"
+          }
+        ],
+        "VpcId": {
+          "Ref": "Vpc<TOKEN>"
+        }
+      },
+      "Type": "AWS::EC2::Subnet"
+    },
+    "VpcPrivateAppSubnet3DefaultRoute<TOKEN>": {
+      "Properties": {
+        "DestinationCidrBlock": "0.0.0.0/0",
+        "NatGatewayId": {
+          "Ref": "VpcPublicSubnet1NATGateway<TOKEN>"
+        },
+        "RouteTableId": {
+          "Ref": "VpcPrivateAppSubnet3RouteTable<TOKEN>"
+        }
+      },
+      "Type": "AWS::EC2::Route"
+    },
+    "VpcPrivateAppSubnet3RouteTable<TOKEN>": {
+      "Properties": {
+        "Tags": [
+          {
+            "Key": "DeploymentMode",
+            "Value": "multi-az"
+          },
+          {
+            "Key": "Name",
+            "Value": "SnapshotNetwork/Vpc/PrivateAppSubnet3"
+          }
+        ],
+        "VpcId": {
+          "Ref": "Vpc<TOKEN>"
+        }
+      },
+      "Type": "AWS::EC2::RouteTable"
+    },
+    "VpcPrivateAppSubnet3RouteTableAssociation<TOKEN>": {
+      "Properties": {
+        "RouteTableId": {
+          "Ref": "VpcPrivateAppSubnet3RouteTable<TOKEN>"
+        },
+        "SubnetId": {
+          "Ref": "VpcPrivateAppSubnet3Subnet<TOKEN>"
+        }
+      },
+      "Type": "AWS::EC2::SubnetRouteTableAssociation"
+    },
+    "VpcPrivateAppSubnet3Subnet<TOKEN>": {
+      "Properties": {
+        "AvailabilityZone": "dummy1c",
+        "CidrBlock": "10.0.128.0/19",
+        "MapPublicIpOnLaunch": false,
+        "Tags": [
+          {
+            "Key": "aws-cdk:subnet-name",
+            "Value": "PrivateApp"
+          },
+          {
+            "Key": "aws-cdk:subnet-type",
+            "Value": "Private"
+          },
+          {
+            "Key": "DeploymentMode",
+            "Value": "multi-az"
+          },
+          {
+            "Key": "Name",
+            "Value": "SnapshotNetwork/Vpc/PrivateAppSubnet3"
+          }
+        ],
+        "VpcId": {
+          "Ref": "Vpc<TOKEN>"
+        }
+      },
+      "Type": "AWS::EC2::Subnet"
+    },
+    "VpcPrivateDataSubnet1RouteTable<TOKEN>": {
+      "Properties": {
+        "Tags": [
+          {
+            "Key": "DeploymentMode",
+            "Value": "multi-az"
+          },
+          {
+            "Key": "Name",
+            "Value": "SnapshotNetwork/Vpc/PrivateDataSubnet1"
+          }
+        ],
+        "VpcId": {
+          "Ref": "Vpc<TOKEN>"
+        }
+      },
+      "Type": "AWS::EC2::RouteTable"
+    },
+    "VpcPrivateDataSubnet1RouteTableAssociation<TOKEN>": {
+      "Properties": {
+        "RouteTableId": {
+          "Ref": "VpcPrivateDataSubnet1RouteTable<TOKEN>"
+        },
+        "SubnetId": {
+          "Ref": "VpcPrivateDataSubnet1Subnet<TOKEN>"
+        }
+      },
+      "Type": "AWS::EC2::SubnetRouteTableAssociation"
+    },
+    "VpcPrivateDataSubnet1Subnet<TOKEN>": {
+      "Properties": {
+        "AvailabilityZone": "dummy1a",
+        "CidrBlock": "10.0.160.0/20",
+        "MapPublicIpOnLaunch": false,
+        "Tags": [
+          {
+            "Key": "aws-cdk:subnet-name",
+            "Value": "PrivateData"
+          },
+          {
+            "Key": "aws-cdk:subnet-type",
+            "Value": "Isolated"
+          },
+          {
+            "Key": "DeploymentMode",
+            "Value": "multi-az"
+          },
+          {
+            "Key": "Name",
+            "Value": "SnapshotNetwork/Vpc/PrivateDataSubnet1"
+          }
+        ],
+        "VpcId": {
+          "Ref": "Vpc<TOKEN>"
+        }
+      },
+      "Type": "AWS::EC2::Subnet"
+    },
+    "VpcPrivateDataSubnet2RouteTable<TOKEN>": {
+      "Properties": {
+        "Tags": [
+          {
+            "Key": "DeploymentMode",
+            "Value": "multi-az"
+          },
+          {
+            "Key": "Name",
+            "Value": "SnapshotNetwork/Vpc/PrivateDataSubnet2"
+          }
+        ],
+        "VpcId": {
+          "Ref": "Vpc<TOKEN>"
+        }
+      },
+      "Type": "AWS::EC2::RouteTable"
+    },
+    "VpcPrivateDataSubnet2RouteTableAssociation<TOKEN>": {
+      "Properties": {
+        "RouteTableId": {
+          "Ref": "VpcPrivateDataSubnet2RouteTable<TOKEN>"
+        },
+        "SubnetId": {
+          "Ref": "VpcPrivateDataSubnet2Subnet<TOKEN>"
+        }
+      },
+      "Type": "AWS::EC2::SubnetRouteTableAssociation"
+    },
+    "VpcPrivateDataSubnet2Subnet<TOKEN>": {
+      "Properties": {
+        "AvailabilityZone": "dummy1b",
+        "CidrBlock": "10.0.176.0/20",
+        "MapPublicIpOnLaunch": false,
+        "Tags": [
+          {
+            "Key": "aws-cdk:subnet-name",
+            "Value": "PrivateData"
+          },
+          {
+            "Key": "aws-cdk:subnet-type",
+            "Value": "Isolated"
+          },
+          {
+            "Key": "DeploymentMode",
+            "Value": "multi-az"
+          },
+          {
+            "Key": "Name",
+            "Value": "SnapshotNetwork/Vpc/PrivateDataSubnet2"
+          }
+        ],
+        "VpcId": {
+          "Ref": "Vpc<TOKEN>"
+        }
+      },
+      "Type": "AWS::EC2::Subnet"
+    },
+    "VpcPrivateDataSubnet3RouteTable<TOKEN>": {
+      "Properties": {
+        "Tags": [
+          {
+            "Key": "DeploymentMode",
+            "Value": "multi-az"
+          },
+          {
+            "Key": "Name",
+            "Value": "SnapshotNetwork/Vpc/PrivateDataSubnet3"
+          }
+        ],
+        "VpcId": {
+          "Ref": "Vpc<TOKEN>"
+        }
+      },
+      "Type": "AWS::EC2::RouteTable"
+    },
+    "VpcPrivateDataSubnet3RouteTableAssociation<TOKEN>": {
+      "Properties": {
+        "RouteTableId": {
+          "Ref": "VpcPrivateDataSubnet3RouteTable<TOKEN>"
+        },
+        "SubnetId": {
+          "Ref": "VpcPrivateDataSubnet3Subnet<TOKEN>"
+        }
+      },
+      "Type": "AWS::EC2::SubnetRouteTableAssociation"
+    },
+    "VpcPrivateDataSubnet3Subnet<TOKEN>": {
+      "Properties": {
+        "AvailabilityZone": "dummy1c",
+        "CidrBlock": "10.0.192.0/20",
+        "MapPublicIpOnLaunch": false,
+        "Tags": [
+          {
+            "Key": "aws-cdk:subnet-name",
+            "Value": "PrivateData"
+          },
+          {
+            "Key": "aws-cdk:subnet-type",
+            "Value": "Isolated"
+          },
+          {
+            "Key": "DeploymentMode",
+            "Value": "multi-az"
+          },
+          {
+            "Key": "Name",
+            "Value": "SnapshotNetwork/Vpc/PrivateDataSubnet3"
+          }
+        ],
+        "VpcId": {
+          "Ref": "Vpc<TOKEN>"
+        }
+      },
+      "Type": "AWS::EC2::Subnet"
+    },
+    "VpcPublicSubnet1DefaultRoute<TOKEN>": {
+      "DependsOn": [
+        "VpcVPCGW<TOKEN>"
+      ],
+      "Properties": {
+        "DestinationCidrBlock": "0.0.0.0/0",
+        "GatewayId": {
+          "Ref": "VpcIGW<TOKEN>"
+        },
+        "RouteTableId": {
+          "Ref": "VpcPublicSubnet1RouteTable<TOKEN>"
+        }
+      },
+      "Type": "AWS::EC2::Route"
+    },
+    "VpcPublicSubnet1EIP<TOKEN>": {
+      "Properties": {
+        "Domain": "vpc",
+        "Tags": [
+          {
+            "Key": "DeploymentMode",
+            "Value": "multi-az"
+          },
+          {
+            "Key": "Name",
+            "Value": "SnapshotNetwork/Vpc/PublicSubnet1"
+          }
+        ]
+      },
+      "Type": "AWS::EC2::EIP"
+    },
+    "VpcPublicSubnet1NATGateway<TOKEN>": {
+      "DependsOn": [
+        "VpcPublicSubnet1DefaultRoute<TOKEN>",
+        "VpcPublicSubnet1RouteTableAssociation<TOKEN>"
+      ],
+      "Properties": {
+        "AllocationId": {
+          "Fn::GetAtt": [
+            "VpcPublicSubnet1EIP<TOKEN>",
+            "AllocationId"
+          ]
+        },
+        "SubnetId": {
+          "Ref": "VpcPublicSubnet1Subnet<TOKEN>"
+        },
+        "Tags": [
+          {
+            "Key": "DeploymentMode",
+            "Value": "multi-az"
+          },
+          {
+            "Key": "Name",
+            "Value": "SnapshotNetwork/Vpc/PublicSubnet1"
+          }
+        ]
+      },
+      "Type": "AWS::EC2::NatGateway"
+    },
+    "VpcPublicSubnet1RouteTable<TOKEN>": {
+      "Properties": {
+        "Tags": [
+          {
+            "Key": "DeploymentMode",
+            "Value": "multi-az"
+          },
+          {
+            "Key": "Name",
+            "Value": "SnapshotNetwork/Vpc/PublicSubnet1"
+          }
+        ],
+        "VpcId": {
+          "Ref": "Vpc<TOKEN>"
+        }
+      },
+      "Type": "AWS::EC2::RouteTable"
+    },
+    "VpcPublicSubnet1RouteTableAssociation<TOKEN>": {
+      "Properties": {
+        "RouteTableId": {
+          "Ref": "VpcPublicSubnet1RouteTable<TOKEN>"
+        },
+        "SubnetId": {
+          "Ref": "VpcPublicSubnet1Subnet<TOKEN>"
+        }
+      },
+      "Type": "AWS::EC2::SubnetRouteTableAssociation"
+    },
+    "VpcPublicSubnet1Subnet<TOKEN>": {
+      "Properties": {
+        "AvailabilityZone": "dummy1a",
+        "CidrBlock": "10.0.0.0/20",
+        "MapPublicIpOnLaunch": true,
+        "Tags": [
+          {
+            "Key": "aws-cdk:subnet-name",
+            "Value": "Public"
+          },
+          {
+            "Key": "aws-cdk:subnet-type",
+            "Value": "Public"
+          },
+          {
+            "Key": "DeploymentMode",
+            "Value": "multi-az"
+          },
+          {
+            "Key": "Name",
+            "Value": "SnapshotNetwork/Vpc/PublicSubnet1"
+          }
+        ],
+        "VpcId": {
+          "Ref": "Vpc<TOKEN>"
+        }
+      },
+      "Type": "AWS::EC2::Subnet"
+    },
+    "VpcPublicSubnet2DefaultRoute<TOKEN>": {
+      "DependsOn": [
+        "VpcVPCGW<TOKEN>"
+      ],
+      "Properties": {
+        "DestinationCidrBlock": "0.0.0.0/0",
+        "GatewayId": {
+          "Ref": "VpcIGW<TOKEN>"
+        },
+        "RouteTableId": {
+          "Ref": "VpcPublicSubnet2RouteTable<TOKEN>"
+        }
+      },
+      "Type": "AWS::EC2::Route"
+    },
+    "VpcPublicSubnet2RouteTable<TOKEN>": {
+      "Properties": {
+        "Tags": [
+          {
+            "Key": "DeploymentMode",
+            "Value": "multi-az"
+          },
+          {
+            "Key": "Name",
+            "Value": "SnapshotNetwork/Vpc/PublicSubnet2"
+          }
+        ],
+        "VpcId": {
+          "Ref": "Vpc<TOKEN>"
+        }
+      },
+      "Type": "AWS::EC2::RouteTable"
+    },
+    "VpcPublicSubnet2RouteTableAssociation<TOKEN>": {
+      "Properties": {
+        "RouteTableId": {
+          "Ref": "VpcPublicSubnet2RouteTable<TOKEN>"
+        },
+        "SubnetId": {
+          "Ref": "VpcPublicSubnet2Subnet<TOKEN>"
+        }
+      },
+      "Type": "AWS::EC2::SubnetRouteTableAssociation"
+    },
+    "VpcPublicSubnet2Subnet<TOKEN>": {
+      "Properties": {
+        "AvailabilityZone": "dummy1b",
+        "CidrBlock": "10.0.16.0/20",
+        "MapPublicIpOnLaunch": true,
+        "Tags": [
+          {
+            "Key": "aws-cdk:subnet-name",
+            "Value": "Public"
+          },
+          {
+            "Key": "aws-cdk:subnet-type",
+            "Value": "Public"
+          },
+          {
+            "Key": "DeploymentMode",
+            "Value": "multi-az"
+          },
+          {
+            "Key": "Name",
+            "Value": "SnapshotNetwork/Vpc/PublicSubnet2"
+          }
+        ],
+        "VpcId": {
+          "Ref": "Vpc<TOKEN>"
+        }
+      },
+      "Type": "AWS::EC2::Subnet"
+    },
+    "VpcPublicSubnet3DefaultRoute<TOKEN>": {
+      "DependsOn": [
+        "VpcVPCGW<TOKEN>"
+      ],
+      "Properties": {
+        "DestinationCidrBlock": "0.0.0.0/0",
+        "GatewayId": {
+          "Ref": "VpcIGW<TOKEN>"
+        },
+        "RouteTableId": {
+          "Ref": "VpcPublicSubnet3RouteTable<TOKEN>"
+        }
+      },
+      "Type": "AWS::EC2::Route"
+    },
+    "VpcPublicSubnet3RouteTable<TOKEN>": {
+      "Properties": {
+        "Tags": [
+          {
+            "Key": "DeploymentMode",
+            "Value": "multi-az"
+          },
+          {
+            "Key": "Name",
+            "Value": "SnapshotNetwork/Vpc/PublicSubnet3"
+          }
+        ],
+        "VpcId": {
+          "Ref": "Vpc<TOKEN>"
+        }
+      },
+      "Type": "AWS::EC2::RouteTable"
+    },
+    "VpcPublicSubnet3RouteTableAssociation<TOKEN>": {
+      "Properties": {
+        "RouteTableId": {
+          "Ref": "VpcPublicSubnet3RouteTable<TOKEN>"
+        },
+        "SubnetId": {
+          "Ref": "VpcPublicSubnet3Subnet<TOKEN>"
+        }
+      },
+      "Type": "AWS::EC2::SubnetRouteTableAssociation"
+    },
+    "VpcPublicSubnet3Subnet<TOKEN>": {
+      "Properties": {
+        "AvailabilityZone": "dummy1c",
+        "CidrBlock": "10.0.32.0/20",
+        "MapPublicIpOnLaunch": true,
+        "Tags": [
+          {
+            "Key": "aws-cdk:subnet-name",
+            "Value": "Public"
+          },
+          {
+            "Key": "aws-cdk:subnet-type",
+            "Value": "Public"
+          },
+          {
+            "Key": "DeploymentMode",
+            "Value": "multi-az"
+          },
+          {
+            "Key": "Name",
+            "Value": "SnapshotNetwork/Vpc/PublicSubnet3"
+          }
+        ],
+        "VpcId": {
+          "Ref": "Vpc<TOKEN>"
+        }
+      },
+      "Type": "AWS::EC2::Subnet"
+    },
+    "VpcRestrictDefaultSecurityGroupCustomResource<TOKEN>": {
+      "DeletionPolicy": "Delete",
+      "Properties": {
+        "Account": "<TOKEN>",
+        "DefaultSecurityGroupId": {
+          "Fn::GetAtt": [
+            "Vpc<TOKEN>",
+            "DefaultSecurityGroup"
+          ]
+        },
+        "ServiceToken": {
+          "Fn::GetAtt": [
+            "CustomVpcRestrictDefaultSGCustomResourceProviderHandler<TOKEN>",
+            "Arn"
+          ]
+        }
+      },
+      "Type": "Custom::VpcRestrictDefaultSG",
+      "UpdateReplacePolicy": "Delete"
+    },
+    "VpcS3Endpoint<TOKEN>": {
+      "Properties": {
+        "RouteTableIds": [
+          {
+            "Ref": "VpcPrivateAppSubnet1RouteTable<TOKEN>"
+          },
+          {
+            "Ref": "VpcPrivateAppSubnet2RouteTable<TOKEN>"
+          },
+          {
+            "Ref": "VpcPrivateAppSubnet3RouteTable<TOKEN>"
+          },
+          {
+            "Ref": "VpcPrivateDataSubnet1RouteTable<TOKEN>"
+          },
+          {
+            "Ref": "VpcPrivateDataSubnet2RouteTable<TOKEN>"
+          },
+          {
+            "Ref": "VpcPrivateDataSubnet3RouteTable<TOKEN>"
+          }
+        ],
+        "ServiceName": {
+          "Fn::Join": [
+            "",
+            [
+              "com.amazonaws.",
+              {
+                "Ref": "AWS::Region"
+              },
+              ".s3"
+            ]
+          ]
+        },
+        "Tags": [
+          {
+            "Key": "DeploymentMode",
+            "Value": "multi-az"
+          },
+          {
+            "Key": "Name",
+            "Value": "ai-platform-dev-vpc"
+          }
+        ],
+        "VpcEndpointType": "Gateway",
+        "VpcId": {
+          "Ref": "Vpc<TOKEN>"
+        }
+      },
+      "Type": "AWS::EC2::VPCEndpoint"
+    },
+    "VpcSageMakerApi<TOKEN>": {
+      "Properties": {
+        "PrivateDnsEnabled": true,
+        "SecurityGroupIds": [
+          {
+            "Fn::GetAtt": [
+              "VpcEndpointSg<TOKEN>",
+              "GroupId"
+            ]
+          }
+        ],
+        "ServiceName": "com.amazonaws.us-east-1.sagemaker.api",
+        "SubnetIds": [
+          {
+            "Ref": "VpcPrivateAppSubnet1Subnet<TOKEN>"
+          },
+          {
+            "Ref": "VpcPrivateAppSubnet2Subnet<TOKEN>"
+          },
+          {
+            "Ref": "VpcPrivateAppSubnet3Subnet<TOKEN>"
+          }
+        ],
+        "Tags": [
+          {
+            "Key": "DeploymentMode",
+            "Value": "multi-az"
+          },
+          {
+            "Key": "Name",
+            "Value": "ai-platform-dev-vpc"
+          }
+        ],
+        "VpcEndpointType": "Interface",
+        "VpcId": {
+          "Ref": "Vpc<TOKEN>"
+        }
+      },
+      "Type": "AWS::EC2::VPCEndpoint"
+    },
+    "VpcSageMakerRuntime<TOKEN>": {
+      "Properties": {
+        "PrivateDnsEnabled": true,
+        "SecurityGroupIds": [
+          {
+            "Fn::GetAtt": [
+              "VpcEndpointSg<TOKEN>",
+              "GroupId"
+            ]
+          }
+        ],
+        "ServiceName": "com.amazonaws.us-east-1.sagemaker.runtime",
+        "SubnetIds": [
+          {
+            "Ref": "VpcPrivateAppSubnet1Subnet<TOKEN>"
+          },
+          {
+            "Ref": "VpcPrivateAppSubnet2Subnet<TOKEN>"
+          },
+          {
+            "Ref": "VpcPrivateAppSubnet3Subnet<TOKEN>"
+          }
+        ],
+        "Tags": [
+          {
+            "Key": "DeploymentMode",
+            "Value": "multi-az"
+          },
+          {
+            "Key": "Name",
+            "Value": "ai-platform-dev-vpc"
+          }
+        ],
+        "VpcEndpointType": "Interface",
+        "VpcId": {
+          "Ref": "Vpc<TOKEN>"
+        }
+      },
+      "Type": "AWS::EC2::VPCEndpoint"
+    },
+    "VpcSsm<TOKEN>": {
+      "Properties": {
+        "PrivateDnsEnabled": true,
+        "SecurityGroupIds": [
+          {
+            "Fn::GetAtt": [
+              "VpcEndpointSg<TOKEN>",
+              "GroupId"
+            ]
+          }
+        ],
+        "ServiceName": "com.amazonaws.us-east-1.ssm",
+        "SubnetIds": [
+          {
+            "Ref": "VpcPrivateAppSubnet1Subnet<TOKEN>"
+          },
+          {
+            "Ref": "VpcPrivateAppSubnet2Subnet<TOKEN>"
+          },
+          {
+            "Ref": "VpcPrivateAppSubnet3Subnet<TOKEN>"
+          }
+        ],
+        "Tags": [
+          {
+            "Key": "DeploymentMode",
+            "Value": "multi-az"
+          },
+          {
+            "Key": "Name",
+            "Value": "ai-platform-dev-vpc"
+          }
+        ],
+        "VpcEndpointType": "Interface",
+        "VpcId": {
+          "Ref": "Vpc<TOKEN>"
+        }
+      },
+      "Type": "AWS::EC2::VPCEndpoint"
+    },
+    "VpcSsmMessages<TOKEN>": {
+      "Properties": {
+        "PrivateDnsEnabled": true,
+        "SecurityGroupIds": [
+          {
+            "Fn::GetAtt": [
+              "VpcEndpointSg<TOKEN>",
+              "GroupId"
+            ]
+          }
+        ],
+        "ServiceName": "com.amazonaws.us-east-1.ssmmessages",
+        "SubnetIds": [
+          {
+            "Ref": "VpcPrivateAppSubnet1Subnet<TOKEN>"
+          },
+          {
+            "Ref": "VpcPrivateAppSubnet2Subnet<TOKEN>"
+          },
+          {
+            "Ref": "VpcPrivateAppSubnet3Subnet<TOKEN>"
+          }
+        ],
+        "Tags": [
+          {
+            "Key": "DeploymentMode",
+            "Value": "multi-az"
+          },
+          {
+            "Key": "Name",
+            "Value": "ai-platform-dev-vpc"
+          }
+        ],
+        "VpcEndpointType": "Interface",
+        "VpcId": {
+          "Ref": "Vpc<TOKEN>"
+        }
+      },
+      "Type": "AWS::EC2::VPCEndpoint"
+    },
+    "VpcSts<TOKEN>": {
+      "Properties": {
+        "PrivateDnsEnabled": true,
+        "SecurityGroupIds": [
+          {
+            "Fn::GetAtt": [
+              "VpcEndpointSg<TOKEN>",
+              "GroupId"
+            ]
+          }
+        ],
+        "ServiceName": "com.amazonaws.us-east-1.sts",
+        "SubnetIds": [
+          {
+            "Ref": "VpcPrivateAppSubnet1Subnet<TOKEN>"
+          },
+          {
+            "Ref": "VpcPrivateAppSubnet2Subnet<TOKEN>"
+          },
+          {
+            "Ref": "VpcPrivateAppSubnet3Subnet<TOKEN>"
+          }
+        ],
+        "Tags": [
+          {
+            "Key": "DeploymentMode",
+            "Value": "multi-az"
+          },
+          {
+            "Key": "Name",
+            "Value": "ai-platform-dev-vpc"
+          }
+        ],
+        "VpcEndpointType": "Interface",
+        "VpcId": {
+          "Ref": "Vpc<TOKEN>"
+        }
+      },
+      "Type": "AWS::EC2::VPCEndpoint"
+    },
+    "VpcVPCGW<TOKEN>": {
+      "Properties": {
+        "InternetGatewayId": {
+          "Ref": "VpcIGW<TOKEN>"
+        },
+        "VpcId": {
+          "Ref": "Vpc<TOKEN>"
+        }
+      },
+      "Type": "AWS::EC2::VPCGatewayAttachment"
+    }
+  },
+  "Rules": {
+    "CheckBootstrapVersion": {
+      "Assertions": [
+        {
+          "Assert": {
+            "Fn::Not": [
+              {
+                "Fn::Contains": [
+                  [
+                    "1",
+                    "2",
+                    "3",
+                    "4",
+                    "5"
+                  ],
+                  {
+                    "Ref": "BootstrapVersion"
+                  }
+                ]
+              }
+            ]
+          },
+          "AssertDescription": "CDK bootstrap stack version 6 required. Please run 'cdk bootstrap' with a recent version of the CDK CLI."
+        }
+      ]
+    }
+  }
 }

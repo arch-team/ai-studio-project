@@ -13,6 +13,7 @@ from aws_cdk import aws_iam as iam
 
 from config import EnvironmentConfig
 from constructs import Construct
+from utils.nag_suppressions import apply_resource_suppression
 from utils.outputs import create_output
 
 
@@ -42,6 +43,7 @@ class IamStack(cdk.Stack):
         scope: Construct,
         construct_id: str,
         env_config: EnvironmentConfig,
+        kms_key_arns: list[str] | None = None,
         **kwargs,
     ) -> None:
         """Initialize the IAM Stack.
@@ -50,11 +52,17 @@ class IamStack(cdk.Stack):
             scope: CDK scope
             construct_id: Stack identifier
             env_config: Environment configuration
+            kms_key_arns: KMS Key ARN 列表，用于限制 KMS 策略资源范围。
+                          如果为 None，使用 account 级别 ARN 模式。
             **kwargs: Additional stack properties
         """
         super().__init__(scope, construct_id, **kwargs)
 
         self.env_config = env_config
+        # 默认限制为当前 account 下的 KMS Key
+        self._kms_key_arns = kms_key_arns or [
+            f"arn:aws:kms:{env_config.region}:{env_config.account}:key/*"
+        ]
 
         # Create IAM roles
         self._eks_node_role = self._create_eks_node_role()
@@ -63,6 +71,9 @@ class IamStack(cdk.Stack):
 
         # Create shared policies
         self._create_shared_policies()
+
+        # 资源级 Nag 抑制 (替代 Stack 级 IAM5 抑制)
+        self._apply_nag_suppressions()
 
         # Export outputs
         self._create_outputs()
@@ -180,10 +191,17 @@ class IamStack(cdk.Stack):
             role_name=f"{self.env_config.resource_prefix}-training-execution-role",
             description="IAM role for HyperPod training job execution",
             assumed_by=iam.CompositePrincipal(
-                # Allow EKS service accounts via IRSA
+                # Allow EKS service accounts via IRSA (with OIDC condition to prevent Confused Deputy)
                 iam.FederatedPrincipal(
                     federated=f"arn:aws:iam::{self.env_config.account}:oidc-provider/oidc.eks.{self.env_config.region}.amazonaws.com",
-                    conditions={},
+                    conditions={
+                        "StringEquals": {
+                            f"oidc.eks.{self.env_config.region}.amazonaws.com:sub":
+                                "system:serviceaccount:training-jobs:training-execution-sa",
+                            f"oidc.eks.{self.env_config.region}.amazonaws.com:aud":
+                                "sts.amazonaws.com",
+                        }
+                    },
                     assume_role_action="sts:AssumeRoleWithWebIdentity",
                 ),
                 # Allow SageMaker service
@@ -284,7 +302,14 @@ class IamStack(cdk.Stack):
             description="IAM role for backend FastAPI application",
             assumed_by=iam.FederatedPrincipal(
                 federated=f"arn:aws:iam::{self.env_config.account}:oidc-provider/oidc.eks.{self.env_config.region}.amazonaws.com",
-                conditions={},
+                conditions={
+                    "StringEquals": {
+                        f"oidc.eks.{self.env_config.region}.amazonaws.com:sub":
+                            "system:serviceaccount:backend:backend-service-sa",
+                        f"oidc.eks.{self.env_config.region}.amazonaws.com:aud":
+                            "sts.amazonaws.com",
+                    }
+                },
                 assume_role_action="sts:AssumeRoleWithWebIdentity",
             ),
             max_session_duration=cdk.Duration.hours(12),
@@ -373,6 +398,27 @@ class IamStack(cdk.Stack):
 
         return role
 
+    def _apply_nag_suppressions(self) -> None:
+        """为已知合理的通配符权限资源添加 Nag 抑制 (资源级)。"""
+        # EKS Node Role: CloudWatch Metrics 使用 resources=["*"] + namespace 条件约束
+        apply_resource_suppression(
+            self._eks_node_role,
+            "AwsSolutions-IAM5",
+            "CloudWatch PutMetricData requires resources=[*], scoped by cloudwatch:namespace condition",
+        )
+        # Training Execution Role: CloudWatch Metrics 同上
+        apply_resource_suppression(
+            self._training_execution_role,
+            "AwsSolutions-IAM5",
+            "CloudWatch PutMetricData requires resources=[*], scoped by cloudwatch:namespace condition",
+        )
+        # KMS Usage Policy: resources 使用 account key pattern + kms:ViaService 条件
+        apply_resource_suppression(
+            self._kms_usage_policy,
+            "AwsSolutions-IAM5",
+            "KMS key ARN pattern limited to current account, scoped by kms:ViaService condition for S3",
+        )
+
     def _create_shared_policies(self) -> None:
         """Create shared IAM policies that can be attached to multiple roles."""
         # KMS key usage policy (for S3 encryption)
@@ -390,7 +436,7 @@ class IamStack(cdk.Stack):
                         "kms:GenerateDataKey",
                         "kms:DescribeKey",
                     ],
-                    resources=["*"],
+                    resources=self._kms_key_arns,
                     conditions={
                         "StringEquals": {
                             "kms:ViaService": [

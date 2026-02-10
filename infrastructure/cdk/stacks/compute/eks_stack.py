@@ -25,7 +25,7 @@ from cdk_constructs.gpu_node_group import create_default_gpu_node_groups
 from config import EnvironmentConfig
 from config.constants import EKS_ADDON_NAMES, ProjectPaths
 from constructs import Construct
-from utils.iam_helpers import create_irsa_role
+from utils.iam_helpers import add_policy_statement, create_irsa_role
 from utils.outputs import create_output
 
 # Path to the HyperPod Helm Chart (centralized in ProjectPaths)
@@ -109,12 +109,16 @@ class EksStack(cdk.Stack):
         """
         eks_config = self.env_config.eks
 
-        # Create EKS cluster admin role
+        # Create EKS cluster admin role (限制仅 EKSAdmin 标签用户可 assume)
         cluster_admin_role = iam.Role(
             self,
             "ClusterAdminRole",
             role_name=f"{self.env_config.resource_prefix}-eks-admin-role",
-            assumed_by=iam.AccountRootPrincipal(),
+            assumed_by=iam.AccountRootPrincipal().with_conditions({
+                "StringEquals": {
+                    "aws:PrincipalTag/Role": "EKSAdmin",
+                }
+            }),
             description="Admin role for EKS cluster management",
         )
 
@@ -251,7 +255,7 @@ class EksStack(cdk.Stack):
             managed_policies=["service-role/AmazonEBSCSIDriverPolicy"],
         )
 
-        # 创建 FSx CSI Driver IRSA 角色
+        # 创建 FSx CSI Driver IRSA 角色 (最小权限，不使用 AmazonFSxFullAccess)
         fsx_csi_role = create_irsa_role(
             scope=self,
             construct_id="FsxCsiDriverRole",
@@ -261,7 +265,18 @@ class EksStack(cdk.Stack):
             role_name_suffix="fsx-csi-role",
             service_account="fsx-csi-controller-sa",
             description="IAM role for FSx CSI driver",
-            managed_policies=["AmazonFSxFullAccess"],
+            managed_policies=[],  # 使用自定义最小权限策略替代 AmazonFSxFullAccess
+        )
+        # FSx CSI Driver 仅需描述和挂载相关权限
+        add_policy_statement(
+            fsx_csi_role,
+            sid="FsxCsiDescribe",
+            actions=[
+                "fsx:DescribeFileSystems",
+                "fsx:DescribeVolumes",
+                "fsx:DescribeDataRepositoryAssociations",
+            ],
+            resources=["*"],  # fsx:Describe 操作不支持资源级限制
         )
 
         # 获取插件版本（集中式版本管理）

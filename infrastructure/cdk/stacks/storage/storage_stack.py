@@ -20,6 +20,7 @@ from aws_cdk import aws_kms as kms
 from aws_cdk import aws_s3 as s3
 
 from config import EnvironmentConfig
+from config.environments import EnvironmentType
 from constructs import Construct
 from utils import LifecycleRuleBuilder
 from utils.outputs import create_output
@@ -59,7 +60,7 @@ class StorageStack(cdk.Stack):
             scope: CDK scope
             construct_id: Stack identifier
             env_config: Environment configuration
-            encryption_key: 自定义 KMS Key 用于 S3 加密 (None 则使用 S3_MANAGED)
+            encryption_key: KMS Key 用于 S3 加密 (必需，禁止降级到 S3_MANAGED)
             **kwargs: Additional stack properties
         """
         super().__init__(scope, construct_id, **kwargs)
@@ -103,13 +104,11 @@ class StorageStack(cdk.Stack):
         # Use protection config for removal policy
         removal_policy = self.env_config.protection.removal_policy
 
-        # 选择加密方式: 自定义 KMS Key > S3 Managed
-        if self._encryption_key:
-            encryption = s3.BucketEncryption.KMS
-            encryption_key_ref = self._encryption_key
-        else:
-            encryption = s3.BucketEncryption.S3_MANAGED
-            encryption_key_ref = None
+        # 强制要求 KMS 加密，禁止降级到 S3_MANAGED
+        if not self._encryption_key:
+            raise ValueError(
+                "encryption_key is required — S3_MANAGED encryption is not allowed for this platform"
+            )
 
         # Create bucket with encryption
         bucket = s3.Bucket(
@@ -117,8 +116,8 @@ class StorageStack(cdk.Stack):
             bucket_id,
             bucket_name=bucket_name,
             # Encryption configuration
-            encryption=encryption,
-            encryption_key=encryption_key_ref,
+            encryption=s3.BucketEncryption.KMS,
+            encryption_key=self._encryption_key,
             # Enable versioning for data protection
             versioned=True,
             # Block all public access (security best practice)
@@ -184,14 +183,20 @@ class StorageStack(cdk.Stack):
             intelligent_tiering=True,
         )
 
-        # Add CORS configuration for web uploads (if needed)
+        # Add CORS configuration for web uploads
+        # Dev 环境允许任意来源便于开发调试，非 Dev 环境限制为平台域名
+        cors_origins = (
+            ["*"]
+            if self.env_config.name == EnvironmentType.DEV
+            else [f"https://{self.env_config.resource_prefix}.example.com"]
+        )
         bucket.add_cors_rule(
             allowed_methods=[
                 s3.HttpMethods.GET,
                 s3.HttpMethods.PUT,
                 s3.HttpMethods.POST,
             ],
-            allowed_origins=["*"],  # Restrict in production
+            allowed_origins=cors_origins,
             allowed_headers=["*"],
             max_age=3000,
         )

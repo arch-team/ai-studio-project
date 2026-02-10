@@ -18,6 +18,7 @@ from aws_cdk import aws_rds as rds
 from aws_cdk import aws_secretsmanager as secretsmanager
 
 from config import EnvironmentConfig
+from config.environments import EnvironmentType
 from constructs import Construct
 from utils.outputs import create_output
 
@@ -98,12 +99,13 @@ class DatabaseStack(cdk.Stack):
             allow_all_outbound=False,
         )
 
-        # Allow MySQL from VPC CIDR (will be restricted further by subnet isolation)
-        sg.add_ingress_rule(
-            peer=ec2.Peer.ipv4(self.env_config.vpc.cidr),
-            connection=ec2.Port.tcp(3306),
-            description="Allow MySQL from VPC CIDR",
-        )
+        # 仅允许 Private 子网访问 MySQL (收窄原 VPC CIDR 全范围规则)
+        for subnet in self._vpc.private_subnets:
+            sg.add_ingress_rule(
+                peer=ec2.Peer.ipv4(subnet.ipv4_cidr_block),
+                connection=ec2.Port.tcp(3306),
+                description=f"MySQL from {subnet.node.id}",
+            )
 
         cdk.Tags.of(sg).add("Name", f"{self.env_config.resource_prefix}-aurora-sg")
 
@@ -124,39 +126,7 @@ class DatabaseStack(cdk.Stack):
 
     def _create_parameter_group(self) -> rds.ParameterGroup:
         """创建数据库参数组，按功能分类配置。"""
-
-        # 性能优化参数
-        performance_params = {
-            "innodb_buffer_pool_size": "{DBInstanceClassMemory*3/4}",
-            "max_connections": "LEAST({DBInstanceClassMemory/9531392},5000)",
-        }
-
-        # 字符集配置（UTF-8 支持）
-        charset_params = {
-            "character_set_server": "utf8mb4",
-            "character_set_client": "utf8mb4",
-            "collation_server": "utf8mb4_unicode_ci",
-        }
-
-        # 查询日志配置（开发环境启用，生产环境禁用）
-        is_dev = self.env_config.name.value == "dev"
-        query_log_params = {
-            "slow_query_log": "1" if is_dev else "0",
-            "long_query_time": "2",
-        }
-
-        # 时区配置
-        timezone_params = {
-            "time_zone": "UTC",
-        }
-
-        # 合并所有参数
-        all_parameters = {
-            **performance_params,
-            **charset_params,
-            **query_log_params,
-            **timezone_params,
-        }
+        is_dev = self.env_config.name == EnvironmentType.DEV
 
         return rds.ParameterGroup(
             self,
@@ -165,7 +135,20 @@ class DatabaseStack(cdk.Stack):
                 version=rds.AuroraMysqlEngineVersion.VER_3_04_0
             ),
             description="Parameter group for AI Training Platform Aurora MySQL",
-            parameters=all_parameters,
+            parameters={
+                # 性能优化
+                "innodb_buffer_pool_size": "{DBInstanceClassMemory*3/4}",
+                "max_connections": "LEAST({DBInstanceClassMemory/9531392},5000)",
+                # 字符集（UTF-8 支持）
+                "character_set_server": "utf8mb4",
+                "character_set_client": "utf8mb4",
+                "collation_server": "utf8mb4_unicode_ci",
+                # 查询日志（开发环境启用，生产环境禁用）
+                "slow_query_log": "1" if is_dev else "0",
+                "long_query_time": "2",
+                # 时区
+                "time_zone": "UTC",
+            },
         )
 
     def _create_aurora_cluster(self) -> rds.DatabaseCluster:
@@ -217,13 +200,18 @@ class DatabaseStack(cdk.Stack):
                 instance_identifier=f"{self.env_config.resource_prefix}-aurora-writer",
             ),
             # Reader instance for read scaling (Serverless v2)
-            readers=[
-                rds.ClusterInstance.serverless_v2(
-                    "Reader",
-                    instance_identifier=f"{self.env_config.resource_prefix}-aurora-reader",
-                    scale_with_writer=True,
-                ),
-            ],
+            # Dev 环境不创建 Reader 以节省成本
+            readers=(
+                [
+                    rds.ClusterInstance.serverless_v2(
+                        "Reader",
+                        instance_identifier=f"{self.env_config.resource_prefix}-aurora-reader",
+                        scale_with_writer=True,
+                    ),
+                ]
+                if self.env_config.name != EnvironmentType.DEV
+                else []
+            ),
             # Network configuration
             vpc=self._vpc,
             subnet_group=self._subnet_group,
