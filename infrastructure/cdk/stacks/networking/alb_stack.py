@@ -50,17 +50,7 @@ class AlbStack(cdk.Stack):
         enable_waf: bool = False,
         **kwargs,
     ) -> None:
-        """Initialize the ALB Stack.
-
-        Args:
-            scope: CDK scope
-            construct_id: Stack identifier
-            env_config: Environment configuration
-            vpc: VPC for ALB deployment
-            certificate_arn: ACM certificate ARN (optional, HTTP-only mode in dev if not provided)
-            enable_waf: Enable AWS WAF protection
-            **kwargs: Additional stack properties
-        """
+        # certificate_arn 为 None 时进入 HTTP-only 模式 (dev 环境)
         super().__init__(scope, construct_id, **kwargs)
 
         self.env_config = env_config
@@ -515,45 +505,36 @@ class AlbStack(cdk.Stack):
 
     @property
     def alb(self) -> elbv2.ApplicationLoadBalancer:
-        """Get Application Load Balancer."""
         return self._alb
 
     @property
     def https_listener(self) -> elbv2.ApplicationListener | None:
-        """Get HTTPS listener (None in HTTP-only dev mode)."""
         return self._https_listener
 
     @property
     def http_listener(self) -> elbv2.ApplicationListener | None:
-        """Get HTTP listener (only in HTTP-only dev mode)."""
         return getattr(self, "_http_listener", None)
 
     @property
     def active_listener(self) -> elbv2.ApplicationListener:
-        """Get the active listener (HTTPS if available, otherwise HTTP)."""
         return self._https_listener if self._https_listener else self._http_listener
 
     @property
     def security_group(self) -> ec2.SecurityGroup:
-        """Get ALB security group."""
         return self._security_group
 
     @property
     def dns_name(self) -> str:
-        """Get ALB DNS name."""
         return self._alb.load_balancer_dns_name
 
     @property
     def backend_target_group(self) -> elbv2.ApplicationTargetGroup:
-        """Get backend API target group."""
         return self._backend_target_group
 
     @property
     def frontend_target_group(self) -> elbv2.ApplicationTargetGroup:
-        """Get frontend target group."""
         return self._frontend_target_group
 
     @property
     def grafana_target_group(self) -> elbv2.ApplicationTargetGroup:
-        """Get Grafana target group."""
         return self._grafana_target_group

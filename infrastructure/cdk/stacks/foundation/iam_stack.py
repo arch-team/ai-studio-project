@@ -46,16 +46,7 @@ class IamStack(cdk.Stack):
         kms_key_arns: list[str] | None = None,
         **kwargs,
     ) -> None:
-        """Initialize the IAM Stack.
-
-        Args:
-            scope: CDK scope
-            construct_id: Stack identifier
-            env_config: Environment configuration
-            kms_key_arns: KMS Key ARN 列表，用于限制 KMS 策略资源范围。
-                          如果为 None，使用 account 级别 ARN 模式。
-            **kwargs: Additional stack properties
-        """
+        # kms_key_arns: 为 None 时使用 account 级别 ARN 模式
         super().__init__(scope, construct_id, **kwargs)
 
         self.env_config = env_config
@@ -481,20 +472,16 @@ class IamStack(cdk.Stack):
 
     @property
     def eks_node_role(self) -> iam.Role:
-        """Get EKS node instance role."""
         return self._eks_node_role
 
     @property
     def training_execution_role(self) -> iam.Role:
-        """Get training job execution role."""
         return self._training_execution_role
 
     @property
     def backend_service_role(self) -> iam.Role:
-        """Get backend service role."""
         return self._backend_service_role
 
     @property
     def kms_usage_policy(self) -> iam.ManagedPolicy:
-        """Get KMS usage policy."""
         return self._kms_usage_policy

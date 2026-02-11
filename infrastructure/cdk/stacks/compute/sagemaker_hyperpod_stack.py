@@ -64,16 +64,6 @@ class SagemakerHyperPodStack(cdk.Stack):
         eks_cluster: eks.ICluster,
         **kwargs,
     ) -> None:
-        """Initialize the SageMaker HyperPod Stack.
-
-        Args:
-            scope: CDK scope
-            construct_id: Stack identifier
-            env_config: Environment configuration
-            vpc: VPC for the cluster
-            eks_cluster: Existing EKS cluster with HyperPod dependencies installed
-            **kwargs: Additional stack properties
-        """
         super().__init__(scope, construct_id, **kwargs)
 
         self.env_config = env_config
@@ -331,15 +321,12 @@ class SagemakerHyperPodStack(cdk.Stack):
 
     @property
     def hyperpod_cluster(self) -> sagemaker.CfnCluster:
-        """Get HyperPod cluster."""
         return self._hyperpod_cluster
 
     @property
     def lifecycle_scripts_bucket(self) -> s3.Bucket:
-        """Get lifecycle scripts bucket."""
         return self._lifecycle_scripts_bucket
 
     @property
     def hyperpod_execution_role(self) -> iam.Role:
-        """Get HyperPod execution role."""
         return self._hyperpod_execution_role

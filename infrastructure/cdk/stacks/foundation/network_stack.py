@@ -42,14 +42,6 @@ class NetworkStack(cdk.Stack):
         env_config: EnvironmentConfig,
         **kwargs,
     ) -> None:
-        """Initialize the Network Stack.
-
-        Args:
-            scope: CDK scope
-            construct_id: Stack identifier
-            env_config: Environment configuration
-            **kwargs: Additional stack properties
-        """
         super().__init__(scope, construct_id, **kwargs)
 
         self.env_config = env_config
@@ -273,20 +265,16 @@ class NetworkStack(cdk.Stack):
 
     @property
     def public_subnets(self) -> ec2.SubnetSelection:
-        """Get public subnet selection."""
         return ec2.SubnetSelection(subnet_type=ec2.SubnetType.PUBLIC)
 
     @property
     def private_app_subnets(self) -> ec2.SubnetSelection:
-        """Get private app layer subnet selection."""
         return ec2.SubnetSelection(subnet_type=ec2.SubnetType.PRIVATE_WITH_EGRESS)
 
     @property
     def private_data_subnets(self) -> ec2.SubnetSelection:
-        """Get private data layer subnet selection (isolated)."""
         return ec2.SubnetSelection(subnet_type=ec2.SubnetType.PRIVATE_ISOLATED)
 
     @property
     def vpc_endpoint_sg(self) -> ec2.SecurityGroup:
-        """Get VPC endpoint security group."""
         return self._vpc_endpoint_sg

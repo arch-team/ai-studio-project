@@ -130,9 +130,9 @@ class TestEksAddonVersions:
         assert versions.coredns == "v1.12.4-eksbuild.1"
         assert versions.kube_proxy == "v1.33.5-eksbuild.2"
 
-    def test_k8s_133_factory(self) -> None:
-        """Verify K8s 1.33 factory method returns correct versions."""
-        versions = EksAddonVersions.for_k8s_1_33()
+    def test_k8s_133_defaults(self) -> None:
+        """Verify default constructor returns K8s 1.33 compatible versions."""
+        versions = EksAddonVersions()
         assert "1.33" in versions.kube_proxy or "v1.33" in versions.kube_proxy
         assert versions.ebs_csi.startswith("v1.5")
 

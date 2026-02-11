@@ -49,16 +49,7 @@ class DatabaseStack(cdk.Stack):
         storage_encryption_key: kms.IKey | None = None,
         **kwargs,
     ) -> None:
-        """Initialize the Database Stack.
-
-        Args:
-            scope: CDK scope
-            construct_id: Stack identifier
-            env_config: Environment configuration
-            vpc: VPC to deploy database into
-            storage_encryption_key: 自定义 KMS Key 用于存储加密 (None 则使用 AWS managed key)
-            **kwargs: Additional stack properties
-        """
+        # storage_encryption_key: 自定义 KMS Key 用于存储加密 (None 则使用 AWS managed key)
         super().__init__(scope, construct_id, **kwargs)
 
         self.env_config = env_config
@@ -341,25 +332,20 @@ class DatabaseStack(cdk.Stack):
 
     @property
     def cluster(self) -> rds.DatabaseCluster:
-        """Get Aurora database cluster."""
         return self._cluster
 
     @property
     def proxy(self) -> rds.DatabaseProxy | None:
-        """Get RDS Proxy instance (None if disabled)."""
         return self._proxy
 
     @property
     def security_group(self) -> ec2.SecurityGroup:
-        """Get database security group."""
         return self._security_group
 
     @property
     def secret(self) -> secretsmanager.ISecret | None:
-        """Get Secrets Manager secret containing credentials."""
         return self._secret
 
     @property
     def connection_string_secret_key(self) -> str:
-        """Get the key name for connection string in secret."""
         return "connectionString"

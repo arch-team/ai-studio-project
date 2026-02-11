@@ -5,6 +5,7 @@ This module provides strongly-typed configuration classes for multi-environment
 deployments (dev, staging, prod) following AWS Well-Architected Framework best practices.
 """
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from enum import Enum
 
@@ -12,13 +13,7 @@ import aws_cdk as cdk
 
 
 class DeploymentMode(str, Enum):
-    """VPC deployment mode for cost vs availability trade-off.
-
-    Attributes:
-        SINGLE_AZ: Single AZ deployment for dev/test (lowest cost, no HA)
-        MULTI_AZ: Multi-AZ deployment for production (full HA)
-        HYBRID: Hybrid mode - compute multi-AZ, data layer single AZ (cost optimized)
-    """
+    """VPC 部署模式：成本与可用性的权衡。"""
 
     SINGLE_AZ = "single-az"
     MULTI_AZ = "multi-az"
@@ -35,14 +30,7 @@ class EnvironmentType(str, Enum):
 
 @dataclass(frozen=True)
 class VpcConfig:
-    """VPC configuration with sensible defaults.
-
-    Attributes:
-        cidr: VPC CIDR block (default: 10.0.0.0/16, supports ~1200 nodes)
-        max_azs: Maximum number of AZs to use
-        nat_gateways: Number of NAT Gateways (2 for cost-optimized HA)
-        deployment_mode: Deployment mode for AZ strategy
-    """
+    """VPC 配置。"""
 
     cidr: str = "10.0.0.0/16"
     max_azs: int = 3
@@ -52,14 +40,7 @@ class VpcConfig:
 
 @dataclass(frozen=True)
 class DatabaseConfig:
-    """Aurora Serverless v2 configuration.
-
-    Attributes:
-        min_acu: Minimum Aurora Capacity Units (0.5 allows pause in dev)
-        max_acu: Maximum Aurora Capacity Units
-        backup_retention_days: Backup retention period
-        enable_proxy: Enable RDS Proxy for connection pooling
-    """
+    """Aurora Serverless v2 配置。"""
 
     min_acu: float = 0.5
     max_acu: float = 16.0
@@ -69,14 +50,7 @@ class DatabaseConfig:
 
 @dataclass(frozen=True)
 class StorageConfig:
-    """Storage configuration for S3 and FSx.
-
-    Attributes:
-        fsx_storage_capacity_gib: FSx for Lustre storage capacity in GiB
-        fsx_throughput_per_tb: FSx throughput tier (500 or 1000 MB/s/TiB)
-        checkpoint_retention_days: Cold checkpoint retention period
-        checkpoint_ia_transition_days: Days before transition to Standard-IA
-    """
+    """S3 和 FSx 存储配置。"""
 
     fsx_storage_capacity_gib: int = 10 * 1024  # 10 TiB default
     fsx_throughput_per_tb: int = 500  # Cost-optimized default
@@ -86,21 +60,10 @@ class StorageConfig:
 
 @dataclass(frozen=True)
 class EksAddonVersions:
-    """EKS Add-on versions compatible with specific Kubernetes versions.
+    """EKS Add-on 版本配置，与特定 Kubernetes 版本兼容。
 
-    These versions are validated for compatibility with EKS.
-    Update these when upgrading Kubernetes version.
-
+    升级 K8s 版本时需同步更新。
     Reference: https://docs.aws.amazon.com/eks/latest/userguide/managing-add-ons.html
-
-    Attributes:
-        ebs_csi: Amazon EBS CSI Driver version
-        fsx_csi: Amazon FSx CSI Driver version
-        vpc_cni: Amazon VPC CNI version
-        coredns: CoreDNS version
-        kube_proxy: kube-proxy version
-        gpu_ami_type: GPU 实例 (NVIDIA) 使用的 EKS AMI 类型
-        neuron_ami_type: Neuron 实例 (trn1/inf2) 使用的 EKS AMI 类型
     """
 
     ebs_csi: str = "v1.54.0-eksbuild.1"
@@ -110,15 +73,6 @@ class EksAddonVersions:
     kube_proxy: str = "v1.33.5-eksbuild.2"
     gpu_ami_type: str = "AL2023_x86_64_NVIDIA"
     neuron_ami_type: str = "AL2023_x86_64_NEURON"
-
-    @classmethod
-    def for_k8s_1_33(cls) -> "EksAddonVersions":
-        """Factory method for Kubernetes 1.33 compatible versions.
-
-        注意: 版本号与类默认值保持一致，更新时需同步修改。
-        K8s 1.33 使用 AL2023 系列 AMI。
-        """
-        return cls()
 
     @classmethod
     def for_k8s_1_32(cls) -> "EksAddonVersions":
@@ -139,13 +93,7 @@ class EksAddonVersions:
 
 @dataclass(frozen=True)
 class GpuInstanceGroupConfig:
-    """GPU 实例组配置.
-
-    Attributes:
-        instance_type: GPU 实例类型 (e.g., ml.g5.2xlarge)
-        instance_count: 实例数量
-        enabled: 是否启用 GPU 实例组
-    """
+    """GPU 实例组配置。"""
 
     instance_type: str = "ml.g5.2xlarge"
     instance_count: int = 1
@@ -154,21 +102,11 @@ class GpuInstanceGroupConfig:
 
 @dataclass(frozen=True)
 class EksConfig:
-    """EKS cluster configuration.
-
-    Attributes:
-        kubernetes_version: EKS Kubernetes version
-        addon_versions: EKS Add-on versions compatible with kubernetes_version
-        node_instance_types: List of GPU instance types for HyperPod
-        min_nodes: Minimum nodes in auto-scaling group
-        max_nodes: Maximum nodes in auto-scaling group
-        gpu_instance_group: GPU 实例组配置 (ml.g5.2xlarge)
-    """
+    """EKS 集群配置。"""
 
     kubernetes_version: str = "1.33"
-    addon_versions: EksAddonVersions = field(
-        default_factory=EksAddonVersions.for_k8s_1_33
-    )
+    # 默认值 = K8s 1.33 兼容版本（即 EksAddonVersions 的类默认值）
+    addon_versions: EksAddonVersions = field(default_factory=EksAddonVersions)
     node_instance_types: tuple[str, ...] = (
         "p4d.24xlarge",
         "p5.48xlarge",
@@ -183,12 +121,7 @@ class EksConfig:
 
 @dataclass(frozen=True)
 class ObservabilityConfig:
-    """可观测性配置.
-
-    Attributes:
-        enable_amp: 是否启用 Amazon Managed Prometheus
-        amp_retention_days: AMP 指标保留天数
-    """
+    """可观测性配置。"""
 
     enable_amp: bool = True
     amp_retention_days: int = 150
@@ -196,13 +129,7 @@ class ObservabilityConfig:
 
 @dataclass(frozen=True)
 class ProtectionConfig:
-    """Resource protection configuration for different environments.
-
-    Attributes:
-        removal_policy: CDK RemovalPolicy for stateful resources (databases, buckets)
-        enable_deletion_protection: Enable deletion protection for databases
-        retain_on_delete: Whether to retain resources when stack is deleted
-    """
+    """资源保护配置（按环境区分删除策略）。"""
 
     removal_policy: cdk.RemovalPolicy = cdk.RemovalPolicy.DESTROY
     enable_deletion_protection: bool = False
@@ -234,6 +161,15 @@ class ProtectionConfig:
             enable_deletion_protection=True,
             retain_on_delete=True,
         )
+
+
+# EnvironmentType → ProtectionConfig 工厂方法的显式映射
+# 避免使用 getattr + 字符串拼接的脆弱模式
+_PROTECTION_FACTORY: dict[EnvironmentType, Callable[[], ProtectionConfig]] = {
+    EnvironmentType.DEV: ProtectionConfig.for_dev,
+    EnvironmentType.STAGING: ProtectionConfig.for_staging,
+    EnvironmentType.PROD: ProtectionConfig.for_prod,
+}
 
 
 @dataclass(frozen=True)
@@ -282,27 +218,6 @@ class EnvironmentConfig:
         gpu_instance_count: int = 1,
         gpu_enabled: bool = True,
     ) -> "EnvironmentConfig":
-        """通用的环境配置创建方法。
-
-        Args:
-            name: 环境类型
-            account: AWS 账户 ID
-            region: AWS 区域
-            vpc_nat_gateways: NAT Gateway 数量
-            vpc_deployment_mode: VPC 部署模式
-            db_min_acu: 数据库最小 ACU
-            db_max_acu: 数据库最大 ACU
-            db_backup_days: 备份保留天数
-            fsx_storage_gib: FSx 存储容量 (GiB)
-            fsx_throughput: FSx 吞吐量 (MB/s/TiB)
-            eks_min_nodes: EKS 最小节点数
-            eks_max_nodes: EKS 最大节点数
-            gpu_instance_count: GPU 实例数量
-            gpu_enabled: 是否启用 GPU 实例组
-
-        Returns:
-            配置好的 EnvironmentConfig 实例
-        """
         return cls(
             name=name,
             account=account,
@@ -328,7 +243,7 @@ class EnvironmentConfig:
                     enabled=gpu_enabled,
                 ),
             ),
-            protection=getattr(ProtectionConfig, f"for_{name.value}")(),
+            protection=_PROTECTION_FACTORY[name](),
         )
 
     @classmethod
@@ -396,18 +311,10 @@ def get_environment_config(
     account: str | None = None,
     region: str | None = None,
 ) -> EnvironmentConfig:
-    """Get environment configuration by name.
-
-    Args:
-        env_name: Environment name (dev, staging, prod)
-        account: AWS account ID (optional, uses CDK default if not provided)
-        region: AWS region (optional, defaults to us-east-1)
-
-    Returns:
-        EnvironmentConfig for the specified environment
+    """按环境名获取配置。
 
     Raises:
-        ValueError: If env_name is not a valid environment type
+        ValueError: env_name 不是有效的环境类型时
     """
     # Use default values if not provided
     account = account or ""

@@ -67,17 +67,6 @@ class FsxLustreStack(cdk.Stack):
         eks_security_group: ec2.ISecurityGroup | None = None,
         **kwargs,
     ) -> None:
-        """Initialize the FSx for Lustre Stack.
-
-        Args:
-            scope: CDK scope
-            construct_id: Stack identifier
-            env_config: Environment configuration
-            vpc: VPC for FSx deployment
-            datasets_bucket: S3 bucket for Data Repository Association
-            eks_security_group: EKS node security group for FSx access
-            **kwargs: Additional stack properties
-        """
         super().__init__(scope, construct_id, **kwargs)
 
         self.env_config = env_config
@@ -363,27 +352,22 @@ class FsxLustreStack(cdk.Stack):
 
     @property
     def file_system(self) -> fsx.CfnFileSystem:
-        """Get FSx for Lustre file system."""
         return self._file_system
 
     @property
     def file_system_id(self) -> str:
-        """Get FSx file system ID."""
         return self._file_system.ref
 
     @property
     def security_group(self) -> ec2.SecurityGroup:
-        """Get FSx security group."""
         return self._security_group
 
     @property
     def dns_name(self) -> str:
-        """Get FSx DNS name for mounting."""
         return f"{self._file_system.ref}.fsx.{self.region}.amazonaws.com"
 
     @property
     def mount_name(self) -> str:
-        """Get FSx mount name."""
         return self._file_system.attr_lustre_mount_name
 
     def get_storage_class_manifest(self) -> dict:

@@ -45,15 +45,6 @@ class ObservabilityStack(cdk.Stack):
         eks_cluster: eks.ICluster,
         **kwargs,
     ) -> None:
-        """Initialize the Observability Stack.
-
-        Args:
-            scope: CDK scope
-            construct_id: Stack identifier
-            env_config: Environment configuration
-            eks_cluster: EKS cluster for add-on installation
-            **kwargs: Additional stack properties
-        """
         super().__init__(scope, construct_id, **kwargs)
 
         self.env_config = env_config
@@ -206,10 +197,8 @@ class ObservabilityStack(cdk.Stack):
 
     @property
     def amp_workspace(self) -> aps.CfnWorkspace | None:
-        """Get AMP Workspace."""
         return self._amp_workspace
 
     @property
     def observability_addon(self) -> eks.CfnAddon:
-        """Get Observability add-on."""
         return self._observability_addon

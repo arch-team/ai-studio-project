@@ -76,6 +76,7 @@ no_implicit_optional = true
 warn_redundant_casts = true
 warn_unused_ignores = true
 show_error_codes = true
+exclude = ["cdk\\.out/"]
 
 [[tool.mypy.overrides]]
 module = [

@@ -1,34 +1,26 @@
-"""
-CloudFormation 输出创建辅助工具。
+"""CloudFormation 输出创建辅助工具。"""
 
-此模块提供便捷的方法来创建 CloudFormation 输出。
-"""
+from __future__ import annotations
 
 import re
+from typing import Protocol, runtime_checkable
 
 import aws_cdk as cdk
+
+from config import EnvironmentConfig
+
+
+@runtime_checkable
+class HasEnvConfig(Protocol):
+    """拥有 env_config 属性的 Stack 协议。"""
+
+    env_config: EnvironmentConfig
 
 
 def to_kebab_case(name: str) -> str:
     """将 PascalCase/camelCase 转换为 kebab-case。
 
-    正确处理连续大写字母（缩写词），例如 "EKS" 保持为 "eks"。
-    混合大小写缩写词（如 GiB, MBps）通过预处理映射表统一为全大写后再转换。
-
-    Args:
-        name: 输入名称 (如 "ClusterEndpoint", "vpcId")
-
-    Returns:
-        转换后的 kebab-case 字符串
-
-    Example:
-        ```python
-        to_kebab_case("ClusterEndpoint")    # "cluster-endpoint"
-        to_kebab_case("vpcId")              # "vpc-id"
-        to_kebab_case("EKSClusterARN")      # "eks-cluster-arn"
-        to_kebab_case("StorageCapacityGiB") # "storage-capacity-gib"
-        to_kebab_case("TotalThroughputMBps") # "total-throughput-mbps"
-        ```
+    正确处理连续大写字母缩写词（EKS, ARN）和混合大小写缩写词（GiB, MBps）。
     """
     # 混合大小写缩写词映射：将其统一为全大写，使正则能正确处理
     _ABBREVIATION_MAP: dict[str, str] = {
@@ -59,34 +51,12 @@ def create_output(
 ) -> cdk.CfnOutput:
     """创建单个 CloudFormation 输出。
 
-    Args:
-        stack: CDK Stack 实例
-        output_id: 输出 ID
-        value: 输出值
-        description: 输出描述
-        export_name: 导出名称（可选，默认根据 output_id 生成）
-
-    Returns:
-        创建的 CfnOutput 实例
-
-    Example:
-        ```python
-        create_output(
-            self,
-            "ClusterEndpoint",
-            cluster.cluster_endpoint.hostname,
-            "Aurora cluster writer endpoint",
-        )
-        ```
+    当未提供 export_name 时，自动从 stack.env_config.resource_prefix
+    和 output_id 生成。要求 stack 实现 HasEnvConfig 协议。
     """
-    # 如果没有提供 export_name，根据 output_id 生成
-    if export_name is None:
-        # 从 Stack 获取 resource_prefix
-        env_config = getattr(stack, "env_config", None)
-        if env_config:
-            resource_prefix = env_config.resource_prefix
-            suffix = to_kebab_case(output_id)
-            export_name = f"{resource_prefix}-{suffix}"
+    if export_name is None and isinstance(stack, HasEnvConfig):
+        suffix = to_kebab_case(output_id)
+        export_name = f"{stack.env_config.resource_prefix}-{suffix}"
 
     return cdk.CfnOutput(
         stack,

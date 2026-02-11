@@ -54,15 +54,7 @@ class StorageStack(cdk.Stack):
         encryption_key: kms.IKey | None = None,
         **kwargs,
     ) -> None:
-        """Initialize the Storage Stack.
-
-        Args:
-            scope: CDK scope
-            construct_id: Stack identifier
-            env_config: Environment configuration
-            encryption_key: KMS Key 用于 S3 加密 (必需，禁止降级到 S3_MANAGED)
-            **kwargs: Additional stack properties
-        """
+        # encryption_key: KMS Key 用于 S3 加密 (必需，禁止降级到 S3_MANAGED)
         super().__init__(scope, construct_id, **kwargs)
 
         self.env_config = env_config
@@ -306,25 +298,17 @@ class StorageStack(cdk.Stack):
 
     @property
     def datasets_bucket(self) -> s3.Bucket:
-        """Get datasets S3 bucket."""
         return self._datasets_bucket
 
     @property
     def models_bucket(self) -> s3.Bucket:
-        """Get models S3 bucket."""
         return self._models_bucket
 
     @property
     def checkpoints_bucket(self) -> s3.Bucket:
-        """Get checkpoints S3 bucket."""
         return self._checkpoints_bucket
 
     def grant_read_write(self, grantee: iam.IGrantable) -> None:
-        """Grant read/write access to all storage buckets.
-
-        Args:
-            grantee: IAM principal to grant access
-        """
         self._datasets_bucket.grant_read_write(grantee)
         self._models_bucket.grant_read_write(grantee)
         self._checkpoints_bucket.grant_read_write(grantee)

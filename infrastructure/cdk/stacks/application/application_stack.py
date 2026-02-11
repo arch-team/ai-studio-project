@@ -32,14 +32,6 @@ class ApplicationStack(cdk.Stack):
         env_config: EnvironmentConfig,
         **kwargs,
     ) -> None:
-        """Initialize the Application Stack.
-
-        Args:
-            scope: CDK scope
-            construct_id: Stack identifier
-            env_config: Environment configuration
-            **kwargs: Additional stack properties
-        """
         super().__init__(scope, construct_id, **kwargs)
 
         self.env_config = env_config
@@ -108,5 +100,4 @@ class ApplicationStack(cdk.Stack):
 
     @property
     def backend_repository(self) -> ecr.Repository:
-        """Get backend ECR repository."""
         return self._backend_repository

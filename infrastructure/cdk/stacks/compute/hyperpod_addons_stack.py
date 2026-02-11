@@ -30,30 +30,18 @@ from config.constants import (
     SERVICE_ACCOUNTS,
 )
 from constructs import Construct
+from utils.eks_helpers import create_eks_addon
 from utils.iam_helpers import create_pod_identity_role
 from utils.outputs import create_output
 from utils.tagging import apply_component_tag, create_addon_tags
 
 
 class HyperPodAddonsStack(cdk.Stack):
-    """HyperPod Add-ons Stack.
+    """HyperPod Add-ons Stack。
 
-    This stack installs HyperPod-specific add-ons:
-    - Training Operator: Manages PyTorchJob, TensorFlowJob CRDs for distributed training
-    - Task Governance: Kueue-based workload scheduling with Gang Scheduling support
-      (includes automatic PriorityClass configuration per spec.md FR-004)
-
-    Note: Observability (Prometheus + Grafana) 已迁移到独立的 ObservabilityStack。
-    Note: Elastic Agent is NOT an EKS add-on. It must be installed in training
-    container images via `pip install hyperpod-elastic-agent`.
-
-    Prerequisites:
-    - EKS cluster must be deployed with HyperPod Helm Chart installed (EksStack)
-    - SageMaker HyperPod cluster must be created (SagemakerHyperPodStack)
-
-    Attributes:
-        training_operator_addon: The Training Operator EKS add-on
-        task_governance_addon: The Task Governance (Kueue) EKS add-on
+    安装 Training Operator 和 Task Governance (Kueue) 两个 HyperPod 专用 Add-on。
+    Observability 已迁移到独立的 ObservabilityStack。
+    Elastic Agent 不是 EKS Add-on，需在训练容器镜像中通过 pip 安装。
     """
 
     def __init__(
@@ -64,15 +52,6 @@ class HyperPodAddonsStack(cdk.Stack):
         eks_cluster: eks.ICluster,
         **kwargs,
     ) -> None:
-        """Initialize the HyperPod Add-ons Stack.
-
-        Args:
-            scope: CDK scope
-            construct_id: Stack identifier
-            env_config: Environment configuration
-            eks_cluster: EKS cluster to install add-ons on
-            **kwargs: Additional stack properties
-        """
         super().__init__(scope, construct_id, **kwargs)
 
         self.env_config = env_config
@@ -104,27 +83,18 @@ class HyperPodAddonsStack(cdk.Stack):
         description: str,
         addon_version: str | None = None,
     ) -> eks.CfnAddon:
-        """Create an EKS add-on with standard configuration.
+        """创建带标签的 HyperPod EKS Add-on。
 
-        Args:
-            construct_id: Unique identifier for the construct
-            addon_name: Name of the EKS add-on
-            component: Component name for tagging
-            description: Description for the add-on
-            addon_version: 插件版本（可选，None 则使用 AWS 默认版本）。
-                建议在生产环境中锁定版本以确保可重复部署。
-                查询可用版本: aws eks describe-addon-versions --addon-name <name>
-
-        Returns:
-            The created CfnAddon
+        addon_version 为 None 则使用 AWS 默认版本。
+        建议在生产环境中锁定版本以确保可重复部署。
+        查询可用版本: aws eks describe-addon-versions --addon-name <name>
         """
-        addon = eks.CfnAddon(
+        addon = create_eks_addon(
             self,
             construct_id,
             addon_name=addon_name,
-            addon_version=addon_version,
             cluster_name=self._eks_cluster.cluster_name,
-            resolve_conflicts="OVERWRITE",
+            addon_version=addon_version,
             tags=create_addon_tags(self.env_config, component, component),
         )
 
@@ -235,10 +205,8 @@ class HyperPodAddonsStack(cdk.Stack):
 
     @property
     def training_operator_addon(self) -> eks.CfnAddon:
-        """Get Training Operator add-on."""
         return self._training_operator_addon
 
     @property
     def task_governance_addon(self) -> eks.CfnAddon:
-        """Get Task Governance add-on."""
         return self._task_governance_addon

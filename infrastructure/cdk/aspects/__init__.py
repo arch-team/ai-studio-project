@@ -1,17 +1,4 @@
-"""
-Tagging utilities for AI Training Platform CDK Stacks.
-
-This module exports functions for centralized tag management.
-
-Usage:
-    from aspects import apply_standard_tags, get_standard_tags
-
-    # Apply standard tags to all resources in app
-    apply_standard_tags(app, env_config)
-
-    # Get tags as dictionary for manual use
-    tags = get_standard_tags(env_config)
-"""
+"""App 级别全局标签管理。"""
 
 from .tagging import (
     apply_standard_tags,

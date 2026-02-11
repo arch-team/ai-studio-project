@@ -25,6 +25,7 @@ from cdk_constructs.gpu_node_group import create_default_gpu_node_groups
 from config import EnvironmentConfig
 from config.constants import EKS_ADDON_NAMES, ProjectPaths
 from constructs import Construct
+from utils.eks_helpers import create_eks_addon
 from utils.iam_helpers import add_policy_statement, create_irsa_role
 from utils.outputs import create_output
 
@@ -35,17 +36,10 @@ HELM_CHART_PATH = ProjectPaths.HYPERPOD_HELM_CHART
 class EksStack(cdk.Stack):
     """Amazon EKS Stack for HyperPod orchestration.
 
-    This stack creates:
-    - Amazon EKS cluster (K8s 1.33+)
-    - Required EKS add-ons (EBS CSI, FSx CSI, VPC CNI, CoreDNS, kube-proxy)
-    - IAM roles for IRSA
-    - HyperPod Helm Chart dependencies (health-monitoring-agent, device plugins, etc.)
+    创建 EKS 集群、EKS Add-ons、IRSA 角色和 HyperPod Helm Chart 依赖。
 
     Prerequisites:
         Run ./scripts/setup_helm_chart.sh before deploying this stack.
-
-    Attributes:
-        eks_cluster: The EKS cluster for orchestration
     """
 
     def __init__(
@@ -57,16 +51,6 @@ class EksStack(cdk.Stack):
         eks_node_role: iam.IRole,
         **kwargs,
     ) -> None:
-        """Initialize the EKS Stack.
-
-        Args:
-            scope: CDK scope
-            construct_id: Stack identifier
-            env_config: Environment configuration
-            vpc: VPC for the cluster
-            eks_node_role: IAM role for EKS nodes
-            **kwargs: Additional stack properties
-        """
         super().__init__(scope, construct_id, **kwargs)
 
         self.env_config = env_config
@@ -99,14 +83,6 @@ class EksStack(cdk.Stack):
         self._create_outputs()
 
     def _create_eks_cluster(self) -> eks.Cluster:
-        """Create Amazon EKS cluster for HyperPod orchestration.
-
-        Creates EKS cluster with:
-        - Kubernetes version 1.33
-        - API and API_AND_CONFIG_MAP authentication modes
-        - Private endpoint access
-        - Cluster logging enabled
-        """
         eks_config = self.env_config.eks
 
         # Create EKS cluster admin role (限制仅 EKSAdmin 标签用户可 assume)
@@ -156,16 +132,6 @@ class EksStack(cdk.Stack):
         return cluster
 
     def _create_system_node_group(self) -> None:
-        """Create EC2 node group for system components.
-
-        This node group runs system workloads like HyperPod dependencies
-        that require compute resources before HyperPod managed nodes are available.
-
-        The node group uses:
-        - t3.medium instances for cost efficiency
-        - AL2023 AMI for K8s 1.33+ compatibility
-        - CriticalAddonsOnly taint to reserve for system workloads
-        """
         self._eks_cluster.add_nodegroup_capacity(
             "SystemNodeGroup",
             nodegroup_name=f"{self.env_config.resource_prefix}-system-nodes",
@@ -197,19 +163,7 @@ class EksStack(cdk.Stack):
         service_account_role_arn: str | None = None,
         configuration_values: str | None = None,
     ) -> eks.CfnAddon:
-        """创建 EKS add-on 的统一辅助方法。
-
-        Args:
-            construct_id: CDK 构造 ID
-            addon_name: EKS 插件名称
-            addon_version: 插件版本（可选）
-            service_account_role_arn: IRSA 角色 ARN（可选）
-            configuration_values: JSON 配置字符串（可选）
-
-        Returns:
-            创建的 CfnAddon
-        """
-        return eks.CfnAddon(
+        return create_eks_addon(
             self,
             construct_id,
             addon_name=addon_name,
@@ -217,7 +171,6 @@ class EksStack(cdk.Stack):
             addon_version=addon_version,
             service_account_role_arn=service_account_role_arn,
             configuration_values=configuration_values,
-            resolve_conflicts="OVERWRITE",
         )
 
     def _install_eks_addons(self) -> None:
@@ -492,11 +445,9 @@ class EksStack(cdk.Stack):
 
     @property
     def eks_cluster(self) -> eks.Cluster:
-        """Get EKS cluster."""
         return self._eks_cluster
 
     def get_kubeconfig_command(self) -> str:
-        """Get command to configure kubectl for cluster access."""
         return (
             f"aws eks update-kubeconfig "
             f"--name {self._eks_cluster.cluster_name} "

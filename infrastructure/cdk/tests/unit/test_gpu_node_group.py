@@ -9,6 +9,8 @@ Tests cover:
 - create_default_gpu_node_groups 工厂函数
 """
 
+from collections.abc import Callable
+
 import aws_cdk as cdk
 import pytest
 from aws_cdk import aws_ec2 as ec2
@@ -456,8 +458,8 @@ class TestGpuAmiTypeSelection:
 
         通过替换 eks 配置中的 addon_versions 来切换 K8s 版本对应的 AMI 类型。
         """
-        method_map = {
-            "1.33": EksAddonVersions.for_k8s_1_33,
+        method_map: dict[str, Callable[[], EksAddonVersions]] = {
+            "1.33": EksAddonVersions,
             "1.32": EksAddonVersions.for_k8s_1_32,
         }
         addon_versions = method_map[k8s_version]()
