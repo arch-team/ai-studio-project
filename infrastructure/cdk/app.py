@@ -1,15 +1,7 @@
 #!/usr/bin/env python3
-"""
-AWS CDK Application Entry Point for AI Training Platform.
+"""CDK 应用入口 — 按依赖顺序实例化所有 Stack。
 
-This is the main entry point for deploying the AI Training Platform infrastructure.
-It instantiates all stacks with proper dependency ordering and environment configuration.
-
-Usage:
-    cdk deploy --context env=dev       # Deploy development environment
-    cdk deploy --context env=staging   # Deploy staging environment
-    cdk deploy --context env=prod      # Deploy production environment
-    cdk synth                          # Synthesize CloudFormation templates
+用法: cdk deploy --context env=dev|staging|prod
 """
 
 import json
@@ -124,10 +116,9 @@ def resolve_account(app: cdk.App, env_name: str) -> str:
 
 
 def create_app() -> cdk.App:
-    """Create and configure the CDK application with all stacks."""
+    """创建并配置 CDK 应用 (所有 Stack)。"""
     app = cdk.App()
 
-    # Get environment from context or default to 'dev'
     env_name = app.node.try_get_context("env") or "dev"
 
     # 按优先级解析 account 和 region
@@ -138,15 +129,12 @@ def create_app() -> cdk.App:
     # 部署确认日志
     print(f"Deploying to {env_name} environment: account={account}, region={region}")
 
-    # Load environment configuration
     env_config = get_environment_config(
         env_name=env_name,
         account=account,
         region=region,
     )
 
-    # Apply standard tags (centralized tag management)
-    # This includes: Project, Environment, ManagedBy, CostCenter
     apply_standard_tags(app, env_config)
 
     # 通用变量
@@ -352,7 +340,7 @@ def create_app() -> cdk.App:
 
 
 def main() -> None:
-    """Main entry point."""
+    """应用入口。"""
     app = create_app()
     app.synth()
 

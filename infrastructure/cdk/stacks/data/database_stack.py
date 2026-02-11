@@ -1,12 +1,6 @@
-"""
-Database Stack for AI Training Platform.
+"""Database Stack — Aurora MySQL Serverless v2。
 
-This stack creates Aurora MySQL Serverless v2 with:
-- Auto-scaling capacity (0.5 - 16 ACU)
-- Multi-AZ deployment for high availability
-- RDS Proxy for connection pooling
-- Automated backups with point-in-time recovery
-- Encryption at rest using AWS managed keys
+自动伸缩 ACU、Multi-AZ、RDS Proxy 连接池、PITR 备份、静态加密。
 """
 
 from typing import Any
@@ -26,21 +20,7 @@ from utils.outputs import create_output
 
 
 class DatabaseStack(cdk.Stack):
-    """Aurora MySQL Serverless v2 Stack with RDS Proxy.
-
-    This stack creates:
-    - Aurora MySQL Serverless v2 cluster
-    - RDS Proxy for connection pooling (optional)
-    - Security groups for database access
-    - Secrets Manager secret for credentials
-    - CloudWatch log group for audit logs
-
-    Attributes:
-        cluster: Aurora database cluster
-        proxy: RDS Proxy instance (if enabled)
-        security_group: Security group for database access
-        secret: Secrets Manager secret containing credentials
-    """
+    """Aurora MySQL Serverless v2 Stack。"""
 
     def __init__(
         self,
@@ -58,31 +38,19 @@ class DatabaseStack(cdk.Stack):
         self._vpc = vpc
         self._storage_encryption_key = storage_encryption_key
 
-        # Create security group for database access
         self._security_group = self._create_security_group()
-
-        # Create subnet group for Aurora
         self._subnet_group = self._create_subnet_group()
-
-        # Create parameter group with custom settings
         self._parameter_group = self._create_parameter_group()
-
-        # Create Aurora Serverless v2 cluster
         self._cluster = self._create_aurora_cluster()
 
-        # Create RDS Proxy if enabled
         self._proxy: rds.DatabaseProxy | None = None
         if env_config.database.enable_proxy:
             self._proxy = self._create_rds_proxy()
 
-        # Export outputs
         self._create_outputs()
 
     def _create_security_group(self) -> ec2.SecurityGroup:
-        """Create security group for Aurora database.
-
-        Allows MySQL (3306) traffic from within VPC.
-        """
+        """创建 Aurora 安全组，允许 Private 子网的 MySQL (3306) 访问。"""
         sg = ec2.SecurityGroup(
             self,
             "DatabaseSg",
@@ -105,7 +73,7 @@ class DatabaseStack(cdk.Stack):
         return sg
 
     def _create_subnet_group(self) -> rds.SubnetGroup:
-        """Create DB subnet group in private data subnets."""
+        """创建数据库子网组 (PRIVATE_ISOLATED)。"""
         return rds.SubnetGroup(
             self,
             "SubnetGroup",
@@ -145,27 +113,16 @@ class DatabaseStack(cdk.Stack):
         )
 
     def _create_aurora_cluster(self) -> rds.DatabaseCluster:
-        """Create Aurora MySQL Serverless v2 cluster.
-
-        Features:
-        - Serverless v2 with configurable ACU range
-        - Multi-AZ deployment
-        - Encryption at rest with AWS managed key
-        - Automated backups with PITR
-        - CloudWatch logs export
-        """
+        """创建 Aurora MySQL Serverless v2 集群。"""
         db_config = self.env_config.database
 
-        # Create credentials secret
         credentials = rds.Credentials.from_generated_secret(
             username="admin",
             secret_name=f"{self.env_config.resource_prefix}/aurora/credentials",
         )
 
-        # Create CloudWatch log group for audit logs
-        # Log group is created but not assigned as Aurora will auto-create it
-        # This explicit creation ensures proper lifecycle management
-        # Note: LogGroup doesn't support SNAPSHOT policy, always use DESTROY
+        # 显式创建 LogGroup 以确保生命周期管理;
+        # Aurora 会自动关联，LogGroup 不支持 SNAPSHOT 策略
         logs.LogGroup(
             self,
             "AuditLogGroup",
@@ -174,7 +131,6 @@ class DatabaseStack(cdk.Stack):
             removal_policy=cdk.RemovalPolicy.DESTROY,
         )
 
-        # Create Aurora Serverless v2 cluster
         cluster = rds.DatabaseCluster(
             self,
             "AuroraCluster",
@@ -184,15 +140,12 @@ class DatabaseStack(cdk.Stack):
             ),
             credentials=credentials,
             default_database_name="ai_platform",
-            # Serverless v2 configuration
             serverless_v2_min_capacity=db_config.min_acu,
             serverless_v2_max_capacity=db_config.max_acu,
-            # Writer instance (Serverless v2)
             writer=rds.ClusterInstance.serverless_v2(
                 "Writer",
                 instance_identifier=f"{self.env_config.resource_prefix}-aurora-writer",
             ),
-            # Reader instance for read scaling (Serverless v2)
             # Dev 环境不创建 Reader 以节省成本
             readers=(
                 [
@@ -205,48 +158,33 @@ class DatabaseStack(cdk.Stack):
                 if self.env_config.name != EnvironmentType.DEV
                 else []
             ),
-            # Network configuration
             vpc=self._vpc,
             subnet_group=self._subnet_group,
             security_groups=[self._security_group],
             vpc_subnets=ec2.SubnetSelection(
                 subnet_type=ec2.SubnetType.PRIVATE_ISOLATED
             ),
-            # Backup configuration
             backup=rds.BackupProps(
                 retention=Duration.days(db_config.backup_retention_days),
-                preferred_window="03:00-04:00",  # UTC
+                preferred_window="03:00-04:00",
             ),
-            # Security configuration
             storage_encrypted=True,
-            storage_encryption_key=self._storage_encryption_key,  # None = AWS managed key
-            iam_authentication=True,  # Enable IAM DB authentication
-            # Maintenance window
-            preferred_maintenance_window="Sun:05:00-Sun:06:00",  # UTC
-            # CloudWatch logs export
+            storage_encryption_key=self._storage_encryption_key,
+            iam_authentication=True,
+            preferred_maintenance_window="Sun:05:00-Sun:06:00",
             cloudwatch_logs_exports=["audit", "error", "slowquery"],
             cloudwatch_logs_retention=logs.RetentionDays.ONE_MONTH,
-            # Parameter group
             parameter_group=self._parameter_group,
-            # Removal policy (from protection config)
             removal_policy=self.env_config.protection.removal_policy,
-            # Deletion protection (from protection config)
             deletion_protection=self.env_config.protection.enable_deletion_protection,
         )
 
-        # Store secret reference
         self._secret = cluster.secret
 
         return cluster
 
     def _create_rds_proxy(self) -> rds.DatabaseProxy:
-        """Create RDS Proxy for connection pooling.
-
-        Benefits:
-        - Connection pooling reduces database load
-        - Automatic failover for multi-AZ
-        - IAM authentication support
-        """
+        """创建 RDS Proxy，提供连接池和自动故障转移。"""
         proxy = rds.DatabaseProxy(
             self,
             "RdsProxy",
@@ -260,16 +198,13 @@ class DatabaseStack(cdk.Stack):
             secrets=[self._cluster.secret],  # type: ignore
             require_tls=True,
             iam_auth=True,
-            # Connection settings
             idle_client_timeout=Duration.minutes(30),
             max_connections_percent=100,
             max_idle_connections_percent=50,
             borrow_timeout=Duration.seconds(120),
-            # Debug settings
             debug_logging=self.env_config.name.value != "prod",
         )
 
-        # Allow proxy to access the cluster
         self._cluster.connections.allow_from(
             proxy,
             ec2.Port.tcp(3306),

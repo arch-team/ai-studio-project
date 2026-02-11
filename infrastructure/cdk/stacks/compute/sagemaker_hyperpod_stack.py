@@ -1,15 +1,6 @@
-"""
-SageMaker HyperPod Stack for AI Training Platform.
+"""SageMaker HyperPod Stack — EKS 编排的 HyperPod 集群。
 
-This stack creates SageMaker HyperPod cluster attached to an existing EKS cluster:
-- SageMaker HyperPod cluster with EKS orchestration
-- Lifecycle scripts S3 bucket
-- IAM execution role for HyperPod instances
-
-Prerequisites:
-1. EKS cluster must be deployed (EksStack)
-2. HyperPod Helm Chart dependencies must be installed on the EKS cluster
-   Reference: https://docs.aws.amazon.com/sagemaker/latest/dg/sagemaker-hyperpod-eks-install-packages-using-helm-chart.html
+前提: EKS 集群已部署且 HyperPod Helm Chart 依赖已安装。
 """
 
 from typing import Any
@@ -41,21 +32,7 @@ from utils.tagging import create_cfn_tags
 
 
 class SagemakerHyperPodStack(cdk.Stack):
-    """SageMaker HyperPod Stack.
-
-    This stack creates:
-    - S3 bucket for lifecycle scripts
-    - IAM execution role for HyperPod instances
-    - SageMaker HyperPod cluster with EKS orchestration
-
-    Prerequisites:
-    - EKS cluster must exist and have HyperPod Helm Chart dependencies installed
-
-    Attributes:
-        hyperpod_cluster: The SageMaker HyperPod cluster
-        lifecycle_scripts_bucket: S3 bucket for lifecycle scripts
-        hyperpod_execution_role: IAM execution role for HyperPod
-    """
+    """SageMaker HyperPod Stack。"""
 
     def __init__(
         self,
@@ -72,24 +49,13 @@ class SagemakerHyperPodStack(cdk.Stack):
         self._vpc = vpc
         self._eks_cluster = eks_cluster
 
-        # Create lifecycle scripts bucket
         self._lifecycle_scripts_bucket = self._create_lifecycle_scripts_bucket()
-
-        # Create HyperPod execution role
         self._hyperpod_execution_role = self._create_hyperpod_execution_role()
-
-        # Create HyperPod cluster
         self._hyperpod_cluster = self._create_hyperpod_cluster()
-
-        # Create outputs
         self._create_outputs()
 
     def _create_lifecycle_scripts_bucket(self) -> s3.Bucket:
-        """Create S3 bucket for HyperPod lifecycle scripts.
-
-        The bucket stores on_create.sh and other lifecycle scripts
-        that are executed during cluster provisioning.
-        """
+        """创建 HyperPod 生命周期脚本 S3 bucket (存储 on_create.sh 等)。"""
         bucket_name = f"sagemaker-{self.env_config.resource_prefix}-lifecycle"
 
         bucket = s3.Bucket(
@@ -107,7 +73,6 @@ class SagemakerHyperPodStack(cdk.Stack):
         cdk.Tags.of(bucket).add(TAG_KEYS.NAME, bucket_name)
         cdk.Tags.of(bucket).add("Purpose", "hyperpod-lifecycle-scripts")
 
-        # Deploy lifecycle scripts to S3
         s3deploy.BucketDeployment(
             self,
             "DeployLifecycleScripts",
@@ -119,14 +84,7 @@ class SagemakerHyperPodStack(cdk.Stack):
         return bucket
 
     def _create_hyperpod_execution_role(self) -> iam.Role:
-        """Create IAM execution role for HyperPod cluster.
-
-        This role is used by HyperPod instances to:
-        - Access S3 for lifecycle scripts
-        - Write CloudWatch logs
-        - Communicate with EKS API
-        - Access VPC/subnet information (required for EKS orchestration)
-        """
+        """创建 HyperPod 执行角色 (S3/CloudWatch/EKS API/VPC 访问)。"""
         role = create_tagged_role(
             scope=self,
             construct_id="HyperPodExecutionRole",
@@ -137,10 +95,8 @@ class SagemakerHyperPodStack(cdk.Stack):
             managed_policies=[MANAGED_POLICIES.SAGEMAKER_CLUSTER_INSTANCE],
         )
 
-        # Add S3 access for lifecycle scripts bucket
         self._lifecycle_scripts_bucket.grant_read(role)
 
-        # Add EKS permissions for HyperPod to interact with the cluster
         add_policy_statement(
             role,
             sid="EksClusterAccess",
@@ -152,8 +108,8 @@ class SagemakerHyperPodStack(cdk.Stack):
             resources=[self._eks_cluster.cluster_arn],
         )
 
-        # Add EC2 permissions required for EKS-orchestrated HyperPod
-        # Reference: https://docs.aws.amazon.com/sagemaker/latest/dg/sagemaker-hyperpod-prerequisites-iam.html
+        # EKS 编排 HyperPod 所需的 EC2 网络权限
+        # https://docs.aws.amazon.com/sagemaker/latest/dg/sagemaker-hyperpod-prerequisites-iam.html
         ec2_network_actions = [
             "ec2:AssignPrivateIpAddresses",
             "ec2:AttachNetworkInterface",
@@ -174,7 +130,6 @@ class SagemakerHyperPodStack(cdk.Stack):
             "ec2:UnassignPrivateIpAddresses",
         ]
 
-        # Add remaining permissions using batch helper
         add_policy_statements(
             role,
             [
@@ -206,16 +161,7 @@ class SagemakerHyperPodStack(cdk.Stack):
         instance_type: str,
         instance_count: int = 1,
     ) -> sagemaker.CfnCluster.ClusterInstanceGroupProperty:
-        """Create a HyperPod instance group configuration.
-
-        Args:
-            name: Instance group name
-            instance_type: SageMaker instance type (e.g., ml.m5.xlarge)
-            instance_count: Number of instances
-
-        Returns:
-            ClusterInstanceGroupProperty for the instance group
-        """
+        """创建 HyperPod 实例组配置。"""
         return sagemaker.CfnCluster.ClusterInstanceGroupProperty(
             instance_group_name=name,
             instance_type=instance_type,
@@ -228,19 +174,10 @@ class SagemakerHyperPodStack(cdk.Stack):
         )
 
     def _create_hyperpod_cluster(self) -> sagemaker.CfnCluster:
-        """Create SageMaker HyperPod cluster with EKS orchestration.
-
-        Note: This creates the HyperPod cluster shell. Instance groups
-        should be added via configuration or separate update operations
-        based on workload requirements.
-        """
-        # Get private subnet IDs for the cluster
+        """创建 SageMaker HyperPod 集群 (EKS 编排)。"""
         private_subnet_ids = [subnet.subnet_id for subnet in self._vpc.private_subnets]
-
-        # Get security group IDs (use EKS cluster security group)
         security_group_ids = [self._eks_cluster.cluster_security_group_id]
 
-        # Create instance groups using helper method
         instance_groups = [
             self._create_instance_group(
                 name=INSTANCE_GROUPS.CONTROLLER,
@@ -255,7 +192,6 @@ class SagemakerHyperPodStack(cdk.Stack):
             ),
         ]
 
-        # Add GPU training instance group if enabled
         gpu_config = self.env_config.eks.gpu_instance_group
         if gpu_config.enabled:
             instance_groups.append(
@@ -266,7 +202,6 @@ class SagemakerHyperPodStack(cdk.Stack):
                 )
             )
 
-        # Create HyperPod cluster with standard tags + SageMaker=true
         cluster = sagemaker.CfnCluster(
             self,
             "HyperPodCluster",
@@ -290,13 +225,12 @@ class SagemakerHyperPodStack(cdk.Stack):
             ),
         )
 
-        # Ensure HyperPod cluster is created after the IAM role
         cluster.node.add_dependency(self._hyperpod_execution_role)
 
         return cluster
 
     def _create_outputs(self) -> None:
-        """Create CloudFormation outputs for cross-stack references."""
+        """创建 CloudFormation 输出。"""
         create_output(
             self,
             "HyperPodClusterArn",

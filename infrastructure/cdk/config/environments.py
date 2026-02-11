@@ -1,9 +1,4 @@
-"""
-Environment configuration for AI Training Platform CDK Stacks.
-
-This module provides strongly-typed configuration classes for multi-environment
-deployments (dev, staging, prod) following AWS Well-Architected Framework best practices.
-"""
+"""多环境部署配置 (dev/staging/prod)。"""
 
 from collections.abc import Callable
 from dataclasses import dataclass, field
@@ -21,7 +16,7 @@ class DeploymentMode(str, Enum):
 
 
 class EnvironmentType(str, Enum):
-    """Environment types for the platform."""
+    """平台环境类型。"""
 
     DEV = "dev"
     STAGING = "staging"
@@ -76,10 +71,7 @@ class EksAddonVersions:
 
     @classmethod
     def for_k8s_1_32(cls) -> "EksAddonVersions":
-        """Factory method for Kubernetes 1.32 compatible versions.
-
-        K8s 1.32 使用 AL2 系列 AMI。
-        """
+        """K8s 1.32 兼容版本 (AL2 系列 AMI)。"""
         return cls(
             ebs_csi="v1.52.0-eksbuild.1",
             fsx_csi="v1.8.0-eksbuild.1",
@@ -137,7 +129,7 @@ class ProtectionConfig:
 
     @classmethod
     def for_dev(cls) -> "ProtectionConfig":
-        """Development: allow easy cleanup."""
+        """开发环境: 允许轻松清理。"""
         return cls(
             removal_policy=cdk.RemovalPolicy.DESTROY,
             enable_deletion_protection=False,
@@ -146,7 +138,7 @@ class ProtectionConfig:
 
     @classmethod
     def for_staging(cls) -> "ProtectionConfig":
-        """Staging: moderate protection - same as dev for resource lifecycle."""
+        """预发布环境: 适度保护。"""
         return cls(
             removal_policy=cdk.RemovalPolicy.DESTROY,
             enable_deletion_protection=True,
@@ -155,7 +147,7 @@ class ProtectionConfig:
 
     @classmethod
     def for_prod(cls) -> "ProtectionConfig":
-        """Production: maximum protection - retain all stateful resources."""
+        """生产环境: 最大保护，保留所有有状态资源。"""
         return cls(
             removal_policy=cdk.RemovalPolicy.RETAIN,
             enable_deletion_protection=True,
@@ -174,11 +166,7 @@ _PROTECTION_FACTORY: dict[EnvironmentType, Callable[[], ProtectionConfig]] = {
 
 @dataclass(frozen=True)
 class EnvironmentConfig:
-    """Complete environment configuration.
-
-    This class aggregates all configuration for a specific environment
-    and provides factory methods for standard configurations.
-    """
+    """完整的环境配置，提供 dev/staging/prod 工厂方法。"""
 
     name: EnvironmentType
     account: str
@@ -191,12 +179,12 @@ class EnvironmentConfig:
     protection: ProtectionConfig = field(default_factory=ProtectionConfig)
 
     def to_cdk_environment(self) -> cdk.Environment:
-        """Convert to CDK Environment for stack deployment."""
+        """转换为 CDK Environment。"""
         return cdk.Environment(account=self.account, region=self.region)
 
     @property
     def resource_prefix(self) -> str:
-        """Generate consistent resource naming prefix."""
+        """生成统一的资源命名前缀。"""
         return f"ai-platform-{self.name.value}"
 
     @classmethod
@@ -316,7 +304,6 @@ def get_environment_config(
     Raises:
         ValueError: env_name 不是有效的环境类型时
     """
-    # Use default values if not provided
     account = account or ""
     region = region or "us-east-1"
 

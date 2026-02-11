@@ -1,16 +1,6 @@
-"""
-Storage Stack for AI Training Platform.
+"""Storage Stack — S3 存储 (数据集/模型/检查点)。
 
-This stack creates S3 buckets for:
-- Training datasets
-- Model artifacts
-- Checkpoints and snapshots
-
-All buckets are configured with:
-- SSE-KMS encryption (AWS managed key)
-- Versioning enabled
-- Lifecycle policies for cost optimization
-- HTTPS-only bucket policy
+SSE-KMS 加密、版本控制、生命周期策略、HTTPS-only。
 """
 
 from typing import Any
@@ -29,24 +19,7 @@ from utils.outputs import create_output
 
 
 class StorageStack(cdk.Stack):
-    """S3 Storage Stack with encryption and lifecycle policies.
-
-    This stack creates:
-    - Datasets bucket: Training data storage
-    - Models bucket: Trained model artifacts
-    - Checkpoints bucket: Training checkpoints with tiered storage
-
-    All buckets enforce:
-    - SSE-KMS encryption at rest
-    - HTTPS-only transport
-    - Versioning for data protection
-    - Lifecycle rules for cost optimization
-
-    Attributes:
-        datasets_bucket: S3 bucket for training datasets
-        models_bucket: S3 bucket for model artifacts
-        checkpoints_bucket: S3 bucket for training checkpoints
-    """
+    """S3 Storage Stack — 数据集/模型/检查点 bucket。"""
 
     def __init__(
         self,
@@ -62,12 +35,9 @@ class StorageStack(cdk.Stack):
         self.env_config = env_config
         self._encryption_key = encryption_key
 
-        # Create S3 buckets
         self._datasets_bucket = self._create_datasets_bucket()
         self._models_bucket = self._create_models_bucket()
         self._checkpoints_bucket = self._create_checkpoints_bucket()
-
-        # Create outputs
         self._create_outputs()
 
     def _create_base_bucket(
@@ -77,25 +47,7 @@ class StorageStack(cdk.Stack):
         lifecycle_rules: list[s3.LifecycleRule] | None = None,
         intelligent_tiering: bool = False,
     ) -> s3.Bucket:
-        """Create a base S3 bucket with standard security configuration.
-
-        All buckets are configured with:
-        - SSE-KMS encryption (AWS managed key: aws/s3)
-        - Versioning enabled
-        - Block all public access
-        - HTTPS-only enforcement via bucket policy
-        - Access logging enabled
-
-        Args:
-            bucket_id: CDK construct ID
-            bucket_name: S3 bucket name
-            lifecycle_rules: Optional lifecycle rules
-            intelligent_tiering: Enable S3 Intelligent-Tiering
-
-        Returns:
-            Configured S3 bucket
-        """
-        # Use protection config for removal policy
+        """创建标准安全配置的 S3 bucket (KMS/版本/公网阻断/HTTPS-only)。"""
         removal_policy = self.env_config.protection.removal_policy
 
         # 强制要求 KMS 加密，禁止降级到 S3_MANAGED
@@ -104,21 +56,15 @@ class StorageStack(cdk.Stack):
                 "encryption_key is required — S3_MANAGED encryption is not allowed for this platform"
             )
 
-        # Create bucket with encryption
         bucket = s3.Bucket(
             self,
             bucket_id,
             bucket_name=bucket_name,
-            # Encryption configuration
             encryption=s3.BucketEncryption.KMS,
             encryption_key=self._encryption_key,
-            # Enable versioning for data protection
             versioned=True,
-            # Block all public access (security best practice)
             block_public_access=s3.BlockPublicAccess.BLOCK_ALL,
-            # Enforce SSL/HTTPS only
             enforce_ssl=True,
-            # Enable intelligent tiering if requested
             intelligent_tiering_configurations=(
                 [
                     s3.IntelligentTieringConfiguration(
@@ -130,17 +76,12 @@ class StorageStack(cdk.Stack):
                 if intelligent_tiering
                 else None
             ),
-            # Lifecycle rules
             lifecycle_rules=lifecycle_rules or [],
-            # Removal policy (from protection config)
             removal_policy=removal_policy,
-            # Auto-delete objects only supported with DESTROY policy
             auto_delete_objects=(removal_policy == cdk.RemovalPolicy.DESTROY),
-            # Object ownership (recommended setting)
             object_ownership=s3.ObjectOwnership.BUCKET_OWNER_ENFORCED,
         )
 
-        # Add standard tags
         cdk.Tags.of(bucket).add("Name", bucket_name)
         cdk.Tags.of(bucket).add("DataClassification", "internal")
 
@@ -177,7 +118,6 @@ class StorageStack(cdk.Stack):
             intelligent_tiering=True,
         )
 
-        # Add CORS configuration for web uploads
         # Dev 环境允许任意来源便于开发调试，非 Dev 环境限制为平台域名
         cors_origins = (
             ["*"]
@@ -316,11 +256,7 @@ class StorageStack(cdk.Stack):
         self._checkpoints_bucket.grant_read_write(grantee)
 
     def grant_read(self, grantee: iam.IGrantable) -> None:
-        """Grant read-only access to all storage buckets.
-
-        Args:
-            grantee: IAM principal to grant access
-        """
+        """授予所有存储 bucket 的只读权限。"""
         self._datasets_bucket.grant_read(grantee)
         self._models_bucket.grant_read(grantee)
         self._checkpoints_bucket.grant_read(grantee)

@@ -1,9 +1,4 @@
-"""
-IAM helper functions for AI Training Platform CDK.
-
-This module provides reusable functions for creating IAM roles,
-policies, and trust relationships to reduce code duplication.
-"""
+"""IAM 辅助函数 — 角色、策略和信任关系的统一创建。"""
 
 from typing import Any
 
@@ -22,15 +17,7 @@ def _apply_role_configuration(
     managed_policies: list[str] | None = None,
     additional_tags: dict[str, str] | None = None,
 ) -> None:
-    """Apply common configuration to an IAM role (internal helper).
-
-    Args:
-        role: The IAM role to configure
-        env_config: Environment configuration
-        role_name_suffix: Suffix for the role name (used in tags)
-        managed_policies: List of AWS managed policy names to attach
-        additional_tags: Additional tags to apply
-    """
+    """为 IAM 角色应用通用配置 (托管策略 + 标签)。"""
     if managed_policies:
         for policy_name in managed_policies:
             role.add_managed_policy(
@@ -56,21 +43,7 @@ def create_tagged_role(
     managed_policies: list[str] | None = None,
     additional_tags: dict[str, str] | None = None,
 ) -> iam.Role:
-    """Create an IAM role with standard tags.
-
-    Args:
-        scope: CDK construct scope
-        construct_id: Unique identifier for the construct
-        env_config: Environment configuration
-        role_name_suffix: Suffix for the role name (will be prefixed with resource_prefix)
-        description: Role description
-        assumed_by: Principal that can assume this role
-        managed_policies: List of AWS managed policy names to attach
-        additional_tags: Additional tags to apply
-
-    Returns:
-        The created IAM Role
-    """
+    """创建带标准标签的 IAM 角色。"""
     role = iam.Role(
         scope,
         construct_id,
@@ -87,13 +60,7 @@ def create_tagged_role(
 
 
 def create_pod_identity_trust_policy() -> iam.PolicyDocument:
-    """Create trust policy for EKS Pod Identity.
-
-    EKS Pod Identity requires both sts:AssumeRole and sts:TagSession actions.
-
-    Returns:
-        PolicyDocument suitable for EKS Pod Identity
-    """
+    """创建 EKS Pod Identity 信任策略 (sts:AssumeRole + sts:TagSession)。"""
     return iam.PolicyDocument(
         statements=[
             iam.PolicyStatement(
@@ -114,24 +81,8 @@ def create_pod_identity_role(
     managed_policies: list[str] | None = None,
     additional_tags: dict[str, str] | None = None,
 ) -> iam.Role:
-    """Create an IAM role for EKS Pod Identity.
-
-    This creates a role with the proper trust policy for EKS Pod Identity,
-    including both sts:AssumeRole and sts:TagSession actions.
-
-    Args:
-        scope: CDK construct scope
-        construct_id: Unique identifier for the construct
-        env_config: Environment configuration
-        role_name_suffix: Suffix for the role name
-        description: Role description
-        managed_policies: List of AWS managed policy names to attach
-        additional_tags: Additional tags to apply
-
-    Returns:
-        The created IAM Role configured for Pod Identity
-    """
-    # Create role with placeholder principal (will be overridden)
+    """创建 EKS Pod Identity IAM 角色。"""
+    # 先用占位 principal 创建角色，后续覆盖为完整信任策略
     role = iam.Role(
         scope,
         construct_id,
@@ -140,7 +91,7 @@ def create_pod_identity_role(
         assumed_by=iam.ServicePrincipal("pods.eks.amazonaws.com"),
     )
 
-    # Override with proper trust policy including sts:TagSession
+    # 覆盖为包含 sts:TagSession 的完整信任策略
     cfn_role = role.node.default_child
     if cfn_role is not None:
         cfn_role.assume_role_policy_document = (  # type: ignore[attr-defined]
@@ -162,16 +113,7 @@ def add_policy_statement(
     conditions: dict[str, Any] | None = None,
     effect: iam.Effect = iam.Effect.ALLOW,
 ) -> None:
-    """Add a policy statement to an IAM role.
-
-    Args:
-        role: The IAM role to add the statement to
-        sid: Statement identifier
-        actions: List of IAM actions
-        resources: List of resource ARNs
-        conditions: Optional conditions for the statement
-        effect: Allow or Deny (default: Allow)
-    """
+    """为 IAM 角色添加策略声明。"""
     role.add_to_policy(
         iam.PolicyStatement(
             sid=sid,
@@ -188,13 +130,7 @@ def add_policy_statements(
     statements: list[tuple[str, list[str], list[str]]],
     effect: iam.Effect = iam.Effect.ALLOW,
 ) -> None:
-    """Add multiple policy statements to an IAM role.
-
-    Args:
-        role: The IAM role to add the statements to
-        statements: List of tuples (sid, actions, resources)
-        effect: Allow or Deny for all statements (default: Allow)
-    """
+    """批量添加策略声明 (sid, actions, resources)。"""
     for sid, actions, resources in statements:
         add_policy_statement(role, sid, actions, resources, effect=effect)
 
@@ -206,18 +142,7 @@ def create_irsa_conditions(
     namespace: str,
     service_account: str,
 ) -> cdk.CfnJson:
-    """Create IRSA (IAM Roles for Service Accounts) conditions.
-
-    Args:
-        scope: CDK construct scope
-        construct_id: Unique identifier for the construct
-        oidc_issuer: OIDC issuer URL (without https://)
-        namespace: Kubernetes namespace
-        service_account: Kubernetes ServiceAccount name
-
-    Returns:
-        CfnJson containing the IRSA conditions
-    """
+    """创建 IRSA 条件 (OIDC audience + subject)。"""
     return cdk.CfnJson(
         scope,
         construct_id,

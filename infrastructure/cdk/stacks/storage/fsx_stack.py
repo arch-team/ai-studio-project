@@ -1,18 +1,7 @@
-"""
-FSx for Lustre Stack for AI Training Platform.
+"""FSx for Lustre Stack — 高性能训练数据存储。
 
-This stack creates an Amazon FSx for Lustre file system for high-performance
-training data storage with the following capabilities:
-
-- PERSISTENT_2 deployment type (persistent, high-performance)
-- Configurable throughput per TiB (125/250/500/1000 MB/s/TiB)
-- S3 Data Repository Association for data synchronization
-- Automatic import/export policies
-- Integration with EKS via FSx CSI Driver StorageClass
-- Automatic backup and lifecycle management
-
-Reference: spec.md NFR-001 (FSx capacity planning formula),
-          FR-007 (≥5GB/s single client throughput)
+PERSISTENT_2 部署，支持 S3 数据仓库关联自动同步。
+参考: spec.md NFR-001 (FSx 容量规划), FR-007 (≥5GB/s 单客户端吞吐)
 """
 
 from typing import Any
@@ -30,33 +19,15 @@ from utils.tagging import create_cfn_tags
 
 
 class FsxLustreStack(cdk.Stack):
-    """FSx for Lustre Stack for high-performance training data storage.
+    """FSx for Lustre Stack — 高性能训练数据存储。"""
 
-    This stack creates:
-    - FSx for Lustre file system (PERSISTENT_2 deployment)
-    - Security group for FSx access
-    - S3 Data Repository Association for data sync
-    - CloudWatch alarms for capacity monitoring
-
-    The file system provides:
-    - High throughput for training workloads (≥5GB/s single client)
-    - Automatic S3 synchronization
-    - Hierarchical storage management
-
-    Attributes:
-        file_system: FSx for Lustre file system
-        security_group: Security group for FSx access
-        dns_name: DNS name for mounting the file system
-        mount_name: Mount name for Lustre client
-    """
-
-    # Valid PERSISTENT_2 throughput values (MB/s/TiB)
+    # PERSISTENT_2 有效吞吐量值 (MB/s/TiB)
     VALID_THROUGHPUT_VALUES = (125, 250, 500, 1000)
 
-    # Minimum storage capacity for PERSISTENT_2 (1.2 TiB in GiB)
+    # PERSISTENT_2 最小存储容量 (1.2 TiB = 1200 GiB)
     MIN_STORAGE_CAPACITY_GIB = 1200
 
-    # Storage capacity increment (2.4 TiB in GiB)
+    # 存储容量增量 (2.4 TiB = 2400 GiB)
     STORAGE_CAPACITY_INCREMENT_GIB = 2400
 
     def __init__(
@@ -76,29 +47,18 @@ class FsxLustreStack(cdk.Stack):
         self._datasets_bucket = datasets_bucket
         self._eks_security_group = eks_security_group
 
-        # Validate throughput configuration
         self._validate_throughput_config()
-
-        # Create security group for FSx
         self._security_group = self._create_security_group()
-
-        # Create FSx for Lustre file system
         self._file_system = self._create_file_system()
-
-        # Create S3 Data Repository Association
         self._data_repository_association = self._create_data_repository_association()
-
-        # Create CloudWatch alarms
         self._create_alarms()
-
-        # Create outputs
         self._create_outputs()
 
     def _validate_throughput_config(self) -> None:
-        """Validate FSx throughput configuration.
+        """验证 FSx 吞吐量配置。
 
         Raises:
-            ValueError: If throughput per TB is not a valid value
+            ValueError: 吞吐量不在 VALID_THROUGHPUT_VALUES 范围内时
         """
         throughput = self.env_config.storage.fsx_throughput_per_tb
         if throughput not in self.VALID_THROUGHPUT_VALUES:
@@ -109,23 +69,13 @@ class FsxLustreStack(cdk.Stack):
             )
 
     def _get_validated_storage_capacity(self) -> int:
-        """Get validated storage capacity aligned to FSx requirements.
-
-        FSx for Lustre PERSISTENT_2 requires:
-        - Minimum 1.2 TiB (1200 GiB)
-        - Increments of 2.4 TiB (2400 GiB)
-
-        Returns:
-            Storage capacity in GiB aligned to FSx requirements
-        """
+        """获取对齐到 FSx PERSISTENT_2 要求的存储容量 (最小 1.2 TiB, 增量 2.4 TiB)。"""
         requested_capacity = self.env_config.storage.fsx_storage_capacity_gib
 
-        # Ensure minimum capacity
         if requested_capacity < self.MIN_STORAGE_CAPACITY_GIB:
             return self.MIN_STORAGE_CAPACITY_GIB
 
-        # Align to 2.4 TiB increments
-        # Formula: ceiling to nearest increment
+        # 向上对齐到 2.4 TiB 增量
         increments = (
             requested_capacity + self.STORAGE_CAPACITY_INCREMENT_GIB - 1
         ) // self.STORAGE_CAPACITY_INCREMENT_GIB
@@ -160,15 +110,7 @@ class FsxLustreStack(cdk.Stack):
         )
 
     def _create_security_group(self) -> ec2.SecurityGroup:
-        """Create security group for FSx for Lustre.
-
-        FSx for Lustre requires the following ports:
-        - TCP 988: Lustre client-server communication
-        - TCP 1021-1023: Lustre inter-node communication
-
-        Returns:
-            Security group configured for FSx access
-        """
+        """创建 FSx 安全组，允许 Lustre 通信端口 (TCP 988, 1021-1023)。"""
         sg = ec2.SecurityGroup(
             self,
             "FsxSecurityGroup",
@@ -197,28 +139,22 @@ class FsxLustreStack(cdk.Stack):
         return sg
 
     def _create_file_system(self) -> fsx.CfnFileSystem:
-        """Create FSx for Lustre file system with PERSISTENT_2 deployment.
+        """创建 FSx for Lustre 文件系统 (PERSISTENT_2)。
 
-        Uses CfnFileSystem (L1) because CDK L2 construct doesn't support
-        PERSISTENT_2 deployment type.
-
-        Returns:
-            FSx for Lustre file system
+        使用 L1 CfnFileSystem 因为 CDK L2 不支持 PERSISTENT_2 部署类型。
         """
         storage_capacity = self._get_validated_storage_capacity()
         throughput_per_tib = self.env_config.storage.fsx_throughput_per_tb
 
-        # Select subnet for FSx deployment (use first private subnet)
         private_subnets = self._vpc.select_subnets(
             subnet_type=ec2.SubnetType.PRIVATE_WITH_EGRESS
         )
         subnet_id = private_subnets.subnet_ids[0]
 
-        # Use protection config for removal policy
         removal_policy = self.env_config.protection.removal_policy
 
-        # Calculate weekly maintenance window (Sunday 2:00 AM UTC)
-        weekly_maintenance_start_time = "7:02:00"  # Day:Hour:Minute (7=Sunday)
+        # Day:Hour:Minute (7=Sunday, 02:00 UTC)
+        weekly_maintenance_start_time = "7:02:00"
 
         file_system = fsx.CfnFileSystem(
             self,
@@ -231,13 +167,9 @@ class FsxLustreStack(cdk.Stack):
             lustre_configuration=fsx.CfnFileSystem.LustreConfigurationProperty(
                 deployment_type="PERSISTENT_2",
                 per_unit_storage_throughput=throughput_per_tib,
-                # Data compression for cost optimization
                 data_compression_type="LZ4",
-                # Copy tags to backups
                 copy_tags_to_backups=True,
-                # Weekly maintenance window (Sunday 2:00 AM)
                 weekly_maintenance_start_time=weekly_maintenance_start_time,
-                # Auto import policy will be configured via Data Repository Association
             ),
             tags=create_cfn_tags(
                 self.env_config,
@@ -249,22 +181,14 @@ class FsxLustreStack(cdk.Stack):
             ),
         )
 
-        # Apply removal policy from protection config
         file_system.apply_removal_policy(removal_policy)
 
         return file_system
 
     def _create_data_repository_association(self) -> fsx.CfnDataRepositoryAssociation:
-        """Create Data Repository Association for S3 synchronization.
+        """创建 S3 数据仓库关联，配置双向自动同步 (NEW/CHANGED/DELETED)。
 
-        Configures automatic import/export between FSx and S3:
-        - Auto import: NEW, CHANGED, DELETED files from S3
-        - Auto export: NEW, CHANGED, DELETED files to S3
-
-        Reference: spec.md SC-005 (S3 to FSx sync <10min for 1TB)
-
-        Returns:
-            Data Repository Association linking FSx to S3
+        参考: spec.md SC-005 (S3 → FSx 同步 <10min/1TB)
         """
         dra = fsx.CfnDataRepositoryAssociation(
             self,
@@ -285,30 +209,20 @@ class FsxLustreStack(cdk.Stack):
             tags=create_cfn_tags(self.env_config, "fsx-dra"),
         )
 
-        # DRA depends on file system
         dra.add_dependency(self._file_system)
 
         return dra
 
     def _create_alarms(self) -> None:
-        """Create CloudWatch alarms for FSx capacity monitoring.
+        """创建 CloudWatch 容量监控告警 (FR-020: 80%/90%/95% 阈值)。
 
-        Implements FR-020 storage capacity monitoring:
-        - Warning at 80% utilization
-        - Critical at 90% utilization
-        - Emergency at 95% utilization
+        FSx 自动向 CloudWatch 发布指标，具体告警在监控 Stack 中配置。
         """
-        # Note: CloudWatch alarms for FSx are created using custom metrics
-        # FSx publishes metrics to CloudWatch automatically
-        # Alarm creation is typically done in a separate monitoring stack
-        # or via CloudWatch dashboard configuration
-
-        # Add tag to indicate monitoring configuration
         cdk.Tags.of(self._file_system).add("MonitoringEnabled", "true")
         cdk.Tags.of(self._file_system).add("CapacityAlertThreshold", "80")
 
     def _create_outputs(self) -> None:
-        """Create CloudFormation outputs for cross-stack references."""
+        """创建 CloudFormation 输出。"""
         prefix = self.env_config.resource_prefix
         storage_capacity = self._get_validated_storage_capacity()
         throughput_mbps = (
@@ -373,11 +287,7 @@ class FsxLustreStack(cdk.Stack):
         return self._file_system.attr_lustre_mount_name
 
     def get_storage_class_manifest(self) -> dict:
-        """Generate Kubernetes StorageClass manifest for FSx CSI Driver.
-
-        Returns:
-            Dictionary containing StorageClass YAML configuration
-        """
+        """生成 FSx CSI Driver 的 Kubernetes StorageClass 配置。"""
         return {
             "apiVersion": "storage.k8s.io/v1",
             "kind": "StorageClass",
@@ -404,14 +314,7 @@ class FsxLustreStack(cdk.Stack):
         }
 
     def grant_read_write(self, role: iam.IRole) -> None:
-        """Grant read/write access to FSx file system.
-
-        This grants the necessary permissions for mounting and accessing
-        the FSx file system from EKS pods.
-
-        Args:
-            role: IAM role to grant access
-        """
+        """授予 FSx 文件系统读写权限 (用于 EKS Pod 挂载)。"""
         iam.Grant.add_to_principal(
             grantee=role,
             actions=[
@@ -423,13 +326,7 @@ class FsxLustreStack(cdk.Stack):
         )
 
     def grant_s3_data_sync(self, role: iam.IRole) -> None:
-        """Grant S3 data synchronization permissions.
-
-        This grants permissions needed for FSx to sync with S3 bucket.
-
-        Args:
-            role: IAM role to grant access
-        """
+        """授予 S3 数据同步权限 (FSx ↔ S3 bucket)。"""
         self._datasets_bucket.grant_read_write(role)
         iam.Grant.add_to_principal(
             grantee=role,

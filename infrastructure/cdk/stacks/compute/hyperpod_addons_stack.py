@@ -1,21 +1,9 @@
-"""
-HyperPod Add-ons Stack for AI Training Platform.
+"""HyperPod Add-ons Stack — Training Operator + Task Governance。
 
-This stack installs HyperPod-specific EKS add-ons using CDK eks.Addon:
-- T008d-1: Training Operator (amazon-sagemaker-hyperpod-training-operator)
-- T008d-1: Task Governance / Kueue (amazon-sagemaker-hyperpod-taskgovernance)
+Observability 已迁移到 ObservabilityStack。
+Elastic Agent 不是 EKS add-on，需在训练容器镜像中 pip install。
 
-Note: Observability (T008d-2) 已迁移到独立的 ObservabilityStack。
-Note: PriorityClass configuration is automatically provided by the Task Governance
-add-on, so no manual PriorityClass creation is needed.
-Note: Elastic Agent (checkpoint management, auto-resume) is NOT an EKS add-on.
-It is a Python package installed in training container images via:
-  pip install hyperpod-elastic-agent
-
-Reference:
-- T008d-1: Training core components installation
-- spec.md FR-004: Priority level numerical mapping (managed by Task Governance)
-- https://docs.aws.amazon.com/eks/latest/userguide/workloads-add-ons-available-eks.html
+参考: spec.md FR-004 (PriorityClass 由 Task Governance 自动管理)
 """
 
 from typing import Any
@@ -59,22 +47,14 @@ class HyperPodAddonsStack(cdk.Stack):
         self.env_config = env_config
         self._eks_cluster = eks_cluster
 
-        # Create IAM role for Training Operator Pod Identity
         self._training_operator_role = self._create_training_operator_role()
-
-        # T008d-1: Install Training Operator add-on
         self._training_operator_addon = self._install_training_operator()
 
-        # Create Pod Identity Association for Training Operator
         self._training_operator_pod_identity = (
             self._create_training_operator_pod_identity()
         )
 
-        # T008d-1: Install Task Governance (Kueue) add-on
-        # Note: Task Governance automatically configures PriorityClass per spec.md FR-004
         self._task_governance_addon = self._install_task_governance()
-
-        # Create outputs
         self._create_outputs()
 
     def _create_addon(
@@ -105,13 +85,7 @@ class HyperPodAddonsStack(cdk.Stack):
         return addon
 
     def _create_training_operator_role(self) -> iam.Role:
-        """Create IAM role for Training Operator Pod Identity.
-
-        This role is assumed by the Training Operator controller manager pod
-        via EKS Pod Identity to access SageMaker APIs for node health checks.
-
-        Reference: https://docs.aws.amazon.com/sagemaker/latest/dg/sagemaker-eks-operator-install.html
-        """
+        """创建 Training Operator Pod Identity 角色 (SageMaker API 访问)。"""
         return create_pod_identity_role(
             scope=self,
             construct_id="TrainingOperatorRole",
@@ -122,11 +96,7 @@ class HyperPodAddonsStack(cdk.Stack):
         )
 
     def _create_training_operator_pod_identity(self) -> eks.CfnPodIdentityAssociation:
-        """Create EKS Pod Identity Association for Training Operator.
-
-        This associates the IAM role with the Training Operator's ServiceAccount,
-        allowing the controller manager to access AWS APIs.
-        """
+        """创建 Training Operator 的 Pod Identity Association。"""
         association = eks.CfnPodIdentityAssociation(
             self,
             "TrainingOperatorPodIdentity",
@@ -136,7 +106,7 @@ class HyperPodAddonsStack(cdk.Stack):
             role_arn=self._training_operator_role.role_arn,
         )
 
-        # Ensure association is created after the add-on (which creates the ServiceAccount)
+        # add-on 创建 ServiceAccount 后才能关联 Pod Identity
         association.add_dependency(self._training_operator_addon)
 
         apply_component_tag(association, "training-operator")
@@ -144,16 +114,7 @@ class HyperPodAddonsStack(cdk.Stack):
         return association
 
     def _install_training_operator(self) -> eks.CfnAddon:
-        """Install HyperPod Training Operator add-on.
-
-        The Training Operator provides:
-        - PyTorchJob and TFJob CRD support
-        - PyTorch DDP/FSDP/DeepSpeed ZeRO framework support
-        - Webhook validation for training job configurations
-        - HyperPod Elastic Agent integration (via training container images)
-
-        Reference: https://docs.aws.amazon.com/sagemaker/latest/dg/sagemaker-eks-operator-install.html
-        """
+        """安装 Training Operator (PyTorchJob/TFJob CRD, DDP/FSDP/DeepSpeed 支持)。"""
         return self._create_addon(
             construct_id="TrainingOperatorAddon",
             addon_name=EKS_ADDON_NAMES.TRAINING_OPERATOR,
@@ -162,17 +123,7 @@ class HyperPodAddonsStack(cdk.Stack):
         )
 
     def _install_task_governance(self) -> eks.CfnAddon:
-        """Install HyperPod Task Governance (Kueue) add-on.
-
-        Task Governance provides:
-        - Kueue-based workload scheduling
-        - Automatic ClusterQueue and LocalQueue creation
-        - Gang Scheduling support (default 60s timeout)
-        - Preemption policy management
-        - PriorityClass configuration (automatically managed per spec.md FR-004)
-
-        Reference: https://docs.aws.amazon.com/sagemaker/latest/dg/sagemaker-hyperpod-eks-operate-console-ui-governance-setup-task-governance.html
-        """
+        """安装 Task Governance (Kueue 调度, Gang Scheduling, PriorityClass)。"""
         addon = self._create_addon(
             construct_id="TaskGovernanceAddon",
             addon_name=EKS_ADDON_NAMES.TASK_GOVERNANCE,
@@ -180,15 +131,13 @@ class HyperPodAddonsStack(cdk.Stack):
             description="HyperPod Task Governance - Kueue for workload scheduling and Gang Scheduling",
         )
 
-        # Ensure Task Governance is installed after Training Operator
-        # for proper CRD dependency resolution
+        # Training Operator CRD 是 Task Governance 的前置条件
         addon.add_dependency(self._training_operator_addon)
 
         return addon
 
     def _create_outputs(self) -> None:
-        """Create CloudFormation outputs for cross-stack references."""
-        # T008d-1 outputs
+        """创建 CloudFormation 输出。"""
         create_output(
             self,
             "TrainingOperatorAddonName",

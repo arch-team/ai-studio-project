@@ -1,11 +1,6 @@
-"""
-GPU Node Group Construct for HyperPod clusters.
+"""GPU 节点组 Construct — HyperPod 训练加速器管理。
 
-This construct creates GPU node groups for SageMaker HyperPod with:
-- GPU instance types (p4d.24xlarge, p5.48xlarge, trn1.32xlarge)
-- Auto Scaling configuration
-- AZ affinity scheduling for cost optimization
-- Topology spread constraints
+支持 P4d/P5/Trn1 实例，含自动伸缩、AZ 亲和调度、拓扑分布约束。
 """
 
 from dataclasses import dataclass, field
@@ -22,22 +17,7 @@ from constructs import Construct
 
 @dataclass(frozen=True)
 class GpuNodeGroupConfig:
-    """Configuration for a GPU node group.
-
-    This is an immutable configuration class following the project's
-    dataclass pattern for type safety and consistency.
-
-    Attributes:
-        name: Node group name
-        instance_types: Tuple of GPU instance types
-        min_size: Minimum number of nodes
-        max_size: Maximum number of nodes
-        desired_size: Desired number of nodes
-        disk_size: Root volume size in GB
-        capacity_type: 容量类型 (ON_DEMAND 或 SPOT)
-        labels: Kubernetes labels for the nodes (创建后不应修改内容)
-        taints: Kubernetes taints for the nodes (创建后不应修改内容)
-    """
+    """GPU 节点组配置。"""
 
     name: str
     instance_types: tuple[str, ...]
@@ -51,18 +31,7 @@ class GpuNodeGroupConfig:
 
 
 class GpuNodeGroupConstruct(Construct):
-    """GPU Node Group construct for EKS clusters.
-
-    Creates managed node groups with GPU instances and proper
-    configuration for AI/ML training workloads.
-
-    Features:
-    - GPU-optimized AMI selection
-    - NVMe local storage support
-    - EFA (Elastic Fabric Adapter) for distributed training
-    - Topology-aware scheduling labels
-    - Auto Scaling with HyperPod integration
-    """
+    """GPU 节点组 Construct — GPU AMI、EFA、拓扑感知调度。"""
 
     def __init__(
         self,
@@ -76,48 +45,24 @@ class GpuNodeGroupConstruct(Construct):
         vpc: ec2.IVpc,
         **kwargs: Any,
     ) -> None:
-        """Initialize GPU Node Group construct.
-
-        Args:
-            scope: CDK scope
-            construct_id: Construct identifier
-            env_config: Environment configuration
-            eks_cluster: EKS cluster to add node group to
-            node_role: IAM role for the nodes
-            node_group_config: Node group configuration
-            subnets: Subnet selection for node placement
-            vpc: VPC for subnet resolution
-            **kwargs: Additional construct properties
-        """
         super().__init__(scope, construct_id, **kwargs)
 
         self.env_config = env_config
         self._node_group_config = node_group_config
         self._vpc = vpc
 
-        # Create launch template for GPU instances
         self._launch_template = self._create_launch_template(eks_cluster)
-
-        # Create node group
         self._node_group = self._create_node_group(eks_cluster, node_role, subnets)
 
     def _create_launch_template(self, _eks_cluster: eks.ICluster) -> ec2.LaunchTemplate:
-        """Create EC2 launch template for GPU nodes.
+        """创建 GPU 节点 Launch Template (GP3 加密卷, IMDSv2)。
 
-        Configures:
-        - EBS root volume with GP3 encryption
-        - Detailed monitoring
-        - IMDSv2 enforcement
-
-        注意: AL2023 EKS 管理节点组使用 nodeadm 自动引导，
-        不再需要自定义 user data 或 /etc/eks/bootstrap.sh。
-        NVMe、NVIDIA、EFA 配置由 AL2023 AMI 和 EKS 插件自动处理。
+        AL2023 使用 nodeadm 自动引导，NVMe/NVIDIA/EFA 由 AMI + EKS 插件处理。
         """
         launch_template = ec2.LaunchTemplate(
             self,
             f"LaunchTemplate-{self._node_group_config.name}",
             launch_template_name=f"{self.env_config.resource_prefix}-{self._node_group_config.name}-lt",
-            # Block device mappings for root volume
             block_devices=[
                 ec2.BlockDevice(
                     device_name="/dev/xvda",
@@ -129,9 +74,7 @@ class GpuNodeGroupConstruct(Construct):
                     ),
                 )
             ],
-            # Enable detailed monitoring
             detailed_monitoring=True,
-            # Instance metadata options (IMDSv2)
             http_tokens=ec2.LaunchTemplateHttpTokens.REQUIRED,
             http_put_response_hop_limit=2,
         )
@@ -172,21 +115,15 @@ class GpuNodeGroupConstruct(Construct):
         node_role: iam.IRole,
         subnets: ec2.SubnetSelection,
     ) -> eks.CfnNodegroup:
-        """Create EKS managed node group for GPU instances.
-
-        Note: Using CfnNodegroup for more control over configuration
-        that's not available in the L2 construct.
-        """
+        """创建 GPU 节点组 (使用 L1 CfnNodegroup 以获取更多配置控制)。"""
         config = self._node_group_config
 
-        # Select subnets from VPC using subnet_type
         subnet_type = getattr(
             subnets, "subnet_type", ec2.SubnetType.PRIVATE_WITH_EGRESS
         )
         selected_subnets = self._vpc.select_subnets(subnet_type=subnet_type)
         subnet_ids = [subnet.subnet_id for subnet in selected_subnets.subnets]
 
-        # Prepare labels with GPU-specific labels
         labels = {
             **config.labels,
             "node.kubernetes.io/instance-type": config.instance_types[0],
@@ -194,7 +131,6 @@ class GpuNodeGroupConstruct(Construct):
             f"{self.env_config.resource_prefix}/node-group": config.name,
         }
 
-        # Prepare taints for GPU node isolation
         taints = (
             [
                 eks.CfnNodegroup.TaintProperty(
@@ -206,7 +142,7 @@ class GpuNodeGroupConstruct(Construct):
             ]
             if config.taints
             else [
-                # Default GPU taint to prevent non-GPU workloads
+                # 默认 GPU taint 防止非 GPU 工作负载调度到此节点
                 eks.CfnNodegroup.TaintProperty(
                     key="nvidia.com/gpu",
                     value="true",
@@ -222,29 +158,23 @@ class GpuNodeGroupConstruct(Construct):
             nodegroup_name=f"{self.env_config.resource_prefix}-{config.name}",
             node_role=node_role.role_arn,
             subnets=subnet_ids,
-            # Scaling configuration
             scaling_config=eks.CfnNodegroup.ScalingConfigProperty(
                 min_size=config.min_size,
                 max_size=config.max_size,
                 desired_size=config.desired_size,
             ),
-            # Instance configuration
             instance_types=list(config.instance_types),
             ami_type=self._get_ami_type(config),  # AL2023 系列，兼容 K8s 1.33+
             capacity_type=config.capacity_type,
-            # Launch template for custom configuration
             launch_template=eks.CfnNodegroup.LaunchTemplateSpecificationProperty(
                 id=self._launch_template.launch_template_id,
                 version=self._launch_template.latest_version_number,
             ),
-            # Labels and taints
             labels=labels,
             taints=taints,
-            # Update configuration
             update_config=eks.CfnNodegroup.UpdateConfigProperty(
-                max_unavailable=1,  # Rolling update with minimal disruption
+                max_unavailable=1,
             ),
-            # Tags (static keys only - dynamic cluster name tags applied separately)
             tags={
                 "Name": f"{self.env_config.resource_prefix}-{config.name}",
                 "k8s.io/cluster-autoscaler/enabled": "true",
@@ -255,12 +185,10 @@ class GpuNodeGroupConstruct(Construct):
 
     @property
     def node_group(self) -> eks.CfnNodegroup:
-        """Get the EKS node group."""
         return self._node_group
 
     @property
     def launch_template(self) -> ec2.LaunchTemplate:
-        """Get the launch template."""
         return self._launch_template
 
 
@@ -330,24 +258,7 @@ def create_default_gpu_node_groups(
     subnets: ec2.SubnetSelection,
     vpc: ec2.IVpc,
 ) -> list[GpuNodeGroupConstruct]:
-    """Create default GPU node groups for the platform.
-
-    Creates node groups for different accelerator types:
-    - p4d: NVIDIA A100 GPUs (8x 40GB)
-    - p5: NVIDIA H100 GPUs (8x 80GB)
-    - trn1: AWS Trainium chips
-
-    Args:
-        scope: CDK scope
-        env_config: Environment configuration
-        eks_cluster: EKS cluster
-        node_role: Node IAM role
-        subnets: Subnet selection
-        vpc: VPC for subnet resolution
-
-    Returns:
-        List of created node group constructs
-    """
+    """创建默认 GPU 节点组 (P4d A100 / P5 H100 / Trn1)。"""
     definitions = _default_node_group_definitions(env_config.eks.max_nodes)
     return [
         GpuNodeGroupConstruct(

@@ -1,9 +1,4 @@
-"""
-Constants for AI Training Platform CDK.
-
-This module centralizes all hardcoded values and magic strings
-to improve maintainability and reduce duplication.
-"""
+"""CDK 常量 — 集中管理硬编码值和魔术字符串。"""
 
 from dataclasses import dataclass
 from pathlib import Path
@@ -11,14 +6,14 @@ from pathlib import Path
 
 @dataclass(frozen=True)
 class EksAddonNames:
-    """EKS Add-on name constants."""
+    """EKS Add-on 名称常量。"""
 
     # HyperPod Add-ons
     TRAINING_OPERATOR: str = "amazon-sagemaker-hyperpod-training-operator"
     TASK_GOVERNANCE: str = "amazon-sagemaker-hyperpod-taskgovernance"
     OBSERVABILITY: str = "amazon-sagemaker-hyperpod-observability"
 
-    # Core EKS Add-ons
+    # 核心 EKS Add-ons
     EBS_CSI_DRIVER: str = "aws-ebs-csi-driver"
     FSX_CSI_DRIVER: str = "aws-fsx-csi-driver"
     VPC_CNI: str = "vpc-cni"
@@ -26,13 +21,13 @@ class EksAddonNames:
     KUBE_PROXY: str = "kube-proxy"
     POD_IDENTITY_AGENT: str = "eks-pod-identity-agent"
 
-    # Community Add-ons
+    # 社区 Add-ons
     CERT_MANAGER: str = "cert-manager"
 
 
 @dataclass(frozen=True)
 class KubernetesNamespaces:
-    """Kubernetes namespace constants."""
+    """Kubernetes 命名空间常量。"""
 
     KUBE_SYSTEM: str = "kube-system"
     CERT_MANAGER: str = "cert-manager"
@@ -43,7 +38,7 @@ class KubernetesNamespaces:
 
 @dataclass(frozen=True)
 class HelmChartConfig:
-    """Helm chart configuration constants."""
+    """Helm Chart 配置常量。"""
 
     # cert-manager
     CERT_MANAGER_VERSION: str = "v1.17.2"
@@ -56,13 +51,12 @@ class HelmChartConfig:
 
 @dataclass(frozen=True)
 class SageMakerInstanceTypes:
-    """SageMaker HyperPod instance type constants."""
+    """SageMaker HyperPod 实例类型常量。"""
 
-    # Controller/System instances
     CONTROLLER: str = "ml.m5.xlarge"
     SYSTEM: str = "ml.m5.4xlarge"
 
-    # GPU instances
+    # GPU 实例
     GPU_P4D: str = "ml.p4d.24xlarge"
     GPU_P5: str = "ml.p5.48xlarge"
     GPU_G5: str = "ml.g5.xlarge"
@@ -71,7 +65,7 @@ class SageMakerInstanceTypes:
 
 @dataclass(frozen=True)
 class Timeouts:
-    """CDK Duration constants (in minutes)."""
+    """CDK Duration 常量 (分钟)。"""
 
     HELM_CHART: int = 15
     CERT_MANAGER: int = 15
@@ -80,9 +74,8 @@ class Timeouts:
 
 @dataclass(frozen=True)
 class ServiceAccountNames:
-    """Kubernetes ServiceAccount name constants."""
+    """Kubernetes ServiceAccount 名称常量。"""
 
-    # EKS CSI drivers
     EBS_CSI_CONTROLLER: str = "ebs-csi-controller-sa"
     FSX_CSI_CONTROLLER: str = "fsx-csi-controller-sa"
 
@@ -93,7 +86,7 @@ class ServiceAccountNames:
 
 @dataclass(frozen=True)
 class InstanceGroupNames:
-    """HyperPod instance group name constants."""
+    """HyperPod 实例组名称常量。"""
 
     CONTROLLER: str = "controller-group"
     SYSTEM: str = "system-group"
@@ -102,9 +95,8 @@ class InstanceGroupNames:
 
 @dataclass(frozen=True)
 class ManagedPolicyNames:
-    """AWS Managed Policy name constants."""
+    """AWS 托管策略名称常量。"""
 
-    # EKS
     EKS_WORKER_NODE: str = "AmazonEKSWorkerNodePolicy"
     EKS_CNI: str = "AmazonEKS_CNI_Policy"
     ECR_READ_ONLY: str = "AmazonEC2ContainerRegistryReadOnly"
@@ -119,7 +111,7 @@ class ManagedPolicyNames:
 
 @dataclass(frozen=True)
 class TagKeys:
-    """Standard tag key constants."""
+    """标准标签键常量。"""
 
     NAME: str = "Name"
     ENVIRONMENT: str = "Environment"
@@ -127,7 +119,7 @@ class TagKeys:
     COMPONENT: str = "Component"
     SAGEMAKER: str = "SageMaker"
 
-    # Kubernetes tags
+    # Kubernetes 标签
     K8S_CLUSTER_TYPE: str = "kubernetes.io/cluster-type"
     K8S_CLUSTER_AUTOSCALER: str = "k8s.io/cluster-autoscaler/enabled"
 
@@ -148,7 +140,7 @@ class ProjectPaths:
     LIFECYCLE_SCRIPTS_DIR: Path = ASSETS_DIR / "lifecycle-scripts"
 
 
-# Singleton instances for easy access
+# 单例实例
 EKS_ADDON_NAMES = EksAddonNames()
 K8S_NAMESPACES = KubernetesNamespaces()
 HELM_CONFIG = HelmChartConfig()

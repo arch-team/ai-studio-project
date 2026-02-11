@@ -1,12 +1,6 @@
-"""
-Network Stack for AI Training Platform.
+"""Network Stack — 3 层子网隔离 VPC。
 
-This stack creates the VPC infrastructure with 3-tier subnet isolation:
-- Public subnets: NAT Gateways, ALB
-- Private App subnets: EKS nodes, compute resources
-- Private Data subnets: FSx for Lustre, Aurora MySQL
-
-Follows AWS Well-Architected Framework security best practices.
+Public (NAT/ALB) / PrivateApp (EKS) / PrivateData (FSx/Aurora)。
 """
 
 from typing import Any
@@ -20,22 +14,7 @@ from utils.outputs import create_output
 
 
 class NetworkStack(cdk.Stack):
-    """VPC Stack with 3-tier subnet isolation and VPC endpoints.
-
-    This stack creates:
-    - VPC with configurable CIDR block
-    - Public, Private App, and Private Data subnets across multiple AZs
-    - NAT Gateways (cost-optimized: 2 AZs by default)
-    - VPC endpoints for AWS services (S3, ECR, CloudWatch, STS, SageMaker, EFS)
-    - Security groups for VPC endpoints
-
-    Attributes:
-        vpc: The created VPC construct
-        public_subnets: List of public subnet selections
-        private_app_subnets: List of private app layer subnet selections
-        private_data_subnets: List of private data layer subnet selections
-        vpc_endpoint_sg: Security group for VPC endpoints
-    """
+    """VPC Stack — 3 层子网隔离 + VPC Endpoints。"""
 
     def __init__(
         self,
@@ -48,52 +27,35 @@ class NetworkStack(cdk.Stack):
 
         self.env_config = env_config
 
-        # Create VPC with 3-tier subnet architecture
         self.vpc = self._create_vpc()
-
-        # Create VPC endpoints for AWS services
         self._vpc_endpoint_sg = self._create_vpc_endpoint_security_group()
         self._create_vpc_endpoints()
-
-        # Export VPC attributes
         self._create_outputs()
 
     def _create_vpc(self) -> ec2.Vpc:
-        """Create VPC with 3-tier subnet isolation.
-
-        Subnet allocation follows the plan.md specification:
-        - Public: 18.75% (NAT Gateway, ALB)
-        - Private App: 37.5% (EKS nodes, RDS)
-        - Private Data: 18.75% (FSx, ElastiCache)
-        """
+        """创建 3 层子网隔离 VPC (按 plan.md 分配子网比例)。"""
         vpc_config = self.env_config.vpc
 
-        # Determine number of AZs based on deployment mode
         max_azs = self._get_azs_for_deployment_mode(vpc_config.deployment_mode)
 
-        # Define subnet configuration for 3-tier architecture
         subnet_configuration = [
-            # Public subnets (NAT Gateway, ALB)
             ec2.SubnetConfiguration(
                 name="Public",
                 subnet_type=ec2.SubnetType.PUBLIC,
-                cidr_mask=20,  # /20 = 4,096 IPs per subnet
+                cidr_mask=20,
             ),
-            # Private App subnets (EKS nodes, compute)
             ec2.SubnetConfiguration(
                 name="PrivateApp",
                 subnet_type=ec2.SubnetType.PRIVATE_WITH_EGRESS,
-                cidr_mask=19,  # /19 = 8,192 IPs per subnet
+                cidr_mask=19,
             ),
-            # Private Data subnets (FSx, Aurora, ElastiCache)
             ec2.SubnetConfiguration(
                 name="PrivateData",
                 subnet_type=ec2.SubnetType.PRIVATE_ISOLATED,
-                cidr_mask=20,  # /20 = 4,096 IPs per subnet
+                cidr_mask=20,
             ),
         ]
 
-        # Create VPC
         vpc = ec2.Vpc(
             self,
             "Vpc",
@@ -104,35 +66,24 @@ class NetworkStack(cdk.Stack):
             subnet_configuration=subnet_configuration,
             enable_dns_hostnames=True,
             enable_dns_support=True,
-            # Restrict default security group (security best practice)
             restrict_default_security_group=True,
         )
 
-        # Add flow logs for network monitoring
         vpc.add_flow_log(
             "FlowLog",
             destination=ec2.FlowLogDestination.to_cloud_watch_logs(),
             traffic_type=ec2.FlowLogTrafficType.ALL,
         )
 
-        # Add tags for cost allocation and identification
         cdk.Tags.of(vpc).add("Name", f"{self.env_config.resource_prefix}-vpc")
         cdk.Tags.of(vpc).add("DeploymentMode", vpc_config.deployment_mode.value)
 
-        # Validate subnet capacity for EKS node scaling
         self._validate_subnet_capacity(vpc)
 
         return vpc
 
     def _get_azs_for_deployment_mode(self, mode: DeploymentMode) -> int:
-        """Get number of AZs based on deployment mode.
-
-        Args:
-            mode: Deployment mode (single-az, multi-az, hybrid)
-
-        Returns:
-            Number of AZs to use
-        """
+        """根据部署模式返回 AZ 数量。"""
         az_mapping = {
             DeploymentMode.SINGLE_AZ: 1,
             DeploymentMode.MULTI_AZ: 3,
@@ -141,28 +92,20 @@ class NetworkStack(cdk.Stack):
         return az_mapping.get(mode, 3)
 
     def _validate_subnet_capacity(self, _vpc: ec2.Vpc) -> None:
-        """Validate subnet capacity meets node scaling requirements.
+        """验证子网容量满足节点扩展需求 (≥1000 节点)。
 
-        Target: Support ≥1000 nodes
-        Formula: Available nodes ≈ Private App subnet IPs / 20 (IPs per node)
-
-        For /19 subnets: 8,192 IPs × 3 AZs = 24,576 IPs
-        Max nodes: 24,576 / 20 ≈ 1,228 nodes ✓
-
-        Note: VPC parameter reserved for future detailed capacity validation.
+        /19 子网: 8,192 IPs x 3 AZs / 20 IPs per node ≈ 1,228 节点。
         """
-        # Add annotation for capacity validation
         cdk.Annotations.of(self).add_info(
             "VPC Capacity: /19 private app subnets support ~1,200+ nodes "
             "(8,192 IPs × 3 AZs / 20 IPs per node)"
         )
 
     def _create_vpc_endpoint_security_group(self) -> ec2.SecurityGroup:
-        """Create security group for VPC endpoints.
+        """创建 VPC Endpoint 安全组。
 
-        Allows HTTPS (443) traffic only from Private and Isolated subnets,
-        following least-privilege principle. Public subnets access AWS services
-        via NAT Gateway → Internet, so they don't need VPC Endpoint access.
+        仅允许 Private/Isolated 子网的 HTTPS (443) 访问 (最小权限)。
+        Public 子网通过 NAT Gateway 访问 AWS 服务，无需 VPC Endpoint。
         """
         sg = ec2.SecurityGroup(
             self,
@@ -173,7 +116,6 @@ class NetworkStack(cdk.Stack):
             allow_all_outbound=False,
         )
 
-        # Allow HTTPS only from Private and Isolated subnets (least-privilege)
         for subnet in self.vpc.private_subnets + self.vpc.isolated_subnets:
             sg.add_ingress_rule(
                 peer=ec2.Peer.ipv4(subnet.ipv4_cidr_block),
@@ -186,13 +128,8 @@ class NetworkStack(cdk.Stack):
         return sg
 
     def _create_vpc_endpoints(self) -> None:
-        """Create VPC endpoints for AWS services.
-
-        Creates both Gateway and Interface endpoints:
-        - Gateway: S3 (no cost)
-        - Interface: ECR, CloudWatch, STS, SageMaker, EFS
-        """
-        # S3 Gateway endpoint (no additional cost)
+        """创建 VPC Endpoints (Gateway: S3; Interface: ECR/CloudWatch/STS/SageMaker/EFS)。"""
+        # S3 Gateway endpoint (免费)
         self.vpc.add_gateway_endpoint(
             "S3Endpoint",
             service=ec2.GatewayVpcEndpointAwsService.S3,
@@ -202,28 +139,20 @@ class NetworkStack(cdk.Stack):
             ],
         )
 
-        # Define interface endpoints
         interface_endpoints = [
-            # ECR endpoints (required for pulling container images)
             ("EcrApi", ec2.InterfaceVpcEndpointAwsService.ECR),
             ("EcrDkr", ec2.InterfaceVpcEndpointAwsService.ECR_DOCKER),
-            # CloudWatch endpoints (required for logging and metrics)
             ("CloudWatchLogs", ec2.InterfaceVpcEndpointAwsService.CLOUDWATCH_LOGS),
             ("CloudWatchMonitoring", ec2.InterfaceVpcEndpointAwsService.CLOUDWATCH),
-            # STS endpoint (required for IAM role assumption)
             ("Sts", ec2.InterfaceVpcEndpointAwsService.STS),
-            # SageMaker API endpoint (required for HyperPod operations)
             ("SageMakerApi", ec2.InterfaceVpcEndpointAwsService.SAGEMAKER_API),
             ("SageMakerRuntime", ec2.InterfaceVpcEndpointAwsService.SAGEMAKER_RUNTIME),
-            # EFS endpoint (required for SageMaker Spaces persistent storage)
             ("Efs", ec2.InterfaceVpcEndpointAwsService.ELASTIC_FILESYSTEM),
-            # SSM endpoints (for Systems Manager access)
             ("Ssm", ec2.InterfaceVpcEndpointAwsService.SSM),
             ("SsmMessages", ec2.InterfaceVpcEndpointAwsService.SSM_MESSAGES),
             ("Ec2Messages", ec2.InterfaceVpcEndpointAwsService.EC2_MESSAGES),
         ]
 
-        # Create interface endpoints
         for endpoint_id, service in interface_endpoints:
             self.vpc.add_interface_endpoint(
                 endpoint_id,
@@ -236,7 +165,7 @@ class NetworkStack(cdk.Stack):
             )
 
     def _create_outputs(self) -> None:
-        """Create CloudFormation outputs for cross-stack references."""
+        """创建 CloudFormation 输出。"""
         create_output(self, "VpcId", self.vpc.vpc_id, "VPC ID")
         create_output(self, "VpcCidr", self.vpc.vpc_cidr_block, "VPC CIDR block")
         create_output(

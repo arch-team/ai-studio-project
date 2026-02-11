@@ -1,8 +1,4 @@
-"""
-Utility modules for AI Training Platform CDK Stacks.
-
-This package contains helper functions and utilities used across multiple stacks.
-"""
+"""CDK Stack 通用工具模块。"""
 
 from .eks_helpers import create_eks_addon
 from .nag_suppressions import apply_nag_suppressions, apply_resource_suppression

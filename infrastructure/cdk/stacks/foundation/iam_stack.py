@@ -1,11 +1,6 @@
-"""
-IAM Stack for AI Training Platform.
+"""IAM Stack — 最小权限 IAM 角色和策略。
 
-This stack creates IAM roles and policies following least-privilege principle:
-- EKS node roles for GPU compute
-- Service account roles for Kubernetes workloads (IRSA)
-- Application roles for backend services
-- Cross-account access policies (if needed)
+EKS 节点角色 / 训练执行角色 / 后端服务角色 / KMS 使用策略。
 """
 
 from typing import Any
@@ -20,25 +15,7 @@ from utils.outputs import create_output
 
 
 class IamStack(cdk.Stack):
-    """IAM Roles and Policies Stack following least-privilege principle.
-
-    This stack creates:
-    - EKS node instance role (for EC2 nodes in the cluster)
-    - Training job execution role (for HyperPod training jobs)
-    - Backend service role (for FastAPI application)
-    - S3 access policies for storage operations
-
-    All roles follow AWS Well-Architected security best practices:
-    - Least privilege permissions
-    - Role separation by function
-    - Session policies for temporary access
-    - Condition keys for enhanced security
-
-    Attributes:
-        eks_node_role: IAM role for EKS worker nodes
-        training_execution_role: IAM role for training job execution
-        backend_service_role: IAM role for backend application
-    """
+    """IAM Stack — 最小权限角色和策略。"""
 
     def __init__(
         self,
@@ -57,46 +34,32 @@ class IamStack(cdk.Stack):
             f"arn:aws:kms:{env_config.region}:{env_config.account}:key/*"
         ]
 
-        # Create IAM roles
         self._eks_node_role = self._create_eks_node_role()
         self._training_execution_role = self._create_training_execution_role()
         self._backend_service_role = self._create_backend_service_role()
-
-        # Create shared policies
         self._create_shared_policies()
 
         # 资源级 Nag 抑制 (替代 Stack 级 IAM5 抑制)
         self._apply_nag_suppressions()
 
-        # Export outputs
         self._create_outputs()
 
     def _create_eks_node_role(self) -> iam.Role:
-        """Create IAM role for EKS worker nodes.
-
-        This role is assumed by EC2 instances running as EKS nodes.
-        Includes permissions for:
-        - EKS worker node operations
-        - ECR image pulling
-        - CloudWatch logging
-        - SSM for node management
-        """
+        """创建 EKS 工作节点 IAM 角色 (ECR/CloudWatch/SSM)。"""
         role = iam.Role(
             self,
             "EksNodeRole",
             role_name=f"{self.env_config.resource_prefix}-eks-node-role",
             description="IAM role for EKS worker nodes",
             assumed_by=iam.ServicePrincipal("ec2.amazonaws.com"),
-            # Session duration for long-running nodes
-            max_session_duration=cdk.Duration.hours(12),
+                max_session_duration=cdk.Duration.hours(12),
         )
 
-        # Attach AWS managed policies for EKS nodes
         managed_policies = [
             "AmazonEKSWorkerNodePolicy",
             "AmazonEKS_CNI_Policy",
             "AmazonEC2ContainerRegistryReadOnly",
-            "AmazonSSMManagedInstanceCore",  # For Systems Manager access
+            "AmazonSSMManagedInstanceCore",
         ]
 
         for policy_name in managed_policies:
@@ -104,7 +67,6 @@ class IamStack(cdk.Stack):
                 iam.ManagedPolicy.from_aws_managed_policy_name(policy_name)
             )
 
-        # Add CloudWatch Logs permissions
         role.add_to_policy(
             iam.PolicyStatement(
                 sid="CloudWatchLogsPermissions",
@@ -123,7 +85,6 @@ class IamStack(cdk.Stack):
             )
         )
 
-        # Add CloudWatch Metrics permissions (for HyperPod Observability)
         role.add_to_policy(
             iam.PolicyStatement(
                 sid="CloudWatchMetricsPermissions",
@@ -181,22 +142,14 @@ class IamStack(cdk.Stack):
         return [f"{prefix}:{rt}/*" for rt in resource_types]
 
     def _create_training_execution_role(self) -> iam.Role:
-        """Create IAM role for training job execution.
-
-        This role is assumed by training jobs via IRSA (IAM Roles for Service Accounts).
-        Includes permissions for:
-        - S3 access for datasets, models, checkpoints
-        - SageMaker HyperPod operations
-        - CloudWatch metrics publishing
-        - FSx for Lustre access
-        """
+        """创建训练任务执行角色 (IRSA: S3/SageMaker/CloudWatch/FSx)。"""
         role = iam.Role(
             self,
             "TrainingExecutionRole",
             role_name=f"{self.env_config.resource_prefix}-training-execution-role",
             description="IAM role for HyperPod training job execution",
             assumed_by=iam.CompositePrincipal(
-                # Allow EKS service accounts via IRSA (with OIDC condition to prevent Confused Deputy)
+                # IRSA: OIDC 条件防止 Confused Deputy 攻击
                 iam.FederatedPrincipal(
                     federated=f"arn:aws:iam::{self.env_config.account}:oidc-provider/oidc.eks.{self.env_config.region}.amazonaws.com",
                     conditions={
@@ -209,13 +162,11 @@ class IamStack(cdk.Stack):
                     },
                     assume_role_action="sts:AssumeRoleWithWebIdentity",
                 ),
-                # Allow SageMaker service
                 iam.ServicePrincipal("sagemaker.amazonaws.com"),
             ),
             max_session_duration=cdk.Duration.hours(12),
         )
 
-        # S3 permissions for training data access
         role.add_to_policy(
             iam.PolicyStatement(
                 sid="S3TrainingDataAccess",
@@ -232,7 +183,6 @@ class IamStack(cdk.Stack):
             )
         )
 
-        # SageMaker permissions for HyperPod operations
         role.add_to_policy(
             iam.PolicyStatement(
                 sid="SageMakerHyperPodAccess",
@@ -241,7 +191,6 @@ class IamStack(cdk.Stack):
                     "sagemaker:DescribeCluster",
                     "sagemaker:ListClusterNodes",
                     "sagemaker:UpdateCluster",
-                    # Training job operations
                     "sagemaker:CreateTrainingJob",
                     "sagemaker:DescribeTrainingJob",
                     "sagemaker:StopTrainingJob",
@@ -251,7 +200,6 @@ class IamStack(cdk.Stack):
             )
         )
 
-        # CloudWatch metrics for training monitoring
         role.add_to_policy(
             iam.PolicyStatement(
                 sid="CloudWatchMetricsTraining",
@@ -266,7 +214,6 @@ class IamStack(cdk.Stack):
             )
         )
 
-        # FSx for Lustre access
         role.add_to_policy(
             iam.PolicyStatement(
                 sid="FSxLustreAccess",
@@ -288,15 +235,7 @@ class IamStack(cdk.Stack):
         return role
 
     def _create_backend_service_role(self) -> iam.Role:
-        """Create IAM role for backend FastAPI application.
-
-        This role is assumed by the backend service pods via IRSA.
-        Includes permissions for:
-        - SageMaker HyperPod API access
-        - S3 metadata operations
-        - Secrets Manager for database credentials
-        - CloudWatch for application logging
-        """
+        """创建后端 FastAPI 服务角色 (IRSA: SageMaker/S3/SecretsManager/CloudWatch)。"""
         role = iam.Role(
             self,
             "BackendServiceRole",
@@ -317,7 +256,6 @@ class IamStack(cdk.Stack):
             max_session_duration=cdk.Duration.hours(12),
         )
 
-        # SageMaker HyperPod read permissions (for status queries)
         role.add_to_policy(
             iam.PolicyStatement(
                 sid="SageMakerReadAccess",
@@ -332,7 +270,6 @@ class IamStack(cdk.Stack):
             )
         )
 
-        # S3 metadata operations (for dataset/model management)
         role.add_to_policy(
             iam.PolicyStatement(
                 sid="S3MetadataAccess",
@@ -348,7 +285,6 @@ class IamStack(cdk.Stack):
             )
         )
 
-        # Presigned URL generation permissions
         role.add_to_policy(
             iam.PolicyStatement(
                 sid="S3PresignedUrlAccess",
@@ -361,7 +297,6 @@ class IamStack(cdk.Stack):
             )
         )
 
-        # Secrets Manager for database credentials
         role.add_to_policy(
             iam.PolicyStatement(
                 sid="SecretsManagerAccess",
@@ -376,7 +311,6 @@ class IamStack(cdk.Stack):
             )
         )
 
-        # CloudWatch Logs for application logging
         role.add_to_policy(
             iam.PolicyStatement(
                 sid="CloudWatchLogsAccess",
@@ -419,8 +353,7 @@ class IamStack(cdk.Stack):
         )
 
     def _create_shared_policies(self) -> None:
-        """Create shared IAM policies that can be attached to multiple roles."""
-        # KMS key usage policy (for S3 encryption)
+        """创建可复用的 IAM 策略 (KMS 密钥使用)。"""
         self._kms_usage_policy = iam.ManagedPolicy(
             self,
             "KmsUsagePolicy",
@@ -447,12 +380,11 @@ class IamStack(cdk.Stack):
             ],
         )
 
-        # Attach KMS policy to roles that need S3 access
         self._training_execution_role.add_managed_policy(self._kms_usage_policy)
         self._backend_service_role.add_managed_policy(self._kms_usage_policy)
 
     def _create_outputs(self) -> None:
-        """Create CloudFormation outputs for cross-stack references."""
+        """创建 CloudFormation 输出。"""
         create_output(
             self,
             "EksNodeRoleArn",

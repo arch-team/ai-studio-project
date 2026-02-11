@@ -1,17 +1,7 @@
-"""
-EKS Stack for AI Training Platform.
+"""EKS Stack — HyperPod 编排基础。
 
-This stack creates Amazon EKS cluster as the foundation for HyperPod:
-- Amazon EKS cluster with Kubernetes 1.33+
-- EKS add-ons (EBS CSI, FSx CSI, VPC CNI, CoreDNS, kube-proxy)
-- IAM roles for IRSA (IAM Roles for Service Accounts)
-- HyperPod Helm Chart dependencies (auto-installed)
-
-Prerequisites:
-    Run ./scripts/setup_helm_chart.sh before deploying this stack
-    to download and prepare the HyperPod Helm Chart.
-
-Reference: https://docs.aws.amazon.com/sagemaker/latest/dg/sagemaker-hyperpod-eks-install-packages-using-helm-chart.html
+创建 EKS 集群、Add-ons、IRSA 角色和 HyperPod Helm Chart 依赖。
+前提: 部署前需运行 ./scripts/setup_helm_chart.sh 下载 Helm Chart。
 """
 
 from typing import Any
@@ -31,18 +21,11 @@ from utils.eks_helpers import create_eks_addon
 from utils.iam_helpers import add_policy_statement, create_irsa_role
 from utils.outputs import create_output
 
-# Path to the HyperPod Helm Chart (centralized in ProjectPaths)
 HELM_CHART_PATH = ProjectPaths.HYPERPOD_HELM_CHART
 
 
 class EksStack(cdk.Stack):
-    """Amazon EKS Stack for HyperPod orchestration.
-
-    创建 EKS 集群、EKS Add-ons、IRSA 角色和 HyperPod Helm Chart 依赖。
-
-    Prerequisites:
-        Run ./scripts/setup_helm_chart.sh before deploying this stack.
-    """
+    """EKS Stack — 创建 EKS 集群、Add-ons、IRSA 角色和 HyperPod Helm Chart。"""
 
     def __init__(
         self,
@@ -59,13 +42,9 @@ class EksStack(cdk.Stack):
         self._vpc = vpc
         self._eks_node_role = eks_node_role
 
-        # Create EKS cluster
         self._eks_cluster = self._create_eks_cluster()
-
-        # Create System Node Group for control plane workloads
         self._create_system_node_group()
 
-        # Create GPU Node Groups (P4d, P5, Trn1)
         self._gpu_node_groups = create_default_gpu_node_groups(
             scope=self,
             env_config=self.env_config,
@@ -75,19 +54,14 @@ class EksStack(cdk.Stack):
             vpc=self._vpc,
         )
 
-        # Install EKS add-ons (including cert-manager community add-on)
         self._install_eks_addons()
-
-        # Install HyperPod Helm Chart dependencies (depends on cert-manager add-on)
         self._install_hyperpod_helm_chart()
-
-        # Create outputs
         self._create_outputs()
 
     def _create_eks_cluster(self) -> eks.Cluster:
         eks_config = self.env_config.eks
 
-        # Create EKS cluster admin role (限制仅 EKSAdmin 标签用户可 assume)
+        # 限制仅 EKSAdmin 标签用户可 assume
         cluster_admin_role = iam.Role(
             self,
             "ClusterAdminRole",
@@ -100,7 +74,6 @@ class EksStack(cdk.Stack):
             description="Admin role for EKS cluster management",
         )
 
-        # Create EKS cluster with official kubectl layer for K8s 1.33
         cluster = eks.Cluster(
             self,
             "EksCluster",
@@ -110,12 +83,10 @@ class EksStack(cdk.Stack):
             vpc_subnets=[
                 ec2.SubnetSelection(subnet_type=ec2.SubnetType.PRIVATE_WITH_EGRESS)
             ],
-            default_capacity=0,  # We'll manage node groups separately
+            default_capacity=0,  # 由独立节点组管理
             endpoint_access=eks.EndpointAccess.PRIVATE,
             masters_role=cluster_admin_role,
-            # Official kubectl layer for K8s 1.33
             kubectl_layer=KubectlV33Layer(self, "KubectlLayer"),
-            # Cluster logging
             cluster_logging=[
                 eks.ClusterLoggingTypes.API,
                 eks.ClusterLoggingTypes.AUDIT,
@@ -123,11 +94,10 @@ class EksStack(cdk.Stack):
                 eks.ClusterLoggingTypes.CONTROLLER_MANAGER,
                 eks.ClusterLoggingTypes.SCHEDULER,
             ],
-            # Authentication mode for HyperPod compatibility
+            # HyperPod 兼容性要求 API_AND_CONFIG_MAP 模式
             authentication_mode=eks.AuthenticationMode.API_AND_CONFIG_MAP,
         )
 
-        # Add cluster-level tags
         cdk.Tags.of(cluster).add("Name", f"{self.env_config.resource_prefix}-eks")
         cdk.Tags.of(cluster).add("kubernetes.io/cluster-type", "hyperpod-orchestrator")
 
@@ -287,57 +257,36 @@ class EksStack(cdk.Stack):
         )
 
     def _install_hyperpod_helm_chart(self) -> None:
-        """Install HyperPod Helm Chart dependencies.
-
-        This installs the HyperPod Helm Chart which includes:
-        - Health monitoring agent (required for cluster monitoring)
-        - Deep health check (for HyperPod deep health check feature)
-        - Job auto-restart (for PyTorch training job auto-restart)
-        - Kubeflow MPI operator (for distributed ML workloads)
-        - NVIDIA device plugin (for GPU instances)
-        - Neuron device plugin (for Trainium/Inferentia instances)
-        - AWS EFA device plugin (for Elastic Fabric Adapter)
-        - Training operators (Kubeflow training operators)
-
-        Prerequisites:
-            Run ./scripts/setup_helm_chart.sh to download the Helm Chart first.
+        """安装 HyperPod Helm Chart (监控、设备插件、训练 Operator 等)。
 
         Raises:
-            FileNotFoundError: If the Helm Chart is not found at the expected path.
+            FileNotFoundError: Helm Chart 不在预期路径时
         """
-        # Check if Helm Chart exists
         if not HELM_CHART_PATH.exists():
             raise FileNotFoundError(
                 f"HyperPod Helm Chart not found at {HELM_CHART_PATH}. "
                 "Please run ./scripts/setup_helm_chart.sh first to download the Helm Chart."
             )
 
-        # Create S3 Asset from the Helm Chart directory
         helm_chart_asset = s3_assets.Asset(
             self,
             "HyperPodHelmChartAsset",
             path=str(HELM_CHART_PATH),
         )
 
-        # Install HyperPod Helm Chart using the EKS cluster's addHelmChart method
-        # Note: We use chart_asset to install from the local packaged chart
-        # Increase timeout to 15 minutes for complex chart with many dependencies
-        # Skip CRDs if they already exist from previous installations
+        # 超时 15 分钟: 多组件 Chart 安装耗时较长
         hyperpod_chart = self._eks_cluster.add_helm_chart(
             "HyperPodDependencies",
             chart_asset=helm_chart_asset,
             namespace="kube-system",
             release="hyperpod-dependencies",
-            wait=False,  # Don't wait for pods to be ready (no nodes yet)
+            wait=False,  # 集群无节点时无需等待 Pod 就绪
             timeout=cdk.Duration.minutes(15),
-            skip_crds=True,  # Skip CRDs that may already exist
-            # Custom values for HyperPod configuration
+            skip_crds=True,
             values={
-                # Global settings
                 "global": {
                     "region": self.env_config.region,
                 },
-                # Enable required components
                 "trainingOperators": {
                     "enabled": True,
                 },
@@ -356,7 +305,6 @@ class EksStack(cdk.Stack):
                 "hyperpod-patching": {
                     "enabled": True,
                 },
-                # Device plugins
                 "nvidia-device-plugin": {
                     "devicePlugin": {
                         "enabled": True,
@@ -372,26 +320,18 @@ class EksStack(cdk.Stack):
                         "enabled": True,
                     },
                 },
-                # cert-manager is installed separately via its own Helm Chart
+                # cert-manager 已通过独立 EKS add-on 安装
                 "cert-manager": {
-                    "enabled": False,  # Installed separately before HyperPod dependencies
+                    "enabled": False,
                 },
-                "mlflow": {
-                    "enabled": False,  # Optional
-                },
-                "storage": {
-                    "enabled": False,  # Using EKS add-ons for storage
-                },
-                "inferenceOperators": {
-                    "enabled": False,  # Enable when inference is needed
-                },
-                "gpu-operator": {
-                    "enabled": False,  # Using nvidia-device-plugin instead
-                },
+                "mlflow": {"enabled": False},
+                "storage": {"enabled": False},  # 使用 EKS add-ons 管理存储
+                "inferenceOperators": {"enabled": False},
+                "gpu-operator": {"enabled": False},  # 使用 nvidia-device-plugin 替代
             },
         )
 
-        # Ensure HyperPod dependencies are installed after cert-manager
+        # HyperPod Training Operator webhook 依赖 cert-manager 签发证书
         hyperpod_chart.node.add_dependency(self._cert_manager_addon)
 
     def _create_outputs(self) -> None:
@@ -424,7 +364,6 @@ class EksStack(cdk.Stack):
             "EKS OIDC provider ARN for IRSA",
             export_name=f"{prefix}-eks-oidc-arn",
         )
-        # Informational outputs (no export_name needed)
         cdk.CfnOutput(
             self,
             "KubeconfigCommand",

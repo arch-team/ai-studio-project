@@ -52,14 +52,6 @@ class PlatformKmsKey(Construct):
         env_config: EnvironmentConfig,
         config: KmsKeyConfig,
     ) -> None:
-        """Initialize PlatformKmsKey.
-
-        Args:
-            scope: CDK construct scope
-            construct_id: Construct identifier
-            env_config: Environment configuration
-            config: KMS Key configuration
-        """
         super().__init__(scope, construct_id)
 
         alias_name = f"alias/{env_config.resource_prefix}-{config.alias_suffix}-key"
@@ -79,5 +71,4 @@ class PlatformKmsKey(Construct):
 
     @property
     def key(self) -> kms.IKey:
-        """Get the KMS Key."""
         return self._key
