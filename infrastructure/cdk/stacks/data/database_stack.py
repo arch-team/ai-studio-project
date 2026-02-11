@@ -9,6 +9,8 @@ This stack creates Aurora MySQL Serverless v2 with:
 - Encryption at rest using AWS managed keys
 """
 
+from typing import Any
+
 import aws_cdk as cdk
 from aws_cdk import Duration
 from aws_cdk import aws_ec2 as ec2
@@ -47,7 +49,7 @@ class DatabaseStack(cdk.Stack):
         env_config: EnvironmentConfig,
         vpc: ec2.IVpc,
         storage_encryption_key: kms.IKey | None = None,
-        **kwargs,
+        **kwargs: Any,
     ) -> None:
         # storage_encryption_key: 自定义 KMS Key 用于存储加密 (None 则使用 AWS managed key)
         super().__init__(scope, construct_id, **kwargs)

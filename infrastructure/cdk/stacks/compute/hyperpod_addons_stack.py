@@ -18,6 +18,8 @@ Reference:
 - https://docs.aws.amazon.com/eks/latest/userguide/workloads-add-ons-available-eks.html
 """
 
+from typing import Any
+
 import aws_cdk as cdk
 from aws_cdk import aws_eks as eks
 from aws_cdk import aws_iam as iam
@@ -50,7 +52,7 @@ class HyperPodAddonsStack(cdk.Stack):
         construct_id: str,
         env_config: EnvironmentConfig,
         eks_cluster: eks.ICluster,
-        **kwargs,
+        **kwargs: Any,
     ) -> None:
         super().__init__(scope, construct_id, **kwargs)
 

@@ -6,6 +6,8 @@ This stack creates application deployment resources:
 - Image lifecycle policy for cost optimization
 """
 
+from typing import Any
+
 import aws_cdk as cdk
 from aws_cdk import aws_ecr as ecr
 
@@ -30,7 +32,7 @@ class ApplicationStack(cdk.Stack):
         scope: Construct,
         construct_id: str,
         env_config: EnvironmentConfig,
-        **kwargs,
+        **kwargs: Any,
     ) -> None:
         super().__init__(scope, construct_id, **kwargs)
 

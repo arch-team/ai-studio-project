@@ -15,6 +15,8 @@ Reference: spec.md NFR-001 (FSx capacity planning formula),
           FR-007 (≥5GB/s single client throughput)
 """
 
+from typing import Any
+
 import aws_cdk as cdk
 from aws_cdk import aws_ec2 as ec2
 from aws_cdk import aws_fsx as fsx
@@ -65,7 +67,7 @@ class FsxLustreStack(cdk.Stack):
         vpc: ec2.IVpc,
         datasets_bucket: s3.IBucket,
         eks_security_group: ec2.ISecurityGroup | None = None,
-        **kwargs,
+        **kwargs: Any,
     ) -> None:
         super().__init__(scope, construct_id, **kwargs)
 

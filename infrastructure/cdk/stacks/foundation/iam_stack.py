@@ -8,6 +8,8 @@ This stack creates IAM roles and policies following least-privilege principle:
 - Cross-account access policies (if needed)
 """
 
+from typing import Any
+
 import aws_cdk as cdk
 from aws_cdk import aws_iam as iam
 
@@ -44,7 +46,7 @@ class IamStack(cdk.Stack):
         construct_id: str,
         env_config: EnvironmentConfig,
         kms_key_arns: list[str] | None = None,
-        **kwargs,
+        **kwargs: Any,
     ) -> None:
         # kms_key_arns: 为 None 时使用 account 级别 ARN 模式
         super().__init__(scope, construct_id, **kwargs)
@@ -166,6 +168,18 @@ class IamStack(cdk.Stack):
             arns.append(f"arn:aws:s3:::{bucket_name}/*")
         return arns
 
+    def _sagemaker_resource_arns(self, *resource_types: str) -> list[str]:
+        """生成 SageMaker 资源的 ARN 列表。
+
+        Args:
+            *resource_types: SageMaker 资源类型 (如 "cluster", "training-job")
+
+        Returns:
+            SageMaker 资源 ARN 列表 (每个类型使用通配符 /*)
+        """
+        prefix = f"arn:aws:sagemaker:{self.env_config.region}:{self.env_config.account}"
+        return [f"{prefix}:{rt}/*" for rt in resource_types]
+
     def _create_training_execution_role(self) -> iam.Role:
         """Create IAM role for training job execution.
 
@@ -233,10 +247,7 @@ class IamStack(cdk.Stack):
                     "sagemaker:StopTrainingJob",
                     "sagemaker:ListTrainingJobs",
                 ],
-                resources=[
-                    f"arn:aws:sagemaker:{self.env_config.region}:{self.env_config.account}:cluster/*",
-                    f"arn:aws:sagemaker:{self.env_config.region}:{self.env_config.account}:training-job/*",
-                ],
+                resources=self._sagemaker_resource_arns("cluster", "training-job"),
             )
         )
 
@@ -317,10 +328,7 @@ class IamStack(cdk.Stack):
                     "sagemaker:DescribeTrainingJob",
                     "sagemaker:ListTrainingJobs",
                 ],
-                resources=[
-                    f"arn:aws:sagemaker:{self.env_config.region}:{self.env_config.account}:cluster/*",
-                    f"arn:aws:sagemaker:{self.env_config.region}:{self.env_config.account}:training-job/*",
-                ],
+                resources=self._sagemaker_resource_arns("cluster", "training-job"),
             )
         )
 

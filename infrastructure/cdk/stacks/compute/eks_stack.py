@@ -14,6 +14,8 @@ Prerequisites:
 Reference: https://docs.aws.amazon.com/sagemaker/latest/dg/sagemaker-hyperpod-eks-install-packages-using-helm-chart.html
 """
 
+from typing import Any
+
 import aws_cdk as cdk
 from aws_cdk import aws_ec2 as ec2
 from aws_cdk import aws_eks as eks
@@ -49,7 +51,7 @@ class EksStack(cdk.Stack):
         env_config: EnvironmentConfig,
         vpc: ec2.IVpc,
         eks_node_role: iam.IRole,
-        **kwargs,
+        **kwargs: Any,
     ) -> None:
         super().__init__(scope, construct_id, **kwargs)
 

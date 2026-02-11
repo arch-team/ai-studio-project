@@ -12,6 +12,8 @@ All traffic is encrypted with TLS 1.2+ and HTTP is redirected to HTTPS.
 Reference: spec.md FR-018 (Transport layer encryption requirements)
 """
 
+from typing import Any
+
 import aws_cdk as cdk
 from aws_cdk import Duration
 from aws_cdk import aws_certificatemanager as acm
@@ -48,7 +50,7 @@ class AlbStack(cdk.Stack):
         vpc: ec2.IVpc,
         certificate_arn: str | None = None,
         enable_waf: bool = False,
-        **kwargs,
+        **kwargs: Any,
     ) -> None:
         # certificate_arn 为 None 时进入 HTTP-only 模式 (dev 环境)
         super().__init__(scope, construct_id, **kwargs)

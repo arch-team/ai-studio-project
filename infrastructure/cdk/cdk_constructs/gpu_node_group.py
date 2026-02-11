@@ -9,6 +9,7 @@ This construct creates GPU node groups for SageMaker HyperPod with:
 """
 
 from dataclasses import dataclass, field
+from typing import Any
 
 import aws_cdk as cdk
 from aws_cdk import aws_ec2 as ec2
@@ -34,8 +35,8 @@ class GpuNodeGroupConfig:
         desired_size: Desired number of nodes
         disk_size: Root volume size in GB
         capacity_type: 容量类型 (ON_DEMAND 或 SPOT)
-        labels: Kubernetes labels for the nodes (immutable mapping)
-        taints: Kubernetes taints for the nodes (immutable tuple)
+        labels: Kubernetes labels for the nodes (创建后不应修改内容)
+        taints: Kubernetes taints for the nodes (创建后不应修改内容)
     """
 
     name: str
@@ -73,7 +74,7 @@ class GpuNodeGroupConstruct(Construct):
         node_group_config: GpuNodeGroupConfig,
         subnets: ec2.SubnetSelection,
         vpc: ec2.IVpc,
-        **kwargs,
+        **kwargs: Any,
     ) -> None:
         """Initialize GPU Node Group construct.
 

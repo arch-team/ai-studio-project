@@ -13,6 +13,8 @@ All buckets are configured with:
 - HTTPS-only bucket policy
 """
 
+from typing import Any
+
 import aws_cdk as cdk
 from aws_cdk import Duration
 from aws_cdk import aws_iam as iam
@@ -52,7 +54,7 @@ class StorageStack(cdk.Stack):
         construct_id: str,
         env_config: EnvironmentConfig,
         encryption_key: kms.IKey | None = None,
-        **kwargs,
+        **kwargs: Any,
     ) -> None:
         # encryption_key: KMS Key 用于 S3 加密 (必需，禁止降级到 S3_MANAGED)
         super().__init__(scope, construct_id, **kwargs)

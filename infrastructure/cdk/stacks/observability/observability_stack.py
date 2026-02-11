@@ -11,6 +11,8 @@ Reference:
 - https://docs.aws.amazon.com/sagemaker/latest/dg/hyperpod-observability-addon-setup.html
 """
 
+from typing import Any
+
 import aws_cdk as cdk
 from aws_cdk import aws_aps as aps
 from aws_cdk import aws_eks as eks
@@ -43,7 +45,7 @@ class ObservabilityStack(cdk.Stack):
         construct_id: str,
         env_config: EnvironmentConfig,
         eks_cluster: eks.ICluster,
-        **kwargs,
+        **kwargs: Any,
     ) -> None:
         super().__init__(scope, construct_id, **kwargs)
 

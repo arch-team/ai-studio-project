@@ -4,160 +4,170 @@ CDK Nag 抑制规则的集中管理。
 此模块提供统一的接口来管理所有 Stack 的 Nag 抑制规则。
 """
 
+from typing import TypedDict
+
 import aws_cdk as cdk
 from cdk_nag import NagSuppressions
 
 from constructs import IConstruct
 
+
+class NagSuppression(TypedDict):
+    """CDK Nag 抑制规则的类型定义。"""
+
+    id: str
+    reason: str
+
+
 # 各 Stack 特定的抑制规则
-STACK_SPECIFIC_SUPPRESSIONS = {
+STACK_SPECIFIC_SUPPRESSIONS: dict[str, list[NagSuppression]] = {
     "network": [
-        {
-            "id": "AwsSolutions-VPC7",
-            "reason": "VPC Flow Logs are explicitly enabled in the stack",
-        },
-        {
-            "id": "AwsSolutions-EC23",
-            "reason": "VPC endpoint security group uses Fn::GetAtt for CIDR which CDK Nag cannot validate",
-        },
+        NagSuppression(
+            id="AwsSolutions-VPC7",
+            reason="VPC Flow Logs are explicitly enabled in the stack",
+        ),
+        NagSuppression(
+            id="AwsSolutions-EC23",
+            reason="VPC endpoint security group uses Fn::GetAtt for CIDR which CDK Nag cannot validate",
+        ),
     ],
     "iam": [
-        {
-            "id": "AwsSolutions-IAM4",
-            "reason": "AWS managed policies are used for EKS node roles following AWS best practices",
-        },
-        {
-            "id": "AwsSolutions-IAM5",
-            "reason": "S3 object-level wildcards (bucket/*), SageMaker resource wildcards (cluster/*, training-job/*), "
+        NagSuppression(
+            id="AwsSolutions-IAM4",
+            reason="AWS managed policies are used for EKS node roles following AWS best practices",
+        ),
+        NagSuppression(
+            id="AwsSolutions-IAM5",
+            reason="S3 object-level wildcards (bucket/*), SageMaker resource wildcards (cluster/*, training-job/*), "
             "CloudWatch metrics (resources=[*] with namespace condition), "
             "and KMS key pattern (account-scoped with kms:ViaService condition) are intentional least-privilege scoping",
-        },
+        ),
     ],
     "database": [
-        {
-            "id": "AwsSolutions-RDS10",
-            "reason": "Deletion protection is enabled for production environments only",
-        },
-        {
-            "id": "AwsSolutions-RDS11",
-            "reason": "Using default port is acceptable for dev environment; production will use custom port",
-        },
-        {
-            "id": "AwsSolutions-RDS14",
-            "reason": "Backtrack is not required for dev environment; will be enabled for production",
-        },
-        {
-            "id": "AwsSolutions-SMG4",
-            "reason": "Secret rotation will be configured in a separate security enhancement task",
-        },
-        {
-            "id": "AwsSolutions-IAM4",
-            "reason": "AWS managed policies used for Lambda log retention custom resource",
-        },
-        {
-            "id": "AwsSolutions-IAM5",
-            "reason": "Wildcard permissions required for Lambda log retention custom resource",
-        },
+        NagSuppression(
+            id="AwsSolutions-RDS10",
+            reason="Deletion protection is enabled for production environments only",
+        ),
+        NagSuppression(
+            id="AwsSolutions-RDS11",
+            reason="Using default port is acceptable for dev environment; production will use custom port",
+        ),
+        NagSuppression(
+            id="AwsSolutions-RDS14",
+            reason="Backtrack is not required for dev environment; will be enabled for production",
+        ),
+        NagSuppression(
+            id="AwsSolutions-SMG4",
+            reason="Secret rotation will be configured in a separate security enhancement task",
+        ),
+        NagSuppression(
+            id="AwsSolutions-IAM4",
+            reason="AWS managed policies used for Lambda log retention custom resource",
+        ),
+        NagSuppression(
+            id="AwsSolutions-IAM5",
+            reason="Wildcard permissions required for Lambda log retention custom resource",
+        ),
     ],
     "storage": [
-        {
-            "id": "AwsSolutions-S1",
-            "reason": "Server access logging will be configured when log bucket is created",
-        },
+        NagSuppression(
+            id="AwsSolutions-S1",
+            reason="Server access logging will be configured when log bucket is created",
+        ),
     ],
     "eks": [
-        {
-            "id": "AwsSolutions-IAM4",
-            "reason": "AWS managed policies used for EKS add-ons and CDK custom resources",
-        },
-        {
-            "id": "AwsSolutions-IAM5",
-            "reason": "Wildcard permissions required for EKS cluster management and CDK custom resources",
-        },
-        {
-            "id": "AwsSolutions-EKS1",
-            "reason": "EKS cluster has private endpoint access enabled",
-        },
-        {
-            "id": "AwsSolutions-L1",
-            "reason": "Lambda runtime version is managed by CDK construct library for EKS and kubectl providers",
-        },
-        {
-            "id": "AwsSolutions-SF1",
-            "reason": "Step Function logging is managed by CDK EKS construct; acceptable for dev environment",
-        },
-        {
-            "id": "AwsSolutions-SF2",
-            "reason": "X-Ray tracing is managed by CDK EKS construct; acceptable for dev environment",
-        },
+        NagSuppression(
+            id="AwsSolutions-IAM4",
+            reason="AWS managed policies used for EKS add-ons and CDK custom resources",
+        ),
+        NagSuppression(
+            id="AwsSolutions-IAM5",
+            reason="Wildcard permissions required for EKS cluster management and CDK custom resources",
+        ),
+        NagSuppression(
+            id="AwsSolutions-EKS1",
+            reason="EKS cluster has private endpoint access enabled",
+        ),
+        NagSuppression(
+            id="AwsSolutions-L1",
+            reason="Lambda runtime version is managed by CDK construct library for EKS and kubectl providers",
+        ),
+        NagSuppression(
+            id="AwsSolutions-SF1",
+            reason="Step Function logging is managed by CDK EKS construct; acceptable for dev environment",
+        ),
+        NagSuppression(
+            id="AwsSolutions-SF2",
+            reason="X-Ray tracing is managed by CDK EKS construct; acceptable for dev environment",
+        ),
     ],
     "sagemaker-hyperpod": [
-        {
-            "id": "AwsSolutions-IAM4",
-            "reason": "AWS managed policies used for HyperPod execution role",
-        },
-        {
-            "id": "AwsSolutions-IAM5",
-            "reason": "Wildcard permissions required for EC2 network access and ECR operations",
-        },
-        {
-            "id": "AwsSolutions-S1",
-            "reason": "Lifecycle scripts bucket access logging will be configured in production",
-        },
-        {
-            "id": "AwsSolutions-L1",
-            "reason": "Lambda runtime version is managed by CDK construct library for S3 deployment",
-        },
+        NagSuppression(
+            id="AwsSolutions-IAM4",
+            reason="AWS managed policies used for HyperPod execution role",
+        ),
+        NagSuppression(
+            id="AwsSolutions-IAM5",
+            reason="Wildcard permissions required for EC2 network access and ECR operations",
+        ),
+        NagSuppression(
+            id="AwsSolutions-S1",
+            reason="Lifecycle scripts bucket access logging will be configured in production",
+        ),
+        NagSuppression(
+            id="AwsSolutions-L1",
+            reason="Lambda runtime version is managed by CDK construct library for S3 deployment",
+        ),
     ],
     "fsx": [
-        {
-            "id": "AwsSolutions-EC23",
-            "reason": "FSx security group allows VPC CIDR access for Lustre client connectivity",
-        },
+        NagSuppression(
+            id="AwsSolutions-EC23",
+            reason="FSx security group allows VPC CIDR access for Lustre client connectivity",
+        ),
     ],
     "hyperpod-addons": [
-        {
-            "id": "AwsSolutions-IAM4",
-            "reason": "AWS managed policies used for HyperPod Training Operator Pod Identity",
-        },
-        {
-            "id": "AwsSolutions-IAM5",
-            "reason": "Wildcard permissions required for HyperPod add-on operations",
-        },
+        NagSuppression(
+            id="AwsSolutions-IAM4",
+            reason="AWS managed policies used for HyperPod Training Operator Pod Identity",
+        ),
+        NagSuppression(
+            id="AwsSolutions-IAM5",
+            reason="Wildcard permissions required for HyperPod add-on operations",
+        ),
     ],
     "application": [
-        {
-            "id": "AwsSolutions-IAM5",
-            "reason": "Wildcard permissions required for ECR auto-delete custom resource",
-        },
-        {
-            "id": "AwsSolutions-IAM4",
-            "reason": "AWS managed policies used for ECR custom resource Lambda",
-        },
-        {
-            "id": "AwsSolutions-L1",
-            "reason": "Lambda runtime version is managed by CDK construct library for ECR auto-delete",
-        },
+        NagSuppression(
+            id="AwsSolutions-IAM5",
+            reason="Wildcard permissions required for ECR auto-delete custom resource",
+        ),
+        NagSuppression(
+            id="AwsSolutions-IAM4",
+            reason="AWS managed policies used for ECR custom resource Lambda",
+        ),
+        NagSuppression(
+            id="AwsSolutions-L1",
+            reason="Lambda runtime version is managed by CDK construct library for ECR auto-delete",
+        ),
     ],
     "observability": [
-        {
-            "id": "AwsSolutions-IAM4",
-            "reason": "AWS managed policies used for Prometheus remote write access",
-        },
-        {
-            "id": "AwsSolutions-IAM5",
-            "reason": "Wildcard permissions required for Prometheus and observability operations",
-        },
+        NagSuppression(
+            id="AwsSolutions-IAM4",
+            reason="AWS managed policies used for Prometheus remote write access",
+        ),
+        NagSuppression(
+            id="AwsSolutions-IAM5",
+            reason="Wildcard permissions required for Prometheus and observability operations",
+        ),
     ],
     "alb": [
-        {
-            "id": "AwsSolutions-ELB2",
-            "reason": "ALB access logging will be enabled when S3 log bucket is configured",
-        },
-        {
-            "id": "AwsSolutions-EC23",
-            "reason": "ALB security group allows 0.0.0.0/0 for public internet access as designed",
-        },
+        NagSuppression(
+            id="AwsSolutions-ELB2",
+            reason="ALB access logging will be enabled when S3 log bucket is configured",
+        ),
+        NagSuppression(
+            id="AwsSolutions-EC23",
+            reason="ALB security group allows 0.0.0.0/0 for public internet access as designed",
+        ),
     ],
 }
 
@@ -216,5 +226,5 @@ def apply_resource_suppression(
     """
     NagSuppressions.add_resource_suppressions(
         construct,
-        [{"id": suppression_id, "reason": reason}],
+        [NagSuppression(id=suppression_id, reason=reason)],
     )
