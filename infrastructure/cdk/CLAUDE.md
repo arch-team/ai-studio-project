@@ -23,6 +23,11 @@ make check                      # lint + test 一键验证
 cdk synth                       # 合成模板
 cdk diff --context env=dev      # 查看变更
 cdk deploy --context env=dev    # 部署
+
+# 安全门控（部署前必须执行）
+make diff-check                 # dev 环境 diff 安全检查
+make diff-check-staging         # staging 环境 diff 安全检查
+make diff-check-prod            # prod 环境 diff 安全检查
 ```
 
 ---

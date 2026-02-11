@@ -11,7 +11,7 @@
 #   make deploy-dev    - Deploy to dev environment
 # =============================================================================
 
-.PHONY: help install lint format type-check test test-cov synth diff deploy-dev deploy-staging deploy-prod clean
+.PHONY: help install lint format type-check test test-cov synth diff deploy-dev deploy-staging deploy-prod diff-check diff-check-staging diff-check-prod clean
 
 # Default target
 .DEFAULT_GOAL := help
@@ -23,6 +23,10 @@ CDK := cdk
 PYTEST := pytest
 RUFF := ruff
 MYPY := mypy
+
+# 显式指定默认 region，避免环境变量 AWS_REGION 歧义
+AWS_REGION ?= us-east-1
+CDK_CMD := AWS_REGION=$(AWS_REGION) $(CDK)
 
 # Colors for output
 CYAN := \033[36m
@@ -49,6 +53,9 @@ help: ## Show this help message
 	@echo ""
 	@echo "$(GREEN)CDK Operations:$(RESET)"
 	@grep -E '^(synth|diff|deploy-dev|deploy-staging|deploy-prod):.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  $(CYAN)%-20s$(RESET) %s\n", $$1, $$2}'
+	@echo ""
+	@echo "$(GREEN)Safety Checks:$(RESET)"
+	@grep -E '^(diff-check|diff-check-staging|diff-check-prod):.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  $(CYAN)%-20s$(RESET) %s\n", $$1, $$2}'
 	@echo ""
 	@echo "$(GREEN)Utilities:$(RESET)"
 	@grep -E '^(clean|pre-commit-install|pre-commit-run):.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  $(CYAN)%-20s$(RESET) %s\n", $$1, $$2}'
@@ -124,52 +131,61 @@ test-integration: ## Run integration tests only
 synth: ## Synthesize CDK stacks (all environments)
 	@echo "$(CYAN)Synthesizing CDK stacks...$(RESET)"
 	@echo "$(YELLOW)Dev environment:$(RESET)"
-	$(CDK) synth --context env=dev --quiet
+	$(CDK_CMD) synth --context env=dev --quiet
 	@echo "$(YELLOW)Staging environment:$(RESET)"
-	$(CDK) synth --context env=staging --quiet
+	$(CDK_CMD) synth --context env=staging --quiet
 	@echo "$(YELLOW)Prod environment:$(RESET)"
-	$(CDK) synth --context env=prod --quiet
+	$(CDK_CMD) synth --context env=prod --quiet
 	@echo "$(GREEN)All environments synthesized successfully!$(RESET)"
 
 synth-dev: ## Synthesize dev environment only
-	$(CDK) synth --context env=dev
+	$(CDK_CMD) synth --context env=dev
 
 synth-staging: ## Synthesize staging environment only
-	$(CDK) synth --context env=staging
+	$(CDK_CMD) synth --context env=staging
 
 synth-prod: ## Synthesize prod environment only
-	$(CDK) synth --context env=prod
+	$(CDK_CMD) synth --context env=prod
 
 diff: ## Show CDK diff for dev environment
 	@echo "$(CYAN)Showing diff for dev environment...$(RESET)"
-	$(CDK) diff --context env=dev
+	$(CDK_CMD) diff --context env=dev
 
 diff-staging: ## Show CDK diff for staging environment
-	$(CDK) diff --context env=staging
+	$(CDK_CMD) diff --context env=staging
 
 diff-prod: ## Show CDK diff for prod environment
-	$(CDK) diff --context env=prod
+	$(CDK_CMD) diff --context env=prod
+
+diff-check: ## Run diff safety check for dev environment
+	@./scripts/diff-safety-check.sh --env dev
+
+diff-check-staging: ## Run diff safety check for staging environment
+	@./scripts/diff-safety-check.sh --env staging
+
+diff-check-prod: ## Run diff safety check for prod environment
+	@./scripts/diff-safety-check.sh --env prod
 
 deploy-dev: ## Deploy to dev environment
 	@echo "$(CYAN)Deploying to dev environment...$(RESET)"
-	$(CDK) deploy --all --context env=dev --require-approval never
+	$(CDK_CMD) deploy --all --context env=dev --require-approval never
 	@echo "$(GREEN)Dev deployment complete!$(RESET)"
 
 deploy-staging: ## Deploy to staging environment (with approval)
 	@echo "$(YELLOW)Deploying to staging environment...$(RESET)"
-	$(CDK) deploy --all --context env=staging --require-approval broadening
+	$(CDK_CMD) deploy --all --context env=staging --require-approval broadening
 	@echo "$(GREEN)Staging deployment complete!$(RESET)"
 
 deploy-prod: ## Deploy to prod environment (with approval)
 	@echo "$(RED)Deploying to PRODUCTION environment...$(RESET)"
 	@echo "$(YELLOW)This will prompt for approval on security-sensitive changes.$(RESET)"
-	$(CDK) deploy --all --context env=prod --require-approval broadening
+	$(CDK_CMD) deploy --all --context env=prod --require-approval broadening
 	@echo "$(GREEN)Production deployment complete!$(RESET)"
 
 destroy-dev: ## Destroy dev environment (DANGEROUS!)
 	@echo "$(RED)WARNING: This will destroy the dev environment!$(RESET)"
 	@read -p "Are you sure? [y/N] " confirm && [ "$$confirm" = "y" ] || exit 1
-	$(CDK) destroy --all --context env=dev --force
+	$(CDK_CMD) destroy --all --context env=dev --force
 
 # =============================================================================
 # Utilities

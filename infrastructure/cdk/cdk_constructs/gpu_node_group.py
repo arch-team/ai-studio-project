@@ -142,23 +142,28 @@ class GpuNodeGroupConstruct(Construct):
 
         return launch_template
 
-    @staticmethod
-    def _get_ami_type(config: GpuNodeGroupConfig) -> str:
-        """根据实例类型选择兼容 K8s 1.33+ 的 AMI 类型。
+    def _get_ami_type(self, config: GpuNodeGroupConfig) -> str:
+        """根据实例类型从配置体系中选择对应的 AMI 类型。
 
-        K8s 1.33 不再支持 AL2_x86_64_GPU，需使用 AL2023 系列:
-        - NVIDIA GPU 实例 → AL2023_x86_64_NVIDIA
-        - Neuron 实例 (trn1/inf2) → AL2023_x86_64_NEURON
+        AMI 类型由 env_config.eks.addon_versions 中的配置决定，
+        与 K8s 版本联动:
+        - K8s 1.33: AL2023_x86_64_NVIDIA / AL2023_x86_64_NEURON
+        - K8s 1.32: AL2_x86_64_GPU / AL2_x86_64_GPU
+
+        根据实例类型前缀判断使用 gpu_ami_type 或 neuron_ami_type:
+        - Neuron 实例 (trn1/inf1/inf2) → neuron_ami_type
+        - 其他 GPU 实例 → gpu_ami_type
 
         Returns:
             EKS AMI 类型字符串
         """
+        addon_versions = self.env_config.eks.addon_versions
         neuron_prefixes = ("trn1", "inf1", "inf2")
         if any(
             inst.startswith(neuron_prefixes) for inst in config.instance_types
         ):
-            return "AL2023_x86_64_NEURON"
-        return "AL2023_x86_64_NVIDIA"
+            return addon_versions.neuron_ami_type
+        return addon_versions.gpu_ami_type
 
     def _create_node_group(
         self,

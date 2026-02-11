@@ -99,6 +99,8 @@ class EksAddonVersions:
         vpc_cni: Amazon VPC CNI version
         coredns: CoreDNS version
         kube_proxy: kube-proxy version
+        gpu_ami_type: GPU 实例 (NVIDIA) 使用的 EKS AMI 类型
+        neuron_ami_type: Neuron 实例 (trn1/inf2) 使用的 EKS AMI 类型
     """
 
     ebs_csi: str = "v1.54.0-eksbuild.1"
@@ -106,24 +108,32 @@ class EksAddonVersions:
     vpc_cni: str = "v1.21.1-eksbuild.1"
     coredns: str = "v1.12.4-eksbuild.1"
     kube_proxy: str = "v1.33.5-eksbuild.2"
+    gpu_ami_type: str = "AL2023_x86_64_NVIDIA"
+    neuron_ami_type: str = "AL2023_x86_64_NEURON"
 
     @classmethod
     def for_k8s_1_33(cls) -> "EksAddonVersions":
         """Factory method for Kubernetes 1.33 compatible versions.
 
         注意: 版本号与类默认值保持一致，更新时需同步修改。
+        K8s 1.33 使用 AL2023 系列 AMI。
         """
         return cls()
 
     @classmethod
     def for_k8s_1_32(cls) -> "EksAddonVersions":
-        """Factory method for Kubernetes 1.32 compatible versions."""
+        """Factory method for Kubernetes 1.32 compatible versions.
+
+        K8s 1.32 使用 AL2 系列 AMI。
+        """
         return cls(
             ebs_csi="v1.52.0-eksbuild.1",
             fsx_csi="v1.8.0-eksbuild.1",
             vpc_cni="v1.19.2-eksbuild.1",
             coredns="v1.11.4-eksbuild.2",
             kube_proxy="v1.32.3-eksbuild.2",
+            gpu_ami_type="AL2_x86_64_GPU",
+            neuron_ami_type="AL2_x86_64_GPU",
         )
 
 

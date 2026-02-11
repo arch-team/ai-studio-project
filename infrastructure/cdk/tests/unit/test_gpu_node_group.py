@@ -22,7 +22,7 @@ from cdk_constructs.gpu_node_group import (
     GpuNodeGroupConstruct,
     create_default_gpu_node_groups,
 )
-from config import EnvironmentConfig
+from config import EksAddonVersions, EksConfig, EnvironmentConfig
 
 
 class TestGpuNodeGroupConfig:
@@ -412,3 +412,221 @@ class TestCreateDefaultGpuNodeGroups:
         )
 
         assert len(node_groups) == 3
+
+
+class TestGpuAmiTypeSelection:
+    """Tests for AMI type selection linked to K8s version configuration."""
+
+    @pytest.fixture
+    def stack(self, cdk_app: cdk.App, cdk_env: cdk.Environment) -> cdk.Stack:
+        """创建测试 Stack."""
+        return cdk.Stack(cdk_app, "TestStack", env=cdk_env)
+
+    @pytest.fixture
+    def vpc(self, stack: cdk.Stack) -> ec2.Vpc:
+        """创建测试 VPC."""
+        return ec2.Vpc(stack, "TestVpc", max_azs=2)
+
+    @pytest.fixture
+    def eks_cluster(self, stack: cdk.Stack, vpc: ec2.Vpc) -> eks.Cluster:
+        """创建测试 EKS 集群."""
+        return eks.Cluster(
+            stack,
+            "TestCluster",
+            cluster_name="test-cluster",
+            version=eks.KubernetesVersion.of("1.33"),
+            vpc=vpc,
+            default_capacity=0,
+            kubectl_layer=KubectlV33Layer(stack, "KubectlLayer"),
+        )
+
+    @pytest.fixture
+    def node_role(self, stack: cdk.Stack) -> iam.Role:
+        """创建测试节点角色."""
+        return iam.Role(
+            stack,
+            "TestNodeRole",
+            assumed_by=iam.ServicePrincipal("ec2.amazonaws.com"),
+        )
+
+    def _make_config_with_k8s_version(
+        self, base_config: EnvironmentConfig, k8s_version: str
+    ) -> EnvironmentConfig:
+        """创建指定 K8s 版本的环境配置。
+
+        通过替换 eks 配置中的 addon_versions 来切换 K8s 版本对应的 AMI 类型。
+        """
+        method_map = {
+            "1.33": EksAddonVersions.for_k8s_1_33,
+            "1.32": EksAddonVersions.for_k8s_1_32,
+        }
+        addon_versions = method_map[k8s_version]()
+        new_eks = EksConfig(
+            kubernetes_version=k8s_version,
+            addon_versions=addon_versions,
+            node_instance_types=base_config.eks.node_instance_types,
+            min_nodes=base_config.eks.min_nodes,
+            max_nodes=base_config.eks.max_nodes,
+            gpu_instance_group=base_config.eks.gpu_instance_group,
+        )
+        return EnvironmentConfig(
+            name=base_config.name,
+            account=base_config.account,
+            region=base_config.region,
+            vpc=base_config.vpc,
+            database=base_config.database,
+            storage=base_config.storage,
+            eks=new_eks,
+            observability=base_config.observability,
+            protection=base_config.protection,
+        )
+
+    def test_k8s_133_uses_al2023_nvidia_ami(
+        self,
+        stack: cdk.Stack,
+        dev_config: EnvironmentConfig,
+        eks_cluster: eks.Cluster,
+        node_role: iam.Role,
+        vpc: ec2.Vpc,
+    ) -> None:
+        """验证 K8s 1.33 GPU 节点使用 AL2023_x86_64_NVIDIA AMI."""
+        config_133 = self._make_config_with_k8s_version(dev_config, "1.33")
+        gpu_config = GpuNodeGroupConfig(
+            name="test-gpu",
+            instance_types=("p4d.24xlarge",),
+        )
+
+        GpuNodeGroupConstruct(
+            stack,
+            "TestGpuNodeGroup",
+            env_config=config_133,
+            eks_cluster=eks_cluster,
+            node_role=node_role,
+            node_group_config=gpu_config,
+            subnets=ec2.SubnetSelection(
+                subnet_type=ec2.SubnetType.PRIVATE_WITH_EGRESS
+            ),
+            vpc=vpc,
+        )
+
+        template = Template.from_stack(stack)
+        template.has_resource_properties(
+            "AWS::EKS::Nodegroup",
+            {"AmiType": "AL2023_x86_64_NVIDIA"},
+        )
+
+    def test_k8s_132_uses_al2_gpu_ami(
+        self,
+        stack: cdk.Stack,
+        dev_config: EnvironmentConfig,
+        eks_cluster: eks.Cluster,
+        node_role: iam.Role,
+        vpc: ec2.Vpc,
+    ) -> None:
+        """验证 K8s 1.32 GPU 节点使用 AL2_x86_64_GPU AMI."""
+        config_132 = self._make_config_with_k8s_version(dev_config, "1.32")
+        gpu_config = GpuNodeGroupConfig(
+            name="test-gpu",
+            instance_types=("p4d.24xlarge",),
+        )
+
+        GpuNodeGroupConstruct(
+            stack,
+            "TestGpuNodeGroup132",
+            env_config=config_132,
+            eks_cluster=eks_cluster,
+            node_role=node_role,
+            node_group_config=gpu_config,
+            subnets=ec2.SubnetSelection(
+                subnet_type=ec2.SubnetType.PRIVATE_WITH_EGRESS
+            ),
+            vpc=vpc,
+        )
+
+        template = Template.from_stack(stack)
+        template.has_resource_properties(
+            "AWS::EKS::Nodegroup",
+            {"AmiType": "AL2_x86_64_GPU"},
+        )
+
+    def test_neuron_instance_uses_neuron_ami(
+        self,
+        stack: cdk.Stack,
+        dev_config: EnvironmentConfig,
+        eks_cluster: eks.Cluster,
+        node_role: iam.Role,
+        vpc: ec2.Vpc,
+    ) -> None:
+        """验证 Neuron 实例 (trn1) 使用 neuron_ami_type."""
+        config_133 = self._make_config_with_k8s_version(dev_config, "1.33")
+        neuron_config = GpuNodeGroupConfig(
+            name="test-neuron",
+            instance_types=("trn1.32xlarge",),
+            taints=(
+                {
+                    "key": "aws.amazon.com/neuron",
+                    "value": "true",
+                    "effect": "NO_SCHEDULE",
+                },
+            ),
+        )
+
+        GpuNodeGroupConstruct(
+            stack,
+            "TestNeuronNodeGroup",
+            env_config=config_133,
+            eks_cluster=eks_cluster,
+            node_role=node_role,
+            node_group_config=neuron_config,
+            subnets=ec2.SubnetSelection(
+                subnet_type=ec2.SubnetType.PRIVATE_WITH_EGRESS
+            ),
+            vpc=vpc,
+        )
+
+        template = Template.from_stack(stack)
+        template.has_resource_properties(
+            "AWS::EKS::Nodegroup",
+            {"AmiType": "AL2023_x86_64_NEURON"},
+        )
+
+    def test_k8s_132_neuron_uses_al2_gpu_ami(
+        self,
+        stack: cdk.Stack,
+        dev_config: EnvironmentConfig,
+        eks_cluster: eks.Cluster,
+        node_role: iam.Role,
+        vpc: ec2.Vpc,
+    ) -> None:
+        """验证 K8s 1.32 Neuron 实例使用 AL2_x86_64_GPU AMI."""
+        config_132 = self._make_config_with_k8s_version(dev_config, "1.32")
+        neuron_config = GpuNodeGroupConfig(
+            name="test-neuron",
+            instance_types=("trn1.32xlarge",),
+            taints=(
+                {
+                    "key": "aws.amazon.com/neuron",
+                    "value": "true",
+                    "effect": "NO_SCHEDULE",
+                },
+            ),
+        )
+
+        GpuNodeGroupConstruct(
+            stack,
+            "TestNeuronNodeGroup132",
+            env_config=config_132,
+            eks_cluster=eks_cluster,
+            node_role=node_role,
+            node_group_config=neuron_config,
+            subnets=ec2.SubnetSelection(
+                subnet_type=ec2.SubnetType.PRIVATE_WITH_EGRESS
+            ),
+            vpc=vpc,
+        )
+
+        template = Template.from_stack(stack)
+        template.has_resource_properties(
+            "AWS::EKS::Nodegroup",
+            {"AmiType": "AL2_x86_64_GPU"},
+        )

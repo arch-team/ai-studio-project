@@ -12,7 +12,9 @@ Usage:
     cdk synth                          # Synthesize CloudFormation templates
 """
 
+import json
 import os
+from pathlib import Path
 
 import aws_cdk as cdk
 from cdk_nag import AwsSolutionsChecks
@@ -35,6 +37,82 @@ from stacks import (
 )
 from utils import apply_nag_suppressions
 
+# 兜底默认 region
+_DEFAULT_REGION = "us-east-1"
+
+
+def _resolve_from_cdk_json(env_name: str, field: str) -> str | None:
+    """从 cdk.json 的 defaultContext.environments 中读取配置值.
+
+    Args:
+        env_name: 环境名称 (dev/staging/prod)
+        field: 配置字段名 (account/region)
+
+    Returns:
+        配置值，不存在或为空时返回 None
+    """
+    cdk_json_path = Path(__file__).parent / "cdk.json"
+    if not cdk_json_path.exists():
+        return None
+    try:
+        with open(cdk_json_path, encoding="utf-8") as f:
+            data = json.load(f)
+        value = (
+            data.get("defaultContext", {})
+            .get("environments", {})
+            .get(env_name, {})
+            .get(field)
+        )
+        return value if value else None
+    except (json.JSONDecodeError, OSError):
+        return None
+
+
+def resolve_region(app: cdk.App, env_name: str) -> str:
+    """解析部署 region，按以下优先级:
+
+    1. --context region=xxx (显式 CLI 参数，最高优先级)
+    2. cdk.json defaultContext.environments.{env}.region (配置文件)
+    3. CDK_DEFAULT_REGION 环境变量 (CDK CLI 自动设置)
+    4. "us-east-1" (兜底默认值)
+    """
+    # 优先级 1: 显式 CLI context 参数
+    context_region = app.node.try_get_context("region")
+    if context_region:
+        return context_region
+
+    # 优先级 2: cdk.json defaultContext 配置
+    cdk_json_region = _resolve_from_cdk_json(env_name, "region")
+    if cdk_json_region:
+        return cdk_json_region
+
+    # 优先级 3: 环境变量
+    env_region = os.environ.get("CDK_DEFAULT_REGION")
+    if env_region:
+        return env_region
+
+    # 优先级 4: 兜底默认值
+    return _DEFAULT_REGION
+
+
+def resolve_account(app: cdk.App, env_name: str) -> str:
+    """解析部署 account，按以下优先级:
+
+    1. --context account=xxx (显式 CLI 参数)
+    2. cdk.json defaultContext.environments.{env}.account (配置文件)
+    3. CDK_DEFAULT_ACCOUNT 环境变量
+    4. "" (空字符串兜底)
+    """
+    context_account = app.node.try_get_context("account")
+    if context_account:
+        return context_account
+
+    cdk_json_account = _resolve_from_cdk_json(env_name, "account")
+    if cdk_json_account:
+        return cdk_json_account
+
+    return os.environ.get("CDK_DEFAULT_ACCOUNT") or ""
+
 
 def create_app() -> cdk.App:
     """Create and configure the CDK application with all stacks."""
@@ -43,17 +121,13 @@ def create_app() -> cdk.App:
     # Get environment from context or default to 'dev'
     env_name = app.node.try_get_context("env") or "dev"
 
-    # Get account and region from context or environment variables
-    account = (
-        app.node.try_get_context("account")
-        or os.environ.get("CDK_DEFAULT_ACCOUNT")
-        or ""
-    )
-    region = (
-        app.node.try_get_context("region")
-        or os.environ.get("CDK_DEFAULT_REGION")
-        or "us-east-1"
-    )
+    # 按优先级解析 account 和 region
+    # 优先级: --context > cdk.json defaultContext > 环境变量 > 兜底默认值
+    account = resolve_account(app, env_name)
+    region = resolve_region(app, env_name)
+
+    # 部署确认日志
+    print(f"Deploying to {env_name} environment: account={account}, region={region}")
 
     # Load environment configuration
     env_config = get_environment_config(
