@@ -108,3 +108,8 @@ Claude Code 生成的计划文件索引。
 | 2026-02-09 | `2026-02-09-claude-code-上下文管理规范迁移分析.md` | Claude Code 上下文管理规范迁移分析 | ⏳ 进行中 |
 | 2026-02-09 | `2026-02-09-infrastructure-工程目录结构与架构设计改进方案.md` | Infrastructure 工程目录结构与架构设计改进方案 | ⏳ 进行中 |
 | 2026-02-09 | `2026-02-09-infrastructure-cdk-claude-code-上下文管理规范优化计划.md` | Infrastructure CDK - Claude Code 上下文管理规范优化计划 | ⏳ 进行中 |
+| 2026-02-09 | `2026-02-09-claude-code-工具生态指导手册-编写计划.md` | Claude Code 工具生态指导手册 — 编写计划 | ⏳ 进行中 |
+| 2026-02-09 | `2026-02-09-计划-为-ai-studio-project-编写-agent-teams-使用指导.md` | 计划: 为 ai-studio-project 编写 Agent Teams 使用指导 | ⏳ 进行中 |
+| 2026-02-09 | `2026-02-09-计划-软件产品全生命周期研发流程管理框架.md` | 计划: 软件产品全生命周期研发流程管理框架 | ⏳ 进行中 |
+| 2026-02-10 | `2026-02-10-infrastructure-cdk-dev-环境验证计划.md` | Infrastructure CDK Dev 环境验证计划 | ⏳ 进行中 |
+| 2026-02-13 | `2026-02-13-计划-软件产品全生命周期研发流程管理框架.md` | 计划: 软件产品全生命周期研发流程管理框架 | ⏳ 进行中 |

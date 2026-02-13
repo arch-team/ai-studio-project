@@ -203,6 +203,7 @@ code-simplifier:code-simplifier。
 
 使用code-simplifier:code-simplifier帮我优化当前项目中的代码，这个项目(backend)是使用python开发的企业训练平台后端项目
 
+使用code-simplifier:code-simplifier帮我优化当前项目中的代码，这个子项目infrastructure，是使用python开发的企业训练平台后端项目的基础设施即代码（IAC）的项目
 
 
 
@@ -491,3 +492,29 @@ project-config.md
 
   对 AI Training Platform 的 infrastructure/ 子项目（AWS CDK + K8s Manifests）进行了 3 个阶段、17 项任务 的系统性改进，覆盖目录结构、架构设计、安全加固、功能补全和工程质量五个维度。
   
+
+
+  /Users/jinhuasu/Project_Workspace/Anker-Projects/ml-platform-research/llm-platform-solution/ai-agents-platform/plan-docs/agent-teams-guide.md 这个是源项目的Claude Code Agent Teams使用的参考，基于这个agent-teams-guide.md，当前的ai-studio-project制定符合本项目现状和实际情况的agent-teams-guide.md
+
+
+
+
+
+我想要让Claude Code 的工作流程遵循软件研发全生命周期的敏捷开发流程，并能给CLaude Code 建立起严格遵守这样的流程，把这些流程软件研发全生命周期的敏捷开发流程中的各种活动和事件写入Claude code的DNA，这样后续面临任何软件开发项目，我都能使用这个构建起来的框架。
+要完成完整这个工作，为Claude Code搭建以AI为中心，人类复杂发起、审核、批准为应该怎么着手呢？
+
+
+/Users/jinhuasu/Project_Workspace/Anker-Projects/ml-platform-research/llm-platform-solution/ai-studio-project/cc-doc/plans/2026-02-09-计划-软件产品全生命周期研发流程管理框架.md 这个文件很重要
+
+
+  ---
+  关键数据
+
+  - ADR 决策: 7 个架构决策记录（最新 ADR-007: 路线图 v1.2 调整）
+  - ALB 端点: http://ai-agents-dev-436462227.us-east-1.elb.amazonaws.com/health → 已验证可用
+  - 端到端验证: 注册 → 登录 → JWT → Agent CRUD → 对话创建全流程已通过 (C-S3-2)
+
+  总结: 项目后端 Phase 1-2 全部完成，基础设施已部署到 Dev 环境。下一步是处理 M7-prep（P2 集成 + S4 运维基础），然后启动 Phase 3 的 orchestration 模块开发。
+
+  开始执行 M7-prep，处理 P2 集成和 S4 剩余变更 
+
