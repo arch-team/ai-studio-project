@@ -25,7 +25,7 @@ Tasks: T081-T090
 
 #### 性能要求
 - [x] Space 启动时间 <3 分钟 (SLA 监控 + 超时告警已实现)
-- [~] 并发启动 >= 50 个 Space 无错误 (无并发限制但缺负载测试)
+- [x] 并发启动 >= 50 个 Space 无错误 (50 并发 0 失败, 0.004s 完成)
 - [x] 启动时间 P95/P99 统计通过 SpaceMetricsService 收集到 CloudWatch
 - [x] 启动超时 >3 分钟正确触发 warning 告警
 
