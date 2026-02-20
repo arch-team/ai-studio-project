@@ -127,3 +127,53 @@ export const VISIBILITY_LABELS: Record<DatasetVisibility, string> = {
   private: '私有',
   restricted: '受限',
 };
+
+// === Version Types ===
+
+export interface DatasetVersion {
+  id: number;
+  dataset_id: number;
+  version: string;
+  description: string | null;
+  storage_uri: string;
+  total_size_bytes: number | null;
+  file_count: number | null;
+  created_at: string;
+  created_by_username: string | null;
+}
+
+export interface DatasetVersionListResponse {
+  items: DatasetVersion[];
+  total: number;
+}
+
+export interface CreateDatasetVersionRequest {
+  description?: string;
+}
+
+// === Upload Types ===
+
+export interface UploadInitResponse {
+  upload_id: string;
+  dataset_id: number;
+  presigned_urls: string[];
+  part_size: number;
+}
+
+export interface UploadPartResult {
+  part_number: number;
+  etag: string;
+}
+
+export interface UploadCompleteRequest {
+  upload_id: string;
+  parts: UploadPartResult[];
+}
+
+export interface UploadProgress {
+  loaded: number;
+  total: number;
+  percentage: number;
+  status: 'idle' | 'uploading' | 'completing' | 'completed' | 'error' | 'cancelled';
+  error?: string;
+}

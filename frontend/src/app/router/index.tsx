@@ -40,10 +40,16 @@ import { ResourceQuotasPage } from '@features/resource-quotas';
 // Reports 模块页面
 import { CostAnalysisPage, ResourceUsageReportPage } from '@features/reports';
 
+// Datasets 模块页面
+import {
+  DatasetListPage,
+  CreateDatasetPage,
+  DatasetVersionsPage,
+} from '@features/datasets';
+
 // 占位页面组件 (待实现)
 const HomePage = () => <div>首页</div>;
 const LoginPage = () => <div>登录页</div>;
-const DatasetsPage = () => <div>数据集列表</div>;
 const DatasetDetailPage = () => <div>数据集详情</div>;
 const CheckpointsPage = () => <div>检查点列表</div>;
 const AdminPage = () => <div>管理后台</div>;
@@ -125,11 +131,19 @@ export const router = createBrowserRouter([
       // 数据管理
       {
         path: ROUTES.DATASETS,
-        element: <DatasetsPage />,
+        element: <DatasetListPage />,
+      },
+      {
+        path: ROUTES.DATASET_CREATE,
+        element: <CreateDatasetPage />,
       },
       {
         path: ROUTES.DATASET_DETAIL,
         element: <DatasetDetailPage />,
+      },
+      {
+        path: ROUTES.DATASET_VERSIONS,
+        element: <DatasetVersionsPage />,
       },
       {
         path: ROUTES.CHECKPOINTS,

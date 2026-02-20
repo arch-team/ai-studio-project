@@ -8,6 +8,10 @@
 import { useMemo } from 'react';
 import type { DatasetSummary, DatasetStatus } from '../types';
 
+// 上传相关 hook
+export { useDatasetUpload } from './useDatasetUpload';
+export type { UseDatasetUploadReturn } from './useDatasetUpload';
+
 /**
  * 计算数据集状态统计
  */

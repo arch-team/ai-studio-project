@@ -8,6 +8,7 @@ import type {
   DatasetFilters,
   CreateDatasetRequest,
   UpdateDatasetRequest,
+  CreateDatasetVersionRequest,
 } from '../types';
 import {
   fetchDatasets,
@@ -16,6 +17,8 @@ import {
   updateDataset,
   deleteDataset,
   archiveDataset,
+  fetchDatasetVersions,
+  createDatasetVersion,
 } from './datasetApi';
 
 // === Query Hooks ===
@@ -98,6 +101,45 @@ export function useArchiveDataset() {
     mutationFn: (id: number) => archiveDataset(id),
     onSuccess: (result) => {
       queryClient.setQueryData(queryKeys.datasets.detail(String(result.id)), result);
+      queryClient.invalidateQueries({ queryKey: queryKeys.datasets.lists() });
+    },
+  });
+}
+
+// === Version Hooks ===
+
+/**
+ * Fetch version list for a dataset.
+ */
+export function useDatasetVersions(datasetId: number | undefined) {
+  return useQuery({
+    queryKey: [...queryKeys.datasets.detail(String(datasetId!)), 'versions'],
+    queryFn: () => fetchDatasetVersions(datasetId!),
+    enabled: datasetId !== undefined,
+  });
+}
+
+/**
+ * Create a new dataset version.
+ */
+export function useCreateDatasetVersion() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({
+      datasetId,
+      data,
+    }: {
+      datasetId: number;
+      data?: CreateDatasetVersionRequest;
+    }) => createDatasetVersion(datasetId, data),
+    onSuccess: (_result, { datasetId }) => {
+      queryClient.invalidateQueries({
+        queryKey: [...queryKeys.datasets.detail(String(datasetId)), 'versions'],
+      });
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.datasets.detail(String(datasetId)),
+      });
       queryClient.invalidateQueries({ queryKey: queryKeys.datasets.lists() });
     },
   });

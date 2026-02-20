@@ -614,10 +614,10 @@
 - [X] [T048] [US2] FSx for Lustre 路径管理 - `backend/src/modules/datasets/application/services/fsx_sync_service.py`,管理 FSx 挂载路径,自动同步 S3 到 FSx,数据预热逻辑
 
 ### 前端页面组件
-- [ ] [T049] [US2] [P] 数据集列表页面 - `frontend/src/features/datasets/pages/DatasetListPage.tsx`,使用 Cloudscape Table,支持搜索/过滤/排序,显示存储类型和大小,创建模块 API 层 `frontend/src/features/datasets/api/queries.ts`
-- [ ] [T050] [US2] [P] 数据集创建页面 - `frontend/src/features/datasets/pages/CreateDatasetPage.tsx`,使用 Cloudscape Form,支持文件上传 (drag & drop),显示上传进度,验证数据集格式
-- [ ] [T051] [US2] [P] 数据集版本管理页面 - `frontend/src/features/datasets/pages/DatasetVersionsPage.tsx`,显示版本历史时间线,支持版本对比和回滚
-- [ ] [T052] [US2] [P] 文件上传组件 - `frontend/src/features/datasets/components/DatasetUploader.tsx`,实现分片上传到 S3,显示上传进度条,支持取消和重试,创建上传 hook `frontend/src/features/datasets/hooks/useDatasetUpload.ts`
+- [X] [T049] [US2] [P] 数据集列表页面 - `frontend/src/features/datasets/pages/DatasetListPage.tsx`,使用 Cloudscape Table,支持搜索/过滤/排序,显示存储类型和大小,创建模块 API 层 `frontend/src/features/datasets/api/queries.ts`
+- [X] [T050] [US2] [P] 数据集创建页面 - `frontend/src/features/datasets/pages/CreateDatasetPage.tsx`,使用 Cloudscape Form,支持文件上传 (drag & drop),显示上传进度,验证数据集格式
+- [X] [T051] [US2] [P] 数据集版本管理页面 - `frontend/src/features/datasets/pages/DatasetVersionsPage.tsx`,显示版本历史时间线,支持版本对比和回滚
+- [X] [T052] [US2] [P] 文件上传组件 - `frontend/src/features/datasets/components/DatasetUploader.tsx`,实现分片上传到 S3,显示上传进度条,支持取消和重试,创建上传 hook `frontend/src/features/datasets/hooks/useDatasetUpload.ts`
 
 **并行执行机会**:
 - 数据库迁移: T039 独立

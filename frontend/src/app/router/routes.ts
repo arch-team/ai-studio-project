@@ -40,7 +40,9 @@ export const ROUTES = {
 
   // 数据管理
   DATASETS: '/datasets',
+  DATASET_CREATE: '/datasets/create',
   DATASET_DETAIL: '/datasets/:id',
+  DATASET_VERSIONS: '/datasets/:id/versions',
   CHECKPOINTS: '/checkpoints',
 
   // 资源管理

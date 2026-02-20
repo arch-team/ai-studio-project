@@ -9,6 +9,8 @@ import type {
   DatasetFilters,
   CreateDatasetRequest,
   UpdateDatasetRequest,
+  DatasetVersionListResponse,
+  CreateDatasetVersionRequest,
 } from '../types';
 
 /**
@@ -71,4 +73,28 @@ export async function deleteDataset(id: number): Promise<void> {
  */
 export async function archiveDataset(id: number): Promise<DatasetDetail> {
   return apiClient.post<DatasetDetail>(`/datasets/${id}/archive`);
+}
+
+/**
+ * Fetch version list for a dataset.
+ */
+export async function fetchDatasetVersions(
+  datasetId: number
+): Promise<DatasetVersionListResponse> {
+  return apiClient.get<DatasetVersionListResponse>(
+    `/datasets/${datasetId}/versions`
+  );
+}
+
+/**
+ * Create a new version for a dataset.
+ */
+export async function createDatasetVersion(
+  datasetId: number,
+  data: CreateDatasetVersionRequest = {}
+): Promise<DatasetDetail> {
+  return apiClient.post<DatasetDetail>(
+    `/datasets/${datasetId}/versions`,
+    data
+  );
 }
