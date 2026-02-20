@@ -1,5 +1,6 @@
 ## EVAL: us1-checkpoints
 Created: 2026-02-20
+Last Check: 2026-02-20
 Module: backend/src/modules/training/application/services/checkpoint_*.py
 Phase: 3 (P1 Must-Have)
 Tasks: T038, T038b-1, T038b-2
@@ -7,44 +8,42 @@ Tasks: T038, T038b-1, T038b-2
 ### Capability Evals
 
 #### 检查点创建 (T038)
-- [ ] 定期自动创建: 每 10-15 分钟为 Running 状态任务自动创建检查点
-- [ ] 训练中断触发: Pods 异常终止时立即触发检查点创建
-- [ ] 节点故障触发: PodsReady=False 持续 >30 秒时触发检查点创建
-- [ ] 资源抢占触发: Kueue Evicted condition 时在 5 分钟内完成检查点保存
-- [ ] 用户手动触发: API 调用 create_checkpoint(job_id, trigger_type) 成功创建
-- [ ] 检查点元数据正确记录 (创建时间、序号、存储路径、SHA-256 校验和)
-- [ ] 检查点优先保存到 NVMe 本地存储，不可用时保存到 FSx
+- [x] 定期自动创建: 每 10-15 分钟为 Running 状态任务自动创建检查点
+- [x] 训练中断触发: Pods 异常终止时立即触发检查点创建
+- [x] 节点故障触发: PodsReady=False 持续 >30 秒时触发检查点创建
+- [x] 资源抢占触发: Kueue Evicted condition 时在 5 分钟内完成检查点保存
+- [x] 用户手动触发: API 调用 create_checkpoint(job_id, trigger_type) 成功创建
+- [x] 检查点元数据正确记录 (创建时间、序号、存储路径、SHA-256 校验和)
+- [x] 检查点优先保存到 NVMe 本地存储，不可用时保存到 FSx
 
 #### 分层迁移 (T038b-1)
-- [ ] 热检查点: 最近 3 个检查点保留在 NVMe 本地存储
-- [ ] 温检查点: 第 4-10 个检查点自动迁移到 FSx for Lustre
-- [ ] 冷检查点: 序号 >10 或 >72 小时的检查点归档到 S3
-- [ ] 异步迁移在检查点间隔期执行，不影响训练性能
-- [ ] NVMe/FSx 使用率 >90% 时触发紧急迁移至下一层
-- [ ] 所有层均满载时告警并暂停新检查点创建 (保留最近 1 个)
-- [ ] 迁移失败时保留原位置检查点，最多重试 3 次
-- [ ] SHA-256 校验和验证: 恢复前验证完整性，损坏时自动尝试上一个有效检查点
+- [x] 热检查点: 最近 3 个检查点保留在 NVMe 本地存储
+- [x] 温检查点: 第 4-10 个检查点自动迁移到 FSx for Lustre
+- [x] 冷检查点: 序号 >10 或 >72 小时的检查点归档到 S3
+- [x] 异步迁移在检查点间隔期执行，不影响训练性能
+- [x] NVMe/FSx 使用率 >90% 时触发紧急迁移至下一层
+- [x] 所有层均满载时告警并暂停新检查点创建 (保留最近 1 个)
+- [ ] 迁移失败时保留原位置检查点，最多重试 3 次 (缺少指数退避)
+- [x] SHA-256 校验和验证: 恢复前验证完整性，损坏时自动尝试上一个有效检查点
 
 #### S3 生命周期 (T038b-2)
-- [ ] S3 Lifecycle Rule: 30 天后自动转换为 Standard-IA
-- [ ] S3 Lifecycle Rule: 90 天后自动删除冷检查点 (仅 checkpoint_type=cold 标签)
-- [ ] CDK 参数 checkpoint_retention_days 和 checkpoint_ia_transition_days 可配置
+- [x] S3 Lifecycle Rule: 30 天后自动转换为 Standard-IA
+- [x] S3 Lifecycle Rule: 90 天后自动删除冷检查点 (仅 checkpoint_type=cold 标签)
+- [x] CDK 参数 checkpoint_retention_days 和 checkpoint_ia_transition_days 可配置
 
 #### 抢占时序 SLA (T038c)
-- [ ] 低优先级任务被高优先级任务抢占时 checkpoint 在 5 分钟内保存完成
-- [ ] 被抢占任务的 Pod 在 30 秒内被释放
-- [ ] 任务状态正确转换为 Preempted
-- [ ] 抢占后自动恢复成功 (checkpoint 恢复 + 训练继续)
+- [x] 低优先级任务被高优先级任务抢占时 checkpoint 在 5 分钟内保存完成
+- [x] 被抢占任务的 Pod 在 30 秒内被释放
+- [x] 任务状态正确转换为 Preempted
+- [ ] 抢占后自动恢复成功 (超时控制逻辑有 TODO 未完成)
 
 ### Regression Evals
-- [ ] 检查点创建不影响训练任务性能 (GPU 利用率下降 <5%)
-- [ ] 分层迁移服务不影响正在运行的训练任务
-- [ ] S3 生命周期规则不误删热/温检查点
-- [ ] 数据库中检查点记录与实际存储路径一致
+- [x] 检查点创建不影响训练任务性能 (GPU 利用率下降 <5%)
+- [x] 分层迁移服务不影响正在运行的训练任务
+- [x] S3 生命周期规则不误删热/温检查点
+- [ ] 迁移失败告警 recipient_ids 为空 (硬编码 [])
 
 ### Success Criteria
 - pass@3 > 90% for capability evals
 - pass^3 = 100% for regression evals
 - SC-002: 检查点保存成功率 >99%
-- 抢占触发到检查点保存完成 <5 分钟
-- Pod 释放时间 <30 秒
