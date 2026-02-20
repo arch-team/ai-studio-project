@@ -27,7 +27,11 @@ import type {
   SelectProps,
 } from "@cloudscape-design/components";
 import { useResourceUsage, useExportReport } from "../api";
-import { formatNumber, calculateDateRange } from "@shared/utils";
+import {
+  formatNumber,
+  calculateDateRange,
+  DATE_RANGE_PICKER_I18N,
+} from "@shared/utils";
 import type {
   GroupBy,
   ResourceUsageFilters,
@@ -331,34 +335,7 @@ export function ResourceUsageReportPage() {
                 }
                 return { valid: true };
               }}
-              i18nStrings={{
-                todayAriaLabel: "今天",
-                nextMonthAriaLabel: "下个月",
-                previousMonthAriaLabel: "上个月",
-                customRelativeRangeDurationLabel: "持续时间",
-                customRelativeRangeDurationPlaceholder: "输入持续时间",
-                customRelativeRangeOptionLabel: "自定义范围",
-                customRelativeRangeOptionDescription: "设置自定义时间范围",
-                customRelativeRangeUnitLabel: "时间单位",
-                formatRelativeRange: (e) => {
-                  const unitText =
-                    e.unit === "day" ? "天" : e.unit === "week" ? "周" : "月";
-                  return `最近 ${e.amount} ${unitText}`;
-                },
-                formatUnit: (e, _n) =>
-                  e === "day" ? "天" : e === "week" ? "周" : "月",
-                dateTimeConstraintText: "时间范围最长 90 天",
-                relativeModeTitle: "相对时间",
-                absoluteModeTitle: "绝对时间",
-                relativeRangeSelectionHeading: "选择时间范围",
-                startDateLabel: "开始日期",
-                endDateLabel: "结束日期",
-                startTimeLabel: "开始时间",
-                endTimeLabel: "结束时间",
-                clearButtonLabel: "清除",
-                cancelButtonLabel: "取消",
-                applyButtonLabel: "应用",
-              }}
+              i18nStrings={DATE_RANGE_PICKER_I18N}
               placeholder="选择时间范围"
             />
           </div>

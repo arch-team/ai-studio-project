@@ -4,3 +4,4 @@
 
 export * from './formatters';
 export * from './dateRange';
+export * from './dateRangePickerConfig';

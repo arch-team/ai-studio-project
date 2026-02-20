@@ -36,7 +36,11 @@ import {
   useMetricSeries,
 } from "../api";
 import { MetricsCharts } from "../components/MetricsCharts";
-import { formatDateTimeShort, calculateTimeRange } from "@shared/utils";
+import {
+  formatDateTimeShort,
+  calculateTimeRange,
+  DATE_RANGE_PICKER_I18N,
+} from "@shared/utils";
 import type {
   Alert,
   ClusterSummary,
@@ -147,38 +151,7 @@ function TimeRangeSelector({
             }
             return { valid: true };
           }}
-          i18nStrings={{
-            todayAriaLabel: "今天",
-            nextMonthAriaLabel: "下个月",
-            previousMonthAriaLabel: "上个月",
-            customRelativeRangeDurationLabel: "持续时间",
-            customRelativeRangeDurationPlaceholder: "输入持续时间",
-            customRelativeRangeOptionLabel: "自定义范围",
-            customRelativeRangeOptionDescription: "设置自定义时间范围",
-            customRelativeRangeUnitLabel: "时间单位",
-            formatRelativeRange: (e) => {
-              const unitText =
-                e.unit === "minute"
-                  ? "分钟"
-                  : e.unit === "hour"
-                    ? "小时"
-                    : "天";
-              return `最近 ${e.amount} ${unitText}`;
-            },
-            formatUnit: (e, _n) =>
-              e === "minute" ? "分钟" : e === "hour" ? "小时" : "天",
-            dateTimeConstraintText: "时间范围最长 30 天",
-            relativeModeTitle: "相对时间",
-            absoluteModeTitle: "绝对时间",
-            relativeRangeSelectionHeading: "选择时间范围",
-            startDateLabel: "开始日期",
-            endDateLabel: "结束日期",
-            startTimeLabel: "开始时间",
-            endTimeLabel: "结束时间",
-            clearButtonLabel: "清除",
-            cancelButtonLabel: "取消",
-            applyButtonLabel: "应用",
-          }}
+          i18nStrings={DATE_RANGE_PICKER_I18N}
           placeholder="选择时间范围"
         />
       </div>

@@ -19,7 +19,11 @@ import {
 } from "@cloudscape-design/components";
 import type { DateRangePickerProps } from "@cloudscape-design/components";
 import { useAuditLogs, useExportAuditLogs } from "../api";
-import { formatDateTime } from "@shared/utils";
+import {
+  formatDateTime,
+  DATE_RANGE_PICKER_I18N,
+  validateDateRange,
+} from "@shared/utils";
 import type {
   AuditLog,
   AuditLogFilters,
@@ -257,57 +261,8 @@ export function AuditLogsPage() {
                 { key: "week", amount: 7, unit: "day", type: "relative" },
                 { key: "month", amount: 1, unit: "month", type: "relative" },
               ]}
-              isValidRange={(range) => {
-                if (range?.type === "absolute") {
-                  const start = new Date(range.startDate);
-                  const end = new Date(range.endDate);
-                  if (start > end) {
-                    return {
-                      valid: false,
-                      errorMessage: "开始时间不能晚于结束时间",
-                    };
-                  }
-                }
-                return { valid: true };
-              }}
-              i18nStrings={{
-                todayAriaLabel: "今天",
-                nextMonthAriaLabel: "下个月",
-                previousMonthAriaLabel: "上个月",
-                customRelativeRangeDurationLabel: "持续时间",
-                customRelativeRangeDurationPlaceholder: "输入持续时间",
-                customRelativeRangeOptionLabel: "自定义范围",
-                customRelativeRangeOptionDescription: "设置自定义时间范围",
-                customRelativeRangeUnitLabel: "时间单位",
-                formatRelativeRange: (e) => {
-                  const unit =
-                    e.unit === "day" ? "天" : e.unit === "week" ? "周" : "月";
-                  return `最近 ${e.amount} ${unit}`;
-                },
-                formatUnit: (e, n) =>
-                  n === 1
-                    ? e === "day"
-                      ? "天"
-                      : e === "week"
-                        ? "周"
-                        : "月"
-                    : e === "day"
-                      ? "天"
-                      : e === "week"
-                        ? "周"
-                        : "月",
-                dateTimeConstraintText: "时间范围最长 31 天",
-                relativeModeTitle: "相对时间",
-                absoluteModeTitle: "绝对时间",
-                relativeRangeSelectionHeading: "选择时间范围",
-                startDateLabel: "开始日期",
-                endDateLabel: "结束日期",
-                startTimeLabel: "开始时间",
-                endTimeLabel: "结束时间",
-                clearButtonLabel: "清除",
-                cancelButtonLabel: "取消",
-                applyButtonLabel: "应用",
-              }}
+              isValidRange={validateDateRange}
+              i18nStrings={DATE_RANGE_PICKER_I18N}
               placeholder="选择时间范围"
             />
           </div>
