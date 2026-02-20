@@ -1,13 +1,23 @@
 """Prometheus HTTP API 客户端封装 (T062)."""
 
 from abc import ABC, abstractmethod
+from dataclasses import dataclass
 from datetime import datetime
 from functools import lru_cache
 from typing import Any
 
 import httpx
 
+from src.shared.domain.problem import Problem, problem
 from src.shared.infrastructure import get_settings
+
+
+@problem(503, "PROMETHEUS_QUERY_ERROR", "Prometheus 查询失败: {message}")
+@dataclass
+class PrometheusQueryError(Problem):
+    """Prometheus 查询错误."""
+
+    message: str
 
 
 class IPrometheusClient(ABC):
@@ -71,7 +81,7 @@ class PrometheusClient(IPrometheusClient):
 
             if data.get("status") != "success":
                 error_msg = data.get("error", "Unknown error")
-                raise PrometheusQueryError(f"Prometheus query failed: {error_msg}")
+                raise PrometheusQueryError(message=f"Prometheus query failed: {error_msg}")
 
             return data.get("data", {}).get("result", [])
 
@@ -98,13 +108,9 @@ class PrometheusClient(IPrometheusClient):
 
             if data.get("status") != "success":
                 error_msg = data.get("error", "Unknown error")
-                raise PrometheusQueryError(f"Prometheus query failed: {error_msg}")
+                raise PrometheusQueryError(message=f"Prometheus query failed: {error_msg}")
 
             return data.get("data", {}).get("result", [])
-
-
-class PrometheusQueryError(Exception):
-    """Prometheus 查询错误."""
 
 
 @lru_cache(maxsize=1)

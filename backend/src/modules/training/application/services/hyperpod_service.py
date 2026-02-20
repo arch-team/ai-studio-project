@@ -5,6 +5,7 @@ T036: HyperPodPytorchJob 集成逻辑
 """
 
 import asyncio
+from dataclasses import dataclass
 from typing import Any
 
 import structlog
@@ -12,6 +13,7 @@ import structlog
 from src.modules.training.application.interfaces import IHyperPodClient
 from src.modules.training.domain.entities.training_job import TrainingJob
 from src.shared.domain.exceptions import EntityNotFoundError
+from src.shared.domain.problem import Problem, problem
 
 logger = structlog.get_logger(__name__)
 
@@ -62,13 +64,13 @@ def build_job_config(job: TrainingJob) -> dict[str, Any]:
     return config
 
 
-class HyperPodServiceError(Exception):
+@problem(503, "HYPERPOD_SERVICE_ERROR", "HyperPod 服务操作失败: {message}")
+@dataclass
+class HyperPodServiceError(Problem):
     """HyperPod 服务异常，包含重试信息."""
 
-    def __init__(self, message: str, retries: int = 0, original_error: Exception | None = None):
-        super().__init__(message)
-        self.retries = retries
-        self.original_error = original_error
+    message: str
+    retries: int = 0
 
 
 class HyperPodService:
@@ -119,10 +121,16 @@ class HyperPodService:
                 if attempt < self._max_retries - 1:
                     await asyncio.sleep(self._retry_delay)
 
-        raise HyperPodServiceError(
-            f"{operation} failed after {self._max_retries} retries: {last_error}",
+        logger.error(
+            "hyperpod_operation_failed",
+            operation=operation,
             retries=self._max_retries,
-            original_error=last_error,
+            original_error=str(last_error),
+            original_error_type=type(last_error).__name__,
+        )
+        raise HyperPodServiceError(
+            message=f"{operation} failed after {self._max_retries} retries: {last_error}",
+            retries=self._max_retries,
         )
 
     async def submit_job(

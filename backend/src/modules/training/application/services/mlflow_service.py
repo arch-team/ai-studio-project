@@ -9,6 +9,7 @@
 """
 
 import asyncio
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
 
@@ -17,12 +18,17 @@ from mlflow.exceptions import MlflowException
 from mlflow.tracking import MlflowClient
 
 from src.modules.training.application.interfaces import IMetricsService, MetricData, MetricPoint
+from src.shared.domain.problem import Problem, problem
 
 logger = structlog.get_logger(__name__)
 
 
-class MLflowServiceError(Exception):
-    """MLflow 服务异常"""
+@problem(503, "MLFLOW_SERVICE_ERROR", "MLflow 服务操作失败: {message}")
+@dataclass
+class MLflowServiceError(Problem):
+    """MLflow 服务异常."""
+
+    message: str
 
 
 class MLflowService(IMetricsService):
@@ -95,7 +101,7 @@ class MLflowService(IMetricsService):
         try:
             metrics = await self._get_metric_history_with_retry(run_id, metric_name)
         except MlflowException as e:
-            raise MLflowServiceError(f"MLflow unavailable: Failed to get metrics for run {run_id}: {e}") from e
+            raise MLflowServiceError(message=f"MLflow unavailable: Failed to get metrics for run {run_id}: {e}") from e
 
         # 3. 转换时间戳并过滤
         start_ts = start_time.timestamp() * 1000
@@ -133,7 +139,7 @@ class MLflowService(IMetricsService):
         experiment = await self._run_sync(_get)
 
         if experiment is None:
-            raise MLflowServiceError(f"Experiment '{full_name}' not found")
+            raise MLflowServiceError(message=f"Experiment '{full_name}' not found")
 
         return {
             "experiment_id": experiment.experiment_id,
@@ -242,7 +248,7 @@ class MLflowService(IMetricsService):
                     logger.debug("mlflow_search_retry", attempt=attempt + 1)
                 continue
 
-        raise MLflowServiceError(f"MLflow unavailable after {self._max_retries} retries: {last_error}")
+        raise MLflowServiceError(message=f"MLflow unavailable after {self._max_retries} retries: {last_error}")
 
     async def _get_metric_history_with_retry(self, run_id: str, metric_name: str) -> list[Any]:
         """带重试的指标历史查询
