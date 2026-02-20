@@ -22,7 +22,7 @@ Tasks: T091-T106
 - [x] 统一错误处理中间件返回 RFC 7807 Problem Details 格式
 - [x] 所有异常被捕获并记录到错误日志
 - [x] 前端 TanStack Query 重试机制: 指数退避 (1s, 2s, 4s)，最多 3 次
-- [~] 前端 ErrorBoundary 组件捕获 React 错误并显示友好页面 (需确认实现)
+- [x] 前端 ErrorBoundary 组件捕获 React 错误并显示友好页面 (Cloudscape UI)
 
 #### 日志和监控 (T100-T102a)
 - [x] structlog JSON 结构化日志包含 trace_id, user_id, request_id

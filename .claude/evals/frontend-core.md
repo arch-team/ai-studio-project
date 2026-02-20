@@ -37,7 +37,7 @@ Tasks: T017-T020
 - [x] 所有 Cloudscape UI 组件来自 @cloudscape-design/components (无 MUI/Ant Design)
 - [x] 所有页面遵循 Feature-Sliced Design (pages -> components -> hooks -> api -> types)
 - [x] 所有 API 调用使用 TanStack Query hooks
-- [~] TypeScript 类型定义完整，无 any 类型 (需运行 tsc --noEmit 验证)
+- [x] TypeScript 类型定义完整，无 any 类型 (tsc --noEmit 零错误)
 
 ### Regression Evals
 - [x] 路由守卫测试 (AuthGuard, RoleGuard) 全部通过

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import time
 import uuid
 from typing import TYPE_CHECKING
@@ -49,6 +50,8 @@ class SpaceService(BaseApplicationService[Space, str]):
         self._space_repository = space_repository
         self._sagemaker_client = sagemaker_client
         self._metrics_service = metrics_service
+        self._sync_task: asyncio.Task[None] | None = None
+        self._sync_interval: float = 30.0
 
     async def create_space(self, owner_id: int, data: dict) -> Space:
         """创建新的开发空间."""
@@ -197,6 +200,57 @@ class SpaceService(BaseApplicationService[Space, str]):
         logger.info("space_deleted", space_id=space_id, space_name=space.space_name)
 
         await self._space_repository.soft_delete(space_id)
+
+    # ── 定期状态同步 ──────────────────────────────────────────────
+
+    async def start_periodic_sync(self, interval_seconds: float = 30.0) -> None:
+        """启动定期 Space 状态同步后台任务 (默认 30 秒间隔)."""
+        self._sync_interval = interval_seconds
+        self._sync_task = asyncio.create_task(self._periodic_sync_loop())
+        logger.info("space_sync_started", interval_seconds=interval_seconds)
+
+    async def _periodic_sync_loop(self) -> None:
+        """定期同步所有活跃 Space 的 SageMaker 状态。"""
+        while True:
+            try:
+                await self._sync_all_active_spaces()
+            except asyncio.CancelledError:
+                raise
+            except Exception:
+                logger.exception("space_periodic_sync_failed")
+            await asyncio.sleep(self._sync_interval)
+
+    async def _sync_all_active_spaces(self) -> None:
+        """同步所有非终态 Space 的状态。"""
+        active_statuses = [SpaceStatus.PENDING, SpaceStatus.RUNNING]
+        spaces = await self._space_repository.list_by_statuses(active_statuses)
+        for space in spaces:
+            try:
+                info = await self._sagemaker_client.describe_space(space.space_name)
+                if info and info.get("status"):
+                    sagemaker_status = info["status"].lower()
+                    # 映射 SageMaker 状态到平台状态
+                    if sagemaker_status == "inservice" and space.status == SpaceStatus.PENDING:
+                        space.start()
+                        await self._space_repository.update(space)
+                    elif sagemaker_status == "failed":
+                        space.mark_failed(error_message=info.get("failure_reason", "Unknown"))
+                        await self._space_repository.update(space)
+            except Exception:
+                logger.warning("space_sync_single_failed", space_id=space.id)
+
+    async def stop_periodic_sync(self) -> None:
+        """停止定期同步。"""
+        if self._sync_task and not self._sync_task.done():
+            self._sync_task.cancel()
+            try:
+                await self._sync_task
+            except asyncio.CancelledError:
+                pass
+            self._sync_task = None
+        logger.info("space_sync_stopped")
+
+    # ── Metrics ──────────────────────────────────────────────────
 
     async def _record_startup_metric(self, space_id: str, elapsed_seconds: float) -> None:
         """上报 Space 启动耗时到 CloudWatch Metrics (可选依赖)."""

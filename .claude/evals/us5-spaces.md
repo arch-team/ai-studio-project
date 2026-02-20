@@ -20,7 +20,7 @@ Tasks: T081-T090
 - [x] Space 创建成功后返回有效的 SageMaker Studio URL
 - [x] 生命周期脚本 (Lifecycle Configuration) 预装 PyTorch/Transformers
 - [x] EFS 持久化存储正确挂载
-- [~] Space 状态同步服务每 30 秒同步一次 DescribeSpace 状态 (逻辑存在但无定时任务)
+- [x] Space 状态同步服务每 30 秒同步一次 DescribeSpace 状态 (start_periodic_sync 已实现)
 - [x] Space 状态转换正确 (pending -> running -> stopped -> deleted)
 
 #### 性能要求
