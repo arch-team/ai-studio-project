@@ -7,7 +7,7 @@ class LoginRequest(BaseModel):
     """Login request schema."""
 
     username: str | None = Field(None, min_length=1, max_length=64, description="Username for local login")
-    password: str | None = Field(None, description="Password for local login")
+    password: str | None = Field(None, max_length=128, description="Password for local login")
     id_token: str | None = Field(None, description="SSO ID token")
 
 
@@ -22,7 +22,7 @@ class LocalAccountCreateRequest(BaseModel):
 
     username: str = Field(..., min_length=3, max_length=64, description="Username")
     email: EmailStr = Field(..., description="Email address")
-    password: str = Field(..., min_length=12, description="Password")
+    password: str = Field(..., min_length=12, max_length=128, description="Password")
     display_name: str | None = Field(None, max_length=128, description="Display name")
     role: str = Field(default="engineer", description="User role")
 
@@ -38,8 +38,8 @@ class LocalAccountUpdateRequest(BaseModel):
 class PasswordChangeRequest(BaseModel):
     """Password change request schema."""
 
-    current_password: str = Field(..., description="Current password")
-    new_password: str = Field(..., min_length=12, description="New password")
+    current_password: str = Field(..., min_length=1, max_length=128, description="Current password")
+    new_password: str = Field(..., min_length=12, max_length=128, description="New password")
 
 
 class PasswordResetRequest(BaseModel):
@@ -52,4 +52,4 @@ class PasswordResetConfirmRequest(BaseModel):
     """Password reset confirmation schema."""
 
     token: str = Field(..., description="Password reset token")
-    new_password: str = Field(..., min_length=12, description="New password")
+    new_password: str = Field(..., min_length=12, max_length=128, description="New password")
