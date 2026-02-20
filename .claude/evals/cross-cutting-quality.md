@@ -1,6 +1,6 @@
 ## EVAL: cross-cutting-quality
 Created: 2026-02-20
-Last Check: 2026-02-20
+Last Check: 2026-02-20 (post-fix)
 Module: 全项目横向质量保障
 Phase: 8 (Polish & Cross-cutting)
 Tasks: T091-T106
@@ -14,9 +14,9 @@ Tasks: T091-T106
 - [x] 所有页面组件有对应的单元测试
 
 #### API Contract 验证 (T093-T095)
-- [ ] training-jobs API 端点与 contracts/training-jobs-api.yaml 一致
-- [ ] datasets API 端点与 contracts/datasets-api.yaml 一致
-- [ ] users + resource-quotas API 端点与对应 contract 一致
+- [x] training-jobs API 端点与 contracts/training-jobs-api.yaml 一致 (13 tests)
+- [x] datasets API 端点与 contracts/datasets-api.yaml 一致 (9 tests)
+- [x] users + resource-quotas API 端点与对应 contract 一致 (15 tests)
 
 #### 错误处理 (T097-T099)
 - [x] 统一错误处理中间件返回 RFC 7807 Problem Details 格式
@@ -48,7 +48,7 @@ Tasks: T091-T106
 - [x] ReDoc (/redoc) 可正常访问
 
 ### Regression Evals
-- [x] 所有后端测试在 CI 环境中通过 (1697 passed)
+- [x] 所有后端测试在 CI 环境中通过 (1560 passed)
 - [x] 所有前端测试在 CI 环境中通过
 - [x] CDK 测试全部通过
 - [x] 无 ESLint/Ruff 错误

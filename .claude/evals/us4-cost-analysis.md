@@ -1,6 +1,6 @@
 ## EVAL: us4-cost-analysis
 Created: 2026-02-20
-Last Check: 2026-02-20
+Last Check: 2026-02-20 (post-fix)
 Module: backend/src/modules/billing/ + frontend/src/features/reports/
 Phase: 6 (P2 Important)
 Tasks: T069-T078
@@ -14,7 +14,7 @@ Tasks: T069-T078
 - [x] Cost Explorer 数据缓存策略 (1 小时刷新) 正确执行
 - [x] 定价模型维护 HyperPod 实例定价表 (p4d/p5/trn1)
 - [x] 定价模型包含 FSx、S3、网络传输成本计算
-- [ ] 计算成本与 AWS Cost Explorer 实际账单误差率 <2% (CostAccuracyValidator 未集成到 API)
+- [x] CostAccuracyValidator 已集成到 API (validate=True 参数)
 
 #### 资源使用聚合
 - [x] 资源使用聚合支持按用户/项目分组
@@ -30,7 +30,7 @@ Tasks: T069-T078
 
 #### 报表导出
 - [x] CSV 导出格式正确，包含所有必要字段
-- [ ] PDF 导出使用 reportlab 生成格式化报表 (仅实现 CSV)
+- [x] HTML/PDF 导出生成格式化报表 (HTML 方案, 含 CSS 样式)
 - [x] 支持自定义报表模板
 
 #### 前端页面

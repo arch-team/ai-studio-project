@@ -1,5 +1,9 @@
 """Checkpoint Trigger Service - 特定场景触发的检查点创建."""
 
+import asyncio
+
+import structlog
+
 from src.modules.training.application.services.checkpoint_creation_service import CheckpointCreationService
 from src.modules.training.domain.entities import Checkpoint
 from src.modules.training.domain.exceptions import (
@@ -111,11 +115,22 @@ class CheckpointTriggerService:
         Returns:
             Checkpoint | None: 创建的检查点，失败返回 None
         """
-        # TODO: 实现超时控制逻辑
-        return await self._safe_create_checkpoint(
-            job_id=job_id,
-            trigger_type=CheckpointTriggerType.PREEMPTION,
-        )
+        logger = structlog.get_logger(__name__)
+        try:
+            return await asyncio.wait_for(
+                self._safe_create_checkpoint(
+                    job_id=job_id,
+                    trigger_type=CheckpointTriggerType.PREEMPTION,
+                ),
+                timeout=timeout_seconds,
+            )
+        except TimeoutError:
+            logger.error(
+                "preemption_checkpoint_timeout",
+                job_id=job_id,
+                timeout_seconds=timeout_seconds,
+            )
+            return None
 
     async def _safe_create_checkpoint(
         self,

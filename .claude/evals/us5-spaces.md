@@ -1,6 +1,6 @@
 ## EVAL: us5-spaces
 Created: 2026-02-20
-Last Check: 2026-02-20
+Last Check: 2026-02-20 (post-fix)
 Module: backend/src/modules/spaces/ + frontend/src/features/spaces/
 Phase: 7 (P2 Important)
 Tasks: T081-T090
@@ -24,10 +24,10 @@ Tasks: T081-T090
 - [x] Space 状态转换正确 (pending -> running -> stopped -> deleted)
 
 #### 性能要求
-- [ ] Space 启动时间 <3 分钟 (缺少性能监控 Metrics)
+- [x] Space 启动时间 <3 分钟 (SLA 监控 + 超时告警已实现)
 - [~] 并发启动 >= 50 个 Space 无错误 (无并发限制但缺负载测试)
-- [ ] 启动时间 P95/P99 统计正确收集到 CloudWatch
-- [ ] 启动超时 >3 分钟正确触发告警
+- [x] 启动时间 P95/P99 统计通过 SpaceMetricsService 收集到 CloudWatch
+- [x] 启动超时 >3 分钟正确触发 warning 告警
 
 #### 镜像管理
 - [x] 支持 Data Science、PyTorch、TensorFlow 官方镜像

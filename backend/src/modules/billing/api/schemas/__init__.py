@@ -2,6 +2,7 @@
 
 from .requests import CostAnalysisReportRequest, ResourceUsageReportRequest
 from .responses import (
+    CostAccuracyInfo,
     CostAnalysisReportResponse,
     CostDataPoint,
     CostForecast,
@@ -18,6 +19,7 @@ __all__ = [
     "ResourceUsageReportResponse",
     "ResourceUsageDataPoint",
     "CostAnalysisReportResponse",
+    "CostAccuracyInfo",
     "CostDataPoint",
     "CostForecast",
     "CostTrend",

@@ -3,6 +3,8 @@
 协调检查点的分层存储迁移流程。
 """
 
+import asyncio
+
 import structlog
 
 from src.modules.training.application.interfaces import (
@@ -40,10 +42,12 @@ class CheckpointMigrationService:
         checkpoint_repository: ICheckpointRepository,
         storage_service: IStorageService,
         notification_service: INotificationService | None = None,
+        alert_recipient_ids: list[int] | None = None,
     ):
         self._checkpoint_repo = checkpoint_repository
         self._storage = storage_service
         self._notification = notification_service
+        self._alert_recipient_ids = alert_recipient_ids or []
         self._strategy = CheckpointMigrationStrategy()
         self._integrity_service = CheckpointIntegrityService(
             checkpoint_repository,
@@ -127,6 +131,7 @@ class CheckpointMigrationService:
         max_retries = int(CHECKPOINT_MIGRATION_CONFIG["max_retry_count"])
         last_error = None
 
+        base_delay = 1.0
         for attempt in range(max_retries):
             try:
                 result = await self._attempt_migration(checkpoint, target_tier)
@@ -134,7 +139,9 @@ class CheckpointMigrationService:
             except Exception as e:
                 last_error = f"{type(e).__name__}: {e}"
                 self._log_migration_attempt_failure(checkpoint, attempt + 1, max_retries, e)
-                continue
+                # 指数退避: 1s → 2s → 4s
+                if attempt < max_retries - 1:
+                    await asyncio.sleep(base_delay * (2**attempt))
 
         # 所有重试都失败
         await self._send_migration_failure_alert(checkpoint, target_tier, last_error)
@@ -302,11 +309,17 @@ class CheckpointMigrationService:
         if self._notification is None:
             return
 
+        if not self._alert_recipient_ids:
+            logger.warning(
+                "alert_recipients_not_configured",
+                checkpoint_id=checkpoint.id,
+            )
+
         alert = Alert(
             title="检查点迁移失败",
             message=f"检查点 {checkpoint.id} 从 {checkpoint.storage_tier.value} 迁移到 {target_tier.value} 失败: {error_message}",
             severity="error",
-            recipient_ids=[],  # TODO: 配置管理员 ID
+            recipient_ids=self._alert_recipient_ids,
             metadata={
                 "checkpoint_id": checkpoint.id,
                 "training_job_id": checkpoint.training_job_id,

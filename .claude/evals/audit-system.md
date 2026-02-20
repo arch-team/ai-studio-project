@@ -1,6 +1,6 @@
 ## EVAL: audit-system
 Created: 2026-02-20
-Last Check: 2026-02-20
+Last Check: 2026-02-20 (post-fix)
 Module: backend/src/modules/audit/
 Phase: 2+5 (Foundational + US3)
 Tasks: T010a, T012a, T016b, T061a-T061b, T102a
@@ -27,8 +27,8 @@ Tasks: T010a, T012a, T016b, T061a-T061b, T102a
 - [x] DELETE /audit-logs/cleanup 清理过期日志 (expires_at < now)
 - [x] 清理返回统计 (清理条数、执行耗时、失败记录数)
 - [x] 仅 admin 角色可调用清理
-- [ ] 自动清理服务每日凌晨 2:00 执行 (需 K8s CronJob 配置)
-- [ ] 清理失败连续 3 天触发告警
+- [x] AuditCleanupService 每日 UTC 18:00 (北京 02:00) 自动执行清理
+- [x] 清理失败连续 3 天触发 critical 告警
 - [x] 保留策略: >= 90 天
 
 #### 领域模型

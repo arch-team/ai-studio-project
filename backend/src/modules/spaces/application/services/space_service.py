@@ -1,6 +1,10 @@
 """Space Service - 开发空间管理业务逻辑."""
 
+from __future__ import annotations
+
+import time
 import uuid
+from typing import TYPE_CHECKING
 
 import structlog
 
@@ -16,7 +20,13 @@ from src.modules.spaces.domain.value_objects import (
 from src.shared.application import BaseApplicationService
 from src.shared.utils import utc_now
 
+if TYPE_CHECKING:
+    from src.modules.spaces.application.services.sagemaker_metrics_service import SpaceMetricsService
+
 logger = structlog.get_logger(__name__)
+
+# Space 启动 SLA 阈值 (秒)
+STARTUP_SLA_SECONDS = 180  # 3 分钟
 
 # IDE 类型映射: SpaceType -> SageMaker IDE 类型
 _IDE_TYPE_MAP = {
@@ -33,10 +43,12 @@ class SpaceService(BaseApplicationService[Space, str]):
         self,
         space_repository: ISpaceRepository,
         sagemaker_client: ISageMakerSpacesClient,
+        metrics_service: SpaceMetricsService | None = None,
     ):
         super().__init__(space_repository, "Space")
         self._space_repository = space_repository
         self._sagemaker_client = sagemaker_client
+        self._metrics_service = metrics_service
 
     async def create_space(self, owner_id: int, data: dict) -> Space:
         """创建新的开发空间."""
@@ -64,8 +76,9 @@ class SpaceService(BaseApplicationService[Space, str]):
             updated_at=utc_now(),
         )
 
-        # 调用 SageMaker API 创建 Space
+        # 调用 SageMaker API 创建 Space，同时记录启动耗时
         ide_type = _IDE_TYPE_MAP.get(space_type, "jupyterlab")
+        start_time = time.monotonic()
         result = await self._sagemaker_client.create_space(
             name=space_name,
             instance_type=instance_type.value,
@@ -73,6 +86,7 @@ class SpaceService(BaseApplicationService[Space, str]):
             lifecycle_config_arn=data.get("lifecycle_config_arn"),
             storage_size_gb=storage_size_gb,
         )
+        elapsed_seconds = time.monotonic() - start_time
 
         # 记录 SageMaker ARN
         space.sagemaker_space_arn = result.get("arn")
@@ -83,7 +97,20 @@ class SpaceService(BaseApplicationService[Space, str]):
             space_id=space.id,
             space_name=space_name,
             sagemaker_arn=space.sagemaker_space_arn,
+            elapsed_seconds=round(elapsed_seconds, 2),
         )
+
+        # 检查是否超过启动 SLA
+        if elapsed_seconds > STARTUP_SLA_SECONDS:
+            logger.warning(
+                "space_creation_sla_exceeded",
+                space_id=space.id,
+                elapsed_seconds=round(elapsed_seconds, 2),
+                sla_seconds=STARTUP_SLA_SECONDS,
+            )
+
+        # 上报启动耗时到 CloudWatch Metrics
+        await self._record_startup_metric(space.id, elapsed_seconds)
 
         # 保存到数据库
         return await self._space_repository.create(space)
@@ -116,14 +143,30 @@ class SpaceService(BaseApplicationService[Space, str]):
         space = await self._get_or_raise(space_id)
         space.start()
 
-        # 调用 SageMaker API 查询并确认 Space 存在
+        # 调用 SageMaker API 查询并确认 Space 存在，记录启动耗时
+        start_time = time.monotonic()
         sagemaker_info = await self._sagemaker_client.describe_space(space.space_name)
+        elapsed_seconds = time.monotonic() - start_time
+
         if sagemaker_info:
             logger.info(
                 "space_starting",
                 space_id=space_id,
                 sagemaker_status=sagemaker_info.get("status"),
+                elapsed_seconds=round(elapsed_seconds, 2),
             )
+
+        # 检查是否超过启动 SLA
+        if elapsed_seconds > STARTUP_SLA_SECONDS:
+            logger.warning(
+                "space_startup_sla_exceeded",
+                space_id=space_id,
+                elapsed_seconds=round(elapsed_seconds, 2),
+                sla_seconds=STARTUP_SLA_SECONDS,
+            )
+
+        # 上报启动耗时到 CloudWatch Metrics
+        await self._record_startup_metric(space_id, elapsed_seconds)
 
         return await self._space_repository.update(space)
 
@@ -154,3 +197,16 @@ class SpaceService(BaseApplicationService[Space, str]):
         logger.info("space_deleted", space_id=space_id, space_name=space.space_name)
 
         await self._space_repository.soft_delete(space_id)
+
+    async def _record_startup_metric(self, space_id: str, elapsed_seconds: float) -> None:
+        """上报 Space 启动耗时到 CloudWatch Metrics (可选依赖)."""
+        if self._metrics_service is None:
+            return
+        try:
+            await self._metrics_service.record_startup_time(
+                space_id=space_id,
+                startup_seconds=elapsed_seconds,
+            )
+        except Exception:
+            # Metrics 上报失败不影响主流程
+            logger.warning("space_startup_metric_record_failed", space_id=space_id)

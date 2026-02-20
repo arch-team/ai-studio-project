@@ -3,15 +3,18 @@
 提供资源使用报表和成本分析报表查询接口。
 """
 
+import structlog
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, Query
 
 from src.modules.auth.api.dependencies import get_current_active_user
 
-from ..application.services import ReportService
-from .dependencies import get_report_service
-from .schemas import CostAnalysisReportResponse, ResourceUsageReportResponse
+from ..application.services import CostAccuracyValidator, ReportService
+from .dependencies import get_cost_accuracy_validator, get_report_service
+from .schemas import CostAccuracyInfo, CostAnalysisReportResponse, ResourceUsageReportResponse
+
+logger = structlog.get_logger(__name__)
 
 router = APIRouter()
 
@@ -61,10 +64,12 @@ async def get_cost_analysis_report(
     user_id: int | None = Query(None, description="用户 ID 过滤"),
     project_id: str | None = Query(None, description="项目 ID 过滤"),
     include_forecast: bool = Query(default=False, description="是否包含成本预测"),
+    validate: bool = Query(default=False, description="是否执行成本准确率验证 (对比 Cost Explorer)"),
     page: int = Query(default=1, ge=1, description="页码"),
     page_size: int = Query(default=20, ge=1, le=100, description="每页数量"),
     _: None = Depends(get_current_active_user),
     report_service: ReportService = Depends(get_report_service),
+    accuracy_validator: CostAccuracyValidator | None = Depends(get_cost_accuracy_validator),
 ) -> CostAnalysisReportResponse:
     """查询成本分析报表 (T072).
 
@@ -74,6 +79,7 @@ async def get_cost_analysis_report(
     - 用户/项目级别钻取
     - 成本趋势分析
     - 成本预测 (可选)
+    - 成本准确率验证 (可选, validate=True 时对比 Cost Explorer 账单)
     - 支持分页
 
     Returns:
@@ -89,5 +95,31 @@ async def get_cost_analysis_report(
         page=page,
         page_size=page_size,
     )
+
+    # 成本准确率验证 (可选)
+    accuracy_info = None
+    if validate and accuracy_validator is not None:
+        try:
+            accuracy_report = await accuracy_validator.validate(
+                start_date=start_date,
+                end_date=end_date,
+            )
+            accuracy_info = CostAccuracyInfo(
+                overall_error_rate=accuracy_report.overall_error_rate,
+                is_accurate=accuracy_report.is_accurate,
+                alert_triggered=accuracy_report.alert_triggered,
+                alert_message=accuracy_report.alert_message,
+                total_calculated=accuracy_report.total_calculated,
+                total_actual=accuracy_report.total_actual,
+            )
+        except Exception:
+            logger.warning(
+                "cost_accuracy_validation_failed",
+                start_date=start_date.isoformat(),
+                end_date=end_date.isoformat(),
+                exc_info=True,
+            )
+
+    result["accuracy"] = accuracy_info
 
     return CostAnalysisReportResponse(**result)

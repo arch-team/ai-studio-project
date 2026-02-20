@@ -63,6 +63,17 @@ class CostTrend(BaseModel):
     current_period_cost: Decimal = Field(..., description="当前周期成本 (USD)")
 
 
+class CostAccuracyInfo(BaseModel):
+    """成本准确率验证信息 (T069c)."""
+
+    overall_error_rate: Decimal = Field(..., description="整体误差率")
+    is_accurate: bool = Field(..., description="是否在阈值内 (误差 <2%)")
+    alert_triggered: bool = Field(..., description="是否触发告警")
+    alert_message: str = Field(default="", description="告警消息")
+    total_calculated: Decimal = Field(..., description="平台计算总成本")
+    total_actual: Decimal = Field(..., description="Cost Explorer 实际总成本")
+
+
 class CostAnalysisReportResponse(BaseModel):
     """成本分析报表响应 (T072)."""
 
@@ -78,6 +89,7 @@ class CostAnalysisReportResponse(BaseModel):
     grand_total_cost: Decimal = Field(..., description="总成本 (USD)")
     trend: CostTrend | None = Field(None, description="成本趋势分析")
     forecast: list[CostForecast] | None = Field(None, description="成本预测数据")
+    accuracy: CostAccuracyInfo | None = Field(None, description="成本准确率验证 (validate=True 时返回)")
     page: int = Field(..., description="当前页码")
     page_size: int = Field(..., description="每页数量")
     total_records: int = Field(..., description="总记录数")

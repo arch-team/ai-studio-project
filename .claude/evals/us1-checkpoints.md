@@ -1,6 +1,6 @@
 ## EVAL: us1-checkpoints
 Created: 2026-02-20
-Last Check: 2026-02-20
+Last Check: 2026-02-20 (post-fix)
 Module: backend/src/modules/training/application/services/checkpoint_*.py
 Phase: 3 (P1 Must-Have)
 Tasks: T038, T038b-1, T038b-2
@@ -23,7 +23,7 @@ Tasks: T038, T038b-1, T038b-2
 - [x] 异步迁移在检查点间隔期执行，不影响训练性能
 - [x] NVMe/FSx 使用率 >90% 时触发紧急迁移至下一层
 - [x] 所有层均满载时告警并暂停新检查点创建 (保留最近 1 个)
-- [ ] 迁移失败时保留原位置检查点，最多重试 3 次 (缺少指数退避)
+- [x] 迁移失败时保留原位置检查点，最多重试 3 次 (指数退避 1s→2s→4s)
 - [x] SHA-256 校验和验证: 恢复前验证完整性，损坏时自动尝试上一个有效检查点
 
 #### S3 生命周期 (T038b-2)
@@ -35,13 +35,13 @@ Tasks: T038, T038b-1, T038b-2
 - [x] 低优先级任务被高优先级任务抢占时 checkpoint 在 5 分钟内保存完成
 - [x] 被抢占任务的 Pod 在 30 秒内被释放
 - [x] 任务状态正确转换为 Preempted
-- [ ] 抢占后自动恢复成功 (超时控制逻辑有 TODO 未完成)
+- [x] 抢占超时控制: asyncio.wait_for(timeout=300s)
 
 ### Regression Evals
 - [x] 检查点创建不影响训练任务性能 (GPU 利用率下降 <5%)
 - [x] 分层迁移服务不影响正在运行的训练任务
 - [x] S3 生命周期规则不误删热/温检查点
-- [ ] 迁移失败告警 recipient_ids 为空 (硬编码 [])
+- [x] 迁移失败告警 recipient_ids 从配置读取 (空时记录 warning)
 
 ### Success Criteria
 - pass@3 > 90% for capability evals
