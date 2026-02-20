@@ -17,7 +17,7 @@ import {
   Table,
 } from "@cloudscape-design/components";
 import { useUsers, useCreateUser, useUpdateUser } from "../hooks";
-import { UserFormModal } from "../components/UserFormModal";
+import { UserFormModal } from "../components";
 import { formatDateTime } from "@shared/utils";
 import type {
   UserDetail,
@@ -33,6 +33,18 @@ import {
   USER_STATUS_LABELS,
   USER_STATUS_COLORS,
 } from "../types";
+
+// 类型守卫：校验字符串是否为有效的 UserRole
+const VALID_ROLES = Object.keys(USER_ROLE_LABELS) as UserRole[];
+function isUserRole(v: string): v is UserRole {
+  return (VALID_ROLES as string[]).includes(v);
+}
+
+// 类型守卫：校验字符串是否为有效的 UserStatus
+const VALID_STATUSES = Object.keys(USER_STATUS_LABELS) as UserStatus[];
+function isUserStatus(v: string): v is UserStatus {
+  return (VALID_STATUSES as string[]).includes(v);
+}
 
 // 构建 Select 选项
 const roleFilterOptions = [
@@ -71,12 +83,12 @@ export function UserManagementPage() {
       page_size: pageSize,
     };
 
-    if (roleFilter) {
-      params.role = roleFilter as UserRole;
+    if (roleFilter && isUserRole(roleFilter)) {
+      params.role = roleFilter;
     }
 
-    if (statusFilter) {
-      params.status = statusFilter as UserStatus;
+    if (statusFilter && isUserStatus(statusFilter)) {
+      params.status = statusFilter;
     }
 
     return params;
