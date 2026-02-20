@@ -3,7 +3,7 @@
 from abc import ABC, abstractmethod
 
 from ..entities import Dataset
-from ..value_objects import DatasetStatus, DatasetType, DatasetVisibility
+from ..value_objects import DatasetStatus, DatasetStorageType, DatasetType, DatasetVisibility
 
 
 class IDatasetRepository(ABC):
@@ -23,7 +23,9 @@ class IDatasetRepository(ABC):
         owner_id: int,
         status: DatasetStatus | None = None,
         dataset_type: DatasetType | None = None,
+        storage_type: DatasetStorageType | None = None,
         visibility: DatasetVisibility | None = None,
+        search: str | None = None,
         page: int = 1,
         page_size: int = 20,
         sort_by: str = "created_at",

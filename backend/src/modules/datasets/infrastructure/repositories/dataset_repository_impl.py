@@ -1,6 +1,6 @@
 """Dataset 仓库实现 - SQLAlchemy 数据访问。"""
 
-from sqlalchemy import func, select
+from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.shared.infrastructure import PydanticRepository
@@ -9,6 +9,7 @@ from ...domain.entities import Dataset
 from ...domain.repositories import IDatasetRepository
 from ...domain.value_objects import (
     DatasetStatus,
+    DatasetStorageType,
     DatasetType,
     DatasetVisibility,
 )
@@ -65,7 +66,9 @@ class DatasetRepositoryImpl(PydanticRepository[Dataset, DatasetModel, int], IDat
         owner_id: int,
         status: DatasetStatus | None = None,
         dataset_type: DatasetType | None = None,
+        storage_type: DatasetStorageType | None = None,
         visibility: DatasetVisibility | None = None,
+        search: str | None = None,
         page: int = 1,
         page_size: int = 20,
         sort_by: str = "created_at",
@@ -84,9 +87,21 @@ class DatasetRepositoryImpl(PydanticRepository[Dataset, DatasetModel, int], IDat
             query = query.where(DatasetModel.dataset_type == dataset_type)
             count_query = count_query.where(DatasetModel.dataset_type == dataset_type)
 
+        if storage_type is not None:
+            query = query.where(DatasetModel.storage_type == storage_type)
+            count_query = count_query.where(DatasetModel.storage_type == storage_type)
+
         if visibility is not None:
             query = query.where(DatasetModel.visibility == visibility)
             count_query = count_query.where(DatasetModel.visibility == visibility)
+
+        # 全文搜索 - 使用 MySQL MATCH...AGAINST（利用 ft_name_desc 索引）
+        if search is not None:
+            ft_condition = text(
+                "MATCH(name, description) AGAINST(:search IN BOOLEAN MODE)"
+            ).bindparams(search=search)
+            query = query.where(ft_condition)
+            count_query = count_query.where(ft_condition)
 
         # 获取总数
         total_result = await self._session.execute(count_query)

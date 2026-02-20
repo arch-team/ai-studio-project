@@ -38,8 +38,8 @@ class TestLoginEndpoint:
             json={"id_token": "some-sso-token"},
         )
 
-        # Should return 501 Not Implemented or 400
-        assert response.status_code in [400, 501, 503]
+        # SSO 中间件已实现, mock 的 AuthService 返回 401 (无效凭证)
+        assert response.status_code in [400, 401, 501, 503]
 
     @pytest.mark.asyncio
     async def test_login_response_format(self, client: AsyncClient) -> None:

@@ -28,6 +28,7 @@ from src.modules.datasets.application.services import DatasetService
 from src.modules.datasets.domain.entities import Dataset
 from src.modules.datasets.domain.value_objects import (
     DatasetStatus,
+    DatasetStorageType,
     DatasetType,
     DatasetVisibility,
 )
@@ -66,6 +67,7 @@ async def create_dataset(
 async def list_datasets(
     page: PageParam = 1,
     page_size: PageSizeParam = 20,
+    search: str | None = Query(default=None, description="全文搜索（搜索名称和描述）"),
     dataset_type: DatasetTypeEnum | None = Query(default=None, description="按数据集类型过滤"),
     storage_type: DatasetStorageTypeEnum | None = Query(default=None, description="按存储类型过滤"),
     visibility: DatasetVisibilityEnum | None = Query(default=None, description="按可见性过滤"),
@@ -75,7 +77,7 @@ async def list_datasets(
     current_user: CurrentUser = Depends(get_current_active_user),
     service: DatasetService = Depends(get_dataset_service),
 ) -> DatasetListResponse:
-    """列出数据集（支持分页和过滤）。
+    """列出数据集（支持分页、过滤和全文搜索）。
 
     返回当前用户拥有的数据集，管理员可查看所有数据集。
     """
@@ -85,7 +87,9 @@ async def list_datasets(
         owner_id=owner_id,
         status=EnumMapper.to_domain(status_filter, DatasetStatus),
         dataset_type=EnumMapper.to_domain(dataset_type, DatasetType),
+        storage_type=EnumMapper.to_domain(storage_type, DatasetStorageType),
         visibility=EnumMapper.to_domain(visibility, DatasetVisibility),
+        search=search,
         page=page,
         page_size=page_size,
         sort_by=sort_by,
