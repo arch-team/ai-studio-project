@@ -62,14 +62,15 @@ def create_app() -> FastAPI:
 
 
 def _create_base_app(settings: Settings) -> FastAPI:
-    """创建基础 FastAPI 应用实例。"""
+    """创建基础 FastAPI 应用实例。非 development 环境禁用 API 文档端点。"""
+    is_dev = settings.environment == "development"
     return FastAPI(
         title=settings.app_name,
         version=settings.app_version,
         description="Enterprise AI Training Platform powered by AWS SageMaker HyperPod",
-        docs_url="/docs",
-        redoc_url="/redoc",
-        openapi_url="/openapi.json",
+        docs_url="/docs" if is_dev else None,
+        redoc_url="/redoc" if is_dev else None,
+        openapi_url="/openapi.json" if is_dev else None,
         lifespan=lifespan,
     )
 
@@ -125,15 +126,14 @@ def _configure_exception_handlers(app: FastAPI) -> None:
 
 
 def _configure_health_check(app: FastAPI, settings: Settings) -> None:
-    """配置健康检查端点。"""
+    """配置健康检查端点。非 development 环境仅返回 status，避免版本信息泄露。"""
     @app.get("/health", tags=["Health"])
     async def _health_check() -> dict:
         """Health check endpoint for load balancers and monitoring."""
-        return {
-            "status": "healthy",
-            "version": settings.app_version,
-            "environment": settings.environment,
-        }
+        base: dict = {"status": "healthy"}
+        if settings.environment == "development":
+            base.update({"version": settings.app_version, "environment": settings.environment})
+        return base
 
 
 # Create the application instance
