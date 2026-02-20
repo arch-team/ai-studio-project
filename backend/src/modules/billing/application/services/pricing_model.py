@@ -4,6 +4,8 @@ from dataclasses import dataclass
 from datetime import datetime
 from decimal import Decimal
 
+from src.shared.utils import utc_now
+
 
 @dataclass(frozen=True)
 class InstancePricing:
@@ -44,7 +46,7 @@ class PricingModelService:
 
     def __init__(self, default_region: str = "us-east-1"):
         self.default_region = default_region
-        self.last_updated = datetime.now()
+        self.last_updated = utc_now()
         self._instance_pricing_data = self._initialize_instance_pricing()
         self._storage_pricing_data = self._initialize_storage_pricing()
         self._network_pricing_data = self._initialize_network_pricing()

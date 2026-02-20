@@ -10,7 +10,7 @@ PricingModelService 单元测试
 6. 定价数据版本管理
 """
 
-from datetime import datetime
+from datetime import UTC, datetime
 from decimal import Decimal
 
 import pytest
@@ -228,7 +228,7 @@ class TestPricingModelService:
     def test_last_updated_timestamp(self, pricing_service: PricingModelService):
         """测试最后更新时间戳"""
         assert isinstance(pricing_service.last_updated, datetime)
-        assert pricing_service.last_updated <= datetime.now()
+        assert pricing_service.last_updated <= datetime.now(UTC)
 
     def test_calculate_training_cost(self, pricing_service: PricingModelService):
         """测试计算训练成本 (集成测试)"""

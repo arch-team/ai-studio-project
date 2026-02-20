@@ -4,7 +4,7 @@
 """
 
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any
 
 from ...infrastructure.external.prometheus_client import IPrometheusClient
@@ -265,7 +265,7 @@ class PrometheusService:
             instance = metric.get("instance", "unknown")
 
             for value in item.get("values", []):
-                timestamp = datetime.fromtimestamp(float(value[0]))
+                timestamp = datetime.fromtimestamp(float(value[0]), tz=UTC)
                 utilization = float(value[1])
                 data_points.append(
                     GPUUtilizationPoint(
@@ -291,7 +291,7 @@ class PrometheusService:
 
         for item in raw_result:
             for value in item.get("values", []):
-                timestamp = datetime.fromtimestamp(float(value[0]))
+                timestamp = datetime.fromtimestamp(float(value[0]), tz=UTC)
                 metric_value = float(value[1])
                 data_points.append(MetricDataPoint(timestamp=timestamp, value=metric_value))
 

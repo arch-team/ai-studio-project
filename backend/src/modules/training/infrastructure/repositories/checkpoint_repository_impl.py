@@ -2,6 +2,8 @@
 
 from datetime import datetime, timedelta
 
+from src.shared.utils import utc_now
+
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -105,7 +107,7 @@ class CheckpointRepository(PydanticRepository[Checkpoint, CheckpointModel, int],
         hours_threshold: int = 72,
     ) -> list[Checkpoint]:
         """Get checkpoints older than threshold for archival."""
-        threshold_time = datetime.utcnow() - timedelta(hours=hours_threshold)
+        threshold_time = utc_now() - timedelta(hours=hours_threshold)
         result = await self._session.execute(
             select(CheckpointModel)
             .where(CheckpointModel.training_job_id == training_job_id)
