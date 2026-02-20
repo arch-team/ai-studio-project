@@ -17,9 +17,9 @@ import {
   Spinner,
   Table,
   Tabs,
-} from '@cloudscape-design/components';
-import { useState, useCallback } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+} from "@cloudscape-design/components";
+import { useState, useCallback } from "react";
+import { useNavigate, useParams } from "react-router-dom";
 import {
   useTrainingJob,
   useTrainingJobCheckpoints,
@@ -27,66 +27,35 @@ import {
   usePauseTrainingJob,
   useResumeTrainingJob,
   useDeleteTrainingJob,
-} from '../api';
-import { TrainingStatusBadge, TrainingStatusMonitor } from '../components';
-import type { LogEntry } from '../types';
-import type { Checkpoint } from '../types';
-import {
-  JOB_PRIORITY_LABELS,
-  DISTRIBUTION_STRATEGY_LABELS,
-} from '../types';
-
-/**
- * 格式化日期时间
- */
-function formatDateTime(dateStr: string | null | undefined): string {
-  if (!dateStr) return '-';
-  const date = new Date(dateStr);
-  return date.toLocaleString('zh-CN', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-  });
-}
-
-/**
- * 格式化持续时间
- */
-function formatDuration(startTime: string | null, endTime: string | null): string {
-  if (!startTime) return '-';
-  const start = new Date(startTime);
-  const end = endTime ? new Date(endTime) : new Date();
-  const diffMs = end.getTime() - start.getTime();
-  const hours = Math.floor(diffMs / (1000 * 60 * 60));
-  const minutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
-  return `${hours}h ${minutes}m`;
-}
+} from "../api";
+import { TrainingStatusBadge, TrainingStatusMonitor } from "../components";
+import { formatDateTime, formatDuration, formatFileSize } from "@shared/utils";
+import type { LogEntry } from "../types";
+import type { Checkpoint } from "../types";
+import { JOB_PRIORITY_LABELS, DISTRIBUTION_STRATEGY_LABELS } from "../types";
 
 /**
  * 检查点表格列定义
  */
 const checkpointColumns = [
   {
-    id: 'checkpoint_name',
-    header: '检查点名称',
+    id: "checkpoint_name",
+    header: "检查点名称",
     cell: (item: Checkpoint) => item.checkpoint_name,
   },
   {
-    id: 'epoch',
-    header: 'Epoch',
-    cell: (item: Checkpoint) => item.epoch ?? '-',
+    id: "epoch",
+    header: "Epoch",
+    cell: (item: Checkpoint) => item.epoch ?? "-",
   },
   {
-    id: 'step',
-    header: 'Step',
-    cell: (item: Checkpoint) => item.step ?? '-',
+    id: "step",
+    header: "Step",
+    cell: (item: Checkpoint) => item.step ?? "-",
   },
   {
-    id: 'storage_path',
-    header: '存储路径',
+    id: "storage_path",
+    header: "存储路径",
     cell: (item: Checkpoint) => (
       <Box fontSize="body-s">
         <code>{item.storage_path}</code>
@@ -94,19 +63,13 @@ const checkpointColumns = [
     ),
   },
   {
-    id: 'size_bytes',
-    header: '大小',
-    cell: (item: Checkpoint) => {
-      if (!item.size_bytes) return '-';
-      const mb = item.size_bytes / (1024 * 1024);
-      return mb >= 1024
-        ? `${(mb / 1024).toFixed(2)} GB`
-        : `${mb.toFixed(2)} MB`;
-    },
+    id: "size_bytes",
+    header: "大小",
+    cell: (item: Checkpoint) => formatFileSize(item.size_bytes),
   },
   {
-    id: 'created_at',
-    header: '创建时间',
+    id: "created_at",
+    header: "创建时间",
     cell: (item: Checkpoint) => formatDateTime(item.created_at),
   },
 ];
@@ -130,13 +93,12 @@ export function TrainingJobDetailPage() {
     useTrainingJobCheckpoints(jobId);
 
   // 获取日志（running 状态时 5 秒轮询）
-  const isRunning = job?.status === 'running';
-  const { data: logsData, isLoading: logsLoading, refetch: refetchLogs } =
-    useTrainingJobLogs(
-      jobId,
-      { limit: 100 },
-      isRunning ? 5000 : undefined
-    );
+  const isRunning = job?.status === "running";
+  const {
+    data: logsData,
+    isLoading: logsLoading,
+    refetch: refetchLogs,
+  } = useTrainingJobLogs(jobId, { limit: 100 }, isRunning ? 5000 : undefined);
 
   // Mutations
   const pauseMutation = usePauseTrainingJob();
@@ -144,11 +106,11 @@ export function TrainingJobDetailPage() {
   const deleteMutation = useDeleteTrainingJob();
 
   // 判断是否可以暂停
-  const canPause = job?.status === 'running';
+  const canPause = job?.status === "running";
   // 判断是否可以恢复
-  const canResume = job?.status === 'paused' || job?.status === 'preempted';
+  const canResume = job?.status === "paused" || job?.status === "preempted";
   // 判断是否可以删除
-  const canDelete = job?.status !== 'running';
+  const canDelete = job?.status !== "running";
 
   // 暂停任务
   const handlePause = useCallback(async () => {
@@ -169,7 +131,7 @@ export function TrainingJobDetailPage() {
     if (!jobId) return;
     await deleteMutation.mutateAsync(jobId);
     setShowDeleteModal(false);
-    navigate('/training-jobs');
+    navigate("/training-jobs");
   }, [jobId, deleteMutation, navigate]);
 
   // 加载状态
@@ -177,7 +139,7 @@ export function TrainingJobDetailPage() {
     return (
       <Box textAlign="center" padding="xxl">
         <Spinner size="large" />
-        <Box margin={{ top: 'm' }}>加载中...</Box>
+        <Box margin={{ top: "m" }}>加载中...</Box>
       </Box>
     );
   }
@@ -187,7 +149,7 @@ export function TrainingJobDetailPage() {
     return (
       <Container>
         <Box textAlign="center" color="text-status-error" padding="xl">
-          {error?.message || '任务不存在'}
+          {error?.message || "任务不存在"}
         </Box>
       </Container>
     );
@@ -198,12 +160,12 @@ export function TrainingJobDetailPage() {
       {/* 面包屑导航 */}
       <BreadcrumbGroup
         items={[
-          { text: '训练任务', href: '/training-jobs' },
-          { text: job.job_name, href: '#' },
+          { text: "训练任务", href: "/training-jobs" },
+          { text: job.job_name, href: "#" },
         ]}
         onFollow={(e) => {
           e.preventDefault();
-          if (e.detail.href !== '#') {
+          if (e.detail.href !== "#") {
             navigate(e.detail.href);
           }
         }}
@@ -218,10 +180,7 @@ export function TrainingJobDetailPage() {
               刷新
             </Button>
             {canPause && (
-              <Button
-                onClick={handlePause}
-                loading={pauseMutation.isPending}
-              >
+              <Button onClick={handlePause} loading={pauseMutation.isPending}>
                 暂停
               </Button>
             )}
@@ -262,7 +221,7 @@ export function TrainingJobDetailPage() {
             <Box>
               {job.distribution_strategy
                 ? DISTRIBUTION_STRATEGY_LABELS[job.distribution_strategy]
-                : '-'}
+                : "-"}
             </Box>
           </div>
           <div>
@@ -279,12 +238,12 @@ export function TrainingJobDetailPage() {
             <div>
               <Box variant="awsui-key-label">当前 Epoch</Box>
               <Box>
-                {job.current_epoch ?? '-'} / {job.total_epochs ?? '-'}
+                {job.current_epoch ?? "-"} / {job.total_epochs ?? "-"}
               </Box>
             </div>
             <div>
               <Box variant="awsui-key-label">当前 Step</Box>
-              <Box>{job.current_step ?? '-'}</Box>
+              <Box>{job.current_step ?? "-"}</Box>
             </div>
             <div>
               <Box variant="awsui-key-label">检查点数量</Box>
@@ -295,7 +254,7 @@ export function TrainingJobDetailPage() {
               <Box>
                 {job.current_epoch != null && job.total_epochs != null
                   ? `${Math.round((job.current_epoch / job.total_epochs) * 100)}%`
-                  : '-'}
+                  : "-"}
               </Box>
             </div>
           </ColumnLayout>
@@ -306,35 +265,44 @@ export function TrainingJobDetailPage() {
       <Tabs
         tabs={[
           {
-            id: 'config',
-            label: '配置信息',
+            id: "config",
+            label: "配置信息",
             content: (
               <Container>
                 <KeyValuePairs
                   columns={2}
                   items={[
-                    { label: '任务 ID', value: String(job.id) },
-                    { label: '任务名称', value: job.job_name },
-                    { label: '描述', value: job.description || '-' },
-                    { label: '实例类型', value: job.instance_type || '-' },
-                    { label: '节点数量', value: String(job.node_count) },
-                    { label: '每节点 GPU', value: String(job.gpu_per_node) },
+                    { label: "任务 ID", value: String(job.id) },
+                    { label: "任务名称", value: job.job_name },
+                    { label: "描述", value: job.description || "-" },
+                    { label: "实例类型", value: job.instance_type || "-" },
+                    { label: "节点数量", value: String(job.node_count) },
+                    { label: "每节点 GPU", value: String(job.gpu_per_node) },
                     {
-                      label: '总 GPU 数',
+                      label: "总 GPU 数",
                       value: String(job.node_count * job.gpu_per_node),
                     },
-                    { label: '容器镜像', value: job.image_uri || '-' },
-                    { label: '训练脚本', value: job.entry_point || '-' },
-                    { label: '创建时间', value: formatDateTime(job.created_at) },
-                    { label: '开始时间', value: formatDateTime(job.started_at) },
-                    { label: '完成时间', value: formatDateTime(job.completed_at) },
+                    { label: "容器镜像", value: job.image_uri || "-" },
+                    { label: "训练脚本", value: job.entry_point || "-" },
+                    {
+                      label: "创建时间",
+                      value: formatDateTime(job.created_at),
+                    },
+                    {
+                      label: "开始时间",
+                      value: formatDateTime(job.started_at),
+                    },
+                    {
+                      label: "完成时间",
+                      value: formatDateTime(job.completed_at),
+                    },
                   ]}
                 />
               </Container>
             ),
           },
           {
-            id: 'checkpoints',
+            id: "checkpoints",
             label: `检查点 (${checkpointsData?.items?.length || 0})`,
             content: (
               <Table
@@ -352,8 +320,8 @@ export function TrainingJobDetailPage() {
             ),
           },
           {
-            id: 'logs',
-            label: '日志',
+            id: "logs",
+            label: "日志",
             content: (
               <Container
                 header={
@@ -373,7 +341,7 @@ export function TrainingJobDetailPage() {
                     {isRunning && (
                       <Box
                         display="inline"
-                        margin={{ left: 's' }}
+                        margin={{ left: "s" }}
                         fontSize="body-s"
                         color="text-body-secondary"
                       >
@@ -391,30 +359,45 @@ export function TrainingJobDetailPage() {
                   <Box padding="s" fontSize="body-s">
                     <div
                       style={{
-                        fontFamily: 'monospace',
-                        whiteSpace: 'pre-wrap',
-                        maxHeight: '500px',
-                        overflow: 'auto',
-                        backgroundColor: 'var(--color-background-container-content)',
-                        padding: '12px',
-                        borderRadius: '8px',
+                        fontFamily: "monospace",
+                        whiteSpace: "pre-wrap",
+                        maxHeight: "500px",
+                        overflow: "auto",
+                        backgroundColor:
+                          "var(--color-background-container-content)",
+                        padding: "12px",
+                        borderRadius: "8px",
                       }}
                     >
                       {logsData.logs.map((log: LogEntry, index: number) => (
-                        <div key={index} style={{ marginBottom: '4px' }}>
-                          <span style={{ color: 'var(--color-text-body-secondary)' }}>
-                            [{new Date(log.timestamp).toLocaleTimeString('zh-CN')}]
-                          </span>{' '}
-                          <span style={{ color: 'var(--color-text-status-info)' }}>
+                        <div key={index} style={{ marginBottom: "4px" }}>
+                          <span
+                            style={{
+                              color: "var(--color-text-body-secondary)",
+                            }}
+                          >
+                            [
+                            {new Date(log.timestamp).toLocaleTimeString(
+                              "zh-CN",
+                            )}
+                            ]
+                          </span>{" "}
+                          <span
+                            style={{ color: "var(--color-text-status-info)" }}
+                          >
                             [{log.pod_name}]
-                          </span>{' '}
+                          </span>{" "}
                           {log.message}
                         </div>
                       ))}
                     </div>
                   </Box>
                 ) : (
-                  <Box textAlign="center" color="text-body-secondary" padding="l">
+                  <Box
+                    textAlign="center"
+                    color="text-body-secondary"
+                    padding="l"
+                  >
                     暂无日志数据
                   </Box>
                 )}
@@ -422,8 +405,8 @@ export function TrainingJobDetailPage() {
             ),
           },
           {
-            id: 'metrics',
-            label: '训练指标',
+            id: "metrics",
+            label: "训练指标",
             content: <TrainingStatusMonitor job={job} />,
           },
         ]}
@@ -437,10 +420,7 @@ export function TrainingJobDetailPage() {
         footer={
           <Box float="right">
             <SpaceBetween direction="horizontal" size="xs">
-              <Button
-                variant="link"
-                onClick={() => setShowDeleteModal(false)}
-              >
+              <Button variant="link" onClick={() => setShowDeleteModal(false)}>
                 取消
               </Button>
               <Button

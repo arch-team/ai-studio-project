@@ -4,7 +4,7 @@
  * 用户管理页面 - 支持用户 CRUD、角色管理
  */
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo } from "react";
 import {
   Box,
   Button,
@@ -15,9 +15,10 @@ import {
   SpaceBetween,
   StatusIndicator,
   Table,
-} from '@cloudscape-design/components';
-import { useUsers, useCreateUser, useUpdateUser } from '../hooks';
-import { UserFormModal } from '../components/UserFormModal';
+} from "@cloudscape-design/components";
+import { useUsers, useCreateUser, useUpdateUser } from "../hooks";
+import { UserFormModal } from "../components/UserFormModal";
+import { formatDateTime } from "@shared/utils";
 import type {
   UserDetail,
   UserFilters,
@@ -25,29 +26,17 @@ import type {
   UserStatus,
   CreateUserRequest,
   UpdateUserRequest,
-} from '../types';
+} from "../types";
 import {
   USER_ROLE_LABELS,
   USER_ROLE_COLORS,
   USER_STATUS_LABELS,
   USER_STATUS_COLORS,
-} from '../types';
-
-// 日期格式化
-function formatDateTime(dateStr: string): string {
-  const date = new Date(dateStr);
-  return date.toLocaleString('zh-CN', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-}
+} from "../types";
 
 // 构建 Select 选项
 const roleFilterOptions = [
-  { value: '', label: '全部角色' },
+  { value: "", label: "全部角色" },
   ...Object.entries(USER_ROLE_LABELS).map(([value, label]) => ({
     value,
     label,
@@ -55,7 +44,7 @@ const roleFilterOptions = [
 ];
 
 const statusFilterOptions = [
-  { value: '', label: '全部状态' },
+  { value: "", label: "全部状态" },
   ...Object.entries(USER_STATUS_LABELS).map(([value, label]) => ({
     value,
     label,
@@ -68,8 +57,8 @@ export function UserManagementPage() {
   const pageSize = 20;
 
   // 过滤器状态
-  const [roleFilter, setRoleFilter] = useState<string>('');
-  const [statusFilter, setStatusFilter] = useState<string>('');
+  const [roleFilter, setRoleFilter] = useState<string>("");
+  const [statusFilter, setStatusFilter] = useState<string>("");
 
   // Modal 状态
   const [isModalVisible, setIsModalVisible] = useState(false);
@@ -127,7 +116,7 @@ export function UserManagementPage() {
           onSuccess: () => {
             handleModalDismiss();
           },
-        }
+        },
       );
     } else {
       createMutation.mutate(formData as CreateUserRequest, {
@@ -141,21 +130,21 @@ export function UserManagementPage() {
   // 表格列定义
   const columnDefinitions = [
     {
-      id: 'username',
-      header: '用户名',
+      id: "username",
+      header: "用户名",
       cell: (item: UserDetail) => item.username,
-      sortingField: 'username',
+      sortingField: "username",
       width: 150,
     },
     {
-      id: 'email',
-      header: '邮箱',
+      id: "email",
+      header: "邮箱",
       cell: (item: UserDetail) => item.email,
       width: 220,
     },
     {
-      id: 'role',
-      header: '角色',
+      id: "role",
+      header: "角色",
       cell: (item: UserDetail) => (
         <StatusIndicator type={USER_ROLE_COLORS[item.role]}>
           {USER_ROLE_LABELS[item.role]}
@@ -164,8 +153,8 @@ export function UserManagementPage() {
       width: 120,
     },
     {
-      id: 'status',
-      header: '状态',
+      id: "status",
+      header: "状态",
       cell: (item: UserDetail) => (
         <StatusIndicator type={USER_STATUS_COLORS[item.status]}>
           {USER_STATUS_LABELS[item.status]}
@@ -174,14 +163,14 @@ export function UserManagementPage() {
       width: 100,
     },
     {
-      id: 'created_at',
-      header: '创建时间',
+      id: "created_at",
+      header: "创建时间",
       cell: (item: UserDetail) => formatDateTime(item.created_at),
       width: 160,
     },
     {
-      id: 'actions',
-      header: '操作',
+      id: "actions",
+      header: "操作",
       cell: (item: UserDetail) => (
         <Button variant="inline-link" onClick={() => handleEdit(item)}>
           编辑
@@ -221,11 +210,12 @@ export function UserManagementPage() {
             <Select
               selectedOption={
                 roleFilter
-                  ? roleFilterOptions.find((o) => o.value === roleFilter) || null
+                  ? roleFilterOptions.find((o) => o.value === roleFilter) ||
+                    null
                   : roleFilterOptions[0]
               }
               onChange={({ detail }) => {
-                setRoleFilter(detail.selectedOption.value || '');
+                setRoleFilter(detail.selectedOption.value || "");
                 setCurrentPage(1);
               }}
               options={roleFilterOptions}
@@ -237,11 +227,12 @@ export function UserManagementPage() {
             <Select
               selectedOption={
                 statusFilter
-                  ? statusFilterOptions.find((o) => o.value === statusFilter) || null
+                  ? statusFilterOptions.find((o) => o.value === statusFilter) ||
+                    null
                   : statusFilterOptions[0]
               }
               onChange={({ detail }) => {
-                setStatusFilter(detail.selectedOption.value || '');
+                setStatusFilter(detail.selectedOption.value || "");
                 setCurrentPage(1);
               }}
               options={statusFilterOptions}

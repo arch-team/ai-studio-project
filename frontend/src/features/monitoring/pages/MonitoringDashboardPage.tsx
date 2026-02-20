@@ -11,7 +11,7 @@
  * - 告警信息展示
  */
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo } from "react";
 import {
   Box,
   ColumnLayout,
@@ -27,16 +27,22 @@ import {
   Table,
   Tabs,
   Toggle,
-} from '@cloudscape-design/components';
-import type { DateRangePickerProps } from '@cloudscape-design/components';
+} from "@cloudscape-design/components";
+import type { DateRangePickerProps } from "@cloudscape-design/components";
 import {
   useClusters,
   useResourceUtilization,
   useAlerts,
   useMetricSeries,
-} from '../api';
-import { MetricsCharts } from '../components/MetricsCharts';
-import type { Alert, ClusterSummary, ResourceUtilization, MetricFilters } from '../types';
+} from "../api";
+import { MetricsCharts } from "../components/MetricsCharts";
+import { formatDateTimeShort, calculateTimeRange } from "@shared/utils";
+import type {
+  Alert,
+  ClusterSummary,
+  ResourceUtilization,
+  MetricFilters,
+} from "../types";
 import {
   CLUSTER_STATUS_LABELS,
   CLUSTER_STATUS_COLORS,
@@ -44,99 +50,53 @@ import {
   CLUSTER_HEALTH_COLORS,
   ALERT_SEVERITY_LABELS,
   ALERT_SEVERITY_COLORS,
-} from '../types';
+} from "../types";
 
 // === 常量配置 ===
 
 // 时间范围预设选项
 const TIME_RANGE_OPTIONS: DateRangePickerProps.RelativeOption[] = [
-  { key: '15m', amount: 15, unit: 'minute', type: 'relative' },
-  { key: '1h', amount: 1, unit: 'hour', type: 'relative' },
-  { key: '6h', amount: 6, unit: 'hour', type: 'relative' },
-  { key: '24h', amount: 24, unit: 'hour', type: 'relative' },
-  { key: '7d', amount: 7, unit: 'day', type: 'relative' },
+  { key: "15m", amount: 15, unit: "minute", type: "relative" },
+  { key: "1h", amount: 1, unit: "hour", type: "relative" },
+  { key: "6h", amount: 6, unit: "hour", type: "relative" },
+  { key: "24h", amount: 24, unit: "hour", type: "relative" },
+  { key: "7d", amount: 7, unit: "day", type: "relative" },
 ];
 
 // 自动刷新间隔选项
 const REFRESH_INTERVAL_OPTIONS = [
-  { id: 'off', text: '关闭' },
-  { id: '30s', text: '30秒' },
-  { id: '1m', text: '1分钟' },
-  { id: '5m', text: '5分钟' },
+  { id: "off", text: "关闭" },
+  { id: "30s", text: "30秒" },
+  { id: "1m", text: "1分钟" },
+  { id: "5m", text: "5分钟" },
 ];
 
 // Grafana 配置 (可从环境变量读取)
 const GRAFANA_CONFIG = {
-  baseUrl: import.meta.env.VITE_GRAFANA_URL || '/grafana',
-  dashboardId: 'cluster-overview',
+  baseUrl: import.meta.env.VITE_GRAFANA_URL || "/grafana",
+  dashboardId: "cluster-overview",
   orgId: 1,
 };
 
 // 默认监控指标
 const DEFAULT_METRICS = [
-  'cpu_utilization',
-  'memory_utilization',
-  'gpu_utilization',
+  "cpu_utilization",
+  "memory_utilization",
+  "gpu_utilization",
 ];
 
 // === 工具函数 ===
-
-/**
- * 日期格式化
- */
-function formatDateTime(dateStr: string): string {
-  const date = new Date(dateStr);
-  return date.toLocaleString('zh-CN', {
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-}
-
-/**
- * 计算时间范围
- */
-function calculateTimeRange(
-  dateRange: DateRangePickerProps.Value | null
-): { startTime: string; endTime: string } {
-  const now = new Date();
-  let startTime: Date;
-  let endTime: Date = now;
-
-  if (!dateRange) {
-    // 默认最近 1 小时
-    startTime = new Date(now.getTime() - 60 * 60 * 1000);
-  } else if (dateRange.type === 'relative') {
-    const { amount, unit } = dateRange;
-    const milliseconds =
-      unit === 'minute'
-        ? amount * 60 * 1000
-        : unit === 'hour'
-          ? amount * 60 * 60 * 1000
-          : amount * 24 * 60 * 60 * 1000;
-    startTime = new Date(now.getTime() - milliseconds);
-  } else {
-    startTime = new Date(dateRange.startDate);
-    endTime = new Date(dateRange.endDate);
-  }
-
-  return {
-    startTime: startTime.toISOString(),
-    endTime: endTime.toISOString(),
-  };
-}
 
 /**
  * 获取刷新间隔毫秒数
  */
 function getRefreshIntervalMs(intervalId: string): number | undefined {
   switch (intervalId) {
-    case '30s':
+    case "30s":
       return 30000;
-    case '1m':
+    case "1m":
       return 60000;
-    case '5m':
+    case "5m":
       return 300000;
     default:
       return undefined;
@@ -167,13 +127,13 @@ function TimeRangeSelector({
           onChange={({ detail }) => onChange(detail.value)}
           relativeOptions={TIME_RANGE_OPTIONS}
           isValidRange={(range) => {
-            if (range?.type === 'absolute') {
+            if (range?.type === "absolute") {
               const start = new Date(range.startDate);
               const end = new Date(range.endDate);
               if (start > end) {
                 return {
                   valid: false,
-                  errorMessage: '开始时间不能晚于结束时间',
+                  errorMessage: "开始时间不能晚于结束时间",
                 };
               }
               // 限制最大范围为 30 天
@@ -181,43 +141,43 @@ function TimeRangeSelector({
               if (end.getTime() - start.getTime() > maxRange) {
                 return {
                   valid: false,
-                  errorMessage: '时间范围不能超过 30 天',
+                  errorMessage: "时间范围不能超过 30 天",
                 };
               }
             }
             return { valid: true };
           }}
           i18nStrings={{
-            todayAriaLabel: '今天',
-            nextMonthAriaLabel: '下个月',
-            previousMonthAriaLabel: '上个月',
-            customRelativeRangeDurationLabel: '持续时间',
-            customRelativeRangeDurationPlaceholder: '输入持续时间',
-            customRelativeRangeOptionLabel: '自定义范围',
-            customRelativeRangeOptionDescription: '设置自定义时间范围',
-            customRelativeRangeUnitLabel: '时间单位',
+            todayAriaLabel: "今天",
+            nextMonthAriaLabel: "下个月",
+            previousMonthAriaLabel: "上个月",
+            customRelativeRangeDurationLabel: "持续时间",
+            customRelativeRangeDurationPlaceholder: "输入持续时间",
+            customRelativeRangeOptionLabel: "自定义范围",
+            customRelativeRangeOptionDescription: "设置自定义时间范围",
+            customRelativeRangeUnitLabel: "时间单位",
             formatRelativeRange: (e) => {
               const unitText =
-                e.unit === 'minute'
-                  ? '分钟'
-                  : e.unit === 'hour'
-                    ? '小时'
-                    : '天';
+                e.unit === "minute"
+                  ? "分钟"
+                  : e.unit === "hour"
+                    ? "小时"
+                    : "天";
               return `最近 ${e.amount} ${unitText}`;
             },
             formatUnit: (e, _n) =>
-              e === 'minute' ? '分钟' : e === 'hour' ? '小时' : '天',
-            dateTimeConstraintText: '时间范围最长 30 天',
-            relativeModeTitle: '相对时间',
-            absoluteModeTitle: '绝对时间',
-            relativeRangeSelectionHeading: '选择时间范围',
-            startDateLabel: '开始日期',
-            endDateLabel: '结束日期',
-            startTimeLabel: '开始时间',
-            endTimeLabel: '结束时间',
-            clearButtonLabel: '清除',
-            cancelButtonLabel: '取消',
-            applyButtonLabel: '应用',
+              e === "minute" ? "分钟" : e === "hour" ? "小时" : "天",
+            dateTimeConstraintText: "时间范围最长 30 天",
+            relativeModeTitle: "相对时间",
+            absoluteModeTitle: "绝对时间",
+            relativeRangeSelectionHeading: "选择时间范围",
+            startDateLabel: "开始日期",
+            endDateLabel: "结束日期",
+            startTimeLabel: "开始时间",
+            endTimeLabel: "结束时间",
+            clearButtonLabel: "清除",
+            cancelButtonLabel: "取消",
+            applyButtonLabel: "应用",
           }}
           placeholder="选择时间范围"
         />
@@ -265,7 +225,9 @@ function ClusterSummaryCards({ clusters }: { clusters: ClusterSummary[] }) {
         <div>
           <Box variant="awsui-key-label">健康状态</Box>
           {cluster.health_status ? (
-            <StatusIndicator type={CLUSTER_HEALTH_COLORS[cluster.health_status]}>
+            <StatusIndicator
+              type={CLUSTER_HEALTH_COLORS[cluster.health_status]}
+            >
               {CLUSTER_HEALTH_LABELS[cluster.health_status]}
             </StatusIndicator>
           ) : (
@@ -296,19 +258,19 @@ function ResourceUtilizationCards({
   }
 
   const resourceLabels: Record<string, string> = {
-    cpu: 'CPU',
-    memory: '内存',
-    gpu: 'GPU',
-    storage: '存储',
+    cpu: "CPU",
+    memory: "内存",
+    gpu: "GPU",
+    storage: "存储",
   };
 
   // 根据利用率获取进度条颜色
   const getProgressStatus = (
-    percentage: number
-  ): 'success' | 'in-progress' | 'error' => {
-    if (percentage < 60) return 'success';
-    if (percentage < 85) return 'in-progress';
-    return 'error';
+    percentage: number,
+  ): "success" | "in-progress" | "error" => {
+    if (percentage < 60) return "success";
+    if (percentage < 85) return "in-progress";
+    return "error";
   };
 
   return (
@@ -319,7 +281,9 @@ function ResourceUtilizationCards({
             <Box variant="awsui-key-label">
               {resourceLabels[item.resource_type] || item.resource_type}
             </Box>
-            <Box variant="awsui-value-large">{item.utilization_percentage}%</Box>
+            <Box variant="awsui-value-large">
+              {item.utilization_percentage}%
+            </Box>
             <ProgressBar
               value={item.utilization_percentage}
               status={getProgressStatus(item.utilization_percentage)}
@@ -352,12 +316,12 @@ function GrafanaDashboard({
       orgId: String(GRAFANA_CONFIG.orgId),
       from: new Date(startTime).getTime().toString(),
       to: new Date(endTime).getTime().toString(),
-      theme: 'light',
-      kiosk: 'tv', // 隐藏 Grafana 导航栏
+      theme: "light",
+      kiosk: "tv", // 隐藏 Grafana 导航栏
     });
 
     if (refreshInterval) {
-      params.append('refresh', `${Math.floor(refreshInterval / 1000)}s`);
+      params.append("refresh", `${Math.floor(refreshInterval / 1000)}s`);
     }
 
     return `${GRAFANA_CONFIG.baseUrl}/d/${GRAFANA_CONFIG.dashboardId}?${params.toString()}`;
@@ -383,7 +347,7 @@ function GrafanaDashboard({
         </Header>
       }
     >
-      <Box padding={{ vertical: 'xxs' }}>
+      <Box padding={{ vertical: "xxs" }}>
         <iframe
           src={grafanaUrl}
           width="100%"
@@ -391,9 +355,9 @@ function GrafanaDashboard({
           frameBorder="0"
           title="Grafana 集群监控仪表盘"
           style={{
-            border: 'none',
-            borderRadius: '4px',
-            backgroundColor: '#f8f8f8',
+            border: "none",
+            borderRadius: "4px",
+            backgroundColor: "#f8f8f8",
           }}
         />
       </Box>
@@ -407,8 +371,8 @@ function GrafanaDashboard({
 function AlertsPanel({ alerts }: { alerts: Alert[] }) {
   const columnDefinitions = [
     {
-      id: 'severity',
-      header: '级别',
+      id: "severity",
+      header: "级别",
       cell: (item: Alert) => (
         <StatusIndicator type={ALERT_SEVERITY_COLORS[item.severity]}>
           {ALERT_SEVERITY_LABELS[item.severity]}
@@ -417,34 +381,34 @@ function AlertsPanel({ alerts }: { alerts: Alert[] }) {
       width: 100,
     },
     {
-      id: 'title',
-      header: '告警',
+      id: "title",
+      header: "告警",
       cell: (item: Alert) => item.title,
     },
     {
-      id: 'resource',
-      header: '资源',
+      id: "resource",
+      header: "资源",
       cell: (item: Alert) => item.resource_type,
       width: 100,
     },
     {
-      id: 'fired_at',
-      header: '触发时间',
-      cell: (item: Alert) => formatDateTime(item.fired_at),
+      id: "fired_at",
+      header: "触发时间",
+      cell: (item: Alert) => formatDateTimeShort(item.fired_at),
       width: 150,
     },
     {
-      id: 'status',
-      header: '状态',
+      id: "status",
+      header: "状态",
       cell: (item: Alert) => (
         <StatusIndicator
-          type={item.status === 'resolved' ? 'success' : 'warning'}
+          type={item.status === "resolved" ? "success" : "warning"}
         >
-          {item.status === 'firing'
-            ? '触发中'
-            : item.status === 'acknowledged'
-              ? '已确认'
-              : '已解决'}
+          {item.status === "firing"
+            ? "触发中"
+            : item.status === "acknowledged"
+              ? "已确认"
+              : "已解决"}
         </StatusIndicator>
       ),
       width: 100,
@@ -485,30 +449,32 @@ export function MonitoringDashboardPage() {
   // === 状态管理 ===
 
   // 时间范围状态 (默认最近 1 小时)
-  const [dateRange, setDateRange] = useState<DateRangePickerProps.Value | null>({
-    type: 'relative',
-    amount: 1,
-    unit: 'hour',
-  } as DateRangePickerProps.RelativeValue);
+  const [dateRange, setDateRange] = useState<DateRangePickerProps.Value | null>(
+    {
+      type: "relative",
+      amount: 1,
+      unit: "hour",
+    } as DateRangePickerProps.RelativeValue,
+  );
 
   // 自动刷新间隔
-  const [refreshInterval, setRefreshInterval] = useState('1m');
+  const [refreshInterval, setRefreshInterval] = useState("1m");
 
   // Grafana 仪表盘显示开关
   const [showGrafana, setShowGrafana] = useState(true);
 
   // 活动标签页
-  const [activeTabId, setActiveTabId] = useState('overview');
+  const [activeTabId, setActiveTabId] = useState("overview");
 
   // === 计算时间范围 ===
   const { startTime, endTime } = useMemo(
     () => calculateTimeRange(dateRange),
-    [dateRange]
+    [dateRange],
   );
 
   const refreshIntervalMs = useMemo(
     () => getRefreshIntervalMs(refreshInterval),
-    [refreshInterval]
+    [refreshInterval],
   );
 
   // === 数据查询 ===
@@ -526,7 +492,7 @@ export function MonitoringDashboardPage() {
 
   // 告警
   const { data: alertsData, isLoading: alertsLoading } = useAlerts({
-    status: 'firing',
+    status: "firing",
   });
 
   // 时间序列指标
@@ -537,12 +503,12 @@ export function MonitoringDashboardPage() {
       end_time: endTime,
       step: 60, // 60 秒间隔
     }),
-    [startTime, endTime]
+    [startTime, endTime],
   );
 
   const { data: metricsData, isLoading: metricsLoading } = useMetricSeries(
     metricFilters,
-    refreshIntervalMs
+    refreshIntervalMs,
   );
 
   // === 数据处理 ===
@@ -596,8 +562,8 @@ export function MonitoringDashboardPage() {
           onChange={({ detail }) => setActiveTabId(detail.activeTabId)}
           tabs={[
             {
-              id: 'overview',
-              label: '概览',
+              id: "overview",
+              label: "概览",
               content: (
                 <SpaceBetween size="l">
                   {/* 集群摘要 */}
@@ -608,9 +574,7 @@ export function MonitoringDashboardPage() {
 
                   {/* 利用率图表 */}
                   {utilization.length > 0 && (
-                    <Grid
-                      gridDefinition={[{ colspan: 6 }, { colspan: 6 }]}
-                    >
+                    <Grid gridDefinition={[{ colspan: 6 }, { colspan: 6 }]}>
                       <MetricsCharts
                         type="bar"
                         title="资源使用对比"
@@ -632,8 +596,8 @@ export function MonitoringDashboardPage() {
               ),
             },
             {
-              id: 'metrics',
-              label: '指标趋势',
+              id: "metrics",
+              label: "指标趋势",
               content: (
                 <SpaceBetween size="l">
                   {/* 时间序列图表 */}
@@ -664,8 +628,8 @@ export function MonitoringDashboardPage() {
               ),
             },
             {
-              id: 'grafana',
-              label: 'Grafana',
+              id: "grafana",
+              label: "Grafana",
               content: (
                 <SpaceBetween size="l">
                   {/* Grafana 显示开关 */}
@@ -701,34 +665,47 @@ export function MonitoringDashboardPage() {
               ),
             },
             {
-              id: 'alerts',
-              label: `告警${alerts.length > 0 ? ` (${alerts.length})` : ''}`,
+              id: "alerts",
+              label: `告警${alerts.length > 0 ? ` (${alerts.length})` : ""}`,
               content: (
                 <SpaceBetween size="l">
                   <AlertsPanel alerts={alerts} />
 
                   {/* 告警统计 */}
                   {alerts.length > 0 && (
-                    <Container
-                      header={<Header variant="h2">告警统计</Header>}
-                    >
+                    <Container header={<Header variant="h2">告警统计</Header>}>
                       <ColumnLayout columns={3} variant="text-grid">
                         <div>
                           <Box variant="awsui-key-label">严重</Box>
-                          <Box variant="awsui-value-large" color="text-status-error">
-                            {alerts.filter((a) => a.severity === 'critical').length}
+                          <Box
+                            variant="awsui-value-large"
+                            color="text-status-error"
+                          >
+                            {
+                              alerts.filter((a) => a.severity === "critical")
+                                .length
+                            }
                           </Box>
                         </div>
                         <div>
                           <Box variant="awsui-key-label">警告</Box>
-                          <Box variant="awsui-value-large" color="text-status-warning">
-                            {alerts.filter((a) => a.severity === 'warning').length}
+                          <Box
+                            variant="awsui-value-large"
+                            color="text-status-warning"
+                          >
+                            {
+                              alerts.filter((a) => a.severity === "warning")
+                                .length
+                            }
                           </Box>
                         </div>
                         <div>
                           <Box variant="awsui-key-label">信息</Box>
-                          <Box variant="awsui-value-large" color="text-status-info">
-                            {alerts.filter((a) => a.severity === 'info').length}
+                          <Box
+                            variant="awsui-value-large"
+                            color="text-status-info"
+                          >
+                            {alerts.filter((a) => a.severity === "info").length}
                           </Box>
                         </div>
                       </ColumnLayout>

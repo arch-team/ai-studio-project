@@ -6,16 +6,19 @@
  */
 
 // Types
-export * from './types';
+export * from "./types";
 
 // API
-export * from './api';
+export * from "./api";
 
 // Hooks
-export * from './hooks';
+export * from "./hooks";
 
 // Events
-export * from './events';
+export * from "./events";
 
 // Components
-export * from './components';
+export * from "./components";
+
+// Utils
+export * from "./utils";

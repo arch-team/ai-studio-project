@@ -11,7 +11,7 @@
  * - 导出功能
  */
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo } from "react";
 import {
   Box,
   Button,
@@ -24,75 +24,38 @@ import {
   SpaceBetween,
   StatusIndicator,
   Table,
-} from '@cloudscape-design/components';
-import type { DateRangePickerProps, SelectProps } from '@cloudscape-design/components';
-import { useCostAnalysis, useExportReport } from '../api';
-import { CostTrendChart } from '../components';
-import type { CostBreakdown, GroupBy, CostAnalysisFilters } from '../types';
-import { GROUP_BY_LABELS, COST_CATEGORY_LABELS, COST_CATEGORY_COLORS } from '../types';
+} from "@cloudscape-design/components";
+import type {
+  DateRangePickerProps,
+  SelectProps,
+} from "@cloudscape-design/components";
+import { useCostAnalysis, useExportReport } from "../api";
+import { CostTrendChart } from "../components";
+import { formatCurrency, calculateDateRange } from "@shared/utils";
+import type { CostBreakdown, GroupBy, CostAnalysisFilters } from "../types";
+import {
+  GROUP_BY_LABELS,
+  COST_CATEGORY_LABELS,
+  COST_CATEGORY_COLORS,
+} from "../types";
 
 // === 常量配置 ===
 
 // 时间范围预设选项
 const TIME_RANGE_OPTIONS: DateRangePickerProps.RelativeOption[] = [
-  { key: '7d', amount: 7, unit: 'day', type: 'relative' },
-  { key: '14d', amount: 14, unit: 'day', type: 'relative' },
-  { key: '30d', amount: 30, unit: 'day', type: 'relative' },
-  { key: '90d', amount: 90, unit: 'day', type: 'relative' },
+  { key: "7d", amount: 7, unit: "day", type: "relative" },
+  { key: "14d", amount: 14, unit: "day", type: "relative" },
+  { key: "30d", amount: 30, unit: "day", type: "relative" },
+  { key: "90d", amount: 90, unit: "day", type: "relative" },
 ];
 
 // 聚合维度选项
 const GROUP_BY_OPTIONS: SelectProps.Option[] = [
-  { value: 'category', label: GROUP_BY_LABELS.category },
-  { value: 'user', label: GROUP_BY_LABELS.user },
-  { value: 'project', label: GROUP_BY_LABELS.project },
-  { value: 'resource_type', label: GROUP_BY_LABELS.resource_type },
+  { value: "category", label: GROUP_BY_LABELS.category },
+  { value: "user", label: GROUP_BY_LABELS.user },
+  { value: "project", label: GROUP_BY_LABELS.project },
+  { value: "resource_type", label: GROUP_BY_LABELS.resource_type },
 ];
-
-// === 工具函数 ===
-
-/**
- * 格式化货币
- */
-function formatCurrency(value: number): string {
-  if (value >= 1000) {
-    return `$${(value / 1000).toFixed(1)}K`;
-  }
-  return `$${value.toFixed(2)}`;
-}
-
-/**
- * 计算时间范围
- */
-function calculateDateRange(
-  dateRange: DateRangePickerProps.Value | null
-): { startDate: string; endDate: string } {
-  const now = new Date();
-  let startDate: Date;
-  let endDate: Date = now;
-
-  if (!dateRange) {
-    // 默认最近 30 天
-    startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-  } else if (dateRange.type === 'relative') {
-    const { amount, unit } = dateRange;
-    const milliseconds =
-      unit === 'minute'
-        ? amount * 60 * 1000
-        : unit === 'hour'
-          ? amount * 60 * 60 * 1000
-          : amount * 24 * 60 * 60 * 1000;
-    startDate = new Date(now.getTime() - milliseconds);
-  } else {
-    startDate = new Date(dateRange.startDate);
-    endDate = new Date(dateRange.endDate);
-  }
-
-  return {
-    startDate: startDate.toISOString().split('T')[0],
-    endDate: endDate.toISOString().split('T')[0],
-  };
-}
 
 // === 子组件 ===
 
@@ -113,10 +76,10 @@ function CostSummaryCards({
   loading: boolean;
 }) {
   const costCards = [
-    { label: '总成本', value: formatCurrency(totalCost), color: '#0073bb' },
-    { label: '计算成本', value: formatCurrency(computeCost), color: '#3184c2' },
-    { label: '存储成本', value: formatCurrency(storageCost), color: '#1d8102' },
-    { label: '网络成本', value: formatCurrency(networkCost), color: '#9469d6' },
+    { label: "总成本", value: formatCurrency(totalCost), color: "#0073bb" },
+    { label: "计算成本", value: formatCurrency(computeCost), color: "#3184c2" },
+    { label: "存储成本", value: formatCurrency(storageCost), color: "#1d8102" },
+    { label: "网络成本", value: formatCurrency(networkCost), color: "#9469d6" },
   ];
 
   if (loading) {
@@ -126,7 +89,7 @@ function CostSummaryCards({
           <Container key={card.label}>
             <Box textAlign="center">
               <Box variant="awsui-key-label">{card.label}</Box>
-              <Box padding={{ top: 'xs' }}>
+              <Box padding={{ top: "xs" }}>
                 <StatusIndicator type="loading">加载中</StatusIndicator>
               </Box>
             </Box>
@@ -166,7 +129,7 @@ function CostDistributionPie({
     return breakdown.map((item) => ({
       title: COST_CATEGORY_LABELS[item.category] || item.name,
       value: item.cost_usd,
-      color: COST_CATEGORY_COLORS[item.category] || '#879596',
+      color: COST_CATEGORY_COLORS[item.category] || "#879596",
     }));
   }, [breakdown]);
 
@@ -199,10 +162,10 @@ function CostDistributionPie({
         hideFilter
         hideLegend={false}
         i18nStrings={{
-          detailsValue: '金额',
-          detailsPercentage: '占比',
-          legendAriaLabel: '图例',
-          chartAriaRoleDescription: '成本分布饼图',
+          detailsValue: "金额",
+          detailsPercentage: "占比",
+          legendAriaLabel: "图例",
+          chartAriaRoleDescription: "成本分布饼图",
         }}
         empty={<Box textAlign="center">暂无数据</Box>}
       />
@@ -222,28 +185,28 @@ function CostBreakdownTable({
 }) {
   const columnDefinitions = [
     {
-      id: 'category',
-      header: '类别',
+      id: "category",
+      header: "类别",
       cell: (item: CostBreakdown) =>
         COST_CATEGORY_LABELS[item.category] || item.name,
       width: 150,
     },
     {
-      id: 'cost',
-      header: '成本',
+      id: "cost",
+      header: "成本",
       cell: (item: CostBreakdown) => formatCurrency(item.cost_usd),
       width: 120,
     },
     {
-      id: 'percentage',
-      header: '占比',
+      id: "percentage",
+      header: "占比",
       cell: (item: CostBreakdown) => `${item.percentage.toFixed(1)}%`,
       width: 100,
     },
     {
-      id: 'count',
-      header: '项目数',
-      cell: (item: CostBreakdown) => item.item_count ?? '-',
+      id: "count",
+      header: "项目数",
+      cell: (item: CostBreakdown) => item.item_count ?? "-",
       width: 100,
     },
   ];
@@ -282,15 +245,17 @@ export function CostAnalysisPage() {
   // === 状态管理 ===
 
   // 时间范围状态 (默认最近 30 天)
-  const [dateRange, setDateRange] = useState<DateRangePickerProps.Value | null>({
-    type: 'relative',
-    amount: 30,
-    unit: 'day',
-  } as DateRangePickerProps.RelativeValue);
+  const [dateRange, setDateRange] = useState<DateRangePickerProps.Value | null>(
+    {
+      type: "relative",
+      amount: 30,
+      unit: "day",
+    } as DateRangePickerProps.RelativeValue,
+  );
 
   // 聚合维度状态
   const [groupBy, setGroupBy] = useState<SelectProps.Option | null>(
-    GROUP_BY_OPTIONS[0]
+    GROUP_BY_OPTIONS[0],
   );
 
   // === 计算过滤条件 ===
@@ -299,7 +264,7 @@ export function CostAnalysisPage() {
     return {
       start_date: startDate,
       end_date: endDate,
-      group_by: (groupBy?.value as GroupBy) || 'category',
+      group_by: (groupBy?.value as GroupBy) || "category",
     };
   }, [dateRange, groupBy]);
 
@@ -320,11 +285,11 @@ export function CostAnalysisPage() {
   const handleExport = () => {
     const { startDate, endDate } = calculateDateRange(dateRange);
     exportMutation.mutate({
-      report_type: 'cost_analysis',
-      format: 'csv',
+      report_type: "cost_analysis",
+      format: "csv",
       start_date: startDate,
       end_date: endDate,
-      group_by: (groupBy?.value as GroupBy) || 'category',
+      group_by: (groupBy?.value as GroupBy) || "category",
     });
   };
 
@@ -377,13 +342,13 @@ export function CostAnalysisPage() {
               onChange={({ detail }) => setDateRange(detail.value)}
               relativeOptions={TIME_RANGE_OPTIONS}
               isValidRange={(range) => {
-                if (range?.type === 'absolute') {
+                if (range?.type === "absolute") {
                   const start = new Date(range.startDate);
                   const end = new Date(range.endDate);
                   if (start > end) {
                     return {
                       valid: false,
-                      errorMessage: '开始时间不能晚于结束时间',
+                      errorMessage: "开始时间不能晚于结束时间",
                     };
                   }
                   // 限制最大范围为 365 天
@@ -391,43 +356,43 @@ export function CostAnalysisPage() {
                   if (end.getTime() - start.getTime() > maxRange) {
                     return {
                       valid: false,
-                      errorMessage: '时间范围不能超过 365 天',
+                      errorMessage: "时间范围不能超过 365 天",
                     };
                   }
                 }
                 return { valid: true };
               }}
               i18nStrings={{
-                todayAriaLabel: '今天',
-                nextMonthAriaLabel: '下个月',
-                previousMonthAriaLabel: '上个月',
-                customRelativeRangeDurationLabel: '持续时间',
-                customRelativeRangeDurationPlaceholder: '输入持续时间',
-                customRelativeRangeOptionLabel: '自定义范围',
-                customRelativeRangeOptionDescription: '设置自定义时间范围',
-                customRelativeRangeUnitLabel: '时间单位',
+                todayAriaLabel: "今天",
+                nextMonthAriaLabel: "下个月",
+                previousMonthAriaLabel: "上个月",
+                customRelativeRangeDurationLabel: "持续时间",
+                customRelativeRangeDurationPlaceholder: "输入持续时间",
+                customRelativeRangeOptionLabel: "自定义范围",
+                customRelativeRangeOptionDescription: "设置自定义时间范围",
+                customRelativeRangeUnitLabel: "时间单位",
                 formatRelativeRange: (e) => {
                   const unitText =
-                    e.unit === 'minute'
-                      ? '分钟'
-                      : e.unit === 'hour'
-                        ? '小时'
-                        : '天';
+                    e.unit === "minute"
+                      ? "分钟"
+                      : e.unit === "hour"
+                        ? "小时"
+                        : "天";
                   return `最近 ${e.amount} ${unitText}`;
                 },
                 formatUnit: (e, _n) =>
-                  e === 'minute' ? '分钟' : e === 'hour' ? '小时' : '天',
-                dateTimeConstraintText: '时间范围最长 365 天',
-                relativeModeTitle: '相对时间',
-                absoluteModeTitle: '绝对时间',
-                relativeRangeSelectionHeading: '选择时间范围',
-                startDateLabel: '开始日期',
-                endDateLabel: '结束日期',
-                startTimeLabel: '开始时间',
-                endTimeLabel: '结束时间',
-                clearButtonLabel: '清除',
-                cancelButtonLabel: '取消',
-                applyButtonLabel: '应用',
+                  e === "minute" ? "分钟" : e === "hour" ? "小时" : "天",
+                dateTimeConstraintText: "时间范围最长 365 天",
+                relativeModeTitle: "相对时间",
+                absoluteModeTitle: "绝对时间",
+                relativeRangeSelectionHeading: "选择时间范围",
+                startDateLabel: "开始日期",
+                endDateLabel: "结束日期",
+                startTimeLabel: "开始时间",
+                endTimeLabel: "结束时间",
+                clearButtonLabel: "清除",
+                cancelButtonLabel: "取消",
+                applyButtonLabel: "应用",
               }}
               placeholder="选择时间范围"
             />
