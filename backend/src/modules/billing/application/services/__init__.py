@@ -1,5 +1,10 @@
 """Billing application services (skeleton)."""
 
+from .cost_accuracy_validator import (
+    CostAccuracyReport,
+    CostAccuracyValidator,
+    CostComparisonItem,
+)
 from .cost_allocation import AllocatedCost, CostAllocationKey
 from .cost_calculator import CostCalculator
 from .cost_models import (
@@ -25,6 +30,9 @@ from .usage_aggregator import (
 )
 
 __all__ = [
+    "CostAccuracyReport",
+    "CostAccuracyValidator",
+    "CostComparisonItem",
     "CostCalculator",
     "CostBreakdown",
     "ComputeCost",

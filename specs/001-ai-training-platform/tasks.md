@@ -719,7 +719,7 @@
 - [x] [T069] [US4] 成本计算引擎核心逻辑 - `backend/src/modules/billing/application/services/cost_calculator.py`,基于 instance_type, node_count, training_duration 计算训练成本,实现成本累加和分摊逻辑,支持多维度成本分析 (compute/storage/network)
 - [x] [T069a] [US4] AWS Cost Explorer 集成 - `backend/src/modules/billing/infrastructure/external/cost_explorer_client.py`,封装 AWS Cost Explorer API,获取实际账单数据 (EC2, S3, FSx, EBS),支持按资源标签过滤成本数据,缓存策略 (1小时刷新)
 - [x] [T069b] [US4] 训练成本定价模型 - `backend/src/modules/billing/application/services/pricing_model.py`,维护 HyperPod 实例定价表 (p4d.24xlarge, p5.48xlarge, trn1.32xlarge),FSx for Lustre 存储定价 (按吞吐量和容量),S3 存储和数据传输定价,网络传输成本计算
-- [ ] [T069c] [US4] 成本准确率验证测试 - `backend/tests/test_cost_accuracy.py`,对比计算成本 vs AWS Cost Explorer 实际账单,误差率计算 (目标 <2%),回归测试 (使用历史训练任务数据),准确率监控告警 (误差 >2% 触发)
+- [x] [T069c] [US4] 成本准确率验证测试 - `backend/tests/test_cost_accuracy.py`,对比计算成本 vs AWS Cost Explorer 实际账单,误差率计算 (目标 <2%),回归测试 (使用历史训练任务数据),准确率监控告警 (误差 >2% 触发)
   - **依赖**: T069 (成本计算引擎), T069a (Cost Explorer 集成), T069b (定价模型), T070 (资源使用聚合查询)
   - **测试数据**: 使用 T070 聚合的历史训练任务数据 (至少 30 天)
 - [x] [T070] [US4] 资源使用聚合查询 - `backend/src/modules/billing/application/services/usage_aggregator.py`,使用 SQLAlchemy aggregation functions 聚合用户/项目资源使用,支持按时间维度分组 (day/week/month)
@@ -729,12 +729,12 @@
 - [x] [T072] [US4] GET /reports/cost-analysis 端点 - 查询成本分析报表,支持时间范围、成本类型 (compute/storage/network) 过滤,返回成本趋势和预测
 
 ### CloudWatch Logs 集成
-- [ ] [T073] [US4] CloudWatch Logs 集成 - `backend/src/shared/infrastructure/external/cloudwatch_client.py`,封装 CloudWatch Logs Insights API,查询训练任务日志,支持 30天留存策略
+- [x] [T073] [US4] CloudWatch Logs 集成 - `backend/src/shared/infrastructure/external/cloudwatch_client.py`,封装 CloudWatch Logs Insights API,查询训练任务日志,支持 30天留存策略
 
 ### 前端页面组件
 - [x] [T074] [US4] [P] 资源使用报表页面 - `frontend/src/features/reports/pages/ResourceUsageReportPage.tsx`,使用 Cloudscape Container,展示资源使用图表和表格,支持导出 CSV,创建模块 API 层 `frontend/src/features/reports/api/queries.ts`,创建模块类型定义 `frontend/src/features/reports/types/index.ts`
 - [x] [T075] [US4] [P] 成本分析仪表盘 - `frontend/src/features/reports/pages/CostAnalysisPage.tsx`,展示成本趋势图、成本分布饼图、成本预测,支持钻取到用户/项目级别
-- [ ] [T076] [US4] [P] 时间范围选择器组件 - `frontend/src/shared/components/forms/DateRangePicker.tsx`,使用 Cloudscape DateRangePicker,支持预设时间范围 (Last 7 days, Last 30 days, Custom),作为共享表单组件供多个功能模块复用
+- [x] [T076] [US4] [P] 时间范围选择器组件 - `frontend/src/shared/components/forms/DateRangePicker.tsx`,使用 Cloudscape DateRangePicker,支持预设时间范围 (Last 7 days, Last 30 days, Custom),作为共享表单组件供多个功能模块复用
 - [x] [T077] [US4] [P] 成本趋势图表组件 - `frontend/src/features/reports/components/CostTrendChart.tsx`,使用 Recharts 渲染成本趋势折线图,支持对比上一周期
 
 ### 报表导出功能
@@ -778,17 +778,17 @@
 - [x] [T084] [US5] DELETE /ide/sessions/{id} 端点实现 - 调用 SageMaker DeleteSpace API 停止在线开发环境,清理 Space 资源
 
 ### SageMaker Spaces 集成服务
-- [ ] [T085] [US5] SageMaker Spaces 集成 - `backend/src/modules/spaces/application/services/sagemaker_spaces_service.py`,封装 `sagemaker-hyperpod.space` 模块 API,使用 T000 验证的 Space 模块方法实现 Space 创建、删除、查询功能,配置生命周期脚本 (Lifecycle Configuration) 预装常用库,管理 Space 状态转换,参考 `docs/hyperpod-sdk-reference.md`。如 SDK 不支持特定配置,MAY 使用 boto3 调用 SageMaker Spaces API 作为备选,但 MUST 提交例外申请并获得平台治理委员会批准,在代码中注释说明理由 (遵循宪章 Principle I.B) (依赖 T000)
-- [ ] [T085a] [US5] SageMaker Spaces 启动性能配置 - `backend/src/modules/spaces/application/services/sagemaker_lifecycle_service.py`,配置 SageMaker Studio 生命周期脚本,预装常用 Python 库 (pip install pytorch transformers),选择合适的实例类型 (ml.g5.xlarge 默认/ml.g5.2xlarge 高性能场景,遵循 spec.md User Story 5 资源配额定义),配置 EFS 持久化存储避免重装,目标启动时间 <3分钟
-- [ ] [T085b] [US5] SageMaker Spaces 启动性能监控 - `backend/src/modules/spaces/application/services/sagemaker_metrics_service.py`,集成 CloudWatch Metrics 监控 Space 启动时间,记录 CreateSpace API 调用到 InService 状态的耗时,P95/P99 启动时间统计,启动超时告警 (>3分钟触发)
-- [ ] [T085c] [US5] SageMaker Spaces 启动性能测试 - `backend/tests/test_sagemaker_spaces_performance.py`,端到端启动时间测试 (目标 <3分钟),并发启动压力测试 (≥50 并发 Space),不同实例类型启动时间对比,性能回归测试 (CI/CD 集成)
-- [ ] [T086] [US5] SageMaker Studio 镜像配置 - `backend/src/modules/spaces/application/services/sagemaker_image_service.py`,使用 SageMaker Studio 官方镜像 (Data Science, PyTorch, TensorFlow),支持自定义镜像注册到 SageMaker Image Registry,配置镜像版本管理
-- [ ] [T090] [US5] SageMaker Space 状态同步 - `backend/src/modules/spaces/application/services/sagemaker_sync_service.py`,定时任务 (30秒) 调用 DescribeSpace API 同步状态到数据库,处理 InService/Pending/Failed 状态转换
+- [x] [T085] [US5] SageMaker Spaces 集成 - `backend/src/modules/spaces/application/services/sagemaker_spaces_service.py`,封装 `sagemaker-hyperpod.space` 模块 API,使用 T000 验证的 Space 模块方法实现 Space 创建、删除、查询功能,配置生命周期脚本 (Lifecycle Configuration) 预装常用库,管理 Space 状态转换,参考 `docs/hyperpod-sdk-reference.md`。如 SDK 不支持特定配置,MAY 使用 boto3 调用 SageMaker Spaces API 作为备选,但 MUST 提交例外申请并获得平台治理委员会批准,在代码中注释说明理由 (遵循宪章 Principle I.B) (依赖 T000)
+- [x] [T085a] [US5] SageMaker Spaces 启动性能配置 - `backend/src/modules/spaces/application/services/sagemaker_lifecycle_service.py`,配置 SageMaker Studio 生命周期脚本,预装常用 Python 库 (pip install pytorch transformers),选择合适的实例类型 (ml.g5.xlarge 默认/ml.g5.2xlarge 高性能场景,遵循 spec.md User Story 5 资源配额定义),配置 EFS 持久化存储避免重装,目标启动时间 <3分钟
+- [x] [T085b] [US5] SageMaker Spaces 启动性能监控 - `backend/src/modules/spaces/application/services/sagemaker_metrics_service.py`,集成 CloudWatch Metrics 监控 Space 启动时间,记录 CreateSpace API 调用到 InService 状态的耗时,P95/P99 启动时间统计,启动超时告警 (>3分钟触发)
+- [x] [T085c] [US5] SageMaker Spaces 启动性能测试 - `backend/tests/test_sagemaker_spaces_performance.py`,端到端启动时间测试 (目标 <3分钟),并发启动压力测试 (≥50 并发 Space),不同实例类型启动时间对比,性能回归测试 (CI/CD 集成)
+- [x] [T086] [US5] SageMaker Studio 镜像配置 - `backend/src/modules/spaces/application/services/sagemaker_image_service.py`,使用 SageMaker Studio 官方镜像 (Data Science, PyTorch, TensorFlow),支持自定义镜像注册到 SageMaker Image Registry,配置镜像版本管理
+- [x] [T090] [US5] SageMaker Space 状态同步 - `backend/src/modules/spaces/application/services/sagemaker_sync_service.py`,定时任务 (30秒) 调用 DescribeSpace API 同步状态到数据库,处理 InService/Pending/Failed 状态转换
 
 ### 前端页面组件
-- [ ] [T087] [US5] [P] 开发空间创建页面 - `frontend/src/features/spaces/pages/CreateSpacePage.tsx`,使用 Cloudscape Form,选择 IDE 类型 (JupyterLab/VS Code)、实例类型 (ml.g5.xlarge 默认/ml.g5.2xlarge,显示资源规格: CPU/内存/GPU,遵循 spec.md User Story 5 资源配额定义)、SageMaker Studio 镜像,显示启动进度和预估启动时间,创建模块 API 层 `frontend/src/features/spaces/api/queries.ts`
-- [ ] [T088] [US5] [P] 在线开发环境列表页面 - `frontend/src/features/spaces/pages/SpaceListPage.tsx`,使用 Cloudscape Table,显示 SageMaker Space 列表,支持启动/停止/删除操作,显示 Space 状态和启动耗时,创建模块类型定义 `frontend/src/features/spaces/types/index.ts`
-- [ ] [T089] [US5] [P] IDE 嵌入组件 - `frontend/src/features/spaces/components/IDEFrame.tsx`,使用 iframe 嵌入 SageMaker Studio URL (JupyterLab/VS Code),支持全屏模式
+- [x] [T087] [US5] [P] 开发空间创建页面 - `frontend/src/features/spaces/pages/CreateSpacePage.tsx`,使用 Cloudscape Form,选择 IDE 类型 (JupyterLab/VS Code)、实例类型 (ml.g5.xlarge 默认/ml.g5.2xlarge,显示资源规格: CPU/内存/GPU,遵循 spec.md User Story 5 资源配额定义)、SageMaker Studio 镜像,显示启动进度和预估启动时间,创建模块 API 层 `frontend/src/features/spaces/api/queries.ts`
+- [x] [T088] [US5] [P] 在线开发环境列表页面 - `frontend/src/features/spaces/pages/SpaceListPage.tsx`,使用 Cloudscape Table,显示 SageMaker Space 列表,支持启动/停止/删除操作,显示 Space 状态和启动耗时,创建模块类型定义 `frontend/src/features/spaces/types/index.ts`
+- [x] [T089] [US5] [P] IDE 嵌入组件 - `frontend/src/features/spaces/components/IDEFrame.tsx`,使用 iframe 嵌入 SageMaker Studio URL (JupyterLab/VS Code),支持全屏模式
 
 **并行执行机会**:
 - 数据库迁移: T079 独立

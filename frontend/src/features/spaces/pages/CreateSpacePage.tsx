@@ -1,0 +1,255 @@
+/**
+ * Create Space Page
+ *
+ * 创建开发空间页面
+ */
+
+import {
+  Box,
+  BreadcrumbGroup,
+  Button,
+  Container,
+  Form,
+  FormField,
+  Header,
+  Input,
+  Select,
+  SpaceBetween,
+} from '@cloudscape-design/components';
+import { useState, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useCreateSpace } from '../api';
+import type { SpaceType, CreateSpaceRequest } from '../types';
+import { SPACE_TYPE_LABELS } from '../types';
+
+// IDE 类型选项
+const spaceTypeOptions = Object.entries(SPACE_TYPE_LABELS)
+  .filter(([key]) => key !== 'custom')
+  .map(([value, label]) => ({
+    label,
+    value,
+  }));
+
+// 实例类型选项（含资源规格说明）
+const instanceTypeOptions = [
+  {
+    label: 'ml.g5.xlarge (4 vCPU, 16 GB, 1x NVIDIA A10G)',
+    value: 'ml.g5.xlarge',
+  },
+  {
+    label: 'ml.g5.2xlarge (8 vCPU, 32 GB, 1x NVIDIA A10G)',
+    value: 'ml.g5.2xlarge',
+  },
+  {
+    label: 'ml.g5.4xlarge (16 vCPU, 64 GB, 1x NVIDIA A10G)',
+    value: 'ml.g5.4xlarge',
+  },
+  {
+    label: 'ml.g5.8xlarge (32 vCPU, 128 GB, 1x NVIDIA A10G)',
+    value: 'ml.g5.8xlarge',
+  },
+];
+
+/**
+ * 表单验证
+ */
+function validateForm(values: {
+  name: string;
+  spaceType: string;
+  instanceType: string;
+  storageGb: string;
+}): Record<string, string> {
+  const errors: Record<string, string> = {};
+
+  if (!values.name.trim()) {
+    errors.name = '请输入空间名称';
+  } else if (values.name.length > 63) {
+    errors.name = '空间名称不能超过 63 个字符';
+  } else if (!/^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/.test(values.name)) {
+    errors.name = '空间名称只能包含小写字母、数字和连字符，且必须以字母或数字开头和结尾';
+  }
+
+  if (!values.spaceType) {
+    errors.spaceType = '请选择 IDE 类型';
+  }
+
+  if (!values.instanceType) {
+    errors.instanceType = '请选择实例类型';
+  }
+
+  const storageNum = parseInt(values.storageGb, 10);
+  if (isNaN(storageNum) || storageNum < 5 || storageNum > 500) {
+    errors.storageGb = '存储大小必须在 5-500 GB 之间';
+  }
+
+  return errors;
+}
+
+/**
+ * 创建开发空间页面
+ */
+export function CreateSpacePage() {
+  const navigate = useNavigate();
+  const createMutation = useCreateSpace();
+
+  // 表单状态
+  const [name, setName] = useState('');
+  const [spaceType, setSpaceType] = useState<string>('jupyter');
+  const [instanceType, setInstanceType] = useState<string>('ml.g5.xlarge');
+  const [storageGb, setStorageGb] = useState('10');
+  const [errors, setErrors] = useState<Record<string, string>>({});
+
+  // 取消创建
+  const handleCancel = useCallback(() => {
+    navigate('/spaces');
+  }, [navigate]);
+
+  // 提交表单
+  const handleSubmit = useCallback(async () => {
+    const validationErrors = validateForm({
+      name,
+      spaceType,
+      instanceType,
+      storageGb,
+    });
+
+    if (Object.keys(validationErrors).length > 0) {
+      setErrors(validationErrors);
+      return;
+    }
+
+    setErrors({});
+
+    const request: CreateSpaceRequest = {
+      name,
+      space_type: spaceType as SpaceType,
+      instance_type: instanceType,
+      storage_gb: parseInt(storageGb, 10),
+    };
+
+    try {
+      await createMutation.mutateAsync(request);
+      navigate('/spaces');
+    } catch (error) {
+      // 错误处理由 mutation 的 onError 处理
+      console.error('创建开发空间失败:', error);
+    }
+  }, [name, spaceType, instanceType, storageGb, createMutation, navigate]);
+
+  return (
+    <SpaceBetween size="l">
+      {/* 面包屑导航 */}
+      <BreadcrumbGroup
+        items={[
+          { text: '在线开发环境', href: '/spaces' },
+          { text: '创建开发空间', href: '#' },
+        ]}
+        onFollow={(e) => {
+          e.preventDefault();
+          if (e.detail.href !== '#') {
+            navigate(e.detail.href);
+          }
+        }}
+      />
+
+      {/* 页面标题 */}
+      <Header variant="h1">创建开发空间</Header>
+
+      {/* 创建表单 */}
+      <Form
+        actions={
+          <SpaceBetween direction="horizontal" size="xs">
+            <Button
+              variant="link"
+              onClick={handleCancel}
+              disabled={createMutation.isPending}
+            >
+              取消
+            </Button>
+            <Button
+              variant="primary"
+              onClick={handleSubmit}
+              loading={createMutation.isPending}
+            >
+              创建空间
+            </Button>
+          </SpaceBetween>
+        }
+      >
+        <Container header={<Header variant="h2">基础配置</Header>}>
+          <SpaceBetween size="m">
+            <FormField
+              label="空间名称"
+              errorText={errors.name}
+              constraintText="必填，小写字母、数字和连字符，最多 63 个字符"
+            >
+              <Input
+                value={name}
+                onChange={({ detail }) => setName(detail.value)}
+                placeholder="my-dev-space"
+              />
+            </FormField>
+
+            <FormField
+              label="IDE 类型"
+              errorText={errors.spaceType}
+              constraintText="选择开发环境类型"
+            >
+              <Select
+                selectedOption={
+                  spaceTypeOptions.find((opt) => opt.value === spaceType) ||
+                  spaceTypeOptions[0]
+                }
+                onChange={({ detail }) =>
+                  setSpaceType(detail.selectedOption.value || 'jupyter')
+                }
+                options={spaceTypeOptions}
+              />
+            </FormField>
+
+            <FormField
+              label="实例类型"
+              errorText={errors.instanceType}
+              constraintText="选择计算实例规格"
+            >
+              <Select
+                selectedOption={
+                  instanceTypeOptions.find(
+                    (opt) => opt.value === instanceType
+                  ) || instanceTypeOptions[0]
+                }
+                onChange={({ detail }) =>
+                  setInstanceType(detail.selectedOption.value || 'ml.g5.xlarge')
+                }
+                options={instanceTypeOptions}
+              />
+            </FormField>
+
+            <FormField
+              label="存储大小 (GB)"
+              errorText={errors.storageGb}
+              constraintText="5-500 GB，默认 10 GB"
+            >
+              <Input
+                type="number"
+                value={storageGb}
+                onChange={({ detail }) => setStorageGb(detail.value)}
+              />
+            </FormField>
+          </SpaceBetween>
+        </Container>
+      </Form>
+
+      {/* 错误提示 */}
+      {createMutation.isError && (
+        <Container>
+          <Box color="text-status-error">
+            创建失败: {createMutation.error?.message || '未知错误'}
+          </Box>
+        </Container>
+      )}
+    </SpaceBetween>
+  );
+}
+
+export default CreateSpacePage;

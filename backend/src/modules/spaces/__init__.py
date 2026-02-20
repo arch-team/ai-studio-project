@@ -1,7 +1,13 @@
 """Spaces module - Development space management for AI training platform."""
 
 from .api import router
-from .application import SpaceService
+from .application import (
+    SageMakerImageService,
+    SageMakerLifecycleService,
+    SpaceMetricsService,
+    SpaceService,
+    SpaceSyncService,
+)
 from .domain import (
     INSTANCE_TYPE_RESOURCES,
     SPACE_STATE_TRANSITIONS,
@@ -22,6 +28,10 @@ __all__ = [
     "router",
     # Services
     "SpaceService",
+    "SageMakerLifecycleService",
+    "SageMakerImageService",
+    "SpaceSyncService",
+    "SpaceMetricsService",
     # Entities
     "Space",
     # Value Objects

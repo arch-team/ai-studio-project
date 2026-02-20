@@ -2,4 +2,5 @@
  * Spaces components exports.
  */
 
-export {};
+export { SpaceStatusBadge } from './SpaceStatusBadge';
+export { IDEFrame } from './IDEFrame';

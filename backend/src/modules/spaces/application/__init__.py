@@ -1,5 +1,17 @@
 """Space application layer - Business services."""
 
-from .services import SpaceService
+from .services import (
+    SageMakerImageService,
+    SageMakerLifecycleService,
+    SpaceMetricsService,
+    SpaceService,
+    SpaceSyncService,
+)
 
-__all__ = ["SpaceService"]
+__all__ = [
+    "SpaceService",
+    "SageMakerLifecycleService",
+    "SageMakerImageService",
+    "SpaceSyncService",
+    "SpaceMetricsService",
+]

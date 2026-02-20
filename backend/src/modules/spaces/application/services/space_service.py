@@ -1,7 +1,10 @@
-"""Space Service - Business logic for development space management (skeleton)."""
+"""Space Service - 开发空间管理业务逻辑."""
 
 import uuid
 
+import structlog
+
+from src.modules.spaces.application.interfaces import ISageMakerSpacesClient
 from src.modules.spaces.domain.entities import Space
 from src.modules.spaces.domain.exceptions import DuplicateSpaceNameError
 from src.modules.spaces.domain.repositories import ISpaceRepository
@@ -13,44 +16,80 @@ from src.modules.spaces.domain.value_objects import (
 from src.shared.application import BaseApplicationService
 from src.shared.utils import utc_now
 
+logger = structlog.get_logger(__name__)
+
+# IDE 类型映射: SpaceType -> SageMaker IDE 类型
+_IDE_TYPE_MAP = {
+    SpaceType.JUPYTER: "jupyterlab",
+    SpaceType.VSCODE: "vscode",
+    SpaceType.RSTUDIO: "jupyterlab",  # RStudio 使用 JupyterLab 容器
+}
+
 
 class SpaceService(BaseApplicationService[Space, str]):
-    """Service for managing development spaces."""
+    """开发空间管理服务."""
 
     def __init__(
         self,
         space_repository: ISpaceRepository,
+        sagemaker_client: ISageMakerSpacesClient,
     ):
         super().__init__(space_repository, "Space")
         self._space_repository = space_repository
+        self._sagemaker_client = sagemaker_client
 
     async def create_space(self, owner_id: int, data: dict) -> Space:
-        """Create a new development space."""
+        """创建新的开发空间."""
         space_name = data["space_name"]
 
-        # Check for duplicate name for same owner
+        # 检查同一所有者下的名称重复
         existing = await self._space_repository.get_by_name_and_owner(space_name, owner_id)
         if existing:
             raise DuplicateSpaceNameError(space_name, owner_id)
 
-        # Create domain entity
+        space_type = SpaceType(data.get("space_type", "jupyter"))
+        instance_type = SpaceInstanceType(data.get("instance_type", "ml.g5.xlarge"))
+        storage_size_gb = data.get("storage_size_gb", 20)
+
+        # 创建域实体
         space = Space(
             id=str(uuid.uuid4()),
             space_name=space_name,
             owner_id=owner_id,
-            instance_type=SpaceInstanceType(data.get("instance_type", "ml.g5.xlarge")),
-            space_type=SpaceType(data.get("space_type", "jupyter")),
-            storage_size_gb=data.get("storage_size_gb", 20),
+            instance_type=instance_type,
+            space_type=space_type,
+            storage_size_gb=storage_size_gb,
             status=SpaceStatus.PENDING,
             created_at=utc_now(),
             updated_at=utc_now(),
         )
 
-        # Save to database
+        # 调用 SageMaker API 创建 Space
+        ide_type = _IDE_TYPE_MAP.get(space_type, "jupyterlab")
+        result = await self._sagemaker_client.create_space(
+            name=space_name,
+            instance_type=instance_type.value,
+            ide_type=ide_type,
+            lifecycle_config_arn=data.get("lifecycle_config_arn"),
+            storage_size_gb=storage_size_gb,
+        )
+
+        # 记录 SageMaker ARN
+        space.sagemaker_space_arn = result.get("arn")
+        space.lifecycle_config_arn = data.get("lifecycle_config_arn")
+
+        logger.info(
+            "space_created",
+            space_id=space.id,
+            space_name=space_name,
+            sagemaker_arn=space.sagemaker_space_arn,
+        )
+
+        # 保存到数据库
         return await self._space_repository.create(space)
 
     async def get_space(self, space_id: str) -> Space:
-        """Get space by ID."""
+        """根据 ID 获取开发空间."""
         return await self._get_or_raise(space_id)
 
     async def list_spaces(
@@ -62,7 +101,7 @@ class SpaceService(BaseApplicationService[Space, str]):
         sort_by: str = "created_at",
         sort_order: str = "desc",
     ) -> tuple[list[Space], int]:
-        """List spaces with filters and pagination."""
+        """列出开发空间 (支持过滤和分页)."""
         return await self._space_repository.list_spaces(
             owner_id=owner_id,
             status=status,
@@ -73,22 +112,45 @@ class SpaceService(BaseApplicationService[Space, str]):
         )
 
     async def start_space(self, space_id: str) -> Space:
-        """Start a development space."""
+        """启动开发空间."""
         space = await self._get_or_raise(space_id)
         space.start()
-        # TODO: Call SageMaker API to start space
+
+        # 调用 SageMaker API 查询并确认 Space 存在
+        sagemaker_info = await self._sagemaker_client.describe_space(space.space_name)
+        if sagemaker_info:
+            logger.info(
+                "space_starting",
+                space_id=space_id,
+                sagemaker_status=sagemaker_info.get("status"),
+            )
+
         return await self._space_repository.update(space)
 
     async def stop_space(self, space_id: str) -> Space:
-        """Stop a development space."""
+        """停止开发空间."""
         space = await self._get_or_raise(space_id)
         space.stop()
-        # TODO: Call SageMaker API to stop space
+
+        # 查询 SageMaker Space 当前状态
+        sagemaker_info = await self._sagemaker_client.describe_space(space.space_name)
+        if sagemaker_info:
+            logger.info(
+                "space_stopping",
+                space_id=space_id,
+                sagemaker_status=sagemaker_info.get("status"),
+            )
+
         return await self._space_repository.update(space)
 
     async def delete_space(self, space_id: str) -> None:
-        """Delete a development space (soft delete)."""
+        """删除开发空间 (软删除)."""
         space = await self._get_or_raise(space_id)
         space.delete()
-        # TODO: Call SageMaker API to delete space
+
+        # 调用 SageMaker API 删除 Space
+        await self._sagemaker_client.delete_space(space.space_name)
+
+        logger.info("space_deleted", space_id=space_id, space_name=space.space_name)
+
         await self._space_repository.soft_delete(space_id)
