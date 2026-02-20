@@ -35,7 +35,7 @@ import {
   useAlerts,
   useMetricSeries,
 } from "../api";
-import { MetricsCharts } from "../components/MetricsCharts";
+import { MetricsCharts } from "../components";
 import {
   formatDateTimeShort,
   calculateTimeRange,
@@ -325,13 +325,10 @@ function GrafanaDashboard({
           src={grafanaUrl}
           width="100%"
           height="500"
-          frameBorder="0"
-          title="Grafana 集群监控仪表盘"
-          style={{
-            border: "none",
-            borderRadius: "4px",
-            backgroundColor: "#f8f8f8",
-          }}
+          title="Grafana 监控仪表盘"
+          sandbox="allow-scripts allow-same-origin"
+          style={{ border: "none", borderRadius: "4px" }}
+          loading="lazy"
         />
       </Box>
     </Container>
