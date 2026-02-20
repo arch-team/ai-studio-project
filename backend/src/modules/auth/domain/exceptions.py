@@ -37,6 +37,7 @@ from src.shared.infrastructure.security.exceptions import (
     UserNotFoundError,
 )
 
+
 # =============================================================================
 # Auth 模块独有异常
 # =============================================================================
@@ -46,18 +47,24 @@ class AccountInactiveError(Problem):
     """账户未激活."""
 
     message: str = field(default="Account is not active")
+
+
 @problem(401, "AUTH_ERROR")
 @dataclass
 class AuthError(Problem):
     """Auth 模块基础异常."""
 
     message: str = field(default="Authentication error")
+
+
 @problem(401, "TOKEN_ERROR")
 @dataclass
 class TokenError(Problem):
     """Token 错误基类."""
 
     message: str = field(default="Token error")
+
+
 __all__ = [
     # 重导出的异常（来自 shared/security）
     "SecurityError",

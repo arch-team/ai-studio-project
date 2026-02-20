@@ -1,13 +1,12 @@
 """Checkpoint Repository Implementation - SQLAlchemy data access."""
 
-from datetime import datetime, timedelta
-
-from src.shared.utils import utc_now
+from datetime import timedelta
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.shared.infrastructure import PydanticRepository
+from src.shared.utils import utc_now
 
 from ...domain.entities import Checkpoint
 from ...domain.repositories import ICheckpointRepository

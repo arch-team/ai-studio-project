@@ -92,9 +92,7 @@ class ModelRepository(PydanticRepository[Model, ModelModel, int], IModelReposito
         count_query = select(func.count(ModelModel.id))
 
         # 应用过滤条件
-        query, count_query = self._apply_model_filters(
-            query, count_query, owner_id, training_job_id, status, framework
-        )
+        query, count_query = self._apply_model_filters(query, count_query, owner_id, training_job_id, status, framework)
 
         # 获取总数
         total = await self._get_total_count(count_query)

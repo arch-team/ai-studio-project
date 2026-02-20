@@ -1,5 +1,6 @@
 """Checkpoint Trigger Service - 特定场景触发的检查点创建."""
 
+from src.modules.training.application.services.checkpoint_creation_service import CheckpointCreationService
 from src.modules.training.domain.entities import Checkpoint
 from src.modules.training.domain.exceptions import (
     CheckpointStorageError,
@@ -8,7 +9,6 @@ from src.modules.training.domain.exceptions import (
 )
 from src.modules.training.domain.repositories import ITrainingJobRepository
 from src.modules.training.domain.value_objects import CheckpointTriggerType, JobStatus
-from src.modules.training.application.services.checkpoint_creation_service import CheckpointCreationService
 from src.shared.utils import utc_now
 
 

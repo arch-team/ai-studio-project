@@ -192,9 +192,7 @@ class PrometheusService:
 
     async def get_network_metrics(self) -> NetworkMetrics:
         """获取网络性能指标 (FR-021)."""
-        latency_ms = await self._query_instant_value(
-            "avg(node_network_receive_latency_seconds) * 1000"
-        )
+        latency_ms = await self._query_instant_value("avg(node_network_receive_latency_seconds) * 1000")
         bandwidth_mbps = await self._query_instant_value(
             "avg(rate(node_network_receive_bytes_total[5m])) / 1024 / 1024 * 8"
         )

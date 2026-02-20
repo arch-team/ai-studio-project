@@ -24,6 +24,8 @@ class QuotaNotFoundError(Problem):
     """配额配置未找到."""
 
     identifier: str
+
+
 @problem(429, "QUOTA_EXCEEDED", "{resource} quota exceeded: requested {requested}, limit {limit}")
 @dataclass
 class QuotaExceededError(Problem):
@@ -32,6 +34,8 @@ class QuotaExceededError(Problem):
     resource: str
     requested: int
     limit: int
+
+
 @problem(
     409,
     "DUPLICATE_CONFIG",
@@ -43,6 +47,8 @@ class DuplicateConfigError(Problem):
 
     role: str
     scope: str
+
+
 @problem(
     409,
     "DUPLICATE_QUOTA_NAME",
@@ -53,4 +59,6 @@ class DuplicateQuotaNameError(Problem):
     """配额名称重复."""
 
     name: str
+
+
 # =============================================================================

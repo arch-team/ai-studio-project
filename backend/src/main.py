@@ -127,6 +127,7 @@ def _configure_exception_handlers(app: FastAPI) -> None:
 
 def _configure_health_check(app: FastAPI, settings: Settings) -> None:
     """配置健康检查端点。非 development 环境仅返回 status，避免版本信息泄露。"""
+
     @app.get("/health", tags=["Health"])
     async def _health_check() -> dict:
         """Health check endpoint for load balancers and monitoring."""

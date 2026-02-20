@@ -90,9 +90,7 @@ class JobTemplateRepository(
         )
 
         # 构建查询
-        query = select(JobTemplateModel).where(
-            and_(JobTemplateModel.deleted_at.is_(None), visibility_condition)
-        )
+        query = select(JobTemplateModel).where(and_(JobTemplateModel.deleted_at.is_(None), visibility_condition))
         count_query = select(func.count(JobTemplateModel.id)).where(
             and_(JobTemplateModel.deleted_at.is_(None), visibility_condition)
         )

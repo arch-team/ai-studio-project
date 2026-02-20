@@ -150,9 +150,7 @@ class StallDetectionService:
         start_time = end_time - timedelta(minutes=config.detection_window_minutes)
 
         # 获取指标数据
-        metric_points, used_metric = await self._analyzer.fetch_metric_points(
-            job, config, start_time, end_time
-        )
+        metric_points, used_metric = await self._analyzer.fetch_metric_points(job, config, start_time, end_time)
 
         # 没有可用指标
         if not metric_points:

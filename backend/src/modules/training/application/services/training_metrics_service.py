@@ -109,6 +109,7 @@ class TrainingMetricsService:
     ) -> dict:
         """查询 Prometheus 指标."""
         from datetime import timedelta
+
         from src.shared.utils import utc_now
 
         # 转换指标类型为 Prometheus 指标名称

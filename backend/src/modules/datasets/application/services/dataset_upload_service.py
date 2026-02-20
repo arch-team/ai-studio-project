@@ -106,9 +106,7 @@ class DatasetUploadService:
         if active_session is not None:
             raise UploadSessionActiveError(dataset_id=dataset_id, upload_id=active_session.upload_id)
 
-    async def _create_s3_multipart_upload(
-        self, s3_key: str, content_type: str, dataset_id: int, filename: str
-    ) -> dict:
+    async def _create_s3_multipart_upload(self, s3_key: str, content_type: str, dataset_id: int, filename: str) -> dict:
         """创建 S3 分片上传."""
         return await self._s3_client.create_multipart_upload(
             key=s3_key,

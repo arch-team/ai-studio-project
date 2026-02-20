@@ -167,5 +167,3 @@ class SSODegradedModeError(Problem):
     """SSO 降级模式."""
 
     message: str = field(default="SSO service is temporarily unavailable")
-
-

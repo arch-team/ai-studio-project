@@ -24,6 +24,8 @@ class ModelNotFoundError(Problem):
     """模型未找到."""
 
     model_id: int | str
+
+
 @problem(409, "DUPLICATE_MODEL_VERSION", "Model version already exists: {model_name} {version}")
 @dataclass
 class DuplicateModelVersionError(Problem):
@@ -31,6 +33,8 @@ class DuplicateModelVersionError(Problem):
 
     model_name: str
     version: str
+
+
 @problem(409, "INVALID_MODEL_STATE", "Cannot {operation} model {model_id} in {current_state} state")
 @dataclass
 class InvalidModelStateError(Problem):

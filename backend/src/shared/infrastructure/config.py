@@ -24,9 +24,7 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
 
     # Database
-    database_url: SecretStr = SecretStr(
-        "mysql+aiomysql://ai_training:ai_training_pass@localhost:3306/ai_training"
-    )
+    database_url: SecretStr = SecretStr("mysql+aiomysql://ai_training:ai_training_pass@localhost:3306/ai_training")
     database_pool_size: int = 5
     database_max_overflow: int = 10
 

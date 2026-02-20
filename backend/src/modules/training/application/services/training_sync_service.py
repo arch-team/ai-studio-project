@@ -256,4 +256,3 @@ class TrainingSyncService:
             JobStatus.PREEMPTED,
         ]
         return await self._repo.list_by_statuses(active_statuses)
-

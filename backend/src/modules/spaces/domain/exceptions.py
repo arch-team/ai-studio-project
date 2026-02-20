@@ -24,6 +24,8 @@ class SpaceNotFoundError(Problem):
     """开发空间未找到."""
 
     space_id: str
+
+
 @problem(
     409,
     "DUPLICATE_SPACE_NAME",
@@ -35,6 +37,8 @@ class DuplicateSpaceNameError(Problem):
 
     space_name: str
     owner_id: int
+
+
 @problem(
     409,
     "INVALID_SPACE_STATE",
@@ -47,6 +51,8 @@ class InvalidSpaceStateError(Problem):
     space_id: str
     current_state: str
     operation: str
+
+
 @problem(
     429,
     "SPACE_QUOTA_EXCEEDED",
@@ -59,4 +65,6 @@ class SpaceQuotaExceededError(Problem):
     resource: str
     required: int
     available: int
+
+
 # =============================================================================

@@ -5,7 +5,6 @@
 
 from dataclasses import dataclass, field
 
-
 # 默认指标回退顺序
 DEFAULT_METRIC_FALLBACK = ["loss", "accuracy", "perplexity"]
 
