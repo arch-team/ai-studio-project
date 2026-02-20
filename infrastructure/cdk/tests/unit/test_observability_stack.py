@@ -83,6 +83,24 @@ class TestObservabilityStackCreation:
             {"RoleName": "ai-platform-dev-observability-collector-role"},
         )
 
+    def test_amp_audit_log_group_created(self, template: Template) -> None:
+        """验证 AMP 审计日志组创建."""
+        template.has_resource_properties(
+            "AWS::Logs::LogGroup",
+            {"LogGroupName": "/aws/amp/ai-platform-dev"},
+        )
+
+    def test_amp_workspace_has_logging_configuration(self, template: Template) -> None:
+        """验证 AMP Workspace 配置了 CloudWatch Logs。"""
+        # 通过 JSON 模板验证 LoggingConfiguration 已设置
+        cfn_template = template.to_json()
+        amp_resources = [
+            v for v in cfn_template.get("Resources", {}).values()
+            if v.get("Type") == "AWS::APS::Workspace"
+        ]
+        assert len(amp_resources) == 1
+        assert "LoggingConfiguration" in amp_resources[0]["Properties"]
+
     def test_outputs_exported(self, observability_stack: ObservabilityStack) -> None:
         """验证 Stack 输出."""
         template = Template.from_stack(observability_stack)

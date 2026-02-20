@@ -12,6 +12,7 @@ import aws_cdk as cdk
 from aws_cdk import aws_aps as aps
 from aws_cdk import aws_eks as eks
 from aws_cdk import aws_iam as iam
+from aws_cdk import aws_logs as logs
 
 from config import EnvironmentConfig
 from config.constants import EKS_ADDON_NAMES, K8S_NAMESPACES, SERVICE_ACCOUNTS
@@ -57,10 +58,22 @@ class ObservabilityStack(cdk.Stack):
 
     def _create_amp_workspace(self) -> aps.CfnWorkspace:
         """创建 Amazon Managed Prometheus Workspace。"""
+        # 创建 AMP 审计日志组
+        log_group = logs.LogGroup(
+            self,
+            "AmpAuditLogs",
+            log_group_name=f"/aws/amp/{self.env_config.resource_prefix}",
+            retention=logs.RetentionDays.THREE_MONTHS,
+            removal_policy=cdk.RemovalPolicy.DESTROY,
+        )
+
         return aps.CfnWorkspace(
             self,
             "AmpWorkspace",
             alias=f"{self.env_config.resource_prefix}-amp",
+            logging_configuration=aps.CfnWorkspace.LoggingConfigurationProperty(
+                log_group_arn=log_group.log_group_arn,
+            ),
             tags=create_cfn_tags(
                 self.env_config,
                 "amp",
