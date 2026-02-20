@@ -142,3 +142,9 @@ infra/.terraform/
 
 # Claude 生成的优化报告（如需保留应放在 cc-doc/plans/）
 **/OPTIMIZATION_REPORT*.md
+
+# 个人提示历史文件
+**/my-prompts.md
+
+# 基础设施测试日志（报告按需保留最新）
+infrastructure/tests/reports/*.log
