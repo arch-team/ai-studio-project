@@ -148,3 +148,7 @@ infra/.terraform/
 
 # 基础设施测试日志（报告按需保留最新）
 infrastructure/tests/reports/*.log
+
+# 自动生成的工具产物
+.reports/
+codemaps/
