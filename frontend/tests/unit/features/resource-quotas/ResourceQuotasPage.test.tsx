@@ -8,8 +8,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { screen, waitFor, fireEvent } from '@testing-library/react';
 import { renderWithProviders } from '@tests/__utils__/test-utils';
-import { ResourceQuotasPage } from '@features/resource-quotas/ResourceQuotasPage';
-import type { ResourceLimitConfig, ResourceLimitConfigListResponse } from '@features/resource-quotas/types';
+import { ResourceQuotasPage } from '@features/resource-quotas';
+import type { ResourceLimitConfig, ResourceLimitConfigListResponse } from '@features/resource-quotas';
 
 // Mock data
 const mockQuotas: ResourceLimitConfig[] = [
@@ -56,7 +56,7 @@ const mockUseResourceLimitConfigs = vi.fn();
 const mockUseCreateResourceLimitConfig = vi.fn();
 const mockUseUpdateResourceLimitConfig = vi.fn();
 
-vi.mock('@features/resource-quotas/hooks', () => ({
+vi.mock('@features/resource-quotas/api', () => ({
   useResourceLimitConfigs: () => mockUseResourceLimitConfigs(),
   useCreateResourceLimitConfig: () => mockUseCreateResourceLimitConfig(),
   useUpdateResourceLimitConfig: () => mockUseUpdateResourceLimitConfig(),
