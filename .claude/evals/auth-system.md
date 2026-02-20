@@ -20,7 +20,7 @@ Tasks: T011, T013-T013d
 - [x] project_manager 可管理项目级资源配额和用户
 - [x] engineer 可创建/管理自己的训练任务和数据集
 - [x] viewer 仅有只读权限
-- [~] 基于资源的权限检查: 用户只能操作自己拥有的资源
+- [x] 基于资源的权限检查: 用户只能操作自己拥有的资源
 - [~] Kubernetes RBAC 集成: 平台角色映射到 K8s ClusterRole
 
 #### 本地账号管理 (T013c)

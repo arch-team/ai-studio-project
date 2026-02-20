@@ -281,10 +281,20 @@ def upgrade() -> None:
         unique=False,
     )
 
-    # Create fulltext index for model_name and description search
-    op.execute(
-        "ALTER TABLE models ADD FULLTEXT INDEX ft_models_search (model_name, description)"
+    # 创建全文索引 (幂等: 若索引已存在则跳过)
+    conn = op.get_bind()
+    result = conn.execute(
+        sa.text(
+            "SELECT COUNT(*) FROM information_schema.statistics "
+            "WHERE table_schema = DATABASE() "
+            "AND table_name = 'models' "
+            "AND index_name = 'ft_models_search'"
+        )
     )
+    if result.scalar() == 0:
+        op.execute(
+            "ALTER TABLE models ADD FULLTEXT INDEX ft_models_search (model_name, description)"
+        )
 
 
 def downgrade() -> None:

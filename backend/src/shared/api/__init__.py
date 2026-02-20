@@ -18,6 +18,7 @@ from .pagination import (
     get_listing_params,
     get_pagination_params,
 )
+from .dependencies import OwnedResource, check_resource_ownership
 from .schemas import EntitySchema
 
 __all__ = [
@@ -40,4 +41,7 @@ __all__ = [
     # 统一查询参数
     "ListingParams",
     "get_listing_params",
+    # 资源所有权检查
+    "OwnedResource",
+    "check_resource_ownership",
 ]

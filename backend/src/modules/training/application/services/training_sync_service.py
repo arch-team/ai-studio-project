@@ -9,6 +9,7 @@
 遵循 Constitution I.B: 优先使用 sagemaker-hyperpod SDK
 """
 
+import asyncio
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -63,6 +64,51 @@ class TrainingSyncService:
         self._repo = training_job_repository
         self._hyperpod = hyperpod_client
         self._cluster_name = cluster_name
+        # 定期同步后台任务相关
+        self._sync_task: asyncio.Task[None] | None = None
+        self._sync_interval: float = 30.0
+
+    async def start_periodic_sync(self, interval_seconds: float = 30.0) -> None:
+        """启动定期状态同步后台任务。
+
+        每隔 interval_seconds 秒自动调用 sync_all_active_jobs()，
+        从 HyperPod 同步所有活跃训练任务的最新状态。
+
+        Args:
+            interval_seconds: 同步间隔秒数，默认 30 秒
+        """
+        self._sync_interval = interval_seconds
+        self._sync_task = asyncio.create_task(self._periodic_sync_loop())
+        logger.info(
+            "periodic_sync_started",
+            interval_seconds=interval_seconds,
+        )
+
+    async def _periodic_sync_loop(self) -> None:
+        """内部定时同步循环。
+
+        持续运行，每隔 _sync_interval 秒执行一次状态同步。
+        单次同步异常不会中断循环，仅记录错误日志。
+        """
+        while True:
+            try:
+                await self.sync_all_active_jobs()
+            except Exception:
+                logger.exception("periodic_sync_failed")
+            await asyncio.sleep(self._sync_interval)
+
+    async def stop_periodic_sync(self) -> None:
+        """停止定期同步后台任务。
+
+        取消正在运行的后台同步循环，等待其清理完成。
+        """
+        if self._sync_task and not self._sync_task.done():
+            self._sync_task.cancel()
+            try:
+                await self._sync_task
+            except asyncio.CancelledError:
+                pass
+            logger.info("periodic_sync_stopped")
 
     async def sync_all_active_jobs(self) -> SyncResult:
         """同步所有活跃任务状态

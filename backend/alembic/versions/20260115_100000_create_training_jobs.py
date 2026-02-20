@@ -424,12 +424,23 @@ def upgrade() -> None:
         unique=False,
     )
 
-    # Create fulltext index for job_name and description search
-    op.execute(
-        "ALTER TABLE training_jobs ADD FULLTEXT INDEX ft_training_jobs_search (job_name, description)"
+    # 创建全文索引 (幂等: 若索引已存在则跳过)
+    conn = op.get_bind()
+    result = conn.execute(
+        sa.text(
+            "SELECT COUNT(*) FROM information_schema.statistics "
+            "WHERE table_schema = DATABASE() "
+            "AND table_name = 'training_jobs' "
+            "AND index_name = 'ft_training_jobs_search'"
+        )
     )
+    if result.scalar() == 0:
+        op.execute(
+            "ALTER TABLE training_jobs ADD FULLTEXT INDEX ft_training_jobs_search (job_name, description)"
+        )
 
-    # Create BEFORE UPDATE trigger to validate state transitions
+    # 创建状态转换校验触发器 (幂等: 先删除再创建)
+    op.execute("DROP TRIGGER IF EXISTS validate_training_job_state_transition_trigger")
     op.execute(
         """
         CREATE TRIGGER validate_training_job_state_transition_trigger

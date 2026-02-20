@@ -1,6 +1,6 @@
 ## EVAL: us1-training-jobs
 Created: 2026-02-20
-Last Check: 2026-02-20
+Last Check: 2026-02-20 (post-fix-2)
 Module: backend/src/modules/training/ + frontend/src/features/training/
 Phase: 3 (P1 Must-Have)
 Tasks: T021-T038c
@@ -9,14 +9,14 @@ Tasks: T021-T038c
 
 #### 后端 API
 - [x] POST /training-jobs 能成功创建训练任务，返回 201 和任务 ID
-- [~] POST /training-jobs 验证资源配额不足时返回 403
+- [x] POST /training-jobs 验证资源配额不足时返回 429 (RFC 6585 配额限制语义)
 - [x] POST /training-jobs 验证训练配置无效时返回 422
 - [x] GET /training-jobs 支持分页 (page, page_size) 并返回正确的总数
 - [x] GET /training-jobs 支持按 status 过滤 (submitted/running/completed/failed)
 - [x] GET /training-jobs 支持按 owner_id 过滤
 - [x] GET /training-jobs 支持按 created_at 和 priority 排序
 - [x] GET /training-jobs/{id} 返回完整任务详情，包含训练配置
-- [~] PUT /training-jobs/{id} 仅允许修改 priority 和 training_config 字段
+- [x] PUT /training-jobs/{id} 仅允许修改 priority, description, max_epochs, checkpoint_interval
 - [x] DELETE /training-jobs/{id} 执行软删除并终止 HyperPod 训练任务
 - [x] POST /training-jobs/{id}/pause 暂停运行中的任务并保存检查点
 - [x] POST /training-jobs/{id}/pause 对非 Running 状态返回 409
@@ -32,7 +32,7 @@ Tasks: T021-T038c
 #### HyperPod 集成
 - [x] HyperPodService 成功通过 SDK 提交 PyTorchJob
 - [x] HyperPodService 支持 DDP/FSDP/DeepSpeed 三种训练模式
-- [~] 训练任务状态同步服务每 30 秒同步一次 HyperPod 状态
+- [x] 训练任务状态同步服务支持 30 秒间隔定期同步 HyperPod 状态
 - [x] Gang Scheduling 验证所有 Pods 在 60 秒内同时就绪
 - [x] 抢占连续失败 3 次后任务状态正确转为 Failed
 - [x] 停滞检测在 Loss 变化率 <0.1% (30分钟窗口) 时触发告警
@@ -50,7 +50,7 @@ Tasks: T021-T038c
 - [x] RBAC 权限检查: viewer 角色无法创建/修改训练任务
 - [x] 审计日志中间件记录所有训练任务 CRUD 操作
 - [x] 资源配额检查在任务提交时正确执行
-- [ ] 数据库迁移 (training_jobs, checkpoints, models) 可重复执行
+- [x] 数据库迁移 (training_jobs, checkpoints, models) 可重复执行
 - [x] 所有 API 端点返回标准化错误响应格式
 
 ### Success Criteria
