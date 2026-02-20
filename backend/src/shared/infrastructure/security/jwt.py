@@ -84,7 +84,7 @@ class JWTManager:
         encoded: bytes = authlib_jwt.encode(
             self._header,
             token_payload,
-            self.settings.secret_key,
+            self.settings.secret_key.get_secret_value(),
         )
         return encoded.decode("utf-8")
 
@@ -144,7 +144,7 @@ class JWTManager:
     ) -> TokenPayload:
         """Verify and decode a JWT token."""
         try:
-            claims = authlib_jwt.decode(token, self.settings.secret_key)
+            claims = authlib_jwt.decode(token, self.settings.secret_key.get_secret_value())
             claims.validate()
 
             # Validate token type if specified
@@ -164,7 +164,7 @@ class JWTManager:
     def get_user_id_from_token(self, token: str) -> int:
         """Extract user ID from token without full validation."""
         try:
-            claims = authlib_jwt.decode(token, self.settings.secret_key)
+            claims = authlib_jwt.decode(token, self.settings.secret_key.get_secret_value())
             return int(claims["sub"])
         except (JoseError, KeyError, ValueError) as e:
             raise InvalidTokenError(f"Cannot extract user ID: {str(e)}")

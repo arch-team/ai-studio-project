@@ -9,6 +9,7 @@ from typing import Any
 from unittest.mock import AsyncMock, MagicMock, Mock, patch
 
 import pytest
+from pydantic import SecretStr
 
 from src.modules.auth.domain.entities.user import UserRole, UserStatus
 from src.shared.infrastructure.security.constants import PASSWORD_BCRYPT_COST
@@ -30,7 +31,7 @@ def jwt_secret_key() -> str:
 def mock_settings(jwt_secret_key: str) -> MagicMock:
     """Mock settings with test secret key."""
     settings = MagicMock()
-    settings.secret_key = jwt_secret_key
+    settings.secret_key = SecretStr(jwt_secret_key)
     settings.access_token_expire_minutes = 30
     return settings
 

@@ -6,6 +6,8 @@ from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 
+from pydantic import SecretStr
+
 from tests.shared.constants import (
     TEST_ACCESS_TOKEN_EXPIRE_MINUTES,
     TEST_JWT_SECRET,
@@ -27,7 +29,7 @@ def jwt_secret_key() -> str:
 def mock_settings(jwt_secret_key: str) -> MagicMock:
     """Mock settings with test secret key."""
     settings = MagicMock()
-    settings.secret_key = jwt_secret_key
+    settings.secret_key = SecretStr(jwt_secret_key)
     settings.access_token_expire_minutes = TEST_ACCESS_TOKEN_EXPIRE_MINUTES
     return settings
 

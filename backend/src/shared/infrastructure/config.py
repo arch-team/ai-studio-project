@@ -2,6 +2,7 @@
 
 from functools import lru_cache
 
+from pydantic import SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -23,14 +24,16 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
 
     # Database
-    database_url: str = "mysql+aiomysql://ai_training:ai_training_pass@localhost:3306/ai_training"
+    database_url: SecretStr = SecretStr(
+        "mysql+aiomysql://ai_training:ai_training_pass@localhost:3306/ai_training"
+    )
     database_pool_size: int = 5
     database_max_overflow: int = 10
 
     # AWS
     aws_region: str = "us-east-1"
     aws_access_key_id: str | None = None
-    aws_secret_access_key: str | None = None
+    aws_secret_access_key: SecretStr | None = None
 
     # S3
     s3_bucket_name: str = "ai-training-platform"
@@ -50,11 +53,19 @@ class Settings(BaseSettings):
     mlflow_max_retries: int = 3
 
     # Security
-    secret_key: str = "change-me-in-production"
+    secret_key: SecretStr = SecretStr("change-me-in-production")
     access_token_expire_minutes: int = 30
 
     # CORS
     cors_origins: list[str] = ["http://localhost:3000"]
+
+    @model_validator(mode="after")
+    def validate_production_secrets(self) -> "Settings":
+        """生产环境强制校验敏感配置不使用默认值."""
+        if self.environment == "production":
+            if self.secret_key.get_secret_value() == "change-me-in-production":
+                raise ValueError("生产环境必须设置 SECRET_KEY 环境变量")
+        return self
 
 
 @lru_cache

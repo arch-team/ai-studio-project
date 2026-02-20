@@ -4,6 +4,7 @@ from typing import Generic, TypeVar
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
+from pydantic import SecretStr
 
 from tests.shared.constants import (
     TEST_ACCESS_TOKEN_EXPIRE_MINUTES,
@@ -17,11 +18,11 @@ T = TypeVar("T")
 def mock_settings() -> MagicMock:
     """Mock application settings."""
     settings = MagicMock()
-    settings.secret_key = TEST_JWT_SECRET
+    settings.secret_key = SecretStr(TEST_JWT_SECRET)
     settings.access_token_expire_minutes = TEST_ACCESS_TOKEN_EXPIRE_MINUTES
     settings.aws_region = "us-east-1"
     settings.s3_bucket_name = "test-bucket"
-    settings.database_url = "sqlite+aiosqlite:///:memory:"
+    settings.database_url = SecretStr("sqlite+aiosqlite:///:memory:")
     return settings
 
 
