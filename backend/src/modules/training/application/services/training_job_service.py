@@ -1,4 +1,4 @@
-"""Training Job Service - Business logic for training job management."""
+"""训练任务服务 - 训练任务管理业务逻辑."""
 
 from datetime import datetime
 
@@ -24,7 +24,7 @@ from src.shared.domain.interfaces import IQuotaChecker
 
 
 class TrainingJobService(BaseApplicationService[TrainingJob, int]):
-    """Service for managing training jobs."""
+    """训练任务管理服务."""
 
     # 可更新字段列表
     UPDATABLE_FIELDS = ["priority", "description", "max_epochs", "checkpoint_interval"]
@@ -45,22 +45,13 @@ class TrainingJobService(BaseApplicationService[TrainingJob, int]):
         self._quota_checker = quota_checker
 
     async def create_job(self, owner_id: int, data: dict) -> TrainingJob:
-        """Create a new training job."""
+        """创建训练任务."""
         job_name = data["job_name"]
-
-        # Use base class method for unique field validation
         await self._validate_unique_field("name", job_name)
-
-        # Check resource quota if checker is available
         await self._check_resource_quota(owner_id, data)
 
-        # Create domain entity using builder
         job = TrainingJobBuilder.build_from_dict(owner_id, data)
-
-        # Submit to HyperPod
         await self._submit_to_hyperpod(job)
-
-        # Save to database
         return await self._repository.create(job)
 
     async def _stop_job_if_running(self, job: TrainingJob) -> None:
@@ -124,7 +115,7 @@ class TrainingJobService(BaseApplicationService[TrainingJob, int]):
         )
 
     async def get_job(self, job_id: int) -> TrainingJob:
-        """Get training job by ID."""
+        """根据 ID 获取训练任务."""
         return await self._get_or_raise(job_id)
 
     async def list_jobs(
@@ -139,7 +130,7 @@ class TrainingJobService(BaseApplicationService[TrainingJob, int]):
         sort_by: str = "created_at",
         sort_order: str = "desc",
     ) -> tuple[list[TrainingJob], int]:
-        """List training jobs with filters and pagination."""
+        """按条件分页查询训练任务列表."""
         return await self._repository.list_jobs(
             owner_id=owner_id,
             status=status,
@@ -153,10 +144,8 @@ class TrainingJobService(BaseApplicationService[TrainingJob, int]):
         )
 
     async def pause_job(self, job_id: int) -> TrainingJob:
-        """Pause a running training job."""
+        """暂停运行中的训练任务."""
         job = await self._get_or_raise(job_id)
-
-        # Use base class method for state transition validation
         self._validate_state_transition(job, JobStatus.PAUSED, [JobStatus.RUNNING])
 
         await self._hyperpod_client.stop_training_job(
@@ -168,17 +157,15 @@ class TrainingJobService(BaseApplicationService[TrainingJob, int]):
         return await self._repository.update(job)
 
     async def resume_job(self, job_id: int) -> TrainingJob:
-        """Resume a paused or preempted training job."""
+        """恢复已暂停或被抢占的训练任务."""
         job = await self._get_or_raise(job_id)
-
-        # Use base class method for state transition validation
         self._validate_state_transition(job, JobStatus.RUNNING, [JobStatus.PAUSED, JobStatus.PREEMPTED])
 
-        # CE-07-06: Check if there is a valid checkpoint for recovery
+        # CE-07-06: 检查是否有有效检查点可用于恢复
         if self._checkpoint_repository is not None:
             latest_checkpoint = await self._checkpoint_repository.get_latest_by_training_job_id(job_id)
             if latest_checkpoint is None and job.current_epoch and job.current_epoch > 0:
-                # Job has progress but no checkpoint - cannot resume safely
+                # 任务有进度但无检查点，无法安全恢复
                 raise NoValidCheckpointError(job_id=job_id)
 
         job_config = TrainingJobBuilder.build_job_config(job)
@@ -192,7 +179,7 @@ class TrainingJobService(BaseApplicationService[TrainingJob, int]):
         return await self._repository.update(job)
 
     async def cancel_job(self, job_id: int) -> TrainingJob:
-        """Cancel a training job."""
+        """取消训练任务."""
         job = await self._get_or_raise(job_id)
 
         if job.is_terminal():
@@ -226,14 +213,7 @@ class TrainingJobService(BaseApplicationService[TrainingJob, int]):
                 setattr(job, field, value)
 
     async def update_job(self, job_id: int, data: dict) -> TrainingJob:
-        """Update a training job.
-
-        Only certain fields can be updated:
-        - priority: Can be updated for non-terminal jobs
-        - description: Can always be updated
-        - max_epochs: Can be updated for running jobs
-        - checkpoint_interval: Can be updated for running jobs
-        """
+        """更新训练任务（仅允许 priority/description/max_epochs/checkpoint_interval）."""
         job = await self._get_or_raise(job_id)
 
         if job.is_terminal():
@@ -247,7 +227,7 @@ class TrainingJobService(BaseApplicationService[TrainingJob, int]):
         return await self._repository.update(job)
 
     async def delete_job(self, job_id: int) -> None:
-        """Delete a training job (soft delete)."""
+        """删除训练任务（软删除）."""
         job = await self._get_or_raise(job_id)
 
         if not job.is_terminal():

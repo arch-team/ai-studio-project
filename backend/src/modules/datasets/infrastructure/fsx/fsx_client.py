@@ -21,8 +21,6 @@ class FsxTaskLifecycle(Enum):
 class FsxClientError(Exception):
     """FSx 客户端错误基类。"""
 
-    pass
-
 
 class FsxClient:
     """FSx for Lustre 客户端。"""

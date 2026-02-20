@@ -110,11 +110,7 @@ class CheckpointMigrationService:
         # 迁移所有检查点 (保留最新 3 个)
         hot_retention = CHECKPOINT_MIGRATION_CONFIG["hot_retention_count"]
         for checkpoint in checkpoints[hot_retention:]:
-            migration_result = await self.migrate_checkpoint(checkpoint, target_tier)
-            if migration_result.success:
-                result.migrated_count += 1
-            else:
-                result.failed_count += 1
+            await self._migrate_and_count(checkpoint, target_tier, result)
 
         return result
 
@@ -264,38 +260,37 @@ class CheckpointMigrationService:
     # 私有方法
     # =========================================================================
 
+    async def _migrate_and_count(
+        self, checkpoint: Checkpoint, target_tier: StorageTier, result: MigrationResult
+    ) -> None:
+        """迁移单个检查点并更新计数."""
+        migration_result = await self.migrate_checkpoint(checkpoint, target_tier)
+        if migration_result.success:
+            result.migrated_count += 1
+        else:
+            result.failed_count += 1
+
     async def _migrate_nvme_to_fsx(self, result: MigrationResult) -> None:
         """从 NVMe 迁移到 FSx"""
         checkpoints = await self._checkpoint_repo.get_by_storage_tier(StorageTier.NVME, limit=100)
         job_checkpoints = self._strategy.group_checkpoints_by_job(checkpoints)
 
-        # 对每个任务，迁移第 4 个及以后的检查点到 FSx
         for job_id, cps in job_checkpoints.items():
             for position, cp in enumerate(cps):
                 if self._strategy.should_migrate_from_nvme(cp, position):
-                    migration_result = await self.migrate_checkpoint(cp, StorageTier.FSX)
-                    if migration_result.success:
-                        result.migrated_count += 1
-                    else:
-                        result.failed_count += 1
+                    await self._migrate_and_count(cp, StorageTier.FSX, result)
 
     async def _migrate_fsx_to_s3(self, result: MigrationResult) -> None:
         """从 FSx 迁移到 S3 (归档)"""
         cold_threshold_hours = CHECKPOINT_MIGRATION_CONFIG["cold_age_threshold_hours"]
-
-        # 获取超过阈值时间的旧检查点
         old_checkpoints = await self._checkpoint_repo.get_oldest_checkpoints(
-            training_job_id=None,  # 获取所有任务的旧检查点
+            training_job_id=None,
             hours_threshold=cold_threshold_hours,
         )
 
         for checkpoint in old_checkpoints:
             if checkpoint.storage_tier == StorageTier.FSX:
-                migration_result = await self.migrate_checkpoint(checkpoint, StorageTier.S3)
-                if migration_result.success:
-                    result.migrated_count += 1
-                else:
-                    result.failed_count += 1
+                await self._migrate_and_count(checkpoint, StorageTier.S3, result)
 
     async def _send_migration_failure_alert(
         self,

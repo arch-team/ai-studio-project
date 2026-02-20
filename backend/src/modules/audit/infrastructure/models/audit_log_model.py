@@ -1,8 +1,8 @@
-"""AuditLog ORM model - Audit trail for platform operations."""
+"""审计日志 ORM 模型."""
 
 import enum
 from datetime import datetime, timedelta
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 from sqlalchemy import BigInteger, DateTime, Enum, ForeignKey, String, Text, event, func
 from sqlalchemy.dialects.mysql import JSON
@@ -11,12 +11,9 @@ from sqlalchemy.orm import Mapped, mapped_column
 from src.shared.infrastructure import Base
 from src.shared.utils import utc_now
 
-if TYPE_CHECKING:
-    pass
-
 
 class OperationType(enum.Enum):
-    """Operation type enumeration."""
+    """操作类型枚举."""
 
     CREATE = "create"
     UPDATE = "update"
@@ -26,7 +23,7 @@ class OperationType(enum.Enum):
 
 
 class ResourceType(enum.Enum):
-    """Resource type enumeration."""
+    """资源类型枚举."""
 
     TRAINING_JOB = "training_job"
     DATASET = "dataset"
@@ -37,14 +34,14 @@ class ResourceType(enum.Enum):
 
 
 class AuditStatus(enum.Enum):
-    """Audit log status enumeration."""
+    """审计状态枚举."""
 
     SUCCESS = "success"
     FAILED = "failed"
 
 
 class AuditLogModel(Base):
-    """Audit log ORM model."""
+    """审计日志 ORM 模型."""
 
     __tablename__ = "audit_logs"
 
@@ -55,7 +52,7 @@ class AuditLogModel(Base):
         comment="审计日志ID",
     )
 
-    # User association
+    # 用户关联
     user_id: Mapped[int | None] = mapped_column(
         BigInteger,
         ForeignKey("users.id", ondelete="SET NULL"),
@@ -64,7 +61,7 @@ class AuditLogModel(Base):
         comment="用户ID",
     )
 
-    # Operation details
+    # 操作详情
     operation_type: Mapped[OperationType] = mapped_column(
         Enum(OperationType),
         nullable=False,
@@ -84,7 +81,7 @@ class AuditLogModel(Base):
         comment="资源ID",
     )
 
-    # Request/Response data
+    # 请求/响应数据
     request_data: Mapped[dict | None] = mapped_column(
         JSON,
         nullable=True,
@@ -96,7 +93,7 @@ class AuditLogModel(Base):
         comment="响应数据",
     )
 
-    # Client information
+    # 客户端信息
     ip_address: Mapped[str | None] = mapped_column(
         String(45),
         nullable=True,
@@ -108,7 +105,7 @@ class AuditLogModel(Base):
         comment="User-Agent",
     )
 
-    # Status
+    # 操作状态
     status: Mapped[AuditStatus] = mapped_column(
         Enum(AuditStatus),
         nullable=False,
@@ -117,7 +114,7 @@ class AuditLogModel(Base):
         comment="操作状态",
     )
 
-    # Timestamps
+    # 时间戳
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=False),
         nullable=False,
@@ -132,17 +129,13 @@ class AuditLogModel(Base):
         comment="过期时间(90天后)",
     )
 
-    # Relationships - will be configured when auth module is migrated
-    # user: Mapped[Optional["UserModel"]] = relationship(
-    #     "UserModel",
-    #     back_populates="audit_logs",
-    # )
+    # 关联关系 - auth 模块迁移后配置
 
     __table_args__ = ({"comment": "审计日志表"},)
 
 
 @event.listens_for(AuditLogModel, "before_insert")
 def set_expires_at(mapper: Any, connection: Any, target: AuditLogModel) -> None:
-    """Auto-set expires_at to 90 days after created_at."""
+    """自动设置 expires_at 为创建后 90 天."""
     if target.expires_at is None:
         target.expires_at = utc_now() + timedelta(days=90)

@@ -54,8 +54,6 @@ def calculate_optimal_part_size(file_size: int) -> int:
 class S3MultipartUploadError(Exception):
     """S3 分片上传错误基类。"""
 
-    pass
-
 
 class S3MultipartClient:
     """S3 分片上传客户端。"""

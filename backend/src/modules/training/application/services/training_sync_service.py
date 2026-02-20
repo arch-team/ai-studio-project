@@ -263,7 +263,3 @@ class TrainingSyncService:
 
         return all_jobs
 
-    @staticmethod
-    def _map_hyperpod_status(hyperpod_status: str) -> JobStatus | None:
-        """HyperPod 状态映射到平台状态（保留用于向后兼容）"""
-        return HYPERPOD_TO_PLATFORM_STATUS.get(hyperpod_status)

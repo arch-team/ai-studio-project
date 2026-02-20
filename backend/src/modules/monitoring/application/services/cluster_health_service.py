@@ -80,18 +80,19 @@ class ClusterHealthService:
 
         Args:
             cluster_id: 集群 ID
+
+        Raises:
+            EntityNotFoundError: 集群不存在
         """
+        # check_health 内部已验证集群存在性，无需重复查询
+        health_result = await self.check_health(cluster_id)
+
+        # 重新获取集群实体来更新状态（check_health 不持有可变引用）
         cluster = await self._cluster_repository.get_by_id(cluster_id)
         if cluster is None:
             raise EntityNotFoundError(entity_type="HyperPodCluster", entity_id=str(cluster_id))
 
-        # 执行健康检查
-        health_result = await self.check_health(cluster_id)
-
-        # 更新集群健康状态
         cluster.update_health(health_result.status)
-
-        # 持久化
         await self._cluster_repository.update(cluster)
 
     async def run_health_check_task(self) -> list[HealthCheckResult]:
@@ -135,13 +136,9 @@ class ClusterHealthService:
         if not all_alerts:
             return HealthStatus.HEALTHY
 
-        # 检查是否有 critical 告警
-        if any(getattr(a, "severity", "") == "critical" for a in all_alerts):
+        # critical 或 high 级别告警视为不健康
+        severities = {getattr(a, "severity", "") for a in all_alerts}
+        if severities & {"critical", "high"}:
             return HealthStatus.UNHEALTHY
 
-        # 检查是否有 high 告警
-        if any(getattr(a, "severity", "") == "high" for a in all_alerts):
-            return HealthStatus.UNHEALTHY
-
-        # 有 warning 告警
         return HealthStatus.DEGRADED

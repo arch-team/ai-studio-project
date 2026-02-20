@@ -1,4 +1,4 @@
-"""Training API response schemas."""
+"""训练模块 API 响应 Schema."""
 
 from datetime import datetime
 from decimal import Decimal
@@ -14,7 +14,7 @@ if TYPE_CHECKING:
 
 
 class JobStatusEnum(str, Enum):
-    """Job status."""
+    """任务状态."""
 
     SUBMITTED = "submitted"
     RUNNING = "running"
@@ -25,7 +25,7 @@ class JobStatusEnum(str, Enum):
 
 
 class JobPriorityEnum(str, Enum):
-    """Job priority."""
+    """任务优先级."""
 
     HIGH = "high"
     MEDIUM = "medium"
@@ -33,7 +33,7 @@ class JobPriorityEnum(str, Enum):
 
 
 class DistributionStrategyEnum(str, Enum):
-    """Distribution strategy."""
+    """分布式训练策略."""
 
     DDP = "ddp"
     FSDP = "fsdp"
@@ -42,7 +42,7 @@ class DistributionStrategyEnum(str, Enum):
 
 
 class CheckpointTypeEnum(str, Enum):
-    """Checkpoint type."""
+    """检查点类型."""
 
     EPOCH = "epoch"
     STEP = "step"
@@ -52,7 +52,7 @@ class CheckpointTypeEnum(str, Enum):
 
 
 class CheckpointStatusEnum(str, Enum):
-    """Checkpoint status."""
+    """检查点状态."""
 
     AVAILABLE = "available"
     ARCHIVED = "archived"
@@ -60,7 +60,7 @@ class CheckpointStatusEnum(str, Enum):
 
 
 class StorageTierEnum(str, Enum):
-    """Storage tier."""
+    """存储层级."""
 
     NVME = "nvme"
     FSX = "fsx"
@@ -68,7 +68,7 @@ class StorageTierEnum(str, Enum):
 
 
 class TrainingJobSummary(EntitySchema["TrainingJob"]):
-    """Training job summary for list view.
+    """训练任务列表摘要.
 
     枚举映射由 EntitySchema 自动从字段类型推断。
     """
@@ -88,7 +88,7 @@ class TrainingJobSummary(EntitySchema["TrainingJob"]):
 
 
 class TrainingJobDetail(TrainingJobSummary):
-    """Training job detailed view - 继承 TrainingJobSummary 扩展更多字段.
+    """训练任务详情 - 继承 TrainingJobSummary 扩展更多字段.
 
     自动继承父类枚举映射，新增枚举字段自动推断。
     """
@@ -105,7 +105,7 @@ class TrainingJobDetail(TrainingJobSummary):
     duration_seconds: int | None = None
     total_gpu_hours: Decimal | None = None
     estimated_cost_usd: Decimal | None = None
-    hyperpod_job_arn: str | None = None  # Only visible to admin
+    hyperpod_job_arn: str | None = None  # 仅管理员可见
     kueue_status: str | None = None
     kueue_workload_name: str | None = None
     error_message: str | None = None
@@ -113,7 +113,7 @@ class TrainingJobDetail(TrainingJobSummary):
 
 
 class TrainingJobListResponse(BaseModel):
-    """Paginated list of training jobs."""
+    """训练任务分页列表响应."""
 
     items: list[TrainingJobSummary]
     total: int
@@ -123,7 +123,7 @@ class TrainingJobListResponse(BaseModel):
 
 
 class CheckpointResponse(EntitySchema["Checkpoint"]):
-    """Checkpoint response.
+    """检查点响应.
 
     枚举映射由 EntitySchema 自动从字段类型推断。
     """
@@ -144,11 +144,11 @@ class CheckpointResponse(EntitySchema["Checkpoint"]):
     created_at: datetime
 
 
-# === Job Template Response Schemas ===
+# === 任务模板响应 Schema ===
 
 
 class TemplateVisibilityEnum(str, Enum):
-    """Template visibility scope."""
+    """模板可见性范围."""
 
     PRIVATE = "private"
     TEAM = "team"
@@ -156,7 +156,7 @@ class TemplateVisibilityEnum(str, Enum):
 
 
 class JobTemplateSummary(EntitySchema["JobTemplate"]):
-    """Job template summary for list view.
+    """任务模板列表摘要.
 
     枚举映射由 EntitySchema 自动从字段类型推断。
     """
@@ -171,7 +171,7 @@ class JobTemplateSummary(EntitySchema["JobTemplate"]):
 
 
 class JobTemplateDetail(JobTemplateSummary):
-    """Job template detailed view."""
+    """任务模板详情."""
 
     training_config: dict
     last_used_at: datetime | None = None
@@ -179,7 +179,7 @@ class JobTemplateDetail(JobTemplateSummary):
 
 
 class JobTemplateListResponse(BaseModel):
-    """Paginated list of job templates."""
+    """任务模板分页列表响应."""
 
     items: list[JobTemplateSummary]
     total: int
@@ -188,11 +188,11 @@ class JobTemplateListResponse(BaseModel):
     total_pages: int
 
 
-# === Log Schemas ===
+# === 日志 Schema ===
 
 
 class LogEntry(BaseModel):
-    """Single log entry."""
+    """单条日志条目."""
 
     timestamp: datetime
     pod_name: str | None = None
@@ -200,17 +200,17 @@ class LogEntry(BaseModel):
 
 
 class TrainingLogsResponse(BaseModel):
-    """Training job logs response."""
+    """训练任务日志响应."""
 
     logs: list[LogEntry]
     next_token: str | None = None
 
 
-# === Kueue Debug Schemas ===
+# === Kueue 调试 Schema ===
 
 
 class KueueCondition(BaseModel):
-    """Kueue Workload condition."""
+    """Kueue Workload 条件."""
 
     type: str
     status: str
@@ -220,7 +220,7 @@ class KueueCondition(BaseModel):
 
 
 class PodSetAssignment(BaseModel):
-    """Pod set resource assignment."""
+    """Pod 集合资源分配."""
 
     name: str
     flavors: dict[str, str] | None = None
@@ -229,14 +229,14 @@ class PodSetAssignment(BaseModel):
 
 
 class KueueAdmission(BaseModel):
-    """Kueue admission info."""
+    """Kueue 准入信息."""
 
     cluster_queue: str
     pod_set_assignments: list[PodSetAssignment] | None = None
 
 
 class KueueWorkloadStatus(BaseModel):
-    """Kueue workload status."""
+    """Kueue Workload 状态."""
 
     admitted: bool = False
     quota_reserved: bool = False
@@ -246,14 +246,14 @@ class KueueWorkloadStatus(BaseModel):
 
 
 class ResourceUsage(BaseModel):
-    """Resource usage info."""
+    """资源使用量."""
 
     used: str
     total: str
 
 
 class KueueQuotaUsage(BaseModel):
-    """Kueue quota usage info."""
+    """Kueue 配额使用量."""
 
     cpu: ResourceUsage | None = None
     memory: ResourceUsage | None = None
@@ -261,7 +261,7 @@ class KueueQuotaUsage(BaseModel):
 
 
 class QueueInfo(BaseModel):
-    """Queue information."""
+    """队列信息."""
 
     local_queue: str | None = None
     cluster_queue: str | None = None
@@ -269,7 +269,7 @@ class QueueInfo(BaseModel):
 
 
 class PreemptionEvent(BaseModel):
-    """Preemption history event."""
+    """抢占历史事件."""
 
     preempted_at: datetime
     preempting_workload: str | None = None
@@ -277,7 +277,7 @@ class PreemptionEvent(BaseModel):
 
 
 class KueueDebugResponse(BaseModel):
-    """Kueue Workload debug information."""
+    """Kueue Workload 调试信息."""
 
     workload_name: str
     namespace: str
@@ -287,10 +287,10 @@ class KueueDebugResponse(BaseModel):
     queue_info: QueueInfo | None = None
     quota_usage: KueueQuotaUsage | None = None
     preemption_history: list[PreemptionEvent] | None = None
-    raw_yaml: str | None = None  # Only visible to admin
+    raw_yaml: str | None = None  # 仅管理员可见
 
 
-# === Training Metrics Schemas (T220) ===
+# === 训练指标 Schema (T220) ===
 
 
 class MetricDataPoint(BaseModel):

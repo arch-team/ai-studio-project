@@ -177,7 +177,7 @@ class PrometheusService:
             usage_percent = float(item.get("value", [0, "0"])[1])
             mountpoint = item.get("metric", {}).get("mountpoint", "unknown")
 
-            severity = self._get_storage_severity(usage_percent)
+            severity = self._get_severity(usage_percent, STORAGE_THRESHOLDS)
             if severity:
                 alerts.append(
                     StorageAlert(
@@ -192,29 +192,15 @@ class PrometheusService:
 
     async def get_network_metrics(self) -> NetworkMetrics:
         """获取网络性能指标 (FR-021)."""
-        # 查询网络延迟
-        latency_query = "avg(node_network_receive_latency_seconds) * 1000"
-        latency_result = await self._client.query_instant(latency_query)
-
-        latency_ms = 0.0
-        if latency_result:
-            latency_ms = float(latency_result[0].get("value", [0, "0"])[1])
-
-        # 查询带宽
-        bandwidth_query = "avg(rate(node_network_receive_bytes_total[5m])) / 1024 / 1024 * 8"
-        bandwidth_result = await self._client.query_instant(bandwidth_query)
-
-        bandwidth_mbps = 0.0
-        if bandwidth_result:
-            bandwidth_mbps = float(bandwidth_result[0].get("value", [0, "0"])[1])
-
-        # 查询丢包率
-        packet_loss_query = "avg(node_network_receive_drop_total / node_network_receive_packets_total) * 100"
-        packet_loss_result = await self._client.query_instant(packet_loss_query)
-
-        packet_loss_percent = 0.0
-        if packet_loss_result:
-            packet_loss_percent = float(packet_loss_result[0].get("value", [0, "0"])[1])
+        latency_ms = await self._query_instant_value(
+            "avg(node_network_receive_latency_seconds) * 1000"
+        )
+        bandwidth_mbps = await self._query_instant_value(
+            "avg(rate(node_network_receive_bytes_total[5m])) / 1024 / 1024 * 8"
+        )
+        packet_loss_percent = await self._query_instant_value(
+            "avg(node_network_receive_drop_total / node_network_receive_packets_total) * 100"
+        )
 
         return NetworkMetrics(
             latency_ms=latency_ms,
@@ -233,7 +219,7 @@ class PrometheusService:
 
         if latency_result:
             latency_ms = float(latency_result[0].get("value", [0, "0"])[1])
-            severity = self._get_network_latency_severity(latency_ms)
+            severity = self._get_severity(latency_ms, NETWORK_LATENCY_THRESHOLDS)
             if severity:
                 alerts.append(
                     NetworkAlert(
@@ -292,6 +278,13 @@ class PrometheusService:
 
         return data_points
 
+    async def _query_instant_value(self, query: str, default: float = 0.0) -> float:
+        """执行即时查询并提取第一个结果值."""
+        result = await self._client.query_instant(query)
+        if result:
+            return float(result[0].get("value", [0, "0"])[1])
+        return default
+
     def _parse_range_result(self, raw_result: list[dict[str, Any]]) -> list[MetricDataPoint]:
         """解析范围查询结果."""
         data_points: list[MetricDataPoint] = []
@@ -304,22 +297,13 @@ class PrometheusService:
 
         return data_points
 
-    def _get_storage_severity(self, usage_percent: float) -> str | None:
-        """根据使用率获取存储告警级别."""
-        if usage_percent >= STORAGE_THRESHOLDS["critical"]:
+    @staticmethod
+    def _get_severity(value: float, thresholds: dict[str, float]) -> str | None:
+        """根据值和阈值配置获取告警级别."""
+        if value >= thresholds["critical"]:
             return "critical"
-        elif usage_percent >= STORAGE_THRESHOLDS["high"]:
+        if value >= thresholds["high"]:
             return "high"
-        elif usage_percent >= STORAGE_THRESHOLDS["warning"]:
-            return "warning"
-        return None
-
-    def _get_network_latency_severity(self, latency_ms: float) -> str | None:
-        """根据延迟获取网络告警级别."""
-        if latency_ms >= NETWORK_LATENCY_THRESHOLDS["critical"]:
-            return "critical"
-        elif latency_ms >= NETWORK_LATENCY_THRESHOLDS["high"]:
-            return "high"
-        elif latency_ms >= NETWORK_LATENCY_THRESHOLDS["warning"]:
+        if value >= thresholds["warning"]:
             return "warning"
         return None

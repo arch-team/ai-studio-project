@@ -1,4 +1,4 @@
-"""Audit logging middleware for API request tracking."""
+"""审计日志中间件 - API 请求追踪."""
 
 import asyncio
 import json
@@ -26,27 +26,27 @@ logger = structlog.get_logger(__name__)
 
 
 class AuditMiddleware(BaseHTTPMiddleware):
-    """Middleware for automatic audit logging of API operations."""
+    """API 操作自动审计日志中间件."""
 
-    # HTTP method to operation type mapping
+    # HTTP 方法 → 操作类型映射
     METHOD_OPERATION_MAP: dict[str, OperationType | None] = {
         "POST": OperationType.CREATE,
         "PUT": OperationType.UPDATE,
         "PATCH": OperationType.UPDATE,
         "DELETE": OperationType.DELETE,
-        "GET": None,  # Read-only operations not audited
+        "GET": None,  # 只读操作不记录审计
         "HEAD": None,
         "OPTIONS": None,
     }
 
-    # Special path patterns for state transition operations
+    # 状态转换操作的路径后缀映射
     STATE_OPERATION_MAP: dict[str, OperationType] = {
         "/pause": OperationType.PAUSE,
         "/resume": OperationType.RESUME,
         "/cancel": OperationType.CANCEL,
     }
 
-    # Path keywords to resource type mapping
+    # 路径关键字 → 资源类型映射
     PATH_RESOURCE_MAP: dict[str, ResourceType] = {
         "training-jobs": ResourceType.TRAINING_JOB,
         "datasets": ResourceType.DATASET,
@@ -59,7 +59,7 @@ class AuditMiddleware(BaseHTTPMiddleware):
         "auth": ResourceType.USER,
     }
 
-    # Sensitive fields to sanitize
+    # 需脱敏的敏感字段
     SENSITIVE_FIELDS: set[str] = {
         "password",
         "token",
@@ -72,7 +72,7 @@ class AuditMiddleware(BaseHTTPMiddleware):
         "private_key",
     }
 
-    # Maximum request body size to store (64KB)
+    # 最大请求体存储大小 (64KB)
     MAX_BODY_SIZE: int = 65536
 
     async def _safe_call_next(
@@ -104,23 +104,23 @@ class AuditMiddleware(BaseHTTPMiddleware):
         request: Request,
         call_next: Callable,
     ) -> Response:
-        """Process request and create audit log entry."""
-        # Skip exempt paths
+        """处理请求并创建审计日志."""
+        # 跳过免审计路径
         if self._should_skip(request):
             return await self._safe_call_next(request, call_next)
 
-        # Get operation type - check for state transitions first
+        # 获取操作类型（优先检查状态转换路径）
         operation_type = self._get_operation_type(request)
         if operation_type is None:
             return await self._safe_call_next(request, call_next)
 
-        # Capture request data before processing
+        # 捕获请求数据
         request_data = await self._capture_request_data(request)
 
-        # Execute the actual request with error handling
+        # 执行实际请求
         response = await self._safe_call_next(request, call_next)
 
-        # Create audit log asynchronously (non-blocking)
+        # 异步写入审计日志（不阻塞主流程）
         asyncio.create_task(
             self._write_audit_log(
                 request=request,
@@ -133,50 +133,46 @@ class AuditMiddleware(BaseHTTPMiddleware):
         return response
 
     def _should_skip(self, request: Request) -> bool:
-        """Check if request should skip audit logging."""
+        """检查请求是否应跳过审计."""
         path = request.url.path
         return path in AUDIT_EXEMPT_PATHS or path.startswith(AUDIT_EXEMPT_PREFIXES)
 
     def _get_operation_type(self, request: Request) -> OperationType | None:
-        """Get operation type based on request method and path.
+        """根据请求方法和路径确定操作类型.
 
-        State transition operations (pause/resume/cancel) are identified
-        by path suffix even though they use POST method.
+        状态转换操作 (pause/resume/cancel) 通过路径后缀识别，
+        即使 HTTP 方法是 POST。
         """
         path = request.url.path
 
-        # Check for state transition operations first (POST to specific paths)
+        # 优先检查状态转换操作（POST 到特定路径后缀）
         if request.method == "POST":
             for suffix, op_type in self.STATE_OPERATION_MAP.items():
                 if path.endswith(suffix):
                     return op_type
 
-        # Fall back to HTTP method mapping
+        # 回退到 HTTP 方法映射
         return self.METHOD_OPERATION_MAP.get(request.method)
 
     async def _capture_request_data(self, request: Request) -> dict[str, Any] | None:
-        """Capture and sanitize request body."""
+        """捕获并脱敏请求体."""
+        _TRUNCATED = {"_truncated": True, "_message": "Request body too large"}
+
         try:
-            # Check content length
+            # 通过 Content-Length 头预检大小
             content_length = request.headers.get("content-length")
             if content_length and int(content_length) > self.MAX_BODY_SIZE:
-                return {"_truncated": True, "_message": "Request body too large"}
+                return _TRUNCATED
 
-            # Read body
             body = await request.body()
-            if not body:
-                return None
+            if not body or len(body) > self.MAX_BODY_SIZE:
+                return _TRUNCATED if body else None
 
-            # Check actual size
-            if len(body) > self.MAX_BODY_SIZE:
-                return {"_truncated": True, "_message": "Request body too large"}
-
-            # Try to parse as JSON
+            # 仅解析 JSON 请求体
             content_type = request.headers.get("content-type", "")
             if "application/json" in content_type:
                 data = json.loads(body.decode("utf-8"))
-                result: dict[str, Any] | None = self._sanitize_data(data)
-                return result
+                return self._sanitize_data(data)
 
             return None
         except (json.JSONDecodeError, UnicodeDecodeError):
@@ -186,7 +182,7 @@ class AuditMiddleware(BaseHTTPMiddleware):
             return None
 
     def _sanitize_data(self, data: Any) -> Any:
-        """Recursively sanitize sensitive fields in data."""
+        """递归脱敏数据中的敏感字段."""
         if isinstance(data, dict):
             return {
                 key: ("***" if key.lower() in self.SENSITIVE_FIELDS else self._sanitize_data(value))
@@ -197,7 +193,7 @@ class AuditMiddleware(BaseHTTPMiddleware):
         return data
 
     def _get_resource_type(self, path: str) -> ResourceType | None:
-        """Extract resource type from request path."""
+        """从请求路径中提取资源类型."""
         path_lower = path.lower()
         for keyword, resource_type in self.PATH_RESOURCE_MAP.items():
             if keyword in path_lower:
@@ -205,8 +201,8 @@ class AuditMiddleware(BaseHTTPMiddleware):
         return None
 
     def _get_resource_id(self, path: str) -> str | None:
-        """Extract resource ID from request path."""
-        # Match patterns like /api/v1/training-jobs/{id}
+        """从请求路径中提取资源 ID."""
+        # 匹配 /api/v1/training-jobs/{id} 模式
         pattern = r"/api/v\d+/[\w-]+/([^/]+)(?:/.*)?$"
         match = re.search(pattern, path)
         if match:
@@ -214,20 +210,19 @@ class AuditMiddleware(BaseHTTPMiddleware):
         return None
 
     def _get_client_ip(self, request: Request) -> str | None:
-        """Extract client IP address."""
-        # Check X-Forwarded-For header first (for reverse proxy)
+        """提取客户端 IP 地址."""
+        # 优先从反向代理头获取
         forwarded_for = request.headers.get("x-forwarded-for")
         if forwarded_for:
-            # Take the first IP in the chain (original client)
             return forwarded_for.split(",")[0].strip()
 
-        # Fall back to direct client
+        # 直连客户端
         if request.client:
             return request.client.host
         return None
 
     def _get_user_id(self, request: Request) -> int | None:
-        """Extract user ID from request state (set by auth middleware)."""
+        """从请求状态中提取用户 ID（由认证中间件设置）."""
         if hasattr(request.state, "user_id"):
             user_id: int | None = request.state.user_id
             return user_id
@@ -240,15 +235,10 @@ class AuditMiddleware(BaseHTTPMiddleware):
         operation_type: OperationType,
         request_data: dict[str, Any] | None,
     ) -> None:
-        """Write audit log to database asynchronously."""
+        """异步写入审计日志到数据库."""
         try:
-            # Determine audit status based on response code
             status = AuditStatus.SUCCESS if response.status_code < 400 else AuditStatus.FAILED
-
-            # Build response data
             response_data = {"status_code": response.status_code}
-
-            # Create audit log entity
             audit_log = AuditLog(
                 id=0,  # Will be assigned by database
                 operation_type=operation_type,
@@ -262,14 +252,14 @@ class AuditMiddleware(BaseHTTPMiddleware):
                 user_agent=request.headers.get("user-agent"),
             )
 
-            # Get repository from app state and persist
+            # 从应用状态获取仓库并持久化
             if hasattr(request.app.state, "audit_repository"):
                 await request.app.state.audit_repository.create(audit_log)
             else:
                 logger.debug("audit_repository_not_configured")
 
         except Exception as e:
-            # Log error but don't fail the request (audit should never block main flow)
+            # 记录错误但不阻塞主流程（审计不应影响业务请求）
             logger.exception(
                 "audit_log_write_failed",
                 operation_type=operation_type.value if operation_type else None,

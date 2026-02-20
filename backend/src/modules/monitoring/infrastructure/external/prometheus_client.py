@@ -106,8 +106,6 @@ class PrometheusClient(IPrometheusClient):
 class PrometheusQueryError(Exception):
     """Prometheus 查询错误."""
 
-    pass
-
 
 @lru_cache(maxsize=1)
 def get_prometheus_client() -> PrometheusClient:

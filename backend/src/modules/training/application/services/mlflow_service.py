@@ -24,8 +24,6 @@ logger = structlog.get_logger(__name__)
 class MLflowServiceError(Exception):
     """MLflow 服务异常"""
 
-    pass
-
 
 class MLflowService(IMetricsService):
     """MLflow 指标服务实现
@@ -59,6 +57,13 @@ class MLflowService(IMetricsService):
         self._experiment_prefix = experiment_prefix
         self._timeout = timeout
         self._max_retries = max_retries
+
+    async def _run_sync(self, func: Any) -> Any:
+        """在线程池中执行同步 MLflow SDK 调用。
+
+        MLflow SDK 没有官方异步版本，因此使用 run_in_executor 包装。
+        """
+        return await asyncio.get_event_loop().run_in_executor(None, func)
 
     async def get_metric_history(
         self,
@@ -125,7 +130,7 @@ class MLflowService(IMetricsService):
         def _get() -> Any:
             return self._client.get_experiment_by_name(full_name)
 
-        experiment = await asyncio.get_event_loop().run_in_executor(None, _get)
+        experiment = await self._run_sync(_get)
 
         if experiment is None:
             raise MLflowServiceError(f"Experiment '{full_name}' not found")
@@ -162,7 +167,7 @@ class MLflowService(IMetricsService):
                 order_by=["start_time DESC"],
             )
 
-        runs = await asyncio.get_event_loop().run_in_executor(None, _search)
+        runs = await self._run_sync(_search)
 
         return [{"run_id": r.info.run_id, "status": r.info.status} for r in runs]
 
@@ -177,7 +182,7 @@ class MLflowService(IMetricsService):
             self._client.search_experiments(max_results=1)
 
         try:
-            await asyncio.get_event_loop().run_in_executor(None, _check)
+            await self._run_sync(_check)
             return True
         except MlflowException:
             return False
@@ -228,7 +233,7 @@ class MLflowService(IMetricsService):
                         order_by=["start_time DESC"],
                     )
 
-                return await asyncio.get_event_loop().run_in_executor(None, _search)
+                return await self._run_sync(_search)
 
             except MlflowException as e:
                 last_error = e
@@ -253,7 +258,7 @@ class MLflowService(IMetricsService):
         def _get() -> list[Any]:
             return self._client.get_metric_history(run_id, metric_name)
 
-        return await asyncio.get_event_loop().run_in_executor(None, _get)
+        return await self._run_sync(_get)
 
     async def get_multiple_metrics(
         self,
