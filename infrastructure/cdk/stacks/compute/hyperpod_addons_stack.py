@@ -138,21 +138,23 @@ class HyperPodAddonsStack(cdk.Stack):
 
     def _create_outputs(self) -> None:
         """创建 CloudFormation 输出。"""
-        create_output(
-            self,
-            "TrainingOperatorAddonName",
-            self._training_operator_addon.addon_name,
-            "HyperPod Training Operator add-on name",
-            export_name=f"{self.env_config.resource_prefix}-training-operator-addon",
-        )
-
-        create_output(
-            self,
-            "TaskGovernanceAddonName",
-            self._task_governance_addon.addon_name,
-            "HyperPod Task Governance add-on name - includes PriorityClass config",
-            export_name=f"{self.env_config.resource_prefix}-task-governance-addon",
-        )
+        prefix = self.env_config.resource_prefix
+        outputs = [
+            (
+                "TrainingOperatorAddonName",
+                self._training_operator_addon.addon_name,
+                "HyperPod Training Operator add-on name",
+                f"{prefix}-training-operator-addon",
+            ),
+            (
+                "TaskGovernanceAddonName",
+                self._task_governance_addon.addon_name,
+                "HyperPod Task Governance add-on name",
+                f"{prefix}-task-governance-addon",
+            ),
+        ]
+        for output_id, value, description, export_name in outputs:
+            create_output(self, output_id, value, description, export_name=export_name)
 
     @property
     def training_operator_addon(self) -> eks.CfnAddon:

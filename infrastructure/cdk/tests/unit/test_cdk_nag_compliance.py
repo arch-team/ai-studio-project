@@ -50,8 +50,7 @@ class TestIamStackNagCompliance:
 
         errors = _get_nag_errors(stack)
         assert len(errors) == 0, (
-            f"IamStack 有 {len(errors)} 个未抑制的 Nag 错误:\n"
-            + "\n".join(errors[:10])
+            f"IamStack 有 {len(errors)} 个未抑制的 Nag 错误:\n" + "\n".join(errors[:10])
         )
 
 

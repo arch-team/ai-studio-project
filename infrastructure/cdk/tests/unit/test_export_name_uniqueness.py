@@ -44,9 +44,7 @@ def all_dev_templates(
     network_stack = NetworkStack(
         cdk_app, "ExportTestNetwork", env_config=dev_config, env=cdk_env
     )
-    iam_stack = IamStack(
-        cdk_app, "ExportTestIam", env_config=dev_config, env=cdk_env
-    )
+    iam_stack = IamStack(cdk_app, "ExportTestIam", env_config=dev_config, env=cdk_env)
 
     # KMS Key
     kms_stack = cdk.Stack(cdk_app, "ExportTestKms", env=cdk_env)
@@ -184,10 +182,7 @@ class TestExportNameUniqueness:
         for stack_name, template in all_dev_templates.items():
             template_json = template.to_json()
             outputs = template_json.get("Outputs", {})
-            has_export = any(
-                "Export" in output_def
-                for output_def in outputs.values()
-            )
+            has_export = any("Export" in output_def for output_def in outputs.values())
             assert has_export, f"{stack_name} Stack 没有任何 Export"
 
     def test_explicit_export_names_follow_prefix_pattern(
@@ -202,9 +197,7 @@ class TestExportNameUniqueness:
         prefix = "ai-platform-dev"
         # 过滤掉 CDK 自动生成的跨 Stack 引用 Export
         explicit_exports = [
-            (stack, name)
-            for stack, name in exports
-            if ":ExportsOutput" not in name
+            (stack, name) for stack, name in exports if ":ExportsOutput" not in name
         ]
         invalid = [
             (stack, name)
@@ -213,8 +206,5 @@ class TestExportNameUniqueness:
         ]
         if invalid:
             details = [f"  {stack}: '{name}'" for stack, name in invalid]
-            msg = (
-                f"以下 Export Name 不以 '{prefix}' 开头:\n"
-                + "\n".join(details)
-            )
+            msg = f"以下 Export Name 不以 '{prefix}' 开头:\n" + "\n".join(details)
             pytest.fail(msg)

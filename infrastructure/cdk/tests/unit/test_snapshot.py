@@ -164,7 +164,11 @@ class TestStorageStackSnapshot:
         test_kms_key: kms.Key,
     ) -> None:
         stack = StorageStack(
-            cdk_app, "SnapshotStorage", env_config=dev_config, encryption_key=test_kms_key, env=cdk_env
+            cdk_app,
+            "SnapshotStorage",
+            env_config=dev_config,
+            encryption_key=test_kms_key,
+            env=cdk_env,
         )
         _assert_snapshot("storage_stack", Template.from_stack(stack), snapshot_update)
 

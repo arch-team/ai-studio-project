@@ -66,11 +66,13 @@ class EksStack(cdk.Stack):
             self,
             "ClusterAdminRole",
             role_name=f"{self.env_config.resource_prefix}-eks-admin-role",
-            assumed_by=iam.AccountRootPrincipal().with_conditions({
-                "StringEquals": {
-                    "aws:PrincipalTag/Role": "EKSAdmin",
+            assumed_by=iam.AccountRootPrincipal().with_conditions(
+                {
+                    "StringEquals": {
+                        "aws:PrincipalTag/Role": "EKSAdmin",
+                    }
                 }
-            }),
+            ),
             description="Admin role for EKS cluster management",
         )
 
@@ -337,51 +339,45 @@ class EksStack(cdk.Stack):
     def _create_outputs(self) -> None:
         """创建 CloudFormation 输出用于跨 Stack 引用。"""
         prefix = self.env_config.resource_prefix
-        create_output(
-            self, "EksClusterName", self._eks_cluster.cluster_name, "EKS cluster name"
-        )
-        create_output(
-            self, "EksClusterArn", self._eks_cluster.cluster_arn, "EKS cluster ARN"
-        )
-        create_output(
-            self,
-            "EksClusterEndpoint",
-            self._eks_cluster.cluster_endpoint,
-            "EKS cluster API endpoint",
-            export_name=f"{prefix}-eks-endpoint",
-        )
-        create_output(
-            self,
-            "EksClusterSecurityGroupId",
-            self._eks_cluster.cluster_security_group_id,
-            "EKS cluster security group ID",
-            export_name=f"{prefix}-eks-sg-id",
-        )
-        create_output(
-            self,
-            "EksOidcProviderArn",
-            self._eks_cluster.open_id_connect_provider.open_id_connect_provider_arn,
-            "EKS OIDC provider ARN for IRSA",
-            export_name=f"{prefix}-eks-oidc-arn",
-        )
+        cluster = self._eks_cluster
+
+        # (output_id, value, description, export_name)
+        outputs: list[tuple[str, str, str, str | None]] = [
+            ("EksClusterName", cluster.cluster_name, "EKS cluster name", None),
+            ("EksClusterArn", cluster.cluster_arn, "EKS cluster ARN", None),
+            (
+                "EksClusterEndpoint",
+                cluster.cluster_endpoint,
+                "EKS cluster API endpoint",
+                f"{prefix}-eks-endpoint",
+            ),
+            (
+                "EksClusterSecurityGroupId",
+                cluster.cluster_security_group_id,
+                "EKS cluster security group ID",
+                f"{prefix}-eks-sg-id",
+            ),
+            (
+                "EksOidcProviderArn",
+                cluster.open_id_connect_provider.open_id_connect_provider_arn,
+                "EKS OIDC provider ARN for IRSA",
+                f"{prefix}-eks-oidc-arn",
+            ),
+            (
+                "CertManagerAddonName",
+                EKS_ADDON_NAMES.CERT_MANAGER,
+                "cert-manager EKS add-on name",
+                f"{prefix}-cert-manager-addon",
+            ),
+        ]
+        for output_id, value, description, export_name in outputs:
+            create_output(self, output_id, value, description, export_name=export_name)
+
         cdk.CfnOutput(
             self,
             "KubeconfigCommand",
-            value=f"aws eks update-kubeconfig --name {self._eks_cluster.cluster_name} --region {self.env_config.region}",
+            value=self.get_kubeconfig_command(),
             description="Command to configure kubectl",
-        )
-        create_output(
-            self,
-            "CertManagerAddonName",
-            EKS_ADDON_NAMES.CERT_MANAGER,
-            "cert-manager EKS add-on name",
-            export_name=f"{prefix}-cert-manager-addon",
-        )
-        cdk.CfnOutput(
-            self,
-            "HelmChartStatus",
-            value="HyperPod Helm Chart automatically installed via CDK",
-            description="HyperPod Helm Chart is automatically installed during stack deployment",
         )
 
     @property

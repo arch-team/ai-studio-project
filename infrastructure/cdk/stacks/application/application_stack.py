@@ -1,10 +1,4 @@
-"""
-Application Stack for AI Training Platform.
-
-This stack creates application deployment resources:
-- ECR Repository for backend Docker images
-- Image lifecycle policy for cost optimization
-"""
+"""Application Stack — 后端应用部署 (ECR 镜像仓库)。"""
 
 from typing import Any
 
@@ -17,15 +11,7 @@ from utils.outputs import create_output
 
 
 class ApplicationStack(cdk.Stack):
-    """后端应用部署 Stack.
-
-    创建:
-    - ECR Repository (后端 Docker 镜像仓库)
-    - 镜像生命周期策略 (自动清理旧镜像)
-
-    Attributes:
-        backend_repository: ECR Repository for backend images
-    """
+    """Application Stack — ECR 镜像仓库 + 生命周期策略。"""
 
     def __init__(
         self,
@@ -37,21 +23,11 @@ class ApplicationStack(cdk.Stack):
         super().__init__(scope, construct_id, **kwargs)
 
         self.env_config = env_config
-
-        # Create ECR Repository
         self._backend_repository = self._create_backend_repository()
-
-        # Create outputs
         self._create_outputs()
 
     def _create_backend_repository(self) -> ecr.Repository:
-        """创建后端 Docker 镜像仓库.
-
-        配置:
-        - 镜像标签不可变 (防止覆盖)
-        - 扫描 push 时自动执行
-        - 生命周期规则: 保留最近 30 个镜像
-        """
+        """创建后端 Docker 镜像仓库 (不可变标签, push 时扫描, 自动清理)。"""
         repository = ecr.Repository(
             self,
             "BackendRepository",
@@ -86,7 +62,7 @@ class ApplicationStack(cdk.Stack):
         return repository
 
     def _create_outputs(self) -> None:
-        """创建 CloudFormation 输出."""
+        """创建 CloudFormation 输出。"""
         create_output(
             self,
             "BackendRepositoryUri",

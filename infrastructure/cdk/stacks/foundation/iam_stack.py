@@ -52,7 +52,7 @@ class IamStack(cdk.Stack):
             role_name=f"{self.env_config.resource_prefix}-eks-node-role",
             description="IAM role for EKS worker nodes",
             assumed_by=iam.ServicePrincipal("ec2.amazonaws.com"),
-                max_session_duration=cdk.Duration.hours(12),
+            max_session_duration=cdk.Duration.hours(12),
         )
 
         managed_policies = [
@@ -154,10 +154,8 @@ class IamStack(cdk.Stack):
                     federated=f"arn:aws:iam::{self.env_config.account}:oidc-provider/oidc.eks.{self.env_config.region}.amazonaws.com",
                     conditions={
                         "StringEquals": {
-                            f"oidc.eks.{self.env_config.region}.amazonaws.com:sub":
-                                "system:serviceaccount:training-jobs:training-execution-sa",
-                            f"oidc.eks.{self.env_config.region}.amazonaws.com:aud":
-                                "sts.amazonaws.com",
+                            f"oidc.eks.{self.env_config.region}.amazonaws.com:sub": "system:serviceaccount:training-jobs:training-execution-sa",
+                            f"oidc.eks.{self.env_config.region}.amazonaws.com:aud": "sts.amazonaws.com",
                         }
                     },
                     assume_role_action="sts:AssumeRoleWithWebIdentity",
@@ -245,10 +243,8 @@ class IamStack(cdk.Stack):
                 federated=f"arn:aws:iam::{self.env_config.account}:oidc-provider/oidc.eks.{self.env_config.region}.amazonaws.com",
                 conditions={
                     "StringEquals": {
-                        f"oidc.eks.{self.env_config.region}.amazonaws.com:sub":
-                            "system:serviceaccount:backend:backend-service-sa",
-                        f"oidc.eks.{self.env_config.region}.amazonaws.com:aud":
-                            "sts.amazonaws.com",
+                        f"oidc.eks.{self.env_config.region}.amazonaws.com:sub": "system:serviceaccount:backend:backend-service-sa",
+                        f"oidc.eks.{self.env_config.region}.amazonaws.com:aud": "sts.amazonaws.com",
                     }
                 },
                 assume_role_action="sts:AssumeRoleWithWebIdentity",
@@ -385,30 +381,30 @@ class IamStack(cdk.Stack):
 
     def _create_outputs(self) -> None:
         """创建 CloudFormation 输出。"""
-        create_output(
-            self,
-            "EksNodeRoleArn",
-            self._eks_node_role.role_arn,
-            "ARN of EKS node instance role",
-        )
-        create_output(
-            self,
-            "EksNodeRoleName",
-            self._eks_node_role.role_name,
-            "Name of EKS node instance role",
-        )
-        create_output(
-            self,
-            "TrainingExecutionRoleArn",
-            self._training_execution_role.role_arn,
-            "ARN of training job execution role",
-        )
-        create_output(
-            self,
-            "BackendServiceRoleArn",
-            self._backend_service_role.role_arn,
-            "ARN of backend service role",
-        )
+        outputs = [
+            (
+                "EksNodeRoleArn",
+                self._eks_node_role.role_arn,
+                "ARN of EKS node instance role",
+            ),
+            (
+                "EksNodeRoleName",
+                self._eks_node_role.role_name,
+                "Name of EKS node instance role",
+            ),
+            (
+                "TrainingExecutionRoleArn",
+                self._training_execution_role.role_arn,
+                "ARN of training job execution role",
+            ),
+            (
+                "BackendServiceRoleArn",
+                self._backend_service_role.role_arn,
+                "ARN of backend service role",
+            ),
+        ]
+        for output_id, value, description in outputs:
+            create_output(self, output_id, value, description)
 
     @property
     def eks_node_role(self) -> iam.Role:

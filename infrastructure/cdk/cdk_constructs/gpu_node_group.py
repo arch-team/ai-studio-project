@@ -103,9 +103,7 @@ class GpuNodeGroupConstruct(Construct):
         """
         addon_versions = self.env_config.eks.addon_versions
         neuron_prefixes = ("trn1", "inf1", "inf2")
-        if any(
-            inst.startswith(neuron_prefixes) for inst in config.instance_types
-        ):
+        if any(inst.startswith(neuron_prefixes) for inst in config.instance_types):
             return addon_versions.neuron_ami_type
         return addon_versions.gpu_ami_type
 

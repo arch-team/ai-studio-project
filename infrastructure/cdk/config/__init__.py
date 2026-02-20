@@ -1,8 +1,4 @@
-"""
-Configuration module for AI Training Platform CDK Stacks.
-
-This module exports environment configuration classes for multi-environment deployments.
-"""
+"""多环境部署配置模块导出。"""
 
 from .environments import (
     DatabaseConfig,

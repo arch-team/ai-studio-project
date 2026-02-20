@@ -1,8 +1,4 @@
-"""
-CDK Nag 抑制规则的集中管理。
-
-此模块提供统一的接口来管理所有 Stack 的 Nag 抑制规则。
-"""
+"""CDK Nag 抑制规则的集中管理。"""
 
 from typing import TypedDict
 

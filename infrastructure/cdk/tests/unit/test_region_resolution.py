@@ -140,9 +140,7 @@ class TestResolveAccount:
     def test_empty_string_fallback(self) -> None:
         """所有来源均无效时返回空字符串."""
         app = cdk.App()
-        env_vars = {
-            k: v for k, v in os.environ.items() if k != "CDK_DEFAULT_ACCOUNT"
-        }
+        env_vars = {k: v for k, v in os.environ.items() if k != "CDK_DEFAULT_ACCOUNT"}
         with patch.dict(os.environ, env_vars, clear=True):
             account = resolve_account(app, "dev")
             assert account == ""

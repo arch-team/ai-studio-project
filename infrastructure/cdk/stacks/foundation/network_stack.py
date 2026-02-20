@@ -166,26 +166,28 @@ class NetworkStack(cdk.Stack):
 
     def _create_outputs(self) -> None:
         """创建 CloudFormation 输出。"""
-        create_output(self, "VpcId", self.vpc.vpc_id, "VPC ID")
-        create_output(self, "VpcCidr", self.vpc.vpc_cidr_block, "VPC CIDR block")
-        create_output(
-            self,
-            "PublicSubnetIds",
-            ",".join([s.subnet_id for s in self.vpc.public_subnets]),
-            "Public subnet IDs",
-        )
-        create_output(
-            self,
-            "PrivateAppSubnetIds",
-            ",".join([s.subnet_id for s in self.vpc.private_subnets]),
-            "Private app layer subnet IDs",
-        )
-        create_output(
-            self,
-            "PrivateDataSubnetIds",
-            ",".join([s.subnet_id for s in self.vpc.isolated_subnets]),
-            "Private data layer subnet IDs",
-        )
+        outputs: list[tuple[str, str, str]] = [
+            ("VpcId", self.vpc.vpc_id, "VPC ID"),
+            ("VpcCidr", self.vpc.vpc_cidr_block, "VPC CIDR block"),
+            (
+                "PublicSubnetIds",
+                ",".join(s.subnet_id for s in self.vpc.public_subnets),
+                "Public subnet IDs",
+            ),
+            (
+                "PrivateAppSubnetIds",
+                ",".join(s.subnet_id for s in self.vpc.private_subnets),
+                "Private app layer subnet IDs",
+            ),
+            (
+                "PrivateDataSubnetIds",
+                ",".join(s.subnet_id for s in self.vpc.isolated_subnets),
+                "Private data layer subnet IDs",
+            ),
+        ]
+        for output_id, value, description in outputs:
+            create_output(self, output_id, value, description)
+
         create_output(
             self,
             "VpcEndpointSecurityGroupId",

@@ -219,9 +219,24 @@ class StorageStack(cdk.Stack):
         """创建 CloudFormation 输出用于跨 Stack 引用。"""
         prefix = self.env_config.resource_prefix
         bucket_outputs = [
-            ("Datasets", self._datasets_bucket, "training datasets", f"{prefix}-datasets-bucket"),
-            ("Models", self._models_bucket, "model artifacts", f"{prefix}-models-bucket"),
-            ("Checkpoints", self._checkpoints_bucket, "training checkpoints", f"{prefix}-checkpoints-bucket"),
+            (
+                "Datasets",
+                self._datasets_bucket,
+                "training datasets",
+                f"{prefix}-datasets-bucket",
+            ),
+            (
+                "Models",
+                self._models_bucket,
+                "model artifacts",
+                f"{prefix}-models-bucket",
+            ),
+            (
+                "Checkpoints",
+                self._checkpoints_bucket,
+                "training checkpoints",
+                f"{prefix}-checkpoints-bucket",
+            ),
         ]
         for label, bucket, description, bucket_export in bucket_outputs:
             create_output(

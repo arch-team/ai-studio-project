@@ -32,7 +32,11 @@ def storage_stack(
 ) -> StorageStack:
     """创建 Storage Stack 依赖."""
     return StorageStack(
-        cdk_app, "TestStorageStack", env_config=dev_config, encryption_key=test_kms_key, env=cdk_env
+        cdk_app,
+        "TestStorageStack",
+        env_config=dev_config,
+        encryption_key=test_kms_key,
+        env=cdk_env,
     )
 
 
@@ -149,7 +153,11 @@ class TestEnvironmentSpecificConfiguration:
         kms_stack = cdk.Stack(cdk_app, f"{prefix}Kms", env=cdk_env)
         test_key = kms.Key(kms_stack, "TestKey")
         storage = StorageStack(
-            cdk_app, f"{prefix}Storage", env_config=env_config, encryption_key=test_key, env=cdk_env
+            cdk_app,
+            f"{prefix}Storage",
+            env_config=env_config,
+            encryption_key=test_key,
+            env=cdk_env,
         )
         fsx = FsxLustreStack(
             cdk_app,

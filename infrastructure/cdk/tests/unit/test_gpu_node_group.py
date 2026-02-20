@@ -505,9 +505,7 @@ class TestGpuAmiTypeSelection:
             eks_cluster=eks_cluster,
             node_role=node_role,
             node_group_config=gpu_config,
-            subnets=ec2.SubnetSelection(
-                subnet_type=ec2.SubnetType.PRIVATE_WITH_EGRESS
-            ),
+            subnets=ec2.SubnetSelection(subnet_type=ec2.SubnetType.PRIVATE_WITH_EGRESS),
             vpc=vpc,
         )
 
@@ -539,9 +537,7 @@ class TestGpuAmiTypeSelection:
             eks_cluster=eks_cluster,
             node_role=node_role,
             node_group_config=gpu_config,
-            subnets=ec2.SubnetSelection(
-                subnet_type=ec2.SubnetType.PRIVATE_WITH_EGRESS
-            ),
+            subnets=ec2.SubnetSelection(subnet_type=ec2.SubnetType.PRIVATE_WITH_EGRESS),
             vpc=vpc,
         )
 
@@ -580,9 +576,7 @@ class TestGpuAmiTypeSelection:
             eks_cluster=eks_cluster,
             node_role=node_role,
             node_group_config=neuron_config,
-            subnets=ec2.SubnetSelection(
-                subnet_type=ec2.SubnetType.PRIVATE_WITH_EGRESS
-            ),
+            subnets=ec2.SubnetSelection(subnet_type=ec2.SubnetType.PRIVATE_WITH_EGRESS),
             vpc=vpc,
         )
 
@@ -621,9 +615,7 @@ class TestGpuAmiTypeSelection:
             eks_cluster=eks_cluster,
             node_role=node_role,
             node_group_config=neuron_config,
-            subnets=ec2.SubnetSelection(
-                subnet_type=ec2.SubnetType.PRIVATE_WITH_EGRESS
-            ),
+            subnets=ec2.SubnetSelection(subnet_type=ec2.SubnetType.PRIVATE_WITH_EGRESS),
             vpc=vpc,
         )
 

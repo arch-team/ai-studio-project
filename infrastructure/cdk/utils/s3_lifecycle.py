@@ -1,8 +1,4 @@
-"""
-S3 生命周期规则构建器。
-
-此模块提供便捷的方法来创建常用的 S3 生命周期规则。
-"""
+"""S3 生命周期规则构建器。"""
 
 from aws_cdk import Duration
 from aws_cdk import aws_s3 as s3

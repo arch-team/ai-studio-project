@@ -153,9 +153,9 @@ class TestEksAddOns:
             policies = role_def.get("Properties", {}).get("ManagedPolicyArns", [])
             for policy in policies:
                 if isinstance(policy, str):
-                    assert "AmazonFSxFullAccess" not in policy, (
-                        "FSx CSI role should not use AmazonFSxFullAccess"
-                    )
+                    assert (
+                        "AmazonFSxFullAccess" not in policy
+                    ), "FSx CSI role should not use AmazonFSxFullAccess"
 
 
 class TestClusterTags:

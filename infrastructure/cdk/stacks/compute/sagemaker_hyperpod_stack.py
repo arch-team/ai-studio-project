@@ -231,29 +231,29 @@ class SagemakerHyperPodStack(cdk.Stack):
 
     def _create_outputs(self) -> None:
         """创建 CloudFormation 输出。"""
-        create_output(
-            self,
-            "HyperPodClusterArn",
-            self._hyperpod_cluster.attr_cluster_arn,
-            "SageMaker HyperPod cluster ARN",
-            export_name=f"{self.env_config.resource_prefix}-hyperpod-arn",
-        )
-
-        create_output(
-            self,
-            "LifecycleScriptsBucketName",
-            self._lifecycle_scripts_bucket.bucket_name,
-            "S3 bucket for HyperPod lifecycle scripts",
-            export_name=f"{self.env_config.resource_prefix}-lifecycle-bucket",
-        )
-
-        create_output(
-            self,
-            "HyperPodExecutionRoleArn",
-            self._hyperpod_execution_role.role_arn,
-            "HyperPod execution role ARN",
-            export_name=f"{self.env_config.resource_prefix}-hyperpod-execution-role-arn",
-        )
+        prefix = self.env_config.resource_prefix
+        outputs = [
+            (
+                "HyperPodClusterArn",
+                self._hyperpod_cluster.attr_cluster_arn,
+                "SageMaker HyperPod cluster ARN",
+                f"{prefix}-hyperpod-arn",
+            ),
+            (
+                "LifecycleScriptsBucketName",
+                self._lifecycle_scripts_bucket.bucket_name,
+                "S3 bucket for HyperPod lifecycle scripts",
+                f"{prefix}-lifecycle-bucket",
+            ),
+            (
+                "HyperPodExecutionRoleArn",
+                self._hyperpod_execution_role.role_arn,
+                "HyperPod execution role ARN",
+                f"{prefix}-hyperpod-execution-role-arn",
+            ),
+        ]
+        for output_id, value, description, export_name in outputs:
+            create_output(self, output_id, value, description, export_name=export_name)
 
     @property
     def hyperpod_cluster(self) -> sagemaker.CfnCluster:

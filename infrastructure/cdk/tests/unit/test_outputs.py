@@ -34,7 +34,10 @@ class TestToKebabCaseBasic:
 
     def test_multi_word_pascal(self) -> None:
         """多词 PascalCase."""
-        assert to_kebab_case("VpcEndpointSecurityGroupId") == "vpc-endpoint-security-group-id"
+        assert (
+            to_kebab_case("VpcEndpointSecurityGroupId")
+            == "vpc-endpoint-security-group-id"
+        )
 
 
 class TestToKebabCaseAllUpperAbbreviations:

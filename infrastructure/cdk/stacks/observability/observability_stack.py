@@ -1,14 +1,9 @@
-"""
-Observability Stack for AI Training Platform.
+"""Observability Stack — AMP + HyperPod 可观测性 Add-on。
 
-This stack creates the observability infrastructure:
-- Amazon Managed Prometheus (AMP) Workspace for metrics storage
-- HyperPod Observability EKS add-on (connects to AMP remote write)
-- IAM roles (Pod Identity) for Prometheus remote write
+创建 Amazon Managed Prometheus Workspace、HyperPod Observability EKS Add-on
+和 Pod Identity IAM 角色。
 
-Reference:
-- spec.md FR-007/FR-016: Observability requirements
-- https://docs.aws.amazon.com/sagemaker/latest/dg/hyperpod-observability-addon-setup.html
+参考: spec.md FR-007/FR-016 (可观测性需求)
 """
 
 from typing import Any
@@ -21,23 +16,14 @@ from aws_cdk import aws_iam as iam
 from config import EnvironmentConfig
 from config.constants import EKS_ADDON_NAMES, K8S_NAMESPACES, SERVICE_ACCOUNTS
 from constructs import Construct
+from utils.eks_helpers import create_eks_addon
 from utils.iam_helpers import create_pod_identity_role
 from utils.outputs import create_output
 from utils.tagging import apply_component_tag, create_addon_tags, create_cfn_tags
 
 
 class ObservabilityStack(cdk.Stack):
-    """可观测性 Stack.
-
-    创建:
-    - Amazon Managed Prometheus (AMP) Workspace
-    - HyperPod Observability EKS Add-on (连接 AMP remote write)
-    - IAM roles (Pod Identity) for Prometheus remote write
-
-    Attributes:
-        amp_workspace: AMP Workspace
-        observability_addon: HyperPod Observability EKS add-on
-    """
+    """Observability Stack — AMP + HyperPod 可观测性 Add-on。"""
 
     def __init__(
         self,
@@ -52,32 +38,26 @@ class ObservabilityStack(cdk.Stack):
         self.env_config = env_config
         self._eks_cluster = eks_cluster
 
-        # 创建 AMP Workspace
         self._amp_workspace: aps.CfnWorkspace | None = None
         if env_config.observability.enable_amp:
             self._amp_workspace = self._create_amp_workspace()
 
-        # 创建 Observability 收集器的 Pod Identity Role
         self._collector_role = self._create_collector_role()
-
-        # 安装 HyperPod Observability Add-on
         self._observability_addon = self._install_observability_addon()
-
-        # 创建 Pod Identity Association
         self._pod_identity = self._create_pod_identity_association()
-
-        # 创建输出
         self._create_outputs()
 
-    def _create_amp_workspace(self) -> aps.CfnWorkspace:
-        """创建 Amazon Managed Prometheus Workspace.
+    def _amp_endpoint_base(self) -> str:
+        """AMP Workspace 端点基础 URL (复用于 add-on 配置和输出)。"""
+        assert self._amp_workspace is not None
+        return (
+            f"https://aps-workspaces.{self.env_config.region}.amazonaws.com"
+            f"/workspaces/{self._amp_workspace.attr_workspace_id}"
+        )
 
-        AMP 提供:
-        - Prometheus 兼容的指标存储
-        - 可扩展的远程写入端点
-        - 与 Grafana 无缝集成
-        """
-        workspace = aps.CfnWorkspace(
+    def _create_amp_workspace(self) -> aps.CfnWorkspace:
+        """创建 Amazon Managed Prometheus Workspace。"""
+        return aps.CfnWorkspace(
             self,
             "AmpWorkspace",
             alias=f"{self.env_config.resource_prefix}-amp",
@@ -88,14 +68,8 @@ class ObservabilityStack(cdk.Stack):
             ),
         )
 
-        return workspace
-
     def _create_collector_role(self) -> iam.Role:
-        """创建 Observability 收集器的 IAM Role (Pod Identity).
-
-        此角色允许 Observability 收集器 Pod 通过 Pod Identity
-        向 AMP 写入指标数据。
-        """
+        """创建 Observability 收集器 Pod Identity 角色 (AMP remote write)。"""
         return create_pod_identity_role(
             scope=self,
             construct_id="ObservabilityCollectorRole",
@@ -106,35 +80,21 @@ class ObservabilityStack(cdk.Stack):
         )
 
     def _install_observability_addon(self) -> eks.CfnAddon:
-        """安装 HyperPod Observability EKS Add-on.
-
-        Observability add-on 提供:
-        - Node Exporter (系统指标)
-        - DCGM Exporter (GPU 指标)
-        - kube-state-metrics (K8s 资源指标)
-        - EFA Exporter (网络指标)
-        - 指标转发到 Amazon Managed Prometheus
-        """
-        # 构建 add-on 配置 (schema 要求 ampWorkspace 嵌套对象)
+        """安装 HyperPod Observability EKS Add-on (Node/DCGM/EFA Exporter + kube-state-metrics)。"""
         configuration: dict = {}
         if self._amp_workspace:
-            amp_endpoint = (
-                f"https://aps-workspaces.{self.env_config.region}.amazonaws.com"
-                f"/workspaces/{self._amp_workspace.attr_workspace_id}"
-            )
             configuration = {
                 "ampWorkspace": {
                     "arn": self._amp_workspace.attr_arn,
-                    "prometheusEndpoint": amp_endpoint,
+                    "prometheusEndpoint": self._amp_endpoint_base(),
                 },
             }
 
-        addon = eks.CfnAddon(
+        addon = create_eks_addon(
             self,
             "ObservabilityAddon",
             addon_name=EKS_ADDON_NAMES.OBSERVABILITY,
             cluster_name=self._eks_cluster.cluster_name,
-            resolve_conflicts="OVERWRITE",
             configuration_values=(
                 cdk.Fn.to_json_string(configuration) if configuration else None
             ),
@@ -149,7 +109,7 @@ class ObservabilityStack(cdk.Stack):
         return addon
 
     def _create_pod_identity_association(self) -> eks.CfnPodIdentityAssociation:
-        """创建 Observability 收集器的 Pod Identity Association."""
+        """创建 Observability 收集器的 Pod Identity Association。"""
         association = eks.CfnPodIdentityAssociation(
             self,
             "ObservabilityCollectorPodIdentity",
@@ -168,7 +128,7 @@ class ObservabilityStack(cdk.Stack):
         return association
 
     def _create_outputs(self) -> None:
-        """创建 CloudFormation 输出."""
+        """创建 CloudFormation 输出。"""
         if self._amp_workspace:
             create_output(
                 self,
@@ -182,11 +142,10 @@ class ObservabilityStack(cdk.Stack):
                 self._amp_workspace.attr_workspace_id,
                 "Amazon Managed Prometheus workspace ID",
             )
-            # AMP remote write endpoint
             create_output(
                 self,
                 "AmpRemoteWriteEndpoint",
-                f"https://aps-workspaces.{self.env_config.region}.amazonaws.com/workspaces/{self._amp_workspace.attr_workspace_id}/api/v1/remote_write",
+                f"{self._amp_endpoint_base()}/api/v1/remote_write",
                 "AMP remote write endpoint for Prometheus",
             )
 

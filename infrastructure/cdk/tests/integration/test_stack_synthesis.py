@@ -57,7 +57,11 @@ def _synthesize_foundation_stacks(
     kms_stack = cdk.Stack(app, f"{env_name}-kms", env=cdk_env)
     test_key = kms.Key(kms_stack, "TestKey")
     storage_stack = StorageStack(
-        app, f"{env_name}-storage", env_config=env_config, encryption_key=test_key, env=cdk_env
+        app,
+        f"{env_name}-storage",
+        env_config=env_config,
+        encryption_key=test_key,
+        env=cdk_env,
     )
 
     # Application (仅 dev 需要验证)
@@ -142,7 +146,11 @@ class TestStackDependencies:
         kms_stack = cdk.Stack(app, "test-kms", env=cdk_env)
         test_key = kms.Key(kms_stack, "TestKey")
         stacks["storage"] = StorageStack(
-            app, "test-storage", env_config=env_config, encryption_key=test_key, env=cdk_env
+            app,
+            "test-storage",
+            env_config=env_config,
+            encryption_key=test_key,
+            env=cdk_env,
         )
         stacks["eks"] = EksStack(
             app,
@@ -212,7 +220,11 @@ class TestCrossStackReferences:
         kms_stack = cdk.Stack(app, "fsx-kms", env=cdk_env)
         test_key = kms.Key(kms_stack, "TestKey")
         storage_stack = StorageStack(
-            app, "fsx-storage", env_config=env_config, encryption_key=test_key, env=cdk_env
+            app,
+            "fsx-storage",
+            env_config=env_config,
+            encryption_key=test_key,
+            env=cdk_env,
         )
         fsx_stack = FsxLustreStack(
             app,
@@ -255,7 +267,11 @@ class TestResourceCounts:
         kms_stack = cdk.Stack(app, "kms-stack", env=cdk_env)
         test_key = kms.Key(kms_stack, "TestKey")
         stack = StorageStack(
-            app, "count-storage-stack", env_config=env_config, encryption_key=test_key, env=cdk_env
+            app,
+            "count-storage-stack",
+            env_config=env_config,
+            encryption_key=test_key,
+            env=cdk_env,
         )
         template = Template.from_stack(stack)
         template.resource_count_is("AWS::S3::Bucket", 3)

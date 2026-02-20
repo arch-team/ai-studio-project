@@ -231,7 +231,12 @@ class FsxLustreStack(cdk.Stack):
 
         # (output_id, value, description, export_name)
         outputs = [
-            ("FileSystemId", self._file_system.ref, "FSx for Lustre file system ID", f"{prefix}-fsx-id"),
+            (
+                "FileSystemId",
+                self._file_system.ref,
+                "FSx for Lustre file system ID",
+                f"{prefix}-fsx-id",
+            ),
             (
                 "FileSystemDnsName",
                 self.dns_name,

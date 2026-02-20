@@ -1,11 +1,4 @@
-"""
-集中 KMS Key Construct for AI Training Platform.
-
-提供统一的 KMS Key 创建逻辑:
-- 自动密钥轮换 (enable_key_rotation)
-- 环境标签 + 标准别名命名
-- 删除策略与环境保护配置对齐
-"""
+"""KMS Key Construct — 统一密钥创建 (自动轮换、标准标签、环境保护对齐)。"""
 
 from dataclasses import dataclass
 
@@ -19,13 +12,7 @@ from constructs import Construct
 
 @dataclass(frozen=True)
 class KmsKeyConfig:
-    """KMS Key 配置.
-
-    Attributes:
-        alias_suffix: Key 别名后缀 (如 "s3", "rds", "ebs")
-        description: Key 描述
-        enable_key_rotation: 是否启用自动轮换 (默认 True)
-    """
+    """KMS Key 配置。"""
 
     alias_suffix: str
     description: str
@@ -33,17 +20,7 @@ class KmsKeyConfig:
 
 
 class PlatformKmsKey(Construct):
-    """统一的 KMS Key Construct.
-
-    自动配置:
-    - 密钥轮换 (默认启用)
-    - 环境标签 (Name, Environment)
-    - 标准别名命名: alias/{resource_prefix}-{suffix}-key
-    - RemovalPolicy 与 ProtectionConfig 对齐
-
-    Attributes:
-        key: KMS Key 实例
-    """
+    """统一 KMS Key Construct (密钥轮换 + 环境标签 + 别名命名)。"""
 
     def __init__(
         self,
