@@ -3,7 +3,7 @@
  * RESTful API calls to backend /api/v1/models endpoints.
  */
 
-import { apiClient } from '@shared/api/client';
+import { apiClient } from '@shared/api';
 import type {
   ModelListResponse,
   ModelDetail,

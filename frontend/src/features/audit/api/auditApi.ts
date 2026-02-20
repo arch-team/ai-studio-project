@@ -4,7 +4,7 @@
  * 审计日志 API - 只读查询接口
  */
 
-import { apiClient } from '@shared/api/client';
+import { apiClient } from '@shared/api';
 import type { AuditLogListResponse, AuditLogFilters, AuditLog } from '../types';
 
 /**

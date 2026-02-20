@@ -4,7 +4,7 @@
  * 用户管理 API - 用户 CRUD 操作
  */
 
-import { apiClient } from '@shared/api/client';
+import { apiClient } from '@shared/api';
 import type {
   UserDetail,
   UserListResponse,

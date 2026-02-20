@@ -2,7 +2,7 @@
  * Billing API client functions.
  */
 
-import { apiClient } from '@shared/api/client';
+import { apiClient } from '@shared/api';
 import type {
   CostReportResponse,
   CostFilters,

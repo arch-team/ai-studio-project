@@ -3,7 +3,7 @@
  * RESTful API calls to backend /api/v1/training-jobs endpoints.
  */
 
-import { apiClient } from '@shared/api/client';
+import { apiClient } from '@shared/api';
 import type {
   TrainingJobListResponse,
   TrainingJobDetail,

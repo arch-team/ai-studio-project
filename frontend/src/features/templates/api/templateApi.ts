@@ -5,7 +5,7 @@
  * 对应后端端点: /api/v1/job-templates
  */
 
-import { apiClient } from '@shared/api/client';
+import { apiClient } from '@shared/api';
 import type {
   CreateJobFromTemplateRequest,
   CreateJobTemplateRequest,

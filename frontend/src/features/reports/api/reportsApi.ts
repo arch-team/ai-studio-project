@@ -5,7 +5,7 @@
  * 调用后端报表 API 端点
  */
 
-import { apiClient } from '@shared/api/client';
+import { apiClient } from '@shared/api';
 import type {
   CostAnalysisResponse,
   CostAnalysisFilters,
