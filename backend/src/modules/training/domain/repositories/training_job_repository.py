@@ -54,5 +54,9 @@ class ITrainingJobRepository(ABC):
         """
 
     @abstractmethod
+    async def list_by_statuses(self, statuses: list[JobStatus], page_size: int = 1000) -> list[TrainingJob]:
+        """通过多个状态批量查询，等效于 WHERE status IN (...)."""
+
+    @abstractmethod
     async def exists_by_name(self, job_name: str) -> bool:
         """Check if a job with the given name exists."""

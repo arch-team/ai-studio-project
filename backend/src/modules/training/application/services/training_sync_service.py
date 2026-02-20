@@ -255,11 +255,5 @@ class TrainingSyncService:
             JobStatus.PAUSED,
             JobStatus.PREEMPTED,
         ]
-
-        all_jobs: list[TrainingJob] = []
-        for status in active_statuses:
-            jobs, _ = await self._repo.list_jobs(status=status, page_size=1000)
-            all_jobs.extend(jobs)
-
-        return all_jobs
+        return await self._repo.list_by_statuses(active_statuses)
 

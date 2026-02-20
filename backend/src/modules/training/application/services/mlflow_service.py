@@ -69,7 +69,7 @@ class MLflowService(IMetricsService):
 
         MLflow SDK 没有官方异步版本，因此使用 run_in_executor 包装。
         """
-        return await asyncio.get_event_loop().run_in_executor(None, func)
+        return await asyncio.get_running_loop().run_in_executor(None, func)
 
     async def get_metric_history(
         self,

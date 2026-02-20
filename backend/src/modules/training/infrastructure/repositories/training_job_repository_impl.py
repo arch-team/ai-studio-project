@@ -146,6 +146,13 @@ class TrainingJobRepository(PydanticRepository[TrainingJob, TrainingJobModel, in
         result = await self._session.execute(query)
         return result.scalars().all()
 
+    async def list_by_statuses(self, statuses: list[JobStatus], page_size: int = 1000) -> list[TrainingJob]:
+        """通过多个状态批量查询，等效于 WHERE status IN (...)."""
+        status_values = [s.value for s in statuses]
+        stmt = select(TrainingJobModel).where(TrainingJobModel.status.in_(status_values)).limit(page_size)
+        result = await self._session.execute(stmt)
+        return [self._to_entity(m) for m in result.scalars()]
+
     async def exists_by_name(self, job_name: str) -> bool:
         """Check if a job with the given name exists."""
         result = await self._session.execute(

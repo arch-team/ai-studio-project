@@ -21,37 +21,22 @@ from src.modules.training.domain.value_objects import (
 # === Fixtures ===
 
 
-def create_mock_list_jobs(jobs_by_status: dict[JobStatus, list[TrainingJob]]):
-    """创建 list_jobs mock，根据 status 参数返回不同的任务列表"""
+def create_mock_list_by_statuses(jobs: list[TrainingJob]):
+    """创建 list_by_statuses mock，返回指定任务列表"""
 
-    async def mock_list_jobs(
-        owner_id=None,
-        status=None,
-        priority=None,
-        submitted_after=None,
-        submitted_before=None,
-        page=1,
-        page_size=20,
-        sort_by="created_at",
-        sort_order="desc",
-    ):
-        if status is not None:
-            jobs = jobs_by_status.get(status, [])
-            return (jobs, len(jobs))
-        # 如果没指定 status，返回所有任务
-        all_jobs = []
-        for job_list in jobs_by_status.values():
-            all_jobs.extend(job_list)
-        return (all_jobs, len(all_jobs))
+    async def mock_list_by_statuses(statuses=None, page_size=1000):
+        if statuses is not None:
+            return [j for j in jobs if j.status in statuses]
+        return jobs
 
-    return mock_list_jobs
+    return mock_list_by_statuses
 
 
 @pytest.fixture
 def mock_training_job_repository() -> AsyncMock:
     """Mock ITrainingJobRepository for sync service testing."""
     repo = AsyncMock()
-    repo.list_jobs = AsyncMock(return_value=([], 0))
+    repo.list_by_statuses = AsyncMock(return_value=[])
     repo.update = AsyncMock()
     return repo
 
@@ -122,7 +107,7 @@ class TestTrainingSyncServiceBasicSync:
 
         # Arrange
         running_job = create_test_job(status=JobStatus.RUNNING)
-        mock_training_job_repository.list_jobs = create_mock_list_jobs({JobStatus.RUNNING: [running_job]})
+        mock_training_job_repository.list_by_statuses = create_mock_list_by_statuses([running_job])
         mock_hyperpod_client.get_training_job_status.return_value = {
             "job_name": "test-job-001",
             "status": "Succeeded",
@@ -157,7 +142,7 @@ class TestTrainingSyncServiceBasicSync:
 
         # Arrange
         running_job = create_test_job(status=JobStatus.RUNNING)
-        mock_training_job_repository.list_jobs = create_mock_list_jobs({JobStatus.RUNNING: [running_job]})
+        mock_training_job_repository.list_by_statuses = create_mock_list_by_statuses([running_job])
         mock_hyperpod_client.get_training_job_status.return_value = {
             "job_name": "test-job-001",
             "status": "Failed",
@@ -191,7 +176,7 @@ class TestTrainingSyncServiceBasicSync:
 
         # Arrange
         submitted_job = create_test_job(status=JobStatus.SUBMITTED)
-        mock_training_job_repository.list_jobs = create_mock_list_jobs({JobStatus.SUBMITTED: [submitted_job]})
+        mock_training_job_repository.list_by_statuses = create_mock_list_by_statuses([submitted_job])
         mock_hyperpod_client.get_training_job_status.return_value = {
             "job_name": "test-job-001",
             "status": "Running",
@@ -221,8 +206,8 @@ class TestTrainingSyncServiceBasicSync:
             TrainingSyncService,
         )
 
-        # Arrange: list_jobs 只返回非终态任务 (这由 Repository 实现过滤)
-        mock_training_job_repository.list_jobs.return_value = ([], 0)
+        # Arrange: list_by_statuses 只返回非终态任务 (这由 Repository 实现过滤)
+        mock_training_job_repository.list_by_statuses.return_value = []
 
         service = TrainingSyncService(
             training_job_repository=mock_training_job_repository,
@@ -257,7 +242,7 @@ class TestTrainingSyncServicePreemption:
 
         # Arrange
         running_job = create_test_job(status=JobStatus.RUNNING, preemption_count=0)
-        mock_training_job_repository.list_jobs = create_mock_list_jobs({JobStatus.RUNNING: [running_job]})
+        mock_training_job_repository.list_by_statuses = create_mock_list_by_statuses([running_job])
         mock_hyperpod_client.get_training_job_status.return_value = {
             "job_name": "test-job-001",
             "status": "Preempted",
@@ -290,7 +275,7 @@ class TestTrainingSyncServicePreemption:
 
         # Arrange: 任务已被抢占 2 次，即将发生第 3 次
         running_job = create_test_job(status=JobStatus.RUNNING, preemption_count=2)
-        mock_training_job_repository.list_jobs = create_mock_list_jobs({JobStatus.RUNNING: [running_job]})
+        mock_training_job_repository.list_by_statuses = create_mock_list_by_statuses([running_job])
         mock_hyperpod_client.get_training_job_status.return_value = {
             "job_name": "test-job-001",
             "status": "Preempted",
@@ -325,7 +310,7 @@ class TestTrainingSyncServicePreemption:
 
         # Arrange: 任务已被抢占 1 次
         running_job = create_test_job(status=JobStatus.RUNNING, preemption_count=1)
-        mock_training_job_repository.list_jobs = create_mock_list_jobs({JobStatus.RUNNING: [running_job]})
+        mock_training_job_repository.list_by_statuses = create_mock_list_by_statuses([running_job])
         mock_hyperpod_client.get_training_job_status.return_value = {
             "job_name": "test-job-001",
             "status": "Preempted",
@@ -365,7 +350,7 @@ class TestTrainingSyncServiceErrorHandling:
 
         # Arrange
         running_job = create_test_job(status=JobStatus.RUNNING)
-        mock_training_job_repository.list_jobs = create_mock_list_jobs({JobStatus.RUNNING: [running_job]})
+        mock_training_job_repository.list_by_statuses = create_mock_list_by_statuses([running_job])
         mock_hyperpod_client.get_training_job_status.side_effect = RuntimeError("API timeout")
 
         service = TrainingSyncService(
@@ -397,7 +382,7 @@ class TestTrainingSyncServiceErrorHandling:
         # Arrange: 两个任务，第一个失败，第二个成功
         job1 = create_test_job(job_id=1, job_name="job-001", status=JobStatus.RUNNING)
         job2 = create_test_job(job_id=2, job_name="job-002", status=JobStatus.RUNNING)
-        mock_training_job_repository.list_jobs = create_mock_list_jobs({JobStatus.RUNNING: [job1, job2]})
+        mock_training_job_repository.list_by_statuses = create_mock_list_by_statuses([job1, job2])
 
         # job-001 失败，job-002 成功
         mock_hyperpod_client.get_training_job_status.side_effect = [
@@ -436,7 +421,7 @@ class TestTrainingSyncServiceErrorHandling:
 
         # Arrange
         running_job = create_test_job(status=JobStatus.RUNNING)
-        mock_training_job_repository.list_jobs = create_mock_list_jobs({JobStatus.RUNNING: [running_job]})
+        mock_training_job_repository.list_by_statuses = create_mock_list_by_statuses([running_job])
         mock_hyperpod_client.get_training_job_status.side_effect = EntityNotFoundError(
             entity_type="TrainingJob",
             entity_id="test-job-001",
@@ -478,7 +463,7 @@ class TestTrainingSyncServiceStateTransition:
         # 注意: Completed 是终态，不应该出现在活跃任务列表中，
         # 但我们测试的是当这种情况发生时的处理逻辑
         completed_job = create_test_job(status=JobStatus.COMPLETED)
-        mock_training_job_repository.list_jobs = create_mock_list_jobs({JobStatus.COMPLETED: [completed_job]})
+        mock_training_job_repository.list_by_statuses = create_mock_list_by_statuses([completed_job])
         mock_hyperpod_client.get_training_job_status.return_value = {
             "job_name": "test-job-001",
             "status": "Running",  # 尝试从 Completed → Running
@@ -511,7 +496,7 @@ class TestTrainingSyncServiceStateTransition:
 
         # Arrange
         running_job = create_test_job(status=JobStatus.RUNNING)
-        mock_training_job_repository.list_jobs = create_mock_list_jobs({JobStatus.RUNNING: [running_job]})
+        mock_training_job_repository.list_by_statuses = create_mock_list_by_statuses([running_job])
         mock_hyperpod_client.get_training_job_status.return_value = {
             "job_name": "test-job-001",
             "status": "Running",  # 状态未变化
@@ -554,19 +539,19 @@ class TestTrainingSyncServiceStatusMapping:
     def test_hyperpod_status_mapping(self, hyperpod_status: str, expected_platform_status: JobStatus) -> None:
         """HyperPod 状态正确映射到平台状态"""
         from src.modules.training.application.services.training_sync_service import (
-            TrainingSyncService,
+            HYPERPOD_TO_PLATFORM_STATUS,
         )
 
-        result = TrainingSyncService._map_hyperpod_status(hyperpod_status)
+        result = HYPERPOD_TO_PLATFORM_STATUS.get(hyperpod_status)
         assert result == expected_platform_status
 
     def test_unknown_status_returns_none(self) -> None:
         """未知状态返回 None"""
         from src.modules.training.application.services.training_sync_service import (
-            TrainingSyncService,
+            HYPERPOD_TO_PLATFORM_STATUS,
         )
 
-        result = TrainingSyncService._map_hyperpod_status("UnknownStatus")
+        result = HYPERPOD_TO_PLATFORM_STATUS.get("UnknownStatus")
         assert result is None
 
 
