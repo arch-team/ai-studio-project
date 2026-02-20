@@ -210,28 +210,6 @@ class TestJWTManagerTokenVerification:
             jwt_manager.verify_token("")
 
 
-class TestJWTManagerHelpers:
-    """Tests for JWT helper methods."""
-
-    def test_get_user_id_from_token(self, jwt_manager: JWTManager) -> None:
-        """Test extracting user ID from token."""
-        token = jwt_manager.create_access_token(
-            user_id=42,
-            username="testuser",
-            email="test@example.com",
-            role="engineer",
-        )
-
-        user_id = jwt_manager.get_user_id_from_token(token)
-
-        assert user_id == 42
-
-    def test_get_user_id_from_invalid_token(self, jwt_manager: JWTManager) -> None:
-        """Test that invalid tokens raise error when extracting user ID."""
-        with pytest.raises(InvalidTokenError):
-            jwt_manager.get_user_id_from_token("invalid-token")
-
-
 class TestJWTManagerSingleton:
     """Tests for JWTManager singleton behavior."""
 

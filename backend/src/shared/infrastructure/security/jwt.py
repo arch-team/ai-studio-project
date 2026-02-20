@@ -156,18 +156,10 @@ class JWTManager:
 
         except AuthlibExpiredTokenError:
             raise TokenExpiredError("Token has expired")
-        except JoseError as e:
-            raise InvalidTokenError(f"Invalid token: {str(e)}")
-        except KeyError as e:
-            raise InvalidTokenError(f"Missing required claim: {str(e)}")
-
-    def get_user_id_from_token(self, token: str) -> int:
-        """Extract user ID from token without full validation."""
-        try:
-            claims = authlib_jwt.decode(token, self.settings.secret_key.get_secret_value())
-            return int(claims["sub"])
-        except (JoseError, KeyError, ValueError) as e:
-            raise InvalidTokenError(f"Cannot extract user ID: {str(e)}")
+        except JoseError:
+            raise InvalidTokenError("Invalid token")
+        except KeyError:
+            raise InvalidTokenError("Invalid token")
 
 
 @lru_cache
