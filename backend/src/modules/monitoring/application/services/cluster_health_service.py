@@ -11,7 +11,7 @@ from src.shared.utils import utc_now
 
 from ...domain.repositories import IHyperPodClusterRepository
 from ...domain.value_objects import HealthStatus
-from .prometheus_service import PrometheusService
+from .prometheus_service import NetworkAlert, PrometheusService, StorageAlert
 
 
 @dataclass
@@ -21,8 +21,8 @@ class HealthCheckResult:
     cluster_id: int
     cluster_name: str
     status: HealthStatus
-    storage_alerts: list
-    network_alerts: list
+    storage_alerts: list[StorageAlert]
+    network_alerts: list[NetworkAlert]
     checked_at: datetime
 
 
@@ -39,6 +39,10 @@ class ClusterHealthService:
     ):
         self._cluster_repository = cluster_repository
         self._prometheus_service = prometheus_service
+
+    async def get_cluster_by_name(self, cluster_name: str):
+        """通过名称获取集群实体."""
+        return await self._cluster_repository.get_by_name(cluster_name)
 
     async def check_health(self, cluster_id: int) -> HealthCheckResult:
         """检查集群健康状态.
@@ -65,7 +69,8 @@ class ClusterHealthService:
         # 判断健康状态
         health_status = self._determine_health_status(storage_alerts, network_alerts)
 
-        assert cluster.id is not None, "Cluster must have ID"
+        if cluster.id is None:
+            raise EntityNotFoundError(entity_type="HyperPodCluster", entity_id="unknown")
         return HealthCheckResult(
             cluster_id=cluster.id,
             cluster_name=cluster.cluster_name,
@@ -127,8 +132,8 @@ class ClusterHealthService:
 
     def _determine_health_status(
         self,
-        storage_alerts: list,
-        network_alerts: list,
+        storage_alerts: list[StorageAlert],
+        network_alerts: list[NetworkAlert],
     ) -> HealthStatus:
         """根据告警判断健康状态."""
         all_alerts = storage_alerts + network_alerts

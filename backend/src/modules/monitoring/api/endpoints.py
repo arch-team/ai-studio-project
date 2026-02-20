@@ -5,6 +5,7 @@
 
 from datetime import datetime, timedelta
 
+import structlog
 from fastapi import APIRouter, Depends, Query
 
 from src.modules.auth.api.dependencies import get_current_active_user
@@ -26,6 +27,7 @@ from .schemas import (
 )
 
 router = APIRouter()
+logger = structlog.get_logger(__name__)
 
 
 @router.get("/clusters/{cluster_name}/metrics", response_model=ClusterMetricsResponse)
@@ -80,8 +82,8 @@ async def get_cluster_metrics(
             )
 
         return ClusterMetricsResponse(cluster_name=cluster_name, metrics=metrics)
-    except Exception:
-        # Prometheus 不可用时返回空结果
+    except Exception as e:
+        logger.warning("prometheus_unavailable", endpoint="cluster_metrics", error=str(e))
         return ClusterMetricsResponse(cluster_name=cluster_name, metrics=[])
 
 
@@ -117,7 +119,8 @@ async def get_job_gpu_utilization(
         ]
 
         return GPUUtilizationResponse(job_id=job_id, data_points=data_points)
-    except Exception:
+    except Exception as e:
+        logger.warning("prometheus_unavailable", endpoint="gpu_utilization", error=str(e))
         return GPUUtilizationResponse(job_id=job_id, data_points=[])
 
 
@@ -172,8 +175,8 @@ async def get_storage_metrics(
             usage_percent=result.usage_percent,
             mountpoint=result.mountpoint,
         )
-    except Exception:
-        # Prometheus 不可用时返回默认值
+    except Exception as e:
+        logger.warning("prometheus_unavailable", endpoint="storage_metrics", error=str(e))
         return StorageMetricsResponse(
             total_bytes=0,
             used_bytes=0,
@@ -197,8 +200,8 @@ async def get_network_metrics(
             packet_loss_percent=result.packet_loss_percent,
             interface=result.interface,
         )
-    except Exception:
-        # Prometheus 不可用时返回默认值
+    except Exception as e:
+        logger.warning("prometheus_unavailable", endpoint="network_metrics", error=str(e))
         return NetworkMetricsResponse(
             latency_ms=0,
             bandwidth_mbps=0,
@@ -214,11 +217,8 @@ async def get_cluster_health(
     health_service: ClusterHealthService = Depends(get_cluster_health_service),
 ) -> ClusterHealthResponse:
     """获取集群健康状态 (T068)."""
-    from ...domain.repositories import IHyperPodClusterRepository
-
     # 首先通过名称获取集群
-    cluster_repo: IHyperPodClusterRepository = health_service._cluster_repository
-    cluster = await cluster_repo.get_by_name(cluster_name)
+    cluster = await health_service.get_cluster_by_name(cluster_name)
 
     if cluster is None:
         # 集群不存在时返回默认状态
@@ -241,7 +241,8 @@ async def get_cluster_health(
             storage_alert_count=len(result.storage_alerts),
             network_alert_count=len(result.network_alerts),
         )
-    except Exception:
+    except Exception as e:
+        logger.warning("cluster_health_check_failed", cluster_name=cluster_name, error=str(e))
         return ClusterHealthResponse(
             cluster_id=cluster.id,
             cluster_name=cluster_name,

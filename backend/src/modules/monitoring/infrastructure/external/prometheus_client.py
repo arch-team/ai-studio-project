@@ -1,6 +1,5 @@
 """Prometheus HTTP API 客户端封装 (T062)."""
 
-from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from datetime import datetime
 from functools import lru_cache
@@ -11,6 +10,8 @@ import httpx
 from src.shared.domain.problem import Problem, problem
 from src.shared.infrastructure import get_settings
 
+from ...application.interfaces.prometheus_client import IPrometheusClient
+
 
 @problem(503, "PROMETHEUS_QUERY_ERROR", "Prometheus 查询失败: {message}")
 @dataclass
@@ -18,41 +19,6 @@ class PrometheusQueryError(Problem):
     """Prometheus 查询错误."""
 
     message: str
-
-
-class IPrometheusClient(ABC):
-    """Prometheus 客户端接口."""
-
-    @abstractmethod
-    async def query_instant(self, query: str) -> list[dict[str, Any]]:
-        """执行即时查询.
-
-        Args:
-            query: PromQL 查询语句
-
-        Returns:
-            查询结果列表
-        """
-
-    @abstractmethod
-    async def query_range(
-        self,
-        query: str,
-        start: datetime,
-        end: datetime,
-        step: str = "1m",
-    ) -> list[dict[str, Any]]:
-        """执行范围查询.
-
-        Args:
-            query: PromQL 查询语句
-            start: 开始时间
-            end: 结束时间
-            step: 时间步长
-
-        Returns:
-            查询结果列表
-        """
 
 
 class PrometheusClient(IPrometheusClient):
