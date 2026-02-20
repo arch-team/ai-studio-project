@@ -6,7 +6,6 @@
 
 import { test, expect } from '@playwright/test';
 import { TrainingJobDetailPage } from '../pages/TrainingJobDetailPage';
-import { TrainingJobListPage } from '../pages/TrainingJobListPage';
 import { MockApi } from '../utils/mockApi';
 
 test.describe('训练任务操作', () => {

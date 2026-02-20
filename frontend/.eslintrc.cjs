@@ -93,5 +93,12 @@ module.exports = {
         'no-restricted-imports': 'off',
       },
     },
+    {
+      // 测试工具文件不应受 react-refresh 组件导出规则约束
+      files: ['tests/**/*.{ts,tsx}', 'e2e/**/*.{ts,tsx}'],
+      rules: {
+        'react-refresh/only-export-components': 'off',
+      },
+    },
   ],
 };

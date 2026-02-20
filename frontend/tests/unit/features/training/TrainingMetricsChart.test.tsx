@@ -8,7 +8,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { TrainingMetricsChart } from '@features/training/components/TrainingMetricsChart';
+import { TrainingMetricsChart } from '@features/training/components';
 import type { TrainingMetric } from '@features/training/types';
 
 // Mock useTrainingJobMetrics hook

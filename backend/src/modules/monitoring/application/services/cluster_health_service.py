@@ -9,6 +9,7 @@ from datetime import datetime
 from src.shared.domain.exceptions import EntityNotFoundError
 from src.shared.utils import utc_now
 
+from ...domain.entities import HyperPodCluster
 from ...domain.repositories import IHyperPodClusterRepository
 from ...domain.value_objects import HealthStatus
 from .prometheus_service import NetworkAlert, PrometheusService, StorageAlert
@@ -40,7 +41,7 @@ class ClusterHealthService:
         self._cluster_repository = cluster_repository
         self._prometheus_service = prometheus_service
 
-    async def get_cluster_by_name(self, cluster_name: str):
+    async def get_cluster_by_name(self, cluster_name: str) -> HyperPodCluster | None:
         """通过名称获取集群实体."""
         return await self._cluster_repository.get_by_name(cluster_name)
 
