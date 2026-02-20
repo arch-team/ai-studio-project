@@ -19,7 +19,7 @@ import {
   useResourceLimitConfigs,
   useCreateResourceLimitConfig,
   useUpdateResourceLimitConfig,
-} from './hooks';
+} from './api';
 import { QuotaFormModal } from './components/QuotaFormModal';
 import type {
   ResourceLimitConfig,

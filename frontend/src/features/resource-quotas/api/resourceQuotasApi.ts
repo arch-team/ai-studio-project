@@ -11,7 +11,7 @@ import type {
   ResourceLimitConfigFilters,
   CreateResourceLimitConfigRequest,
   UpdateResourceLimitConfigRequest,
-} from './types';
+} from '../types';
 
 /**
  * 获取资源限制配置列表

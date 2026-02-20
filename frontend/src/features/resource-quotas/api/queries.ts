@@ -1,5 +1,5 @@
 /**
- * Resource Limit Config Hooks
+ * Resource Limit Config TanStack Query Hooks
  */
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -8,12 +8,12 @@ import {
   fetchResourceLimitConfigs,
   createResourceLimitConfig,
   updateResourceLimitConfig,
-} from './api';
+} from './resourceQuotasApi';
 import type {
   ResourceLimitConfigFilters,
   CreateResourceLimitConfigRequest,
   UpdateResourceLimitConfigRequest,
-} from './types';
+} from '../types';
 
 /**
  * 获取资源限制配置列表

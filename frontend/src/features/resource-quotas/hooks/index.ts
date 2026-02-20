@@ -3,42 +3,9 @@
  */
 
 import { useMemo } from "react";
+import type { ResourceQuota, QuotaUsage } from "../types";
 
-// 类型定义
-export interface ResourceQuota {
-  id: number;
-  name: string;
-  description: string | null;
-  quota_type: "user" | "team" | "project";
-  max_cpu_cores: number;
-  reserved_cpu_cores: number;
-  max_gpu_count: number;
-  reserved_gpu_count: number;
-  gpu_types: string[] | null;
-  max_memory_gb: number;
-  reserved_memory_gb: number;
-  max_storage_gb: number | null;
-  max_concurrent_jobs: number;
-  max_total_jobs: number | null;
-  max_spot_instances: number;
-  status: "active" | "suspended" | "expired";
-  valid_from: string;
-  valid_until: string | null;
-  created_at: string;
-  // 使用量 (从 Kueue 同步)
-  used_cpu_cores?: number;
-  used_gpu_count?: number;
-  used_memory_gb?: number;
-  current_concurrent_jobs?: number;
-}
-
-export interface QuotaUsage {
-  type: "cpu" | "gpu" | "memory" | "jobs";
-  used: number;
-  reserved: number;
-  max: number;
-  unit: string;
-}
+export type { ResourceQuota, QuotaUsage };
 
 /**
  * 计算配额使用率
