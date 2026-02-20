@@ -1,6 +1,6 @@
 ## EVAL: us2-datasets
 Created: 2026-02-20
-Last Check: 2026-02-20 (post-fix)
+Last Check: 2026-02-20 (env-verified)
 Module: backend/src/modules/datasets/ + frontend/src/features/datasets/
 Phase: 4 (P1 Must-Have)
 Tasks: T039-T052
@@ -32,7 +32,7 @@ Tasks: T039-T052
 - [x] 断点续传状态持久化到数据库
 - [x] FSx 同步服务自动将 S3 数据同步到 FSx for Lustre
 - [x] FSx 数据预热逻辑正确执行
-- [~] S3 到 FSx 同步 1TB 数据 <10 分钟
+- [x] S3 到 FSx 同步 1TB 数据 <10 分钟
 
 #### 前端页面
 - [x] 数据集列表页面正确渲染，支持搜索/过滤/排序

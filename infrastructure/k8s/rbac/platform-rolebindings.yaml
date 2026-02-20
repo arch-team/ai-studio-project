@@ -1,0 +1,136 @@
+# 平台角色 K8s RBAC 绑定
+# 将平台角色 (admin/project_manager/engineer/viewer) 映射到 K8s ClusterRole/Role
+# 参考: backend/src/modules/auth/application/services/rbac_service.py K8S_RBAC_BINDINGS
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: ai-platform-admin-cluster-binding
+  labels:
+    app.kubernetes.io/part-of: ai-training-platform
+    platform-role: admin
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: cluster-admin
+subjects:
+  - kind: Group
+    name: platform-admins
+    apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: ai-platform-pm-cluster-binding
+  labels:
+    app.kubernetes.io/part-of: ai-training-platform
+    platform-role: project_manager
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: view
+subjects:
+  - kind: Group
+    name: platform-project-managers
+    apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: ai-platform-engineer-cluster-binding
+  labels:
+    app.kubernetes.io/part-of: ai-training-platform
+    platform-role: engineer
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: view
+subjects:
+  - kind: Group
+    name: platform-engineers
+    apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: ai-platform-viewer-cluster-binding
+  labels:
+    app.kubernetes.io/part-of: ai-training-platform
+    platform-role: viewer
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: view
+subjects:
+  - kind: Group
+    name: platform-viewers
+    apiGroup: rbac.authorization.k8s.io
+---
+# 命名空间级 RoleBindings (kubeflow 命名空间)
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: ai-platform-admin-ns-binding
+  namespace: kubeflow
+  labels:
+    app.kubernetes.io/part-of: ai-training-platform
+    platform-role: admin
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: admin
+subjects:
+  - kind: Group
+    name: platform-admins
+    apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: ai-platform-pm-ns-binding
+  namespace: kubeflow
+  labels:
+    app.kubernetes.io/part-of: ai-training-platform
+    platform-role: project_manager
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: edit
+subjects:
+  - kind: Group
+    name: platform-project-managers
+    apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: ai-platform-engineer-ns-binding
+  namespace: kubeflow
+  labels:
+    app.kubernetes.io/part-of: ai-training-platform
+    platform-role: engineer
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: edit
+subjects:
+  - kind: Group
+    name: platform-engineers
+    apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: ai-platform-viewer-ns-binding
+  namespace: kubeflow
+  labels:
+    app.kubernetes.io/part-of: ai-training-platform
+    platform-role: viewer
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: view
+subjects:
+  - kind: Group
+    name: platform-viewers
+    apiGroup: rbac.authorization.k8s.io

@@ -1,6 +1,6 @@
 ## EVAL: auth-system
 Created: 2026-02-20
-Last Check: 2026-02-20 (post-fix)
+Last Check: 2026-02-20 (env-verified)
 Module: backend/src/modules/auth/ + backend/src/shared/api/middleware/
 Phase: 2 (Foundational)
 Tasks: T011, T013-T013d
@@ -21,7 +21,7 @@ Tasks: T011, T013-T013d
 - [x] engineer 可创建/管理自己的训练任务和数据集
 - [x] viewer 仅有只读权限
 - [x] 基于资源的权限检查: 用户只能操作自己拥有的资源
-- [~] Kubernetes RBAC 集成: 平台角色映射到 K8s ClusterRole
+- [x] Kubernetes RBAC 集成: 平台角色映射到 K8s ClusterRole
 
 #### 本地账号管理 (T013c)
 - [x] POST /auth/local-accounts 创建本地账号
