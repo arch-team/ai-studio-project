@@ -100,6 +100,22 @@ export function AuditLogsPage() {
     if (dateRange?.type === "absolute") {
       params.start_date = dateRange.startDate;
       params.end_date = dateRange.endDate;
+    } else if (dateRange?.type === "relative") {
+      const now = new Date();
+      const msMap: Record<string, number> = {
+        second: 1000,
+        minute: 60 * 1000,
+        hour: 60 * 60 * 1000,
+        day: 24 * 60 * 60 * 1000,
+        week: 7 * 24 * 60 * 60 * 1000,
+        month: 30 * 24 * 60 * 60 * 1000,
+        year: 365 * 24 * 60 * 60 * 1000,
+      };
+      const start = new Date(
+        now.getTime() - dateRange.amount * (msMap[dateRange.unit] ?? msMap.day),
+      );
+      params.start_date = start.toISOString();
+      params.end_date = now.toISOString();
     }
 
     return params;
