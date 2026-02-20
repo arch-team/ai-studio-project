@@ -60,7 +60,6 @@ def mock_jwt_manager() -> Mock:
         token_type=TokenType.ACCESS,
         jti="test-jti",
     )
-    manager.get_user_id_from_token.return_value = 1
     return manager
 
 
