@@ -67,6 +67,7 @@ backend/.env.e2e
 backend/.env.e2e.dev
 backend/.env.e2e.staging
 backend/.env.e2e.prod
+backend/.env.aws-integration
 
 # IDE
 .vscode/
