@@ -1,0 +1,49 @@
+## EVAL: audit-system
+Created: 2026-02-20
+Module: backend/src/modules/audit/
+Phase: 2+5 (Foundational + US3)
+Tasks: T010a, T012a, T016b, T061a-T061b, T102a
+
+### Capability Evals
+
+#### 审计日志中间件 (T016b)
+- [ ] 自动拦截所有 API 请求并记录操作日志
+- [ ] 正确记录 user_id, operation_type, resource_type, resource_id
+- [ ] 正确记录 request_data 和 response_data (JSON)
+- [ ] 正确记录 ip_address 和 user_agent
+- [ ] 异步写入数据库不阻塞 API 响应
+- [ ] 审计日志记录 status (success/failed)
+
+#### 审计日志 API (T061a)
+- [ ] GET /audit-logs 支持分页
+- [ ] GET /audit-logs 支持按 user_id 过滤
+- [ ] GET /audit-logs 支持按 operation_type 过滤 (create/update/delete/login/logout)
+- [ ] GET /audit-logs 支持按 resource_type 过滤 (training_job/dataset/model/user/quota/space)
+- [ ] GET /audit-logs 支持时间范围过滤
+- [ ] GET /audit-logs 仅 admin 角色可访问
+
+#### 审计日志清理 (T061b + T102a)
+- [ ] DELETE /audit-logs/cleanup 清理过期日志 (expires_at < now)
+- [ ] 清理返回统计 (清理条数、执行耗时、失败记录数)
+- [ ] 仅 admin 角色可调用清理
+- [ ] 自动清理服务每日凌晨 2:00 执行
+- [ ] 清理失败连续 3 天触发告警
+- [ ] 保留策略: >= 90 天
+
+#### 领域模型
+- [ ] AuditLog 实体自动计算 expires_at (created_at + 90 天)
+- [ ] AuditLog 实体正确关联 User
+- [ ] 支持所有操作类型和资源类型枚举
+
+### Regression Evals
+- [ ] 审计中间件不影响 API 性能 (延迟增加 <10ms)
+- [ ] 审计日志表索引正确创建 (user_id, operation_type, created_at)
+- [ ] 数据库迁移 (audit_logs 表) 可重复执行
+- [ ] 清理操作不删除未过期的日志
+
+### Success Criteria
+- pass@3 > 90% for capability evals
+- pass^3 = 100% for regression evals
+- 审计日志完整性: 100% API 操作被记录
+- FR-017: 保留策略 >= 90 天
+- 中间件性能开销 <10ms
