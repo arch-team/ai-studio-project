@@ -8,48 +8,48 @@
  * 应用路由配置
  */
 
-import { createBrowserRouter, Navigate, Outlet } from 'react-router-dom';
-import { MainLayout } from '@layouts/MainLayout';
-import { AuthGuard } from './guards/AuthGuard';
-import { RoleGuard } from './guards/RoleGuard';
-import { ROUTES } from './routes';
+import { createBrowserRouter, Navigate, Outlet } from "react-router-dom";
+import { MainLayout } from "@layouts/MainLayout";
+import { AuthGuard } from "./guards/AuthGuard";
+import { RoleGuard } from "./guards/RoleGuard";
+import { ROUTES } from "./routes";
 
 // Training 模块页面
 import {
   TrainingJobListPage,
   CreateTrainingJobPage,
   TrainingJobDetailPage,
-} from '@features/training';
+} from "@features/training";
 
 // Templates 模块页面
-import {
-  TemplateListPage,
-  TemplateDetailPage,
-} from '@features/templates';
+import { TemplateListPage, TemplateDetailPage } from "@features/templates";
 
 // Models 模块页面
 import {
   ModelListPage,
   ModelDetailPage,
   ModelVersionsPage,
-} from '@features/models';
+} from "@features/models";
 
 // Resource Quotas 模块页面
-import { ResourceQuotasPage } from '@features/resource-quotas';
+import { ResourceQuotasPage } from "@features/resource-quotas";
 
 // Reports 模块页面
-import { CostAnalysisPage, ResourceUsageReportPage } from '@features/reports';
+import { CostAnalysisPage, ResourceUsageReportPage } from "@features/reports";
 
 // Datasets 模块页面
 import {
   DatasetListPage,
   CreateDatasetPage,
   DatasetVersionsPage,
-} from '@features/datasets';
+} from "@features/datasets";
+
+// Auth 模块页面
+import { LoginPage } from "@features/auth";
+import { AuthLayout } from "@layouts/AuthLayout";
 
 // 占位页面组件 (待实现)
 const HomePage = () => <div>首页</div>;
-const LoginPage = () => <div>登录页</div>;
 const DatasetDetailPage = () => <div>数据集详情</div>;
 const CheckpointsPage = () => <div>检查点列表</div>;
 const AdminPage = () => <div>管理后台</div>;
@@ -79,7 +79,11 @@ export const router = createBrowserRouter([
   // 公共路由
   {
     path: ROUTES.LOGIN,
-    element: <LoginPage />,
+    element: (
+      <AuthLayout>
+        <LoginPage />
+      </AuthLayout>
+    ),
   },
 
   // 受保护路由
@@ -160,7 +164,7 @@ export const router = createBrowserRouter([
       {
         path: ROUTES.ADMIN,
         element: (
-          <RoleGuard allowedRoles={['admin']}>
+          <RoleGuard allowedRoles={["admin"]}>
             <AdminPage />
           </RoleGuard>
         ),
@@ -168,7 +172,7 @@ export const router = createBrowserRouter([
       {
         path: ROUTES.REPORTS,
         element: (
-          <RoleGuard allowedRoles={['admin', 'team_lead']}>
+          <RoleGuard allowedRoles={["admin", "team_lead"]}>
             <ReportsPage />
           </RoleGuard>
         ),
@@ -176,7 +180,7 @@ export const router = createBrowserRouter([
       {
         path: ROUTES.REPORTS_RESOURCE_USAGE,
         element: (
-          <RoleGuard allowedRoles={['admin', 'team_lead']}>
+          <RoleGuard allowedRoles={["admin", "team_lead"]}>
             <ResourceUsageReportPage />
           </RoleGuard>
         ),
@@ -184,7 +188,7 @@ export const router = createBrowserRouter([
       {
         path: ROUTES.REPORTS_COST_ANALYSIS,
         element: (
-          <RoleGuard allowedRoles={['admin', 'team_lead']}>
+          <RoleGuard allowedRoles={["admin", "team_lead"]}>
             <CostAnalysisPage />
           </RoleGuard>
         ),
@@ -210,8 +214,7 @@ export const router = createBrowserRouter([
 
   // 未匹配路由重定向到 404
   {
-    path: '*',
+    path: "*",
     element: <Navigate to={ROUTES.NOT_FOUND} replace />,
   },
 ]);
-
