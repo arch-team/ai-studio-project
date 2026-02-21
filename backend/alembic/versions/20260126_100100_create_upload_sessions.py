@@ -1,7 +1,7 @@
 """create upload_sessions table
 
-Revision ID: a1b2c3d4e5f6
-Revises: 1a2b3c4d5e6f
+Revision ID: b2c3d4e5f6a7
+Revises: a1b2c3d4e5f6
 Create Date: 2026-01-26 10:01:00.000000
 
 Creates the upload_sessions table for tracking S3 multipart upload progress,
@@ -15,8 +15,8 @@ from alembic import op
 from sqlalchemy.dialects import mysql
 
 # revision identifiers, used by Alembic.
-revision: str = "a1b2c3d4e5f6"
-down_revision: Union[str, None] = "1a2b3c4d5e6f"
+revision: str = "b2c3d4e5f6a7"
+down_revision: Union[str, None] = "a1b2c3d4e5f6"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
