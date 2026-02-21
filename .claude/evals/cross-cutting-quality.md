@@ -1,6 +1,6 @@
 ## EVAL: cross-cutting-quality
 Created: 2026-02-20
-Last Check: 2026-02-20 (post-fix)
+Last Check: 2026-02-21 (前端覆盖率修复)
 Module: 全项目横向质量保障
 Phase: 8 (Polish & Cross-cutting)
 Tasks: T091-T106
@@ -9,7 +9,7 @@ Tasks: T091-T106
 
 #### 测试覆盖 (T091-T092)
 - [x] 后端单元测试覆盖率 >= 80% (pytest --cov)
-- [~] 前端单元测试覆盖率 >= 70% (实际 31.52%, 253 tests passed, 需持续补充)
+- [x] 前端单元测试覆盖率 >= 70% (实际 74.54%, 807 tests passed, 56 test files)
 - [x] 所有 API 端点有对应的单元测试
 - [x] 所有页面组件有对应的单元测试
 
