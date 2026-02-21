@@ -2,7 +2,7 @@
 
 import re
 
-from passlib.context import CryptContext
+import bcrypt
 
 from src.shared.infrastructure.security.constants import (
     PASSWORD_BCRYPT_COST,
@@ -15,23 +15,36 @@ class PasswordHasher:
     """Password hashing using bcrypt."""
 
     def __init__(self, cost_factor: int = PASSWORD_BCRYPT_COST):
-        self._context = CryptContext(
-            schemes=["bcrypt"],
-            deprecated="auto",
-            bcrypt__rounds=cost_factor,
-        )
+        self._cost_factor = cost_factor
 
     def hash_password(self, password: str) -> str:
         """Hash a password using bcrypt."""
-        return self._context.hash(password)
+        return bcrypt.hashpw(
+            password.encode("utf-8"),
+            bcrypt.gensalt(rounds=self._cost_factor),
+        ).decode("utf-8")
 
     def verify_password(self, plain_password: str, hashed_password: str) -> bool:
         """Verify a password against a hash."""
-        return self._context.verify(plain_password, hashed_password)
+        try:
+            return bcrypt.checkpw(
+                plain_password.encode("utf-8"),
+                hashed_password.encode("utf-8"),
+            )
+        except (ValueError, TypeError):
+            return False
 
     def needs_rehash(self, hashed_password: str) -> bool:
-        """Check if a password hash needs to be updated."""
-        return self._context.needs_update(hashed_password)
+        """Check if a password hash needs to be updated (cost factor changed)."""
+        try:
+            # 从哈希中提取 rounds: $2b$12$...
+            parts = hashed_password.split("$")
+            if len(parts) >= 3:
+                current_rounds = int(parts[2])
+                return current_rounds != self._cost_factor
+        except (ValueError, IndexError):
+            pass
+        return True
 
 
 class PasswordValidator:

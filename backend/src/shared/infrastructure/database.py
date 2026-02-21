@@ -1,5 +1,6 @@
 """Database configuration - SQLAlchemy 2.0 async setup."""
 
+import ssl
 from collections.abc import AsyncGenerator
 
 import structlog
@@ -54,6 +55,16 @@ class Base(DeclarativeBase):
 def create_engine() -> AsyncEngine:
     """Create async SQLAlchemy engine."""
     settings = get_settings()
+
+    connect_args: dict = {}
+    if settings.database_require_ssl:
+        # RDS Proxy 要求 TLS 连接
+        # 使用通用 TLS 上下文（非 PROTOCOL_TLS_CLIENT），跳过证书验证
+        ssl_ctx = ssl.SSLContext()
+        ssl_ctx.check_hostname = False
+        ssl_ctx.verify_mode = ssl.CERT_NONE
+        connect_args["ssl"] = ssl_ctx
+
     return create_async_engine(
         settings.database_url.get_secret_value(),
         pool_size=settings.database_pool_size,
@@ -61,6 +72,7 @@ def create_engine() -> AsyncEngine:
         pool_pre_ping=True,
         pool_recycle=3600,
         echo=settings.debug,
+        connect_args=connect_args,
     )
 
 

@@ -27,6 +27,7 @@ class Settings(BaseSettings):
     database_url: SecretStr = SecretStr("mysql+aiomysql://ai_training:ai_training_pass@localhost:3306/ai_training")
     database_pool_size: int = 5
     database_max_overflow: int = 10
+    database_require_ssl: bool = False
 
     # AWS
     aws_region: str = "us-east-1"
