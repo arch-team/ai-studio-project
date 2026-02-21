@@ -100,6 +100,12 @@ class EksStack(cdk.Stack):
             authentication_mode=eks.AuthenticationMode.API_AND_CONFIG_MAP,
         )
 
+        # 添加 Admin IAM 用户到 aws-auth ConfigMap，授予 system:masters 权限
+        cluster.aws_auth.add_user_mapping(
+            iam.User.from_user_name(self, "AdminUser", "Admin"),
+            groups=["system:masters"],
+        )
+
         cdk.Tags.of(cluster).add("Name", f"{self.env_config.resource_prefix}-eks")
         cdk.Tags.of(cluster).add("kubernetes.io/cluster-type", "hyperpod-orchestrator")
 
@@ -252,6 +258,70 @@ class EksStack(cdk.Stack):
 
         # EKS Pod Identity Agent（HyperPod Training Operator IAM 认证前置条件）
         self._create_addon("PodIdentityAgentAddon", EKS_ADDON_NAMES.POD_IDENTITY_AGENT)
+
+        # AWS Load Balancer Controller — 通过 Helm Chart 安装 (K8s 1.33 不支持 EKS 托管 add-on)
+        # 部署后需手动执行:
+        #   helm repo add eks https://aws.github.io/eks-charts
+        #   helm install aws-load-balancer-controller eks/aws-load-balancer-controller \
+        #     -n kube-system --set clusterName=ai-platform-dev-eks \
+        #     --set serviceAccount.create=false \
+        #     --set serviceAccount.name=aws-load-balancer-controller
+        lb_controller_role = create_irsa_role(
+            scope=self,
+            construct_id="LbControllerRole",
+            env_config=self.env_config,
+            oidc_provider_arn=oidc_arn,
+            oidc_issuer=oidc_issuer,
+            role_name_suffix="lb-controller-role",
+            service_account="aws-load-balancer-controller",
+            description="IAM role for AWS Load Balancer Controller",
+            managed_policies=[
+                "ElasticLoadBalancingFullAccess",
+            ],
+        )
+        add_policy_statement(
+            lb_controller_role,
+            sid="LbControllerAdditional",
+            actions=[
+                "ec2:DescribeAvailabilityZones",
+                "ec2:DescribeSecurityGroups",
+                "ec2:DescribeSubnets",
+                "ec2:DescribeVpcs",
+                "ec2:DescribeInternetGateways",
+                "ec2:DescribeAccountAttributes",
+                "ec2:DescribeAddresses",
+                "ec2:DescribeInstances",
+                "ec2:DescribeNetworkInterfaces",
+                "ec2:DescribeCoipPools",
+                "ec2:GetCoipPoolUsage",
+                "ec2:DescribeTags",
+                "ec2:CreateTags",
+                "ec2:DeleteTags",
+                "ec2:CreateSecurityGroup",
+                "ec2:DeleteSecurityGroup",
+                "ec2:AuthorizeSecurityGroupIngress",
+                "ec2:RevokeSecurityGroupIngress",
+                "cognito-idp:DescribeUserPoolClient",
+                "acm:ListCertificates",
+                "acm:DescribeCertificate",
+                "iam:ListServerCertificates",
+                "iam:GetServerCertificate",
+                "waf-regional:GetWebACLForResource",
+                "waf-regional:GetWebACL",
+                "waf-regional:AssociateWebACL",
+                "waf-regional:DisassociateWebACL",
+                "wafv2:GetWebACL",
+                "wafv2:GetWebACLForResource",
+                "wafv2:AssociateWebACL",
+                "wafv2:DisassociateWebACL",
+                "shield:GetSubscriptionState",
+                "shield:DescribeProtection",
+                "shield:CreateProtection",
+                "shield:DeleteProtection",
+            ],
+            resources=["*"],
+        )
+        self._lb_controller_role = lb_controller_role
 
         # cert-manager community add-on（HyperPod Training Operator webhook 证书前置条件）
         self._cert_manager_addon = self._create_addon(

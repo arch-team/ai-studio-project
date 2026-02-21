@@ -12,7 +12,7 @@ metadata:
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: cluster-admin
+  name: platform-admin
 subjects:
   - kind: Group
     name: platform-admins
@@ -28,7 +28,7 @@ metadata:
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: view
+  name: tenant-admin
 subjects:
   - kind: Group
     name: platform-project-managers
@@ -44,7 +44,7 @@ metadata:
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: view
+  name: training-user
 subjects:
   - kind: Group
     name: platform-engineers
@@ -60,7 +60,7 @@ metadata:
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: view
+  name: viewer
 subjects:
   - kind: Group
     name: platform-viewers

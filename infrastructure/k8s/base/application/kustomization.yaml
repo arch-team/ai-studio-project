@@ -1,0 +1,19 @@
+# Kustomize Application - AI Training Platform 应用部署清单
+# 包含前端、后端的 Deployment / Service / TargetGroupBinding 等资源
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - namespace.yaml
+  - backend-serviceaccount.yaml
+  - backend-configmap.yaml
+  - backend-deployment.yaml
+  - backend-service.yaml
+  - frontend-deployment.yaml
+  - frontend-service.yaml
+  - backend-targetgroupbinding.yaml
+  - frontend-targetgroupbinding.yaml
+
+commonLabels:
+  app.kubernetes.io/part-of: ai-training-platform
+  app.kubernetes.io/managed-by: kustomize

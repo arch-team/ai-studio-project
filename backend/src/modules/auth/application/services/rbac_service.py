@@ -67,21 +67,23 @@ ROLE_PERMISSIONS: dict[str, set[Permission]] = {
 }
 
 # K8s RBAC binding mappings
+# cluster_role: 自定义 ClusterRole (定义在 infrastructure/k8s/rbac/cluster-roles.yaml)
+# namespace_role: 内置 K8s Role (命名空间级别通用操作)
 K8S_RBAC_BINDINGS: dict[str, dict[str, str]] = {
     "admin": {
-        "cluster_role": "cluster-admin",
+        "cluster_role": "platform-admin",
         "namespace_role": "admin",
     },
     "project_manager": {
-        "cluster_role": "view",
+        "cluster_role": "tenant-admin",
         "namespace_role": "edit",
     },
     "engineer": {
-        "cluster_role": "view",
+        "cluster_role": "training-user",
         "namespace_role": "edit",
     },
     "viewer": {
-        "cluster_role": "view",
+        "cluster_role": "viewer",
         "namespace_role": "view",
     },
 }

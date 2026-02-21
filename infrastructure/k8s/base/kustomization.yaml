@@ -15,3 +15,5 @@ resources:
   - namespace-psa-labels.yaml
   # Storage
   - fsx-storage-class.yaml
+  # Application
+  - application/

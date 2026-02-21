@@ -1,0 +1,21 @@
+# 前端 ALB TargetGroupBinding
+# 将 AWS ALB Target Group 绑定到 K8s Service (通过 AWS Load Balancer Controller)
+apiVersion: elbv2.k8s.aws/v1beta1
+kind: TargetGroupBinding
+metadata:
+  name: frontend-tgb
+  namespace: ai-platform
+spec:
+  serviceRef:
+    name: frontend-svc
+    port: 3000
+  targetGroupARN: "arn:aws:elasticloadbalancing:us-east-1:897473508751:targetgroup/ai-platform-dev-frontend/fa8a0251575dab05"
+  targetType: ip
+  networking:
+    ingress:
+      - from:
+          - securityGroup:
+              groupID: sg-05c1520322739b62a
+        ports:
+          - port: 3000
+            protocol: TCP

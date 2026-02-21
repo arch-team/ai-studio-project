@@ -1,0 +1,29 @@
+# 数据库迁移 Job (独立执行，不包含在 kustomization.yaml 中)
+# 使用方式: kubectl apply -f db-migration-job.yaml
+# 注意: 执行前确保 backend-config ConfigMap 和 backend-secrets Secret 已存在
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: db-migration
+  namespace: ai-platform
+spec:
+  backoffLimit: 3
+  template:
+    metadata:
+      labels:
+        app: db-migration
+    spec:
+      serviceAccountName: backend-service-sa
+      restartPolicy: Never
+      containers:
+        - name: db-migration
+          image: 897473508751.dkr.ecr.us-east-1.amazonaws.com/ai-platform-dev-backend:v1.0.3
+          command: ["alembic", "upgrade", "head"]
+          envFrom:
+            - configMapRef:
+                name: backend-config
+            - secretRef:
+                name: backend-secrets
+          securityContext:
+            runAsNonRoot: true
+            allowPrivilegeEscalation: false

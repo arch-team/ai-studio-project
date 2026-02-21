@@ -1,0 +1,15 @@
+# 后端服务 Service (ClusterIP)
+# 供 ALB TargetGroupBinding 和集群内部服务发现使用
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend-svc
+  namespace: ai-platform
+spec:
+  type: ClusterIP
+  selector:
+    app: backend
+  ports:
+    - port: 8000
+      targetPort: 8000
+      protocol: TCP

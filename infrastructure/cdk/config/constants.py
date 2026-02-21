@@ -21,6 +21,9 @@ class EksAddonNames:
     KUBE_PROXY: str = "kube-proxy"
     POD_IDENTITY_AGENT: str = "eks-pod-identity-agent"
 
+    # 网络 Add-ons
+    AWS_LB_CONTROLLER: str = "aws-load-balancer-controller"
+
     # 社区 Add-ons
     CERT_MANAGER: str = "cert-manager"
 
@@ -78,6 +81,7 @@ class ServiceAccountNames:
 
     EBS_CSI_CONTROLLER: str = "ebs-csi-controller-sa"
     FSX_CSI_CONTROLLER: str = "fsx-csi-controller-sa"
+    AWS_LB_CONTROLLER: str = "aws-load-balancer-controller"
 
     # HyperPod
     TRAINING_OPERATOR: str = "hp-training-operator-controller-manager"

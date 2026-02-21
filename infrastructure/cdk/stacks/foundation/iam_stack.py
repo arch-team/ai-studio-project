@@ -243,7 +243,7 @@ class IamStack(cdk.Stack):
                 federated=f"arn:aws:iam::{self.env_config.account}:oidc-provider/oidc.eks.{self.env_config.region}.amazonaws.com",
                 conditions={
                     "StringEquals": {
-                        f"oidc.eks.{self.env_config.region}.amazonaws.com:sub": "system:serviceaccount:backend:backend-service-sa",
+                        f"oidc.eks.{self.env_config.region}.amazonaws.com:sub": "system:serviceaccount:ai-platform:backend-service-sa",
                         f"oidc.eks.{self.env_config.region}.amazonaws.com:aud": "sts.amazonaws.com",
                     }
                 },

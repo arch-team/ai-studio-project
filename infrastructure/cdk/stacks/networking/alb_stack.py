@@ -241,7 +241,7 @@ class AlbStack(cdk.Stack):
             action=elbv2.ListenerAction.forward([self._grafana_target_group]),
         )
 
-        # Frontend catch-all (最低优先级)
+        # Frontend catch-all (最低优先级, port=3000 匹配 nginx 监听端口)
         self._frontend_target_group = self._create_target_group(
             "FrontendTargetGroup",
             port=3000,

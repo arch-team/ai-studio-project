@@ -1,0 +1,14 @@
+# AI Platform 应用命名空间
+# PSA 策略: baseline (nginx 需要 root 绑定端口，restricted 过于严格)
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: ai-platform
+  labels:
+    app.kubernetes.io/part-of: ai-training-platform
+    pod-security.kubernetes.io/enforce: baseline
+    pod-security.kubernetes.io/enforce-version: latest
+    pod-security.kubernetes.io/audit: baseline
+    pod-security.kubernetes.io/audit-version: latest
+    pod-security.kubernetes.io/warn: restricted
+    pod-security.kubernetes.io/warn-version: latest

@@ -187,33 +187,35 @@ class TestRBACServiceK8sBinding:
         return RBACService()
 
     def test_get_k8s_rbac_binding_admin(self, rbac_service: RBACService) -> None:
-        """Test admin gets cluster-admin binding."""
+        """Test admin gets platform-admin binding."""
         binding = rbac_service.get_k8s_rbac_binding("admin")
 
         assert binding is not None
-        assert binding["cluster_role"] == "cluster-admin"
+        assert binding["cluster_role"] == "platform-admin"
         assert binding["namespace_role"] == "admin"
 
     def test_get_k8s_rbac_binding_viewer(self, rbac_service: RBACService) -> None:
-        """Test viewer gets view binding."""
+        """Test viewer gets viewer binding."""
         binding = rbac_service.get_k8s_rbac_binding("viewer")
 
         assert binding is not None
-        assert binding["cluster_role"] == "view"
+        assert binding["cluster_role"] == "viewer"
         assert binding["namespace_role"] == "view"
 
     def test_get_k8s_rbac_binding_engineer(self, rbac_service: RBACService) -> None:
-        """Test engineer gets edit binding."""
+        """Test engineer gets training-user binding."""
         binding = rbac_service.get_k8s_rbac_binding("engineer")
 
         assert binding is not None
+        assert binding["cluster_role"] == "training-user"
         assert binding["namespace_role"] == "edit"
 
     def test_get_k8s_rbac_binding_project_manager(self, rbac_service: RBACService) -> None:
-        """Test project manager gets edit binding."""
+        """Test project manager gets tenant-admin binding."""
         binding = rbac_service.get_k8s_rbac_binding("project_manager")
 
         assert binding is not None
+        assert binding["cluster_role"] == "tenant-admin"
         assert binding["namespace_role"] == "edit"
 
     def test_get_k8s_rbac_binding_invalid_role(self, rbac_service: RBACService) -> None:
