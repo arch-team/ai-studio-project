@@ -5,13 +5,19 @@
 
 // === Enums ===
 
-export type StorageType = 'fsx' | 's3' | 'efs';
+export type StorageType = "fsx" | "s3" | "efs";
 
-export type DatasetType = 'image' | 'text' | 'audio' | 'video' | 'tabular' | 'custom';
+export type DatasetType =
+  | "image"
+  | "text"
+  | "audio"
+  | "video"
+  | "tabular"
+  | "custom";
 
-export type DatasetStatus = 'available' | 'preparing' | 'archived' | 'error';
+export type DatasetStatus = "available" | "preparing" | "archived" | "error";
 
-export type DatasetVisibility = 'public' | 'private' | 'restricted';
+export type DatasetVisibility = "public" | "private" | "restricted";
 
 // === Dataset Types ===
 
@@ -74,8 +80,8 @@ export interface DatasetFilters {
   search?: string;
   page?: number;
   page_size?: number;
-  sort_by?: 'created_at' | 'name' | 'total_size_bytes';
-  sort_order?: 'asc' | 'desc';
+  sort_by?: "created_at" | "name" | "total_size_bytes";
+  sort_order?: "asc" | "desc";
 }
 
 // === Response Types ===
@@ -91,41 +97,31 @@ export interface DatasetListResponse {
 // === UI Helper Types ===
 
 export const DATASET_STATUS_LABELS: Record<DatasetStatus, string> = {
-  available: '可用',
-  preparing: '准备中',
-  archived: '已归档',
-  error: '错误',
-};
-
-export const DATASET_STATUS_COLORS: Record<
-  DatasetStatus,
-  'green' | 'blue' | 'grey' | 'red'
-> = {
-  available: 'green',
-  preparing: 'blue',
-  archived: 'grey',
-  error: 'red',
+  available: "可用",
+  preparing: "准备中",
+  archived: "已归档",
+  error: "错误",
 };
 
 export const STORAGE_TYPE_LABELS: Record<StorageType, string> = {
-  fsx: 'FSx for Lustre',
-  s3: 'Amazon S3',
-  efs: 'Amazon EFS',
+  fsx: "FSx for Lustre",
+  s3: "Amazon S3",
+  efs: "Amazon EFS",
 };
 
 export const DATASET_TYPE_LABELS: Record<DatasetType, string> = {
-  image: '图像',
-  text: '文本',
-  audio: '音频',
-  video: '视频',
-  tabular: '表格',
-  custom: '自定义',
+  image: "图像",
+  text: "文本",
+  audio: "音频",
+  video: "视频",
+  tabular: "表格",
+  custom: "自定义",
 };
 
 export const VISIBILITY_LABELS: Record<DatasetVisibility, string> = {
-  public: '公开',
-  private: '私有',
-  restricted: '受限',
+  public: "公开",
+  private: "私有",
+  restricted: "受限",
 };
 
 // === Version Types ===
@@ -174,6 +170,12 @@ export interface UploadProgress {
   loaded: number;
   total: number;
   percentage: number;
-  status: 'idle' | 'uploading' | 'completing' | 'completed' | 'error' | 'cancelled';
+  status:
+    | "idle"
+    | "uploading"
+    | "completing"
+    | "completed"
+    | "error"
+    | "cancelled";
   error?: string;
 }
