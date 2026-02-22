@@ -55,6 +55,9 @@ class Settings(BaseSettings):
     secret_key: SecretStr = SecretStr("change-me-in-production")
     access_token_expire_minutes: int = 30
 
+    # SSO (AWS IAM Identity Center)
+    sso_issuer_url: str | None = None
+
     # CORS
     cors_origins: list[str] = ["http://localhost:3000"]
 
@@ -64,6 +67,11 @@ class Settings(BaseSettings):
         if self.environment == "production":
             if self.secret_key.get_secret_value() == "change-me-in-production":
                 raise ValueError("生产环境必须设置 SECRET_KEY 环境变量")
+            default_db_prefix = "mysql+aiomysql://ai_training:ai_training_pass@localhost"
+            if self.database_url.get_secret_value().startswith(default_db_prefix):
+                raise ValueError("生产环境必须设置 DATABASE_URL 环境变量")
+            if not self.database_require_ssl:
+                raise ValueError("生产环境必须启用 DATABASE_REQUIRE_SSL=true")
         return self
 
 

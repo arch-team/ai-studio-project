@@ -22,6 +22,8 @@ CMD ["uvicorn", "src.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload
 
 # Production stage
 FROM base as production
+RUN useradd -r -s /bin/false appuser
 COPY . .
 RUN pip install --no-cache-dir gunicorn
+USER appuser
 CMD ["gunicorn", "src.main:app", "-w", "4", "-k", "uvicorn.workers.UvicornWorker", "-b", "0.0.0.0:8000"]

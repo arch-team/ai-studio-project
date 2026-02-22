@@ -35,13 +35,4 @@ mlflow>=2.10.0
 python-dotenv>=1.0.0
 structlog>=24.1.0
 
-# Testing
-pytest>=8.0.0
-pytest-asyncio>=0.23.0
-pytest-cov>=4.1.0
-
-# Development
-black>=24.0.0
-isort>=5.13.0
-mypy>=1.13.0
-ruff>=0.8.0
+# 开发/测试依赖请参见 requirements-dev.txt

@@ -58,11 +58,21 @@ def create_engine() -> AsyncEngine:
 
     connect_args: dict = {}
     if settings.database_require_ssl:
-        # RDS Proxy 要求 TLS 连接
-        # 使用通用 TLS 上下文（非 PROTOCOL_TLS_CLIENT），跳过证书验证
-        ssl_ctx = ssl.SSLContext()
-        ssl_ctx.check_hostname = False
-        ssl_ctx.verify_mode = ssl.CERT_NONE
+        if settings.environment == "production":
+            # 生产环境: 验证 RDS SSL 证书
+            ssl_ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+            ssl_ctx.load_default_certs()
+            # RDS 根证书路径 (通过 Dockerfile COPY 或 ConfigMap 挂载)
+            rds_ca_path = "/app/certs/global-bundle.pem"
+            import os
+
+            if os.path.exists(rds_ca_path):
+                ssl_ctx.load_verify_locations(rds_ca_path)
+        else:
+            # 非生产环境: 跳过证书验证 (便于开发)
+            ssl_ctx = ssl.SSLContext()
+            ssl_ctx.check_hostname = False
+            ssl_ctx.verify_mode = ssl.CERT_NONE
         connect_args["ssl"] = ssl_ctx
 
     return create_async_engine(

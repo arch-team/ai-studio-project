@@ -80,17 +80,38 @@ class SSOService:
     async def validate_sso_token(self, token: str) -> SSOUserInfo:
         """验证 OIDC JWT token，提取用户信息.
 
+        生产/staging 环境通过 JWKS 验证签名，开发环境跳过签名验证。
+
         Raises:
-            SSOError: Token 验证失败时
+            SSOError: Token 验证失败或配置缺失时
         """
+        settings = get_settings()
+
         try:
-            # 解码 JWT（不验证签名，生产环境应通过 JWKS 验证）
-            # 实际部署时需配置 issuer_url 并从 OIDC discovery 获取公钥
-            claims = pyjwt.decode(
-                token,
-                options={"verify_signature": False},
-                algorithms=["RS256", "HS256"],
-            )
+            if settings.environment in ("staging", "production"):
+                # 生产环境: 必须验证 JWT 签名
+                if not self._issuer_url:
+                    raise SSOError(
+                        message="SSO issuer_url 未配置，生产环境无法跳过签名验证"
+                    )
+                jwks_client = pyjwt.PyJWKClient(
+                    f"{self._issuer_url}/.well-known/jwks.json",
+                    cache_keys=True,
+                )
+                signing_key = jwks_client.get_signing_key_from_jwt(token)
+                claims = pyjwt.decode(
+                    token,
+                    signing_key.key,
+                    algorithms=["RS256"],
+                    options={"verify_aud": False},
+                )
+            else:
+                # 开发环境: 跳过签名验证
+                claims = pyjwt.decode(
+                    token,
+                    options={"verify_signature": False},
+                    algorithms=["RS256", "HS256"],
+                )
 
             return SSOUserInfo(
                 iam_identity_id=claims.get("sub", ""),
@@ -228,7 +249,7 @@ def get_sso_service() -> SSOService:
         settings = get_settings()
         _sso_service_instance = SSOService(
             region=settings.aws_region,
-            issuer_url=None,  # 可通过环境变量扩展
+            issuer_url=settings.sso_issuer_url,
         )
     return _sso_service_instance
 
