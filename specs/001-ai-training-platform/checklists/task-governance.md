@@ -15,14 +15,15 @@
 | 文档完整性 | 9 | 1 | 3 | 69% |
 | 需求一致性 | 7 | 2 | 0 | 78% |
 | 需求清晰度 | 4 | 1 | 5 | 40% |
-| 实施参考完备性 | 8 | 1 | 2 | 73% |
+| 实施参考完备性 | 10 | 0 | 1 | 91% |
 | 场景覆盖 | 3 | 0 | 7 | 30% |
 | 测试覆盖 | 2 | 0 | 5 | 29% |
 | 官方文档引用 | 3 | 1 | 2 | 50% |
 | 安全与合规 | 3 | 0 | 2 | 60% |
-| **总计** | **39** | **6** | **26** | **55%** |
+| **总计** | **41** | **5** | **25** | **58%** |
 
 > **2026-01-24 更新**: 修复了 4 个高优先级问题 (CHK015, CHK005, CHK009, CHK010)，通过率从 49% 提升至 55%
+> **2026-02-22 Phase 8 审计更新**: CHK038/CHK039 确认已在 CHK009/CHK010 修复中覆盖，CHK040 确认目录已创建，通过率从 55% 提升至 58%
 
 ---
 
@@ -188,17 +189,17 @@
 - [x] CHK037 - 是否提供了三级 PriorityClass（high/medium/low）的完整 YAML 配置模板? [Completeness, hyperpod-sdk-gaps.md]
   - ✅ **通过**: hyperpod-sdk-gaps.md 提供了完整的 PriorityClass YAML
 
-- [ ] CHK038 - 是否提供了 ClusterQueue 配置模板（包括 resourceGroups、borrowingLimit、preemption 策略）? [Gap]
-  - ❌ **未通过**: 没有 ClusterQueue 配置模板
-  - **建议**: 创建配置模板
+- [X] CHK038 - 是否提供了 ClusterQueue 配置模板（包括 resourceGroups、borrowingLimit、preemption 策略）? [Gap]
+  - ✅ **通过** (Phase 8 审计更新): `docs/task-governance-configuration-guide.md` 已包含 ClusterQueue CRD 结构参考（含 resourceGroups、borrowingLimit、preemption 配置）
+  - **注意**: CHK009 修复时已覆盖此项
 
-- [ ] CHK039 - 是否提供了 LocalQueue 关联 ClusterQueue 的配置模板? [Gap]
-  - ❌ **未通过**: 没有 LocalQueue 配置模板
-  - **建议**: 创建配置模板
+- [X] CHK039 - 是否提供了 LocalQueue 关联 ClusterQueue 的配置模板? [Gap]
+  - ✅ **通过** (Phase 8 审计更新): `docs/task-governance-configuration-guide.md` 已包含 LocalQueue CRD 结构参考和命名空间关联说明
+  - **注意**: CHK010 修复时已覆盖此项
 
-- [~] CHK040 - 是否说明了这些配置应放置在项目的哪个目录（如 infrastructure/k8s/）? [Clarity, plan.md]
-  - ⚠️ **部分通过**: plan.md 提到 "infrastructure/k8s/network-policies/"，但没有明确 Kueue 配置目录
-  - **建议**: 明确 `infrastructure/k8s/kueue/` 目录
+- [X] CHK040 - 是否说明了这些配置应放置在项目的哪个目录（如 infrastructure/k8s/）? [Clarity, plan.md]
+  - ✅ **通过** (Phase 8 审计更新): `infrastructure/k8s/kueue/` 目录已创建，Kueue 配置有明确的存放位置
+  - **实施证据**: 项目中 `infrastructure/k8s/` 包含 kueue/、network-policies/、rbac/、security/、storage/ 等子目录
 
 ### 4.3 开发决策指南
 
@@ -368,7 +369,7 @@
 |-------|---------|---------|
 | CHK012 | 缺少多租户配额分配策略 | 补充推荐分配策略和计算公式 |
 | CHK035 | 缺少 API 响应格式示例 | 补充 workload-status API 响应格式 |
-| ~~CHK038-039~~ | ~~缺少 ClusterQueue/LocalQueue 配置模板~~ | ✅ 已在 CHK009/010 修复中覆盖 |
+| ~~CHK038-039~~ | ~~缺少 ClusterQueue/LocalQueue 配置模板~~ | ✅ 已在 CHK009/010 修复中覆盖 (Phase 8 审计确认) |
 | CHK043 | 缺少例外审批流程模板 | 创建审批流程文档 |
 
 ### 低优先级（可在实施阶段完善）
@@ -401,8 +402,9 @@
 
 ---
 
-**文档版本**: v1.1
+**文档版本**: v1.2
 **创建者**: Claude Code
 **执行者**: Claude Code
 **检查执行日期**: 2026-01-24
-**审核状态**: 检查完成，待改进项已识别
+**Phase 8 审计日期**: 2026-02-22
+**审核状态**: 检查完成，Phase 8 审计更新 3 项 (CHK038/CHK039/CHK040)，剩余 25 项待改进
