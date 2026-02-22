@@ -197,11 +197,10 @@ test.describe("Phase 8 质量保障测试", () => {
 
   // === 5. OpenAPI 文档可访问性 ===
 
-  // 注意: OpenAPI 文档端点需要 nginx 配置暴露后端 /docs 路径，
-  // 当前 Dev 环境的 nginx 将所有非 /api 路径转发到前端 SPA。
-  // 需要在 nginx.conf 中添加 /docs、/redoc、/openapi.json 的代理规则后验证。
+  // nginx.conf 已添加 /docs、/redoc、/openapi.json 代理规则，
+  // 重新部署前端 nginx 后即可通过。
   test.describe("OpenAPI 文档端点", () => {
-    test.fixme("Swagger UI 文档应可访问", async ({ page, baseURL }) => {
+    test("Swagger UI 文档应可访问", async ({ page, baseURL }) => {
       // 通过 page.request 请求后端 API 文档端点（使用 baseURL 配置）
       // FastAPI 默认在根路径 /docs 提供 Swagger UI
       const response = await page.request.get(`${baseURL}/docs`);
@@ -216,7 +215,7 @@ test.describe("Phase 8 质量保障测试", () => {
       expect(html).toContain("swagger"); // Swagger UI 的标志性内容
     });
 
-    test.fixme("ReDoc 文档应可访问", async ({ page, baseURL }) => {
+    test("ReDoc 文档应可访问", async ({ page, baseURL }) => {
       // FastAPI 默认在根路径 /redoc 提供 ReDoc
       const response = await page.request.get(`${baseURL}/redoc`);
 
@@ -230,7 +229,7 @@ test.describe("Phase 8 质量保障测试", () => {
       expect(html).toContain("redoc"); // ReDoc 的标志性内容
     });
 
-    test.fixme("OpenAPI JSON 规范应可访问", async ({ page, baseURL }) => {
+    test("OpenAPI JSON 规范应可访问", async ({ page, baseURL }) => {
       // FastAPI 默认在根路径 /openapi.json 提供 OpenAPI 规范
       const response = await page.request.get(`${baseURL}/openapi.json`);
 

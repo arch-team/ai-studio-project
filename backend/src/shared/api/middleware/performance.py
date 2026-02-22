@@ -42,23 +42,24 @@ class PerformanceMiddleware(BaseHTTPMiddleware):
             return await call_next(request)
 
         start_time = time.monotonic()
-        response = await call_next(request)
-        duration_ms = (time.monotonic() - start_time) * 1000
+        response = None
+        try:
+            response = await call_next(request)
+            return response
+        finally:
+            duration_ms = (time.monotonic() - start_time) * 1000
+            status_code = response.status_code if response else 500
+            method = request.method
 
-        status_code = response.status_code
-        method = request.method
+            # 记录性能日志（适配 CloudWatch Logs Insights 查询）
+            log_data = {
+                "method": method,
+                "path": path,
+                "status_code": status_code,
+                "duration_ms": round(duration_ms, 2),
+            }
 
-        # 记录性能日志（适配 CloudWatch Logs Insights 查询）
-        log_data = {
-            "method": method,
-            "path": path,
-            "status_code": status_code,
-            "duration_ms": round(duration_ms, 2),
-        }
-
-        if duration_ms > P95_LATENCY_THRESHOLD_MS:
-            logger.warning("slow_request", **log_data)
-        else:
-            logger.info("request_completed", **log_data)
-
-        return response
+            if duration_ms > P95_LATENCY_THRESHOLD_MS:
+                logger.warning("slow_request", **log_data)
+            else:
+                logger.info("request_completed", **log_data)

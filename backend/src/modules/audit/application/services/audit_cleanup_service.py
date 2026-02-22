@@ -6,7 +6,7 @@
 """
 
 import asyncio
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 import structlog
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
@@ -164,9 +164,9 @@ class AuditCleanupService:
         now = datetime.now(UTC)
         # 计算今天的目标时间
         target = now.replace(hour=CLEANUP_HOUR_UTC, minute=0, second=0, microsecond=0)
-        # 如果已过今天的目标时间, 设为明天
+        # 如果已过今天的目标时间, 设为明天 (使用 timedelta 避免月末日期溢出)
         if now >= target:
-            target = target.replace(day=target.day + 1)
+            target = target + timedelta(days=1)
         diff = (target - now).total_seconds()
         # 安全保底: 至少等 60 秒, 避免无限快速循环
         return max(60.0, diff)
