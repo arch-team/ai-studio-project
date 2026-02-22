@@ -816,39 +816,39 @@
 **目标**: 确保系统质量、稳定性、可维护性、安全合规性、审计日志保留策略和 GitOps 持续部署
 
 ### 单元测试
-- [ ] [T091] [P] 后端单元测试覆盖 - 使用 pytest,覆盖所有 API 端点、服务逻辑、数据模型,目标覆盖率 ≥80% (`backend/tests/`)
-- [ ] [T092] [P] 前端单元测试覆盖 - 使用 Jest + React Testing Library,覆盖所有页面组件、业务逻辑,目标覆盖率 ≥70% (`frontend/tests/`)
+- [X] [T091] [P] 后端单元测试覆盖 - 使用 pytest,覆盖所有 API 端点、服务逻辑、数据模型,目标覆盖率 ≥80% (`backend/tests/`)
+- [X] [T092] [P] 前端单元测试覆盖 - 使用 Jest + React Testing Library,覆盖所有页面组件、业务逻辑,目标覆盖率 ≥70% (`frontend/tests/`)
 
 ### 集成测试 (API Contract Validation)
-- [ ] [T093] API Contract 集成测试 - training-jobs-api.yaml - 使用 pytest + OpenAPI validator,验证 POST/GET/PUT/DELETE /training-jobs 端点与 contract 一致性 (`backend/tests/integration/test_training_jobs_contract.py`)
-- [ ] [T094] API Contract 集成测试 - datasets-api.yaml - 验证 /datasets 端点与 contract 一致性
-- [ ] [T095] API Contract 集成测试 - users-api.yaml, resource-quotas-api.yaml - 验证 /users, /resource-quotas 端点与 contract 一致性
+- [X] [T093] API Contract 集成测试 - training-jobs-api.yaml - 使用 pytest + OpenAPI validator,验证 POST/GET/PUT/DELETE /training-jobs 端点与 contract 一致性 (`backend/tests/integration/test_training_jobs_contract.py`)
+- [X] [T094] API Contract 集成测试 - datasets-api.yaml - 验证 /datasets 端点与 contract 一致性
+- [X] [T095] API Contract 集成测试 - users-api.yaml, resource-quotas-api.yaml - 验证 /users, /resource-quotas 端点与 contract 一致性
 
 ### 文档生成
-- [ ] [T096] [P] OpenAPI 文档生成 - 配置 FastAPI 自动生成 OpenAPI 3.0 规范,集成 Swagger UI (`/docs`) 和 ReDoc (`/redoc`)
+- [X] [T096] [P] OpenAPI 文档生成 - 配置 FastAPI 自动生成 OpenAPI 3.0 规范,集成 Swagger UI (`/docs`) 和 ReDoc (`/redoc`)
 
 ### 错误处理和重试逻辑
-- [ ] [T097] [P] 统一错误处理中间件 - `backend/src/shared/api/middleware/error_handler.py`,捕获所有异常,返回标准化错误响应 (RFC 7807 Problem Details),记录错误日志
-- [ ] [T098] [P] 请求重试逻辑 - `frontend/src/lib/api/client.ts`,使用 TanStack Query retry 机制,配置指数退避策略 (1s, 2s, 4s),最多重试 3 次,创建请求/响应拦截器 `frontend/src/lib/api/interceptors.ts`
-- [ ] [T099] [P] 前端错误边界组件 - `frontend/src/shared/components/feedback/ErrorBoundary.tsx`,捕获 React 组件错误,显示友好错误页面,支持错误上报,作为共享反馈组件供全局使用
+- [X] [T097] [P] 统一错误处理中间件 - `backend/src/shared/api/middleware/error_handler.py`,捕获所有异常,返回标准化错误响应 (RFC 7807 Problem Details),记录错误日志
+- [X] [T098] [P] 请求重试逻辑 - `frontend/src/lib/api/client.ts`,使用 TanStack Query retry 机制,配置指数退避策略 (1s, 2s, 4s),最多重试 3 次,创建请求/响应拦截器 `frontend/src/lib/api/interceptors.ts`
+- [X] [T099] [P] 前端错误边界组件 - `frontend/src/shared/components/feedback/ErrorBoundary.tsx`,捕获 React 组件错误,显示友好错误页面,支持错误上报,作为共享反馈组件供全局使用
 
 ### 日志和监控
-- [ ] [T100] 日志格式标准化 - 使用 structlog 配置 JSON 结构化日志,包含 trace_id, user_id, request_id 字段,输出到 CloudWatch Logs
-- [ ] [T101] CloudWatch Logs 配置验证 - 验证 30天日志留存策略,配置日志组 (/aws/hyperpod/training-platform),创建 CloudWatch Logs Insights 查询模板
-- [ ] [T101a] 加密合规性验证 - 验证所有 S3 存储桶启用 SSE-KMS 加密,验证 API 端点强制 TLS 1.2+,生成加密审计报告,确保符合 FR-018 要求
-- [ ] [T102] 性能监控埋点 - 使用 FastAPI middleware 记录 API 延迟,上报到 CloudWatch Metrics,配置告警 (P95 延迟 >500ms)
-- [ ] [T102a] 审计日志自动清理服务 - `backend/src/modules/audit/application/services/audit_cleanup_service.py`,配置定时任务 (使用 APScheduler 或 Celery Beat,每日凌晨 2:00 执行),调用 DELETE /audit-logs/cleanup API (T061b),记录清理统计 (清理条数、执行耗时、失败记录数),CloudWatch Logs 记录清理事件 (级别 INFO,包含清理时间和统计),配置清理失败告警 (连续 3 天失败触发),确保符合 FR-017 保留策略 ≥90天
+- [X] [T100] 日志格式标准化 - 使用 structlog 配置 JSON 结构化日志,包含 trace_id, user_id, request_id 字段,输出到 CloudWatch Logs
+- [X] [T101] CloudWatch Logs 配置验证 - 验证 30天日志留存策略,配置日志组 (/aws/hyperpod/training-platform),创建 CloudWatch Logs Insights 查询模板
+- [X] [T101a] 加密合规性验证 - 验证所有 S3 存储桶启用 SSE-KMS 加密,验证 API 端点强制 TLS 1.2+,生成加密审计报告,确保符合 FR-018 要求
+- [X] [T102] 性能监控埋点 - 使用 FastAPI middleware 记录 API 延迟,上报到 CloudWatch Metrics,配置告警 (P95 延迟 >500ms)
+- [X] [T102a] 审计日志自动清理服务 - `backend/src/modules/audit/application/services/audit_cleanup_service.py`,配置定时任务 (使用 APScheduler 或 Celery Beat,每日凌晨 2:00 执行),调用 DELETE /audit-logs/cleanup API (T061b),记录清理统计 (清理条数、执行耗时、失败记录数),CloudWatch Logs 记录清理事件 (级别 INFO,包含清理时间和统计),配置清理失败告警 (连续 3 天失败触发),确保符合 FR-017 保留策略 ≥90天
   - **职责**: 定时任务调度和执行监控,不负责实际清理逻辑 (委托给 T061b)
   - **依赖**: T061b (cleanup API)
 
 ### 前端性能优化
-- [ ] [T103] 前端性能优化 - 实现 React.lazy() 代码分割,路由级别懒加载,使用 Vite 构建优化 (tree shaking, minification),目标首屏加载 <3秒
+- [X] [T103] 前端性能优化 - 实现 React.lazy() 代码分割,路由级别懒加载,使用 Vite 构建优化 (tree shaking, minification),目标首屏加载 <3秒
 
 ### 无障碍访问
-- [ ] [T104] 无障碍访问测试 - 使用 axe-core 测试 WCAG 2.1 AA 级别合规性,修复键盘导航、屏幕阅读器、颜色对比度问题
+- [X] [T104] 无障碍访问测试 - 使用 axe-core 测试 WCAG 2.1 AA 级别合规性,修复键盘导航、屏幕阅读器、颜色对比度问题
 
 ### 用户引导测试
-- [ ] [T104a] 用户引导 E2E 测试 - `frontend/tests/e2e/test_user_onboarding.spec.ts`,验证 SC-005 首次用户引导完成率 ≥90%:
+- [X] [T104a] 用户引导 E2E 测试 - `frontend/tests/e2e/test_user_onboarding.spec.ts`,验证 SC-005 首次用户引导完成率 ≥90%:
   - **引导流程测试**: 模拟首次登录用户,验证引导向导正确显示和步骤流转
   - **关键功能覆盖**: 验证引导覆盖核心功能 (创建训练任务、上传数据集、查看监控)
   - **完成率统计**: 集成前端埋点,统计引导各步骤完成率和跳出率
@@ -857,17 +857,17 @@
   - **参考**: spec.md SC-005 用户引导完成率 ≥90%
 
 ### UI 组件库合规性
-- [ ] [T106] Cloudscape 组件库合规性审计 - 扫描前端代码 (`frontend/src/`),验证所有 UI 组件来自 @cloudscape-design/components,禁止使用 MUI/Ant Design/自定义实现,使用 ESLint 规则 (no-restricted-imports) 自动检测,生成合规性报告 (不合规组件列表、违规文件路径、修复建议),CI/CD 集成 (不合规则 PR 失败)
+- [X] [T106] Cloudscape 组件库合规性审计 - 扫描前端代码 (`frontend/src/`),验证所有 UI 组件来自 @cloudscape-design/components,禁止使用 MUI/Ant Design/自定义实现,使用 ESLint 规则 (no-restricted-imports) 自动检测,生成合规性报告 (不合规组件列表、违规文件路径、修复建议),CI/CD 集成 (不合规则 PR 失败)
 
 ### 用户手册和部署文档
-- [ ] [T105] 用户手册和部署文档 - 创建用户手册 (`docs/user-guide.md`),部署文档 (`docs/deployment.md`),包含环境配置、故障排查、最佳实践
+- [X] [T105] 用户手册和部署文档 - 创建用户手册 (`docs/user-guide.yaml`),部署文档 (`docs/deployment.yaml`),包含环境配置、故障排查、最佳实践
 
 ### GitOps 工作流和持续部署
-- [ ] [T105a] ArgoCD 安装和配置 - `infrastructure/argocd/install.yaml`,在 EKS 集群安装 ArgoCD,配置 ArgoCD Server 访问权限,创建 ArgoCD Projects (dev/staging/prod),配置 RBAC 策略
-- [ ] [T105b] ArgoCD Application 配置 - `infrastructure/argocd/applications/`,创建 ArgoCD Application 清单 (backend-app.yaml, frontend-app.yaml),配置 Git 仓库源 (auto-sync, self-heal),定义目标集群和命名空间,配置同步策略和健康检查
-- [ ] [T105c] Kubernetes 部署清单 - `infrastructure/k8s/`,编写 Deployment (backend/frontend), Service (ClusterIP/LoadBalancer), Ingress (ALB), ConfigMap (环境变量), Secret (敏感信息), HPA (自动扩缩容) 清单,遵循 Kubernetes 最佳实践
-- [ ] [T105d] CI/CD 流水线集成 - `.github/workflows/deploy.yaml`,配置 GitHub Actions 流水线,实现 build → test → push image → update Git manifest → ArgoCD auto-sync 完整流程,支持多环境部署 (dev/staging/prod)
-- [ ] [T105e] 配置漂移检测和审计追踪 - `infrastructure/gitops/monitoring/`,配置 ArgoCD 同步状态监控 (SyncStatus, Health Status),设置漂移告警规则 (Slack/邮件通知),记录配置变更审计日志 (Git commit SHA, 操作者, 变更时间),定时检查 (5分钟间隔) 并生成漂移报告,集成到 Grafana 仪表盘
+- [X] [T105a] ArgoCD 安装和配置 - `infrastructure/argocd/install.yaml`,在 EKS 集群安装 ArgoCD,配置 ArgoCD Server 访问权限,创建 ArgoCD Projects (dev/staging/prod),配置 RBAC 策略
+- [X] [T105b] ArgoCD Application 配置 - `infrastructure/argocd/applications/`,创建 ArgoCD Application 清单 (backend-app.yaml, frontend-app.yaml),配置 Git 仓库源 (auto-sync, self-heal),定义目标集群和命名空间,配置同步策略和健康检查
+- [X] [T105c] Kubernetes 部署清单 - `infrastructure/k8s/`,编写 Deployment (backend/frontend), Service (ClusterIP/LoadBalancer), Ingress (ALB), ConfigMap (环境变量), Secret (敏感信息), HPA (自动扩缩容) 清单,遵循 Kubernetes 最佳实践
+- [X] [T105d] CI/CD 流水线集成 - `.github/workflows/deploy.yaml`,配置 GitHub Actions 流水线,实现 build → test → push image → update Git manifest → ArgoCD auto-sync 完整流程,支持多环境部署 (dev/staging/prod)
+- [X] [T105e] 配置漂移检测和审计追踪 - `infrastructure/gitops/monitoring/`,配置 ArgoCD 同步状态监控 (SyncStatus, Health Status),设置漂移告警规则 (Slack/邮件通知),记录配置变更审计日志 (Git commit SHA, 操作者, 变更时间),定时检查 (5分钟间隔) 并生成漂移报告,集成到 Grafana 仪表盘
 
 **并行执行机会**:
 - 单元测试: T091, T092 可并行
