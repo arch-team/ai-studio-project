@@ -1,6 +1,7 @@
 """Structlog 结构化日志配置。
 
 提供开发环境彩色输出和生产环境 JSON 结构化输出的统一日志配置。
+生产环境 JSON 输出适配 CloudWatch Logs，包含 trace_id, user_id, request_id 等标准字段。
 """
 
 import logging
@@ -11,6 +12,12 @@ import structlog
 from structlog.types import EventDict, Processor
 
 from src.shared.infrastructure.config import get_settings
+
+
+def _add_service_info(logger: logging.Logger, method_name: str, event_dict: EventDict) -> EventDict:
+    """添加服务标识到日志上下文（适配 CloudWatch Logs 过滤）。"""
+    event_dict.setdefault("service", "ai-training-platform")
+    return event_dict
 
 
 def _add_module_info(logger: logging.Logger, method_name: str, event_dict: EventDict) -> EventDict:
@@ -38,6 +45,18 @@ def _ensure_exception_info(logger: logging.Logger, method_name: str, event_dict:
     return event_dict
 
 
+def _normalize_context_fields(logger: logging.Logger, method_name: str, event_dict: EventDict) -> EventDict:
+    """标准化上下文字段名称，确保 trace_id/user_id/request_id 始终存在。
+
+    CloudWatch Logs Insights 查询依赖这些字段，未绑定时填充 null 以保证 JSON schema 一致。
+    """
+    # 确保标准追踪字段存在（contextvars 已合并，此处补全缺失字段）
+    event_dict.setdefault("trace_id", None)
+    event_dict.setdefault("user_id", None)
+    event_dict.setdefault("request_id", None)
+    return event_dict
+
+
 def get_processors(is_json: bool = False) -> list[Processor]:
     """获取日志处理器链。
 
@@ -53,6 +72,7 @@ def get_processors(is_json: bool = False) -> list[Processor]:
         structlog.stdlib.add_log_level,
         structlog.stdlib.add_logger_name,
         structlog.stdlib.PositionalArgumentsFormatter(),
+        _add_service_info,
         _add_module_info,
         _drop_color_message,
         _ensure_exception_info,
@@ -62,9 +82,10 @@ def get_processors(is_json: bool = False) -> list[Processor]:
     ]
 
     if is_json:
-        # 生产环境：JSON 格式
+        # 生产环境：JSON 格式，适配 CloudWatch Logs
         shared_processors.extend(
             [
+                _normalize_context_fields,
                 structlog.processors.format_exc_info,
                 structlog.processors.JSONRenderer(),
             ]

@@ -3,6 +3,7 @@
 import re
 from datetime import UTC
 
+import structlog
 from fastapi import Request
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 from starlette.responses import JSONResponse, Response
@@ -68,18 +69,22 @@ class AuthenticationMiddleware(BaseHTTPMiddleware):
             )
 
         # Attach user info to request state
-        request.state.user_id = int(payload.sub)
+        user_id = int(payload.sub)
+        request.state.user_id = user_id
         request.state.username = payload.username
         request.state.email = payload.email
         request.state.role = payload.role
         request.state.token_payload = payload
         # Also set as a dict for CurrentUser.from_request compatibility
         request.state.user = {
-            "user_id": int(payload.sub),
+            "user_id": user_id,
             "username": payload.username,
             "email": payload.email,
             "role": payload.role,
         }
+
+        # 绑定 user_id 到 structlog contextvars，后续日志自动携带
+        structlog.contextvars.bind_contextvars(user_id=user_id)
 
         return await call_next(request)
 

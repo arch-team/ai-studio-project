@@ -1,12 +1,15 @@
 """审计日志自动清理服务。
 
 实现定时清理过期审计日志, 支持连续失败告警。
+每日凌晨 2:00 (UTC 18:00) 执行, 清理超过 90 天的审计日志。
+清理统计记录到 CloudWatch Logs (通过 structlog JSON 输出)。
 """
 
 import asyncio
 from datetime import UTC, datetime
 
 import structlog
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from src.modules.audit.domain.repositories import IAuditLogRepository
 
@@ -30,15 +33,19 @@ class AuditCleanupService:
     """审计日志自动清理服务。
 
     支持定时清理过期审计日志, 连续失败超过阈值时触发告警。
+    可通过 repository 直接注入（用于测试/手动调用），
+    或通过 session_factory 自动创建 session（用于后台定时任务）。
     """
 
     def __init__(
         self,
         repository: IAuditLogRepository,
         alert_service: AlertService | None = None,
+        session_factory: async_sessionmaker[AsyncSession] | None = None,
     ) -> None:
         self._repository = repository
         self._alert_service = alert_service
+        self._session_factory = session_factory
         self._consecutive_failures = 0
         self._cleanup_task: asyncio.Task[None] | None = None
         self._last_cleanup_at: datetime | None = None
@@ -73,10 +80,24 @@ class AuditCleanupService:
         logger.info("audit_cleanup_stopped")
 
     async def execute_cleanup(self) -> dict:
-        """执行一次清理, 返回清理结果。"""
+        """执行一次清理, 返回清理结果。
+
+        如果提供了 session_factory（后台任务模式），会为每次清理创建独立的 session。
+        否则使用注入的 repository（API 调用模式）。
+        """
         start = datetime.now(UTC)
         try:
-            deleted_count = await self._repository.delete_expired()
+            if self._session_factory:
+                # 后台任务模式：创建独立 session 避免连接泄漏
+                from src.modules.audit.infrastructure import AuditLogRepositoryImpl
+
+                async with self._session_factory() as session:
+                    repo = AuditLogRepositoryImpl(session)
+                    deleted_count = await repo.delete_expired()
+                    await session.commit()
+            else:
+                deleted_count = await self._repository.delete_expired()
+
             elapsed_ms = (datetime.now(UTC) - start).total_seconds() * 1000
             self._last_cleanup_at = start
             return {

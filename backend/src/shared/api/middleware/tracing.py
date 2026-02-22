@@ -2,6 +2,7 @@
 
 import uuid
 
+import structlog
 from fastapi import Request
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 from starlette.responses import Response
@@ -17,6 +18,7 @@ class TracingMiddleware(BaseHTTPMiddleware):
     trace_id 将被添加到:
     - request.state.trace_id (供异常处理器使用)
     - 响应头 X-Request-ID (供前端日志关联)
+    - structlog contextvars (供所有日志自动携带)
     """
 
     async def dispatch(
@@ -30,6 +32,13 @@ class TracingMiddleware(BaseHTTPMiddleware):
 
         # 添加到请求状态供异常处理器使用
         request.state.trace_id = trace_id
+
+        # 绑定到 structlog contextvars，后续所有日志自动携带
+        structlog.contextvars.clear_contextvars()
+        structlog.contextvars.bind_contextvars(
+            trace_id=trace_id,
+            request_id=trace_id,
+        )
 
         # 执行请求
         response = await call_next(request)
