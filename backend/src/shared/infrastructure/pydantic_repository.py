@@ -65,7 +65,10 @@ class PydanticRepository(Generic[EntityT, ModelT, IdT]):
             exclude = self._exclude_from_model.copy()
             if getattr(entity, "id", None) is None:
                 exclude.add("id")
-            data = entity.to_model_dict(exclude=exclude)
+            # convert_enums=False: 保留 enum 对象传给 ORM。
+            # SQLAlchemy Enum() 列直接接受 enum 成员，由 SA 处理到数据库值的转换。
+            # 这避免了 enum 值大小写与数据库 ENUM 列定义不匹配的问题。
+            data = entity.to_model_dict(exclude=exclude, convert_enums=False)
             return self._model_class(**data)
         raise NotImplementedError("子类必须实现 _to_model() 或设置 _entity_class")
 

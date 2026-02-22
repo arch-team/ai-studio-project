@@ -11,6 +11,11 @@ from ...domain.value_objects import LimitRole
 from ..models import ResourceLimitConfigModel
 
 
+def _not_deleted() -> and_:
+    """软删除过滤条件: deleted_at IS NULL."""
+    return ResourceLimitConfigModel.deleted_at.is_(None)
+
+
 class ResourceLimitConfigRepository(
     PydanticRepository[ResourceLimitConfig, ResourceLimitConfigModel, int], IResourceLimitConfigRepository
 ):
@@ -35,22 +40,14 @@ class ResourceLimitConfigRepository(
     # ========== IResourceLimitConfigRepository 接口方法 ==========
 
     async def get_by_role_and_project(self, role: LimitRole, project_id: int | None) -> ResourceLimitConfig | None:
-        """Get config by role and project combination."""
+        """Get config by role and project combination (excludes soft-deleted)."""
+        conditions = [_not_deleted(), ResourceLimitConfigModel.role == role]
         if project_id is None:
-            query = select(ResourceLimitConfigModel).where(
-                and_(
-                    ResourceLimitConfigModel.role == role,
-                    ResourceLimitConfigModel.project_id.is_(None),
-                )
-            )
+            conditions.append(ResourceLimitConfigModel.project_id.is_(None))
         else:
-            query = select(ResourceLimitConfigModel).where(
-                and_(
-                    ResourceLimitConfigModel.role == role,
-                    ResourceLimitConfigModel.project_id == project_id,
-                )
-            )
+            conditions.append(ResourceLimitConfigModel.project_id == project_id)
 
+        query = select(ResourceLimitConfigModel).where(and_(*conditions))
         result = await self._session.execute(query)
         model = result.scalar_one_or_none()
         return self._to_entity(model) if model else None
@@ -65,9 +62,9 @@ class ResourceLimitConfigRepository(
         sort_by: str = "created_at",
         sort_order: str = "desc",
     ) -> tuple[list[ResourceLimitConfig], int]:
-        """List configs with pagination and filters."""
-        query = select(ResourceLimitConfigModel)
-        count_query = select(func.count(ResourceLimitConfigModel.id))
+        """List configs with pagination and filters (excludes soft-deleted)."""
+        query = select(ResourceLimitConfigModel).where(_not_deleted())
+        count_query = select(func.count(ResourceLimitConfigModel.id)).where(_not_deleted())
 
         # Apply role filter
         if role is not None:
@@ -111,36 +108,15 @@ class ResourceLimitConfigRepository(
         """Create a new config."""
         return await super().create(config)
 
-    async def soft_delete(self, config_id: int) -> bool:
-        """Soft delete a config (hard delete for now, no soft delete column)."""
-        result = await self._session.execute(
-            select(ResourceLimitConfigModel).where(ResourceLimitConfigModel.id == config_id)
-        )
-        model = result.scalar_one_or_none()
-        if model is None:
-            return False
-
-        await self._session.delete(model)
-        await self._session.flush()
-        return True
-
     async def exists_by_role_and_project(self, role: LimitRole, project_id: int | None) -> bool:
-        """Check if config with role and project combination exists."""
+        """Check if active config with role and project combination exists (excludes soft-deleted)."""
+        conditions = [_not_deleted(), ResourceLimitConfigModel.role == role]
         if project_id is None:
-            query = select(func.count(ResourceLimitConfigModel.id)).where(
-                and_(
-                    ResourceLimitConfigModel.role == role,
-                    ResourceLimitConfigModel.project_id.is_(None),
-                )
-            )
+            conditions.append(ResourceLimitConfigModel.project_id.is_(None))
         else:
-            query = select(func.count(ResourceLimitConfigModel.id)).where(
-                and_(
-                    ResourceLimitConfigModel.role == role,
-                    ResourceLimitConfigModel.project_id == project_id,
-                )
-            )
+            conditions.append(ResourceLimitConfigModel.project_id == project_id)
 
+        query = select(func.count(ResourceLimitConfigModel.id)).where(and_(*conditions))
         result = await self._session.execute(query)
         count = result.scalar() or 0
         return count > 0

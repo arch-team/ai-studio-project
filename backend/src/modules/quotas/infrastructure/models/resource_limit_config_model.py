@@ -1,14 +1,14 @@
 """ResourceLimitConfig ORM model - Per-job resource limits by role."""
 
-from sqlalchemy import BigInteger, Enum, Integer, String
+from sqlalchemy import BigInteger, Enum, Integer, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from src.modules.quotas.domain.value_objects import LimitRole, PriorityDefault
 from src.shared.infrastructure.database import Base
-from src.shared.infrastructure.models import TimestampMixin
+from src.shared.infrastructure.models import SoftDeleteMixin, TimestampMixin
 
 
-class ResourceLimitConfigModel(Base, TimestampMixin):
+class ResourceLimitConfigModel(Base, TimestampMixin, SoftDeleteMixin):
     """Resource limit configuration ORM model."""
 
     __tablename__ = "resource_limit_configs"
@@ -84,4 +84,7 @@ class ResourceLimitConfigModel(Base, TimestampMixin):
         comment="默认优先级",
     )
 
-    __table_args__ = ({"comment": "资源限制配置表"},)
+    __table_args__ = (
+        UniqueConstraint("role", "project_id", name="uq_resource_limit_configs_role_project"),
+        {"comment": "资源限制配置表"},
+    )

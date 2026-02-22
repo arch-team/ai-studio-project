@@ -9,29 +9,62 @@ EnumT = TypeVar("EnumT", bound=Enum)
 
 
 class EnumMapper:
-    """Bidirectional mapper between Domain enums (UPPERCASE) and API enums (lowercase).
+    """Bidirectional mapper between Domain enums and API enums.
 
-    Domain enums use UPPERCASE values (e.g., JobStatus.RUNNING = "RUNNING")
-    API enums use lowercase values (e.g., JobStatusEnum.RUNNING = "running")
+    Supports both conventions:
+    - UPPERCASE domain (JobStatus.RUNNING = "RUNNING") ↔ lowercase API ("running")
+    - Same-case domain (LimitRole.ADMIN = "admin") ↔ API ("admin")
     """
 
     @staticmethod
     def to_api(domain_enum: DomainEnumT | None, api_enum_class: type[ApiEnumT]) -> ApiEnumT | None:
-        """Convert Domain enum to API enum (UPPERCASE → lowercase).
+        """Convert Domain enum to API enum.
+
+        Tries exact value match first, then lowercase conversion.
 
         Example:
-            JobStatus.RUNNING → JobStatusEnum.RUNNING (value: "running")
+            JobStatus.RUNNING (value: "RUNNING") → JobStatusEnum.RUNNING (value: "running")
+            LimitRole.ADMIN (value: "admin") → LimitRoleEnum.ADMIN (value: "admin")
         """
-        return api_enum_class(domain_enum.value.lower()) if domain_enum else None
+        if domain_enum is None:
+            return None
+        # 先尝试精确值匹配（同大小写枚举）
+        try:
+            return api_enum_class(domain_enum.value)
+        except ValueError:
+            pass
+        # 回退到小写匹配（大写 Domain → 小写 API）
+        return api_enum_class(domain_enum.value.lower())
 
     @staticmethod
     def to_domain(api_enum: ApiEnumT | None, domain_enum_class: type[DomainEnumT]) -> DomainEnumT | None:
-        """Convert API enum to Domain enum (lowercase → UPPERCASE).
+        """Convert API enum to Domain enum.
+
+        Tries exact value match first, then uppercase conversion.
+        Handles both UPPERCASE domain enums (e.g. JobStatus.RUNNING = "RUNNING")
+        and lowercase domain enums (e.g. LimitRole.ADMIN = "admin").
 
         Example:
             JobStatusEnum.RUNNING → JobStatus.RUNNING (value: "RUNNING")
+            LimitRoleEnum.ADMIN → LimitRole.ADMIN (value: "admin")
         """
-        return domain_enum_class(api_enum.value.upper()) if api_enum else None
+        if api_enum is None:
+            return None
+        # 先尝试精确值匹配（适用于同大小写的枚举）
+        try:
+            return domain_enum_class(api_enum.value)
+        except ValueError:
+            pass
+        # 回退到大写匹配（适用于 API 小写 → Domain 大写的枚举）
+        try:
+            return domain_enum_class(api_enum.value.upper())
+        except ValueError:
+            pass
+        # 按名称匹配
+        try:
+            return domain_enum_class[api_enum.name]
+        except KeyError:
+            return None
 
     @staticmethod
     def model_to_domain(

@@ -175,17 +175,18 @@ class TestListResourceLimitConfigsEndpoint:
         assert response.status_code == 401
 
     @pytest.mark.asyncio
-    async def test_list_configs_requires_admin(
+    async def test_list_configs_accessible_by_engineer(
         self,
         client: AsyncClient,
         engineer_auth_headers: dict[str, str],
     ) -> None:
-        """Test listing configs requires admin role."""
+        """Test listing configs is accessible by any authenticated user (needed for quota checks)."""
         response = await client.get(
             "/api/v1/resource-limit-configs",
+            params={"page": 1, "page_size": 20},
             headers=engineer_auth_headers,
         )
-        assert response.status_code in [403, 500, 503]
+        assert response.status_code in [200, 500, 503]
 
     @pytest.mark.asyncio
     async def test_list_configs_success(
@@ -284,17 +285,18 @@ class TestGetResourceLimitConfigEndpoint:
         assert response.status_code == 401
 
     @pytest.mark.asyncio
-    async def test_get_config_requires_admin(
+    async def test_get_config_accessible_by_engineer(
         self,
         client: AsyncClient,
         engineer_auth_headers: dict[str, str],
     ) -> None:
-        """Test getting config requires admin role."""
+        """Test getting config is accessible by any authenticated user."""
         response = await client.get(
             "/api/v1/resource-limit-configs/1",
             headers=engineer_auth_headers,
         )
-        assert response.status_code in [403, 500, 503]
+        # 200 (found), 404 (not found), 500 (DB error)
+        assert response.status_code in [200, 404, 500, 503]
 
     @pytest.mark.asyncio
     async def test_get_config_not_found(
@@ -417,32 +419,65 @@ class TestDeleteResourceLimitConfigEndpoint:
 
 
 class TestResourceLimitConfigsRBAC:
-    """Tests for resource limit configs API RBAC rules."""
+    """Tests for resource limit configs API RBAC rules.
+
+    权限模型:
+    - GET (list/detail): 所有已认证用户可访问（训练任务表单需要配额检查）
+    - POST/PUT/DELETE: 仅 admin 可操作
+    """
 
     @pytest.mark.asyncio
-    async def test_viewer_cannot_access_configs(
+    async def test_viewer_can_read_configs(
         self,
         client: AsyncClient,
         viewer_auth_headers: dict[str, str],
     ) -> None:
-        """Test viewer role cannot access config endpoints."""
+        """Test viewer role can read config list (needed for quota display)."""
         response = await client.get(
             "/api/v1/resource-limit-configs",
+            params={"page": 1, "page_size": 20},
             headers=viewer_auth_headers,
         )
-        # Viewer should get 403 for admin-only endpoints
+        assert response.status_code in [200, 500, 503]
+
+    @pytest.mark.asyncio
+    async def test_viewer_cannot_create_configs(
+        self,
+        client: AsyncClient,
+        viewer_auth_headers: dict[str, str],
+    ) -> None:
+        """Test viewer role cannot create configs."""
+        response = await client.post(
+            "/api/v1/resource-limit-configs",
+            json={"config_name": "test", "role": "viewer"},
+            headers=viewer_auth_headers,
+        )
         assert response.status_code in [403, 500, 503]
 
     @pytest.mark.asyncio
-    async def test_engineer_cannot_access_configs(
+    async def test_engineer_can_read_configs(
         self,
         client: AsyncClient,
         engineer_auth_headers: dict[str, str],
     ) -> None:
-        """Test engineer role cannot access config endpoints."""
+        """Test engineer role can read config list (needed for quota checks in training form)."""
         response = await client.get(
             "/api/v1/resource-limit-configs",
             params={"page": 1, "page_size": 20},
+            headers=engineer_auth_headers,
+        )
+        assert response.status_code in [200, 500, 503]
+
+    @pytest.mark.asyncio
+    async def test_engineer_cannot_create_configs(
+        self,
+        client: AsyncClient,
+        engineer_auth_headers: dict[str, str],
+    ) -> None:
+        """Test engineer role cannot create configs."""
+        response = await client.post(
+            "/api/v1/resource-limit-configs",
+            json={"config_name": "test", "role": "engineer"},
             headers=engineer_auth_headers,
         )
         assert response.status_code in [403, 500, 503]
@@ -459,7 +494,6 @@ class TestResourceLimitConfigsRBAC:
             params={"page": 1, "page_size": 20},
             headers=admin_auth_headers,
         )
-        # Admin should be allowed (200) or DB error (500)
         assert response.status_code in [200, 500]
 
 

@@ -90,6 +90,48 @@ class TestEnumMapperRoundTrip:
         assert back_to_api == api_status
 
 
+class TestEnumMapperToDomainLowercaseEnums:
+    """Tests for EnumMapper.to_domain() with lowercase domain enums (e.g. LimitRole)."""
+
+    def test_converts_same_case_enums(self):
+        """API admin → Domain admin (同大小写)."""
+        from src.modules.quotas.api.schemas import LimitRoleEnum
+        from src.modules.quotas.domain.value_objects import LimitRole
+
+        result = EnumMapper.to_domain(LimitRoleEnum.ADMIN, LimitRole)
+        assert result == LimitRole.ADMIN
+        assert result.value == "admin"
+
+    def test_converts_all_limit_roles(self):
+        """All LimitRoleEnum values convert correctly."""
+        from src.modules.quotas.api.schemas import LimitRoleEnum
+        from src.modules.quotas.domain.value_objects import LimitRole
+
+        for api_enum in LimitRoleEnum:
+            result = EnumMapper.to_domain(api_enum, LimitRole)
+            assert result is not None
+            assert result.value == api_enum.value
+
+    def test_converts_priority_enums(self):
+        """API medium → Domain medium (同大小写)."""
+        from src.modules.quotas.api.schemas import PriorityDefaultEnum
+        from src.modules.quotas.domain.value_objects import PriorityDefault
+
+        result = EnumMapper.to_domain(PriorityDefaultEnum.HIGH, PriorityDefault)
+        assert result == PriorityDefault.HIGH
+        assert result.value == "high"
+
+    def test_roundtrip_lowercase_enums(self):
+        """LimitRole roundtrip: API → Domain → API."""
+        from src.modules.quotas.api.schemas import LimitRoleEnum
+        from src.modules.quotas.domain.value_objects import LimitRole
+
+        for api_enum in LimitRoleEnum:
+            domain_enum = EnumMapper.to_domain(api_enum, LimitRole)
+            back_to_api = EnumMapper.to_api(domain_enum, LimitRoleEnum)
+            assert back_to_api == api_enum
+
+
 class TestEnumMapperModelToDomain:
     """Tests for EnumMapper.model_to_domain()."""
 

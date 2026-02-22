@@ -1,9 +1,9 @@
-"""ResourceLimitConfig Endpoints - Admin CRUD operations for resource limits."""
+"""ResourceLimitConfig Endpoints - Resource limit CRUD operations."""
 
 from fastapi import APIRouter, Depends, Query, status
 
 from src.modules.auth.api.current_user import CurrentUser
-from src.modules.auth.api.dependencies import require_admin
+from src.modules.auth.api.dependencies import get_current_active_user, require_admin
 from src.modules.quotas.api.dependencies import get_resource_limit_config_service
 from src.modules.quotas.api.schemas import (
     CreateResourceLimitConfigRequest,
@@ -35,12 +35,12 @@ async def list_resource_limit_configs(
     project_id: int | None = Query(default=None, description="Filter by project ID"),
     sort_by: SortByParam = "created_at",
     sort_order: SortOrderParam = SortOrder.DESC,
-    current_user: CurrentUser = Depends(require_admin),
+    current_user: CurrentUser = Depends(get_current_active_user),
     service: ResourceLimitConfigService = Depends(get_resource_limit_config_service),
 ) -> ResourceLimitConfigListResponse:
     """List resource limit configurations.
 
-    Admin-only endpoint for listing all resource limit configurations.
+    Any authenticated user can view configurations (needed for quota checks in training job form).
     Supports filtering by role and project_id, with pagination.
     """
     configs, total = await service.list_configs(
@@ -92,12 +92,12 @@ async def create_resource_limit_config(
 @router.get("/{config_id}", response_model=ResourceLimitConfigResponse)
 async def get_resource_limit_config(
     config_id: int,
-    current_user: CurrentUser = Depends(require_admin),
+    current_user: CurrentUser = Depends(get_current_active_user),
     service: ResourceLimitConfigService = Depends(get_resource_limit_config_service),
 ) -> ResourceLimitConfigResponse:
     """Get a resource limit configuration by ID.
 
-    Admin-only endpoint for retrieving a specific configuration.
+    Any authenticated user can view a specific configuration.
     """
     config = await service.get_config(config_id)
     return ResourceLimitConfigResponse.from_entity(config)
@@ -148,7 +148,7 @@ async def delete_resource_limit_config(
 ) -> None:
     """Delete a resource limit configuration.
 
-    Admin-only endpoint for deleting configurations (soft delete).
+    Admin-only endpoint for soft-deleting configurations.
     """
     await service.delete_config(config_id)
     return None
