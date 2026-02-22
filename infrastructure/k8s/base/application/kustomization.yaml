@@ -7,12 +7,17 @@ resources:
   - namespace.yaml
   - backend-serviceaccount.yaml
   - backend-configmap.yaml
+  - frontend-configmap.yaml
   - backend-deployment.yaml
   - backend-service.yaml
   - frontend-deployment.yaml
   - frontend-service.yaml
   - backend-targetgroupbinding.yaml
   - frontend-targetgroupbinding.yaml
+  - backend-hpa.yaml
+  - frontend-hpa.yaml
+  - backend-pdb.yaml
+  - ingress.yaml
 
 commonLabels:
   app.kubernetes.io/part-of: ai-training-platform

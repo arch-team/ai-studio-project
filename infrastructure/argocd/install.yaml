@@ -1,0 +1,204 @@
+# ArgoCD 安装清单
+# 在 EKS 集群中安装 ArgoCD，使用 Helm 方式部署
+#
+# 安装步骤:
+#   kubectl apply -f install.yaml
+#   kubectl wait --for=condition=available deployment/argocd-server -n argocd --timeout=300s
+#
+# 参考: https://argo-cd.readthedocs.io/en/stable/operator-manual/installation/
+---
+
+# 1. 创建 ArgoCD 命名空间
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: argocd
+  labels:
+    app.kubernetes.io/part-of: argocd
+    app.kubernetes.io/managed-by: kubectl
+
+---
+
+# 2. ArgoCD Server ConfigMap
+# 核心配置: URL、状态栏、RBAC 等
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: argocd-cm
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: argocd-cm
+    app.kubernetes.io/part-of: argocd
+data:
+  # ArgoCD Server URL (通过 ALB Ingress 访问)
+  url: "https://argocd.ai-platform.internal"
+
+  # 启用状态标记
+  statusbadge.enabled: "true"
+
+  # 资源健康检查自定义 (TargetGroupBinding)
+  resource.customizations.health.elbv2.k8s.aws_TargetGroupBinding: |
+    hs = {}
+    hs.status = "Healthy"
+    hs.message = "TargetGroupBinding is healthy"
+    return hs
+
+  # Kustomize 构建选项
+  kustomize.buildOptions: "--enable-helm"
+
+---
+
+# 3. ArgoCD RBAC ConfigMap
+# 定义用户角色和权限
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: argocd-rbac-cm
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: argocd-rbac-cm
+    app.kubernetes.io/part-of: argocd
+data:
+  # 默认策略: 只读
+  policy.default: role:readonly
+
+  # RBAC 策略定义
+  policy.csv: |
+    # 管理员角色: 完全控制
+    p, role:admin, applications, *, */*, allow
+    p, role:admin, clusters, *, *, allow
+    p, role:admin, repositories, *, *, allow
+    p, role:admin, projects, *, *, allow
+    p, role:admin, logs, *, *, allow
+    p, role:admin, exec, *, */*, allow
+
+    # 开发者角色: 可以同步应用和查看日志
+    p, role:developer, applications, get, */*, allow
+    p, role:developer, applications, sync, */*, allow
+    p, role:developer, applications, action/*, */*, allow
+    p, role:developer, logs, get, */*, allow
+    p, role:developer, projects, get, *, allow
+
+    # 只读角色: 仅查看
+    p, role:readonly, applications, get, */*, allow
+    p, role:readonly, projects, get, *, allow
+    p, role:readonly, logs, get, */*, allow
+
+    # 角色绑定 (通过 SSO 组映射)
+    g, platform-admins, role:admin
+    g, platform-developers, role:developer
+    g, platform-viewers, role:readonly
+
+  # 范围定义
+  scopes: "[groups]"
+
+---
+
+# 4. ArgoCD Server Service (ClusterIP)
+# 通过 ALB Ingress 或 port-forward 访问
+apiVersion: v1
+kind: Service
+metadata:
+  name: argocd-server
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: argocd-server
+    app.kubernetes.io/part-of: argocd
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: argocd-server
+  ports:
+    - name: http
+      port: 80
+      targetPort: 8080
+      protocol: TCP
+    - name: https
+      port: 443
+      targetPort: 8080
+      protocol: TCP
+
+---
+
+# 5. ArgoCD Server Ingress (ALB)
+# 通过 AWS ALB Ingress Controller 暴露 ArgoCD 管理界面
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: argocd-server-ingress
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: argocd-server
+    app.kubernetes.io/part-of: argocd
+  annotations:
+    # ALB Ingress 注解
+    kubernetes.io/ingress.class: alb
+    alb.ingress.kubernetes.io/scheme: internal
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTPS":443}]'
+    alb.ingress.kubernetes.io/ssl-policy: ELBSecurityPolicy-TLS13-1-2-2021-06
+    alb.ingress.kubernetes.io/healthcheck-path: /healthz
+    alb.ingress.kubernetes.io/healthcheck-protocol: HTTP
+    # 后端协议: ArgoCD Server 使用 HTTP
+    alb.ingress.kubernetes.io/backend-protocol: HTTP
+    alb.ingress.kubernetes.io/tags: Environment=dev,Component=argocd,ManagedBy=gitops
+spec:
+  ingressClassName: alb
+  rules:
+    - host: argocd.ai-platform.internal
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: argocd-server
+                port:
+                  number: 80
+
+---
+
+# 6. ArgoCD 通知 ConfigMap (可选)
+# 配置同步状态通知
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: argocd-notifications-cm
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: argocd-notifications-cm
+    app.kubernetes.io/part-of: argocd
+data:
+  # 通知模板
+  template.app-sync-succeeded: |
+    message: |
+      应用 {{.app.metadata.name}} 同步成功
+      - 状态: {{.app.status.sync.status}}
+      - 修订: {{.app.status.sync.revision}}
+      - 目标: {{.app.spec.destination.namespace}}
+
+  template.app-sync-failed: |
+    message: |
+      应用 {{.app.metadata.name}} 同步失败
+      - 状态: {{.app.status.sync.status}}
+      - 健康: {{.app.status.health.status}}
+      需要立即处理！
+
+  template.app-health-degraded: |
+    message: |
+      应用 {{.app.metadata.name}} 健康状态降级
+      - 健康状态: {{.app.status.health.status}}
+      - 命名空间: {{.app.spec.destination.namespace}}
+
+  # 触发器定义
+  trigger.on-sync-succeeded: |
+    - when: app.status.sync.status == 'Synced' and app.status.health.status == 'Healthy'
+      send: [app-sync-succeeded]
+
+  trigger.on-sync-failed: |
+    - when: app.status.sync.status == 'OutOfSync' or app.status.health.status == 'Degraded'
+      send: [app-sync-failed]
+
+  trigger.on-health-degraded: |
+    - when: app.status.health.status == 'Degraded'
+      send: [app-health-degraded]

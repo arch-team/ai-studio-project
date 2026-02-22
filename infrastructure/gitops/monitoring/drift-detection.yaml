@@ -1,0 +1,159 @@
+# ArgoCD 配置漂移检测 CronJob
+# 每 5 分钟检查 ArgoCD 应用同步状态，检测配置漂移
+# 发现漂移时发送告警通知并记录审计日志
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: argocd-drift-detection
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: drift-detection
+    app.kubernetes.io/part-of: ai-training-platform
+    component: gitops-monitoring
+spec:
+  # 每 5 分钟执行一次
+  schedule: "*/5 * * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 1
+      activeDeadlineSeconds: 120
+      template:
+        metadata:
+          labels:
+            app: drift-detection
+        spec:
+          serviceAccountName: drift-detection-sa
+          restartPolicy: Never
+          containers:
+            - name: drift-detector
+              image: bitnami/kubectl:1.28
+              command:
+                - /bin/bash
+                - -c
+                - |
+                  set -euo pipefail
+
+                  echo "=========================================="
+                  echo "配置漂移检测 - $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+                  echo "=========================================="
+
+                  DRIFT_FOUND=false
+                  REPORT=""
+
+                  # 获取所有 ArgoCD Application
+                  APPS=$(kubectl get applications -n argocd -o json 2>/dev/null || echo '{"items":[]}')
+                  APP_COUNT=$(echo "$APPS" | jq '.items | length')
+
+                  echo "检查 ${APP_COUNT} 个 ArgoCD Application..."
+
+                  for i in $(seq 0 $((APP_COUNT - 1))); do
+                    APP_NAME=$(echo "$APPS" | jq -r ".items[$i].metadata.name")
+                    SYNC_STATUS=$(echo "$APPS" | jq -r ".items[$i].status.sync.status // \"Unknown\"")
+                    HEALTH_STATUS=$(echo "$APPS" | jq -r ".items[$i].status.health.status // \"Unknown\"")
+                    REVISION=$(echo "$APPS" | jq -r ".items[$i].status.sync.revision // \"N/A\"")
+                    LAST_SYNC=$(echo "$APPS" | jq -r ".items[$i].status.operationState.finishedAt // \"N/A\"")
+
+                    echo ""
+                    echo "--- ${APP_NAME} ---"
+                    echo "  同步状态: ${SYNC_STATUS}"
+                    echo "  健康状态: ${HEALTH_STATUS}"
+                    echo "  当前版本: ${REVISION:0:8}"
+                    echo "  最后同步: ${LAST_SYNC}"
+
+                    # 检测漂移
+                    if [[ "$SYNC_STATUS" == "OutOfSync" ]]; then
+                      DRIFT_FOUND=true
+                      REPORT="${REPORT}\n[DRIFT] ${APP_NAME}: 配置已漂移 (OutOfSync)"
+
+                      # 获取差异详情
+                      echo "  [警告] 检测到配置漂移!"
+                      DIFF_RESOURCES=$(echo "$APPS" | jq -r ".items[$i].status.resources[] | select(.status != \"Synced\") | \"\(.kind)/\(.name): \(.status)\"" 2>/dev/null || echo "无法获取差异")
+                      echo "  漂移资源:"
+                      echo "  ${DIFF_RESOURCES}"
+                    fi
+
+                    # 检测健康异常
+                    if [[ "$HEALTH_STATUS" == "Degraded" ]] || [[ "$HEALTH_STATUS" == "Missing" ]]; then
+                      DRIFT_FOUND=true
+                      REPORT="${REPORT}\n[UNHEALTHY] ${APP_NAME}: 健康状态异常 (${HEALTH_STATUS})"
+                      echo "  [警告] 健康状态异常: ${HEALTH_STATUS}"
+                    fi
+                  done
+
+                  echo ""
+                  echo "=========================================="
+
+                  if [[ "$DRIFT_FOUND" == "true" ]]; then
+                    echo "[告警] 检测到配置漂移或健康异常!"
+                    echo -e "$REPORT"
+
+                    # 记录审计事件到 ConfigMap (追加模式)
+                    AUDIT_ENTRY="$(date -u '+%Y-%m-%dT%H:%M:%SZ')|DRIFT_DETECTED|${REPORT}"
+                    kubectl create configmap drift-audit-$(date +%s) \
+                      --namespace argocd \
+                      --from-literal=timestamp="$(date -u '+%Y-%m-%dT%H:%M:%SZ')" \
+                      --from-literal=event="DRIFT_DETECTED" \
+                      --from-literal=details="$(echo -e "$REPORT")" \
+                      -l app=drift-audit 2>/dev/null || true
+
+                    exit 1
+                  else
+                    echo "[正常] 所有应用同步正常，无配置漂移"
+                    exit 0
+                  fi
+              resources:
+                requests:
+                  cpu: 50m
+                  memory: 64Mi
+                limits:
+                  cpu: 100m
+                  memory: 128Mi
+
+---
+# 漂移检测 ServiceAccount
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: drift-detection-sa
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: drift-detection
+
+---
+# 漂移检测 ClusterRole
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: drift-detection-role
+  labels:
+    app.kubernetes.io/name: drift-detection
+rules:
+  # 读取 ArgoCD Application 状态
+  - apiGroups: ["argoproj.io"]
+    resources: ["applications"]
+    verbs: ["get", "list"]
+  # 创建审计 ConfigMap
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    verbs: ["create", "get", "list"]
+
+---
+# 漂移检测 ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: drift-detection-binding
+  labels:
+    app.kubernetes.io/name: drift-detection
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: drift-detection-role
+subjects:
+  - kind: ServiceAccount
+    name: drift-detection-sa
+    namespace: argocd

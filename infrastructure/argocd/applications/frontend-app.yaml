@@ -1,0 +1,71 @@
+# ArgoCD Application - 前端服务 (React + nginx)
+# 通过 Kustomize overlay 部署前端应用到各环境
+#
+# GitOps 工作流:
+#   1. CI 构建新镜像并推送到 ECR
+#   2. CI 更新 Kustomize overlay 中的镜像标签
+#   3. ArgoCD 检测 Git 变更并自动同步
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: ai-platform-frontend-dev
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: frontend
+    app.kubernetes.io/part-of: ai-training-platform
+    environment: dev
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: ai-platform-dev
+
+  source:
+    repoURL: https://github.com/anker-ai/ai-studio-project.git
+    targetRevision: main
+    path: infrastructure/k8s/overlays/dev
+
+    kustomize:
+      images:
+        - 897473508751.dkr.ecr.us-east-1.amazonaws.com/ai-platform-dev-frontend:v1.0.3
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: ai-platform
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+      allowEmpty: false
+
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+      - PrunePropagationPolicy=foreground
+      - RespectIgnoreDifferences=true
+
+    retry:
+      limit: 3
+      backoff:
+        duration: 10s
+        factor: 2
+        maxDuration: 3m
+
+  ignoreDifferences:
+    - group: ""
+      kind: ConfigMap
+      jsonPointers:
+        - /metadata/annotations
+    - group: apps
+      kind: Deployment
+      jsonPointers:
+        - /spec/replicas
+
+  info:
+    - name: "环境"
+      value: "dev"
+    - name: "服务"
+      value: "frontend (React + nginx)"
+    - name: "端口"
+      value: "3000"

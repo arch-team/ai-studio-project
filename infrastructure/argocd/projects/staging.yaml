@@ -1,0 +1,61 @@
+# ArgoCD AppProject - Staging 环境
+# 定义 Staging 环境的应用部署范围和权限
+---
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: ai-platform-staging
+  namespace: argocd
+  labels:
+    environment: staging
+    app.kubernetes.io/part-of: ai-training-platform
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  description: "AI Training Platform - Staging 环境"
+
+  sourceRepos:
+    - "https://github.com/anker-ai/ai-studio-project.git"
+    - "https://github.com/anker-ai/ai-studio-project"
+
+  destinations:
+    - server: https://kubernetes.default.svc
+      namespace: ai-platform-staging
+
+  clusterResourceWhitelist:
+    - group: ""
+      kind: Namespace
+
+  namespaceResourceWhitelist:
+    - group: ""
+      kind: ConfigMap
+    - group: ""
+      kind: Secret
+    - group: ""
+      kind: Service
+    - group: ""
+      kind: ServiceAccount
+    - group: apps
+      kind: Deployment
+    - group: batch
+      kind: Job
+    - group: networking.k8s.io
+      kind: Ingress
+    - group: autoscaling
+      kind: HorizontalPodAutoscaler
+    - group: elbv2.k8s.aws
+      kind: TargetGroupBinding
+
+  # Staging 环境: 警告孤立资源但不自动删除
+  orphanedResources:
+    warn: true
+    ignore: []
+
+  roles:
+    - name: staging-deployer
+      description: "Staging 环境部署者 (仅管理员)"
+      policies:
+        - p, proj:ai-platform-staging:staging-deployer, applications, sync, ai-platform-staging/*, allow
+        - p, proj:ai-platform-staging:staging-deployer, applications, get, ai-platform-staging/*, allow
+      groups:
+        - platform-admins

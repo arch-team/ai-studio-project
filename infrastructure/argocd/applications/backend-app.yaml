@@ -1,0 +1,92 @@
+# ArgoCD Application - 后端服务 (FastAPI)
+# 通过 Kustomize overlay 部署后端应用到各环境
+#
+# GitOps 工作流:
+#   1. CI 构建新镜像并推送到 ECR
+#   2. CI 更新 Kustomize overlay 中的镜像标签
+#   3. ArgoCD 检测 Git 变更并自动同步
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: ai-platform-backend-dev
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: backend
+    app.kubernetes.io/part-of: ai-training-platform
+    environment: dev
+  # 应用删除时清理目标集群资源
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  # 关联 AppProject
+  project: ai-platform-dev
+
+  # Git 仓库源
+  source:
+    repoURL: https://github.com/anker-ai/ai-studio-project.git
+    targetRevision: main
+    path: infrastructure/k8s/overlays/dev
+
+    # Kustomize 配置
+    kustomize:
+      # 镜像覆盖 (CI 更新此处)
+      images:
+        - 897473508751.dkr.ecr.us-east-1.amazonaws.com/ai-platform-dev-backend:v1.2.1
+
+  # 部署目标
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: ai-platform
+
+  # 同步策略
+  syncPolicy:
+    # 自动同步: Dev 环境启用
+    automated:
+      # 自动修剪已删除的资源
+      prune: true
+      # 自动修复手动修改 (self-heal)
+      selfHeal: true
+      # 允许空目录
+      allowEmpty: false
+
+    # 同步选项
+    syncOptions:
+      # 自动创建命名空间
+      - CreateNamespace=true
+      # 应用资源时使用 server-side apply
+      - ServerSideApply=true
+      # 修剪时先标记再删除 (安全措施)
+      - PrunePropagationPolicy=foreground
+      # 尊重资源的 finalizers
+      - RespectIgnoreDifferences=true
+
+    # 重试策略
+    retry:
+      limit: 3
+      backoff:
+        duration: 10s
+        factor: 2
+        maxDuration: 3m
+
+  # 忽略的差异 (避免误报)
+  ignoreDifferences:
+    # 忽略 ConfigMap 中由控制器管理的字段
+    - group: ""
+      kind: ConfigMap
+      jsonPointers:
+        - /metadata/annotations
+    # 忽略 Deployment 的 replicas (由 HPA 管理)
+    - group: apps
+      kind: Deployment
+      jsonPointers:
+        - /spec/replicas
+
+  # 资源健康检查
+  info:
+    - name: "环境"
+      value: "dev"
+    - name: "服务"
+      value: "backend (FastAPI)"
+    - name: "端口"
+      value: "8000"

@@ -1,0 +1,278 @@
+# CloudWatch Logs Insights 查询模板
+# 用于 AI Training Platform 日常运维、问题排查和性能分析
+# 使用方式: 在 AWS Console > CloudWatch > Logs Insights 中粘贴查询
+---
+
+# ============================================================
+# 1. 错误日志查询
+# ============================================================
+
+error_queries:
+
+  # 1.1 最近 1 小时错误日志
+  recent_errors:
+    log_group: /aws/hyperpod/training-platform
+    description: "查询最近的错误和异常日志"
+    query: |
+      fields @timestamp, @message, @logStream
+      | filter @message like /(?i)(error|exception|traceback|critical)/
+      | sort @timestamp desc
+      | limit 100
+
+  # 1.2 按错误类型统计 (最近 24 小时)
+  error_type_stats:
+    log_group: /aws/hyperpod/training-platform
+    description: "按错误类型聚合统计，识别高频问题"
+    query: |
+      fields @timestamp, @message
+      | filter @message like /(?i)(error|exception)/
+      | parse @message /(?<error_type>\w+Error|\w+Exception)/
+      | stats count(*) as error_count by error_type
+      | sort error_count desc
+      | limit 20
+
+  # 1.3 HTTP 5xx 错误统计
+  http_5xx_errors:
+    log_group: /aws/hyperpod/training-platform/api
+    description: "统计服务端错误，按端点和状态码分组"
+    query: |
+      fields @timestamp, @message
+      | filter @message like /HTTP\/\d\.\d" 5\d{2}/
+      | parse @message /"(?<method>\w+) (?<path>[^ ]+) HTTP\/\d\.\d" (?<status>\d+)/
+      | stats count(*) as count by method, path, status
+      | sort count desc
+      | limit 20
+
+  # 1.4 训练任务失败日志
+  training_job_failures:
+    log_group: /aws/hyperpod/training-platform/training-jobs
+    description: "查询训练任务失败相关日志"
+    query: |
+      fields @timestamp, @message, @logStream
+      | filter @message like /training.*fail|TrainingJobFailed|job.*error/i
+      | sort @timestamp desc
+      | limit 50
+
+# ============================================================
+# 2. 请求延迟分析
+# ============================================================
+
+latency_queries:
+
+  # 2.1 API 端点 P50/P90/P99 延迟
+  api_latency_percentiles:
+    log_group: /aws/hyperpod/training-platform/api
+    description: "按端点统计请求延迟百分位数"
+    query: |
+      fields @timestamp, @message
+      | parse @message /(?<method>\w+) (?<path>\/api\/v1\/[^ ?]+).*(?<duration>\d+\.?\d*)ms/
+      | stats
+          avg(duration) as avg_ms,
+          pct(duration, 50) as p50_ms,
+          pct(duration, 90) as p90_ms,
+          pct(duration, 99) as p99_ms,
+          count(*) as request_count
+        by path
+      | sort p99_ms desc
+      | limit 20
+
+  # 2.2 慢请求追踪 (>1 秒)
+  slow_requests:
+    log_group: /aws/hyperpod/training-platform/api
+    description: "查找响应时间超过 1 秒的慢请求"
+    query: |
+      fields @timestamp, @message, @logStream
+      | parse @message /(?<method>\w+) (?<path>\/api\/v1\/[^ ?]+).*(?<duration>\d+\.?\d*)ms/
+      | filter duration > 1000
+      | sort duration desc
+      | limit 50
+
+  # 2.3 请求吞吐量趋势 (每 5 分钟)
+  throughput_trend:
+    log_group: /aws/hyperpod/training-platform/api
+    description: "按 5 分钟间隔统计请求吞吐量趋势"
+    query: |
+      fields @timestamp, @message
+      | filter @message like /(?:GET|POST|PUT|DELETE|PATCH) \/api\//
+      | stats count(*) as requests by bin(5m)
+      | sort @timestamp asc
+
+  # 2.4 数据集上传延迟分析
+  dataset_upload_latency:
+    log_group: /aws/hyperpod/training-platform/api
+    description: "分析数据集上传接口的延迟分布"
+    query: |
+      fields @timestamp, @message
+      | filter @message like /\/api\/v1\/datasets.*upload/
+      | parse @message /(?<duration>\d+\.?\d*)ms/
+      | stats
+          avg(duration) as avg_ms,
+          max(duration) as max_ms,
+          count(*) as upload_count
+        by bin(1h)
+      | sort @timestamp asc
+
+# ============================================================
+# 3. 用户操作审计
+# ============================================================
+
+audit_queries:
+
+  # 3.1 用户操作总览 (最近 24 小时)
+  user_activity_overview:
+    log_group: /aws/hyperpod/training-platform/audit
+    description: "按用户和操作类型统计活动量"
+    query: |
+      fields @timestamp, @message
+      | parse @message /user_id[=:](?<user_id>[^ ,]+).*action[=:](?<action>[^ ,]+)/
+      | stats count(*) as action_count by user_id, action
+      | sort action_count desc
+      | limit 50
+
+  # 3.2 资源配额变更审计
+  quota_changes:
+    log_group: /aws/hyperpod/training-platform/audit
+    description: "追踪资源配额和限制的变更历史"
+    query: |
+      fields @timestamp, @message, @logStream
+      | filter @message like /(?i)(quota|resource.?limit|resource.?config)/
+      | filter @message like /(?i)(create|update|delete|modify)/
+      | sort @timestamp desc
+      | limit 50
+
+  # 3.3 登录/认证事件
+  auth_events:
+    log_group: /aws/hyperpod/training-platform/audit
+    description: "查询用户登录和认证相关事件"
+    query: |
+      fields @timestamp, @message
+      | filter @message like /(?i)(login|auth|token|session|sign.?in)/
+      | parse @message /user[=:](?<user>[^ ,]+)/
+      | stats count(*) as event_count by user
+      | sort @timestamp desc
+      | limit 100
+
+  # 3.4 训练任务操作审计
+  training_job_operations:
+    log_group: /aws/hyperpod/training-platform/audit
+    description: "追踪训练任务的创建、暂停、恢复、终止等操作"
+    query: |
+      fields @timestamp, @message
+      | filter @message like /(?i)training.?job/
+      | filter @message like /(?i)(submit|create|pause|resume|terminate|delete)/
+      | parse @message /user_id[=:](?<user_id>[^ ,]+).*job_id[=:](?<job_id>[^ ,]+)/
+      | sort @timestamp desc
+      | limit 100
+
+  # 3.5 权限拒绝事件
+  permission_denied:
+    log_group: /aws/hyperpod/training-platform/audit
+    description: "查询权限拒绝和未授权访问事件"
+    query: |
+      fields @timestamp, @message, @logStream
+      | filter @message like /(?i)(forbidden|unauthorized|permission.?denied|access.?denied|403)/
+      | sort @timestamp desc
+      | limit 50
+
+# ============================================================
+# 4. 系统健康检查
+# ============================================================
+
+health_queries:
+
+  # 4.1 容器重启事件
+  container_restarts:
+    log_group: /aws/hyperpod/training-platform
+    description: "检测容器重启、OOM 和崩溃事件"
+    query: |
+      fields @timestamp, @message, @logStream
+      | filter @message like /(?i)(restart|oom|killed|crash)/
+      | sort @timestamp desc
+      | limit 50
+
+  # 4.2 数据库连接错误
+  database_errors:
+    log_group: /aws/hyperpod/training-platform
+    description: "查询数据库连接池和查询错误"
+    query: |
+      fields @timestamp, @message
+      | filter @message like /(?i)(database|mysql|aurora|sqlalchemy|connection.*pool|pool.*exhausted)/
+      | filter @message like /(?i)(error|fail|timeout|refused)/
+      | sort @timestamp desc
+      | limit 50
+
+  # 4.3 S3/AWS 服务错误
+  aws_service_errors:
+    log_group: /aws/hyperpod/training-platform
+    description: "查询 AWS 服务调用错误 (S3, SageMaker, FSx 等)"
+    query: |
+      fields @timestamp, @message
+      | filter @message like /(?i)(s3|sagemaker|fsx|boto|aws)/
+      | filter @message like /(?i)(error|fail|timeout|throttl)/
+      | sort @timestamp desc
+      | limit 50
+
+  # 4.4 健康检查失败
+  health_check_failures:
+    log_group: /aws/hyperpod/training-platform
+    description: "追踪 Kubernetes 健康检查探针失败"
+    query: |
+      fields @timestamp, @message
+      | filter @message like /(?i)(health|readiness|liveness)/
+      | filter @message like /(?i)(fail|unhealthy|timeout)/
+      | sort @timestamp desc
+      | limit 50
+
+# ============================================================
+# 5. 训练任务监控
+# ============================================================
+
+training_queries:
+
+  # 5.1 训练任务状态分布
+  job_status_distribution:
+    log_group: /aws/hyperpod/training-platform/training-jobs
+    description: "统计训练任务各状态的数量分布"
+    query: |
+      fields @timestamp, @message
+      | filter @message like /(?i)training.*status/
+      | parse @message /status[=:](?<status>\w+)/
+      | stats count(*) as count by status
+      | sort count desc
+
+  # 5.2 GPU 资源使用异常
+  gpu_errors:
+    log_group: /aws/hyperpod/training-platform/training-jobs
+    description: "查询 GPU/CUDA 相关错误 (OOM、驱动等)"
+    query: |
+      fields @timestamp, @message
+      | filter @message like /(?i)(gpu|cuda|dcgm)/
+      | filter @message like /(?i)(error|fail|out.of.memory|oom)/
+      | sort @timestamp desc
+      | limit 50
+
+  # 5.3 训练任务耗时统计
+  job_duration_stats:
+    log_group: /aws/hyperpod/training-platform/training-jobs
+    description: "按天统计训练任务的平均/最短/最长耗时"
+    query: |
+      fields @timestamp, @message
+      | filter @message like /(?i)training.*job.*(completed|finished)/
+      | parse @message /duration[=:](?<duration_sec>\d+)/
+      | stats
+          avg(duration_sec) as avg_sec,
+          min(duration_sec) as min_sec,
+          max(duration_sec) as max_sec,
+          count(*) as job_count
+        by bin(1d)
+
+# ============================================================
+# 日志组与查询对应关系
+# ============================================================
+# | 查询类别   | 推荐日志组                                        |
+# |-----------|--------------------------------------------------|
+# | 错误日志   | /aws/hyperpod/training-platform                   |
+# | 请求延迟   | /aws/hyperpod/training-platform/api               |
+# | 用户审计   | /aws/hyperpod/training-platform/audit             |
+# | 训练任务   | /aws/hyperpod/training-platform/training-jobs     |
+# | 系统健康   | /aws/hyperpod/training-platform                   |

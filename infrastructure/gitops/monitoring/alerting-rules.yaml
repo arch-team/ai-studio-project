@@ -1,0 +1,146 @@
+# ArgoCD 漂移告警规则
+# 配置 Prometheus AlertManager 规则，检测 ArgoCD 同步状态异常
+# 告警渠道: Slack / 邮件
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: argocd-alerting-rules
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: alerting-rules
+    app.kubernetes.io/part-of: ai-training-platform
+    component: gitops-monitoring
+data:
+  # Prometheus 告警规则
+  alerting-rules.yaml: |
+    groups:
+      - name: argocd-sync-alerts
+        rules:
+          # 1. 应用同步状态异常 (OutOfSync 超过 10 分钟)
+          - alert: ArgoCDAppOutOfSync
+            expr: |
+              argocd_app_info{sync_status="OutOfSync"} == 1
+            for: 10m
+            labels:
+              severity: warning
+              team: platform
+            annotations:
+              summary: "ArgoCD 应用 {{ $labels.name }} 配置漂移"
+              description: |
+                应用 {{ $labels.name }} 已 OutOfSync 超过 10 分钟。
+                项目: {{ $labels.project }}
+                目标命名空间: {{ $labels.dest_namespace }}
+                需要检查 Git 仓库变更或手动同步。
+
+          # 2. 应用健康状态降级
+          - alert: ArgoCDAppDegraded
+            expr: |
+              argocd_app_info{health_status="Degraded"} == 1
+            for: 5m
+            labels:
+              severity: critical
+              team: platform
+            annotations:
+              summary: "ArgoCD 应用 {{ $labels.name }} 健康状态降级"
+              description: |
+                应用 {{ $labels.name }} 健康状态为 Degraded。
+                项目: {{ $labels.project }}
+                可能原因: Pod CrashLoopBackOff、资源不足、配置错误。
+                需要立即排查。
+
+          # 3. 同步失败
+          - alert: ArgoCDSyncFailed
+            expr: |
+              argocd_app_info{sync_status="Unknown"} == 1
+            for: 15m
+            labels:
+              severity: critical
+              team: platform
+            annotations:
+              summary: "ArgoCD 应用 {{ $labels.name }} 同步状态未知"
+              description: |
+                应用 {{ $labels.name }} 同步状态为 Unknown 超过 15 分钟。
+                可能 ArgoCD 与集群的连接存在问题。
+
+          # 4. 应用缺失 (被意外删除)
+          - alert: ArgoCDAppMissing
+            expr: |
+              argocd_app_info{health_status="Missing"} == 1
+            for: 5m
+            labels:
+              severity: critical
+              team: platform
+            annotations:
+              summary: "ArgoCD 应用 {{ $labels.name }} 目标资源缺失"
+              description: |
+                应用 {{ $labels.name }} 的目标资源在集群中不存在。
+                可能被手动删除。需要立即确认并恢复。
+
+      - name: argocd-server-alerts
+        rules:
+          # 5. ArgoCD Server 不可用
+          - alert: ArgoCDServerDown
+            expr: |
+              up{job="argocd-server-metrics"} == 0
+            for: 5m
+            labels:
+              severity: critical
+              team: platform
+            annotations:
+              summary: "ArgoCD Server 不可用"
+              description: "ArgoCD Server 指标端点无法访问超过 5 分钟。GitOps 工作流可能中断。"
+
+          # 6. ArgoCD 同步操作延迟
+          - alert: ArgoCDSyncLatencyHigh
+            expr: |
+              argocd_app_sync_total{phase="Error"} > 0
+            for: 10m
+            labels:
+              severity: warning
+              team: platform
+            annotations:
+              summary: "ArgoCD 同步操作出现错误"
+              description: "过去 10 分钟内有 ArgoCD 同步操作出现错误，请检查应用状态。"
+
+  # Slack 通知模板
+  notification-templates.yaml: |
+    # Slack Webhook 配置
+    # 在 ArgoCD Notifications 中配置
+    apiVersion: v1
+    kind: Secret
+    metadata:
+      name: argocd-notifications-secret
+      namespace: argocd
+    stringData:
+      # 替换为实际的 Slack Webhook URL
+      slack-token: "xoxb-your-slack-bot-token"
+
+  # 告警路由配置
+  alertmanager-config.yaml: |
+    route:
+      group_by: ['alertname', 'namespace']
+      group_wait: 30s
+      group_interval: 5m
+      repeat_interval: 4h
+      receiver: 'platform-team'
+      routes:
+        # 严重告警: 立即通知
+        - match:
+            severity: critical
+          receiver: 'platform-team-urgent'
+          group_wait: 10s
+          repeat_interval: 1h
+
+    receivers:
+      - name: 'platform-team'
+        slack_configs:
+          - channel: '#ai-platform-alerts'
+            title: '{{ .GroupLabels.alertname }}'
+            text: '{{ range .Alerts }}{{ .Annotations.description }}{{ end }}'
+
+      - name: 'platform-team-urgent'
+        slack_configs:
+          - channel: '#ai-platform-urgent'
+            title: '[紧急] {{ .GroupLabels.alertname }}'
+            text: '{{ range .Alerts }}{{ .Annotations.description }}{{ end }}'

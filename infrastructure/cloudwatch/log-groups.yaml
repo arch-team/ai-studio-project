@@ -1,0 +1,50 @@
+# CloudWatch Log Groups 定义
+# 本文件用于文档化日志组配置，实际资源由 CDK ObservabilityStack 创建
+# 参考: infrastructure/cdk/stacks/observability/observability_stack.py
+---
+# 日志组配置清单
+log_groups:
+  # 平台应用日志 (后端 FastAPI 应用输出)
+  - name: /aws/hyperpod/training-platform
+    retention_days: 30
+    description: "平台应用主日志组 - 后端服务运行日志"
+    kms_key_alias: ai-platform-logs-key
+    tags:
+      Component: application
+      Environment: "${ENVIRONMENT}"
+
+  # API 请求/响应日志 (用于性能分析和问题排查)
+  - name: /aws/hyperpod/training-platform/api
+    retention_days: 30
+    description: "API 网关请求/响应日志 - 延迟分析、错误追踪"
+    kms_key_alias: ai-platform-logs-key
+    tags:
+      Component: api
+      Environment: "${ENVIRONMENT}"
+
+  # 训练任务日志 (长期保留用于训练结果追溯)
+  - name: /aws/hyperpod/training-platform/training-jobs
+    retention_days: 90
+    description: "训练任务执行日志 - 任务状态变更、训练指标"
+    kms_key_alias: ai-platform-logs-key
+    tags:
+      Component: training
+      Environment: "${ENVIRONMENT}"
+
+  # 安全审计日志 (合规性要求长期保留)
+  - name: /aws/hyperpod/training-platform/audit
+    retention_days: 365
+    description: "安全审计日志 - 用户操作、权限变更、资源访问记录"
+    kms_key_alias: ai-platform-logs-key
+    tags:
+      Component: audit
+      Environment: "${ENVIRONMENT}"
+
+# 留存策略说明:
+# - 应用/API 日志: 30 天 (满足日常运维排查需求，控制成本)
+# - 训练任务日志: 90 天 (训练实验需要较长的结果比对周期)
+# - 审计日志: 365 天 (满足企业合规审计要求)
+#
+# 成本优化:
+# - Dev 环境可考虑缩短为 7 天 (通过 CDK Context 覆盖)
+# - Prod 环境审计日志建议配置 S3 归档 (Glacier) 以降低长期成本

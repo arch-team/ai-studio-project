@@ -43,6 +43,7 @@ class ObservabilityStack(cdk.Stack):
         if env_config.observability.enable_amp:
             self._amp_workspace = self._create_amp_workspace()
 
+        self._platform_log_groups = self._create_platform_log_groups()
         self._collector_role = self._create_collector_role()
         self._observability_addon = self._install_observability_addon()
         self._pod_identity = self._create_pod_identity_association()
@@ -55,6 +56,41 @@ class ObservabilityStack(cdk.Stack):
             f"https://aps-workspaces.{self.env_config.region}.amazonaws.com"
             f"/workspaces/{self._amp_workspace.attr_workspace_id}"
         )
+
+    def _create_platform_log_groups(self) -> dict[str, logs.LogGroup]:
+        """创建 AI Training Platform 应用日志组。
+
+        日志组留存策略:
+        - 应用/API 日志: 30 天 (日常运维排查)
+        - 训练任务日志: 90 天 (训练实验结果比对)
+        - 审计日志: 365 天 (企业合规审计要求)
+        """
+        prefix = "/aws/hyperpod/training-platform"
+        log_group_configs = {
+            "platform": (prefix, logs.RetentionDays.ONE_MONTH, "平台应用主日志"),
+            "api": (f"{prefix}/api", logs.RetentionDays.ONE_MONTH, "API 请求/响应日志"),
+            "training_jobs": (
+                f"{prefix}/training-jobs",
+                logs.RetentionDays.THREE_MONTHS,
+                "训练任务执行日志",
+            ),
+            "audit": (f"{prefix}/audit", logs.RetentionDays.ONE_YEAR, "安全审计日志"),
+        }
+
+        result: dict[str, logs.LogGroup] = {}
+        for key, (name, retention, description) in log_group_configs.items():
+            log_group = logs.LogGroup(
+                self,
+                f"PlatformLogGroup{key.title().replace('_', '')}",
+                log_group_name=name,
+                retention=retention,
+                removal_policy=cdk.RemovalPolicy.RETAIN,
+            )
+            cdk.Tags.of(log_group).add("Component", "platform-logs")
+            cdk.Tags.of(log_group).add("Description", description)
+            result[key] = log_group
+
+        return result
 
     def _create_amp_workspace(self) -> aps.CfnWorkspace:
         """创建 Amazon Managed Prometheus Workspace。"""
@@ -169,6 +205,15 @@ class ObservabilityStack(cdk.Stack):
             "HyperPod Observability add-on name",
         )
 
+        # 平台日志组输出
+        for key, log_group in self._platform_log_groups.items():
+            create_output(
+                self,
+                f"PlatformLogGroup{key.title().replace('_', '')}",
+                log_group.log_group_name,
+                f"Platform log group for {key}",
+            )
+
     @property
     def amp_workspace(self) -> aps.CfnWorkspace | None:
         return self._amp_workspace
@@ -176,3 +221,7 @@ class ObservabilityStack(cdk.Stack):
     @property
     def observability_addon(self) -> eks.CfnAddon:
         return self._observability_addon
+
+    @property
+    def platform_log_groups(self) -> dict[str, logs.LogGroup]:
+        return self._platform_log_groups

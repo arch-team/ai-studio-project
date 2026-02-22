@@ -1,0 +1,275 @@
+# AI Training Platform - 用户手册
+# 版本: 1.0
+# 最后更新: 2026-02-22
+---
+
+overview:
+  title: "AI Training Platform 用户手册"
+  description: |
+    企业级 AI 训练平台，基于 AWS SageMaker HyperPod 构建，
+    提供分布式训练管理、数据集管理、资源配额管理和监控能力。
+  target_audience:
+    - AI/ML 工程师
+    - 数据科学家
+    - 平台管理员
+
+# ============================================================
+# 1. 系统登录和导航
+# ============================================================
+login_and_navigation:
+  login:
+    description: "系统使用 JWT 认证，通过用户名/密码登录"
+    steps:
+      - "打开平台地址 (由管理员提供，格式: https://<domain>)"
+      - "输入用户名和密码"
+      - "点击'登录'按钮"
+      - "登录成功后跳转到仪表板首页"
+    notes:
+      - "首次登录需要管理员创建账号"
+      - "Token 有效期为 24 小时，过期后需重新登录"
+      - "连续 5 次登录失败将锁定账号 15 分钟"
+
+  navigation:
+    description: "左侧导航栏提供所有主要功能入口"
+    menu_items:
+      - name: "仪表板"
+        path: "/"
+        description: "系统概览，显示训练任务统计、资源使用率"
+      - name: "训练任务"
+        path: "/training-jobs"
+        description: "创建、管理和监控训练任务"
+      - name: "数据集"
+        path: "/datasets"
+        description: "上传、管理数据集和版本"
+      - name: "模型"
+        path: "/models"
+        description: "查看模型版本和制品"
+      - name: "资源配额"
+        path: "/resource-quotas"
+        description: "查看和管理资源配额 (仅管理员)"
+      - name: "集群监控"
+        path: "/monitoring"
+        description: "集群状态、节点利用率、GPU 使用率"
+
+  user_roles:
+    - role: "admin"
+      permissions: "所有功能，包括用户管理和资源配额管理"
+    - role: "user"
+      permissions: "训练任务、数据集、模型管理，查看自己的资源使用"
+
+# ============================================================
+# 2. 训练任务创建和管理
+# ============================================================
+training_jobs:
+  create_job:
+    description: "提交分布式训练任务到 HyperPod 集群"
+    steps:
+      - "点击左侧导航'训练任务' → '创建训练任务'"
+      - "填写基本信息: 任务名称、描述"
+      - "选择训练框架: PyTorch DDP / PyTorch FSDP / DeepSpeed"
+      - "配置资源需求: GPU 类型、GPU 数量、节点数"
+      - "选择数据集: 从已上传的数据集列表选择"
+      - "配置训练参数: 学习率、batch size、epoch 数等"
+      - "选择检查点策略: 保存间隔、最大保留数"
+      - "点击'提交'创建任务"
+
+    resource_config:
+      description: "资源配置说明"
+      fields:
+        - name: "GPU 类型"
+          options: "p4d.24xlarge (A100), p5.48xlarge (H100)"
+          note: "根据训练规模选择，P1 优先级任务可抢占低优先级任务的资源"
+        - name: "节点数"
+          range: "1-16"
+          note: "多节点训练使用 Gang Scheduling，确保所有节点同时启动"
+        - name: "优先级"
+          options: "low / normal / high"
+          note: "高优先级任务在资源不足时可抢占低优先级任务"
+
+  manage_jobs:
+    description: "管理已创建的训练任务"
+    operations:
+      - action: "查看详情"
+        description: "点击任务名称查看训练日志、指标曲线、资源使用"
+      - action: "暂停"
+        description: "暂停运行中的任务，释放资源 (保存当前检查点)"
+      - action: "恢复"
+        description: "从最近的检查点恢复暂停的任务"
+      - action: "终止"
+        description: "停止训练任务并释放所有资源"
+
+  job_states:
+    description: "训练任务状态说明"
+    states:
+      - name: "submitted"
+        label: "已提交"
+        description: "任务已创建，等待资源分配"
+      - name: "running"
+        label: "运行中"
+        description: "训练正在执行"
+      - name: "completed"
+        label: "已完成"
+        description: "训练成功完成"
+      - name: "failed"
+        label: "失败"
+        description: "训练因错误终止"
+      - name: "paused"
+        label: "已暂停"
+        description: "用户手动暂停"
+      - name: "preempted"
+        label: "被抢占"
+        description: "被更高优先级任务抢占资源"
+
+# ============================================================
+# 3. 数据集上传和版本管理
+# ============================================================
+datasets:
+  upload:
+    description: "上传训练数据集到平台"
+    steps:
+      - "点击左侧导航'数据集' → '上传数据集'"
+      - "填写数据集名称和描述"
+      - "选择文件或文件夹上传"
+      - "等待上传完成 (支持大文件断点续传)"
+    notes:
+      - "单次上传最大支持 50GB"
+      - "断点续传: 网络中断后重新上传会自动从断点继续"
+      - "文件存储在 S3 上，通过 SSE-KMS 加密"
+
+  version_management:
+    description: "数据集版本管理"
+    operations:
+      - action: "创建新版本"
+        description: "对已有数据集上传新版本的数据文件"
+      - action: "查看版本历史"
+        description: "查看数据集所有版本及其状态"
+      - action: "切换版本"
+        description: "训练任务可选择特定版本的数据集"
+      - action: "删除版本"
+        description: "删除不再需要的数据集版本 (需确认)"
+
+  data_format:
+    supported_formats:
+      - "CSV / TSV"
+      - "JSON / JSONL"
+      - "Parquet"
+      - "自定义二进制格式"
+    storage:
+      primary: "S3 (SSE-KMS 加密)"
+      high_performance: "FSx for Lustre (训练时挂载)"
+
+# ============================================================
+# 4. 资源配额管理
+# ============================================================
+resource_quotas:
+  description: "管理团队和用户的计算资源配额"
+  admin_only: true
+
+  view_quotas:
+    description: "查看当前资源配额配置"
+    steps:
+      - "点击左侧导航'资源配额'"
+      - "查看各团队/用户的 GPU 配额、存储配额"
+
+  manage_quotas:
+    description: "管理员可配置资源配额"
+    configurable_items:
+      - name: "GPU 配额"
+        description: "团队可同时使用的最大 GPU 数量"
+        unit: "GPU 卡数"
+      - name: "存储配额"
+        description: "团队可使用的最大存储空间"
+        unit: "GB"
+      - name: "最大并发任务数"
+        description: "团队可同时运行的最大训练任务数"
+        unit: "个"
+      - name: "最大单任务节点数"
+        description: "单个训练任务可请求的最大节点数"
+        unit: "节点"
+
+    steps:
+      - "选择要修改的配额配置"
+      - "调整配额数值"
+      - "点击'保存'"
+      - "新配额立即生效"
+
+  quota_enforcement:
+    description: "配额超限处理"
+    behavior:
+      - "提交任务时检查配额: 如果超限，任务提交被拒绝并提示"
+      - "运行中不回收: 已运行的任务不会因配额调整而被终止"
+      - "Kueue 排队: 资源不足时任务进入队列排队"
+
+# ============================================================
+# 5. 监控和日志查看
+# ============================================================
+monitoring:
+  cluster_monitoring:
+    description: "查看 HyperPod 集群整体状态"
+    metrics:
+      - name: "节点状态"
+        description: "查看集群中各节点的在线/离线状态"
+      - name: "GPU 利用率"
+        description: "集群级别和节点级别的 GPU 使用率"
+      - name: "内存使用"
+        description: "各节点的内存使用率"
+      - name: "网络流量"
+        description: "节点间网络吞吐量 (EFA)"
+
+  training_metrics:
+    description: "训练任务实时指标"
+    available_metrics:
+      - "训练 Loss 曲线"
+      - "学习率变化"
+      - "GPU 使用率"
+      - "内存使用"
+      - "数据加载吞吐量"
+      - "通信开销"
+
+  log_viewing:
+    description: "查看应用和训练日志"
+    access_methods:
+      - method: "平台 UI"
+        description: "在训练任务详情页查看实时日志流"
+      - method: "CloudWatch"
+        description: "在 AWS Console 使用 CloudWatch Logs Insights 进行高级查询"
+        log_groups:
+          - "/aws/hyperpod/training-platform (应用日志)"
+          - "/aws/hyperpod/training-platform/api (API 日志)"
+          - "/aws/hyperpod/training-platform/training-jobs (训练日志)"
+          - "/aws/hyperpod/training-platform/audit (审计日志)"
+      - method: "Grafana"
+        description: "通过 Grafana 仪表盘查看集群监控指标和趋势图"
+
+  alerts:
+    description: "告警通知"
+    alert_types:
+      - "训练任务失败通知"
+      - "GPU 利用率异常告警"
+      - "节点离线告警"
+      - "存储空间不足告警"
+      - "配额即将用尽提醒"
+
+# ============================================================
+# 常见问题 (FAQ)
+# ============================================================
+faq:
+  - question: "训练任务一直处于'已提交'状态怎么办?"
+    answer: |
+      可能原因:
+      1. 资源不足 - 检查集群 GPU 可用量和您的配额
+      2. 排队中 - Kueue 正在等待资源释放
+      3. 配额超限 - 联系管理员增加配额
+      建议: 查看任务详情中的事件日志获取具体原因
+
+  - question: "上传大文件中断了怎么办?"
+    answer: "平台支持断点续传。重新上传同一文件时会自动检测已上传的部分并从断点继续。"
+
+  - question: "如何从检查点恢复训练?"
+    answer: "在任务详情页点击'从检查点恢复'，选择要恢复的检查点版本，系统会自动创建新任务并从该检查点继续训练。"
+
+  - question: "被抢占的任务如何处理?"
+    answer: "被高优先级任务抢占后，系统会自动保存检查点。当资源可用时，任务会自动恢复训练。您也可以手动终止被抢占的任务。"
+
+  - question: "如何查看训练任务的 GPU 使用率?"
+    answer: "在训练任务详情页的'资源监控'标签页可查看实时 GPU 使用率。也可以通过 Grafana 仪表盘查看历史趋势。"

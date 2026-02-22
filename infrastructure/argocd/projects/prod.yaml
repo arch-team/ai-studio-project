@@ -1,0 +1,72 @@
+# ArgoCD AppProject - Prod 环境
+# 定义 Prod 环境的应用部署范围和权限
+# 生产环境限制更严格: 手动同步、仅管理员操作
+---
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: ai-platform-prod
+  namespace: argocd
+  labels:
+    environment: prod
+    app.kubernetes.io/part-of: ai-training-platform
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  description: "AI Training Platform - Prod 环境 (需人工审批同步)"
+
+  sourceRepos:
+    - "https://github.com/anker-ai/ai-studio-project.git"
+    - "https://github.com/anker-ai/ai-studio-project"
+
+  destinations:
+    - server: https://kubernetes.default.svc
+      namespace: ai-platform-prod
+
+  clusterResourceWhitelist:
+    - group: ""
+      kind: Namespace
+
+  namespaceResourceWhitelist:
+    - group: ""
+      kind: ConfigMap
+    - group: ""
+      kind: Secret
+    - group: ""
+      kind: Service
+    - group: ""
+      kind: ServiceAccount
+    - group: apps
+      kind: Deployment
+    - group: batch
+      kind: Job
+    - group: networking.k8s.io
+      kind: Ingress
+    - group: autoscaling
+      kind: HorizontalPodAutoscaler
+    - group: elbv2.k8s.aws
+      kind: TargetGroupBinding
+
+  # Prod 环境: 严格的孤立资源管理
+  orphanedResources:
+    warn: true
+    ignore: []
+
+  # 同步窗口: 仅允许工作日非高峰时段同步
+  syncWindows:
+    - kind: allow
+      schedule: "0 2-6 * * 1-5"  # 工作日 UTC 02:00-06:00
+      duration: 4h
+      applications:
+        - "*"
+      namespaces:
+        - "ai-platform-prod"
+
+  roles:
+    - name: prod-deployer
+      description: "Prod 环境部署者 (仅高级管理员，需审批)"
+      policies:
+        - p, proj:ai-platform-prod:prod-deployer, applications, sync, ai-platform-prod/*, allow
+        - p, proj:ai-platform-prod:prod-deployer, applications, get, ai-platform-prod/*, allow
+      groups:
+        - platform-admins

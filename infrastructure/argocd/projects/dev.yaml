@@ -1,0 +1,71 @@
+# ArgoCD AppProject - Dev 环境
+# 定义 Dev 环境的应用部署范围和权限
+---
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: ai-platform-dev
+  namespace: argocd
+  labels:
+    environment: dev
+    app.kubernetes.io/part-of: ai-training-platform
+  # 防止意外删除
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  description: "AI Training Platform - Dev 环境"
+
+  # 允许的 Git 仓库源
+  sourceRepos:
+    - "https://github.com/anker-ai/ai-studio-project.git"
+    - "https://github.com/anker-ai/ai-studio-project"
+
+  # 允许的部署目标
+  destinations:
+    - server: https://kubernetes.default.svc
+      namespace: ai-platform
+    - server: https://kubernetes.default.svc
+      namespace: ai-platform-dev
+
+  # 允许部署的资源类型
+  clusterResourceWhitelist:
+    - group: ""
+      kind: Namespace
+
+  # 命名空间级资源白名单
+  namespaceResourceWhitelist:
+    - group: ""
+      kind: ConfigMap
+    - group: ""
+      kind: Secret
+    - group: ""
+      kind: Service
+    - group: ""
+      kind: ServiceAccount
+    - group: apps
+      kind: Deployment
+    - group: batch
+      kind: Job
+    - group: networking.k8s.io
+      kind: Ingress
+    - group: autoscaling
+      kind: HorizontalPodAutoscaler
+    - group: elbv2.k8s.aws
+      kind: TargetGroupBinding
+
+  # 孤立资源管理: dev 环境允许自动清理
+  orphanedResources:
+    warn: true
+    ignore: []
+
+  # 角色定义
+  roles:
+    - name: dev-deployer
+      description: "Dev 环境部署者"
+      policies:
+        - p, proj:ai-platform-dev:dev-deployer, applications, sync, ai-platform-dev/*, allow
+        - p, proj:ai-platform-dev:dev-deployer, applications, get, ai-platform-dev/*, allow
+        - p, proj:ai-platform-dev:dev-deployer, applications, action/*, ai-platform-dev/*, allow
+      groups:
+        - platform-developers
+        - platform-admins

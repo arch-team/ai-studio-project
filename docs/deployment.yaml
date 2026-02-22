@@ -1,0 +1,381 @@
+# AI Training Platform - 部署文档
+# 版本: 1.0
+# 最后更新: 2026-02-22
+---
+
+overview:
+  title: "AI Training Platform 部署指南"
+  description: |
+    本文档描述 AI Training Platform 从零到生产环境的完整部署流程，
+    包括基础设施配置、应用部署和运维操作。
+  architecture:
+    compute: "AWS EKS 1.32+ + SageMaker HyperPod"
+    database: "Aurora MySQL 3.04.x (生产) / MySQL 8.0.28 (开发)"
+    storage: "S3 (SSE-KMS) + FSx for Lustre"
+    networking: "ALB + VPC + PrivateLink"
+    monitoring: "HyperPod Observability Add-on (Prometheus + Grafana)"
+    iac: "AWS CDK (Python)"
+
+# ============================================================
+# 1. 环境要求
+# ============================================================
+prerequisites:
+  aws_account:
+    description: "AWS 账号和权限要求"
+    requirements:
+      - "AWS 账号启用以下服务: EKS, SageMaker, S3, Aurora, FSx, KMS, CloudWatch"
+      - "IAM 用户/角色需要 AdministratorAccess 或等效权限 (仅部署阶段)"
+      - "Service Quotas 满足: P4d/P5 实例配额、EKS 集群配额"
+      - "区域: us-east-1 (默认)，其他区域需确认 HyperPod 可用性"
+
+  tools:
+    description: "本地开发/部署工具"
+    required:
+      - tool: "AWS CLI v2"
+        version: ">=2.15.0"
+        install: "https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html"
+      - tool: "AWS CDK"
+        version: ">=2.150.0"
+        install: "npm install -g aws-cdk"
+      - tool: "Python"
+        version: ">=3.11"
+        install: "https://www.python.org/downloads/"
+      - tool: "Node.js"
+        version: ">=18.x"
+        install: "https://nodejs.org/"
+      - tool: "Docker"
+        version: ">=24.0"
+        install: "https://docs.docker.com/get-docker/"
+      - tool: "kubectl"
+        version: ">=1.28"
+        install: "https://kubernetes.io/docs/tasks/tools/"
+      - tool: "Helm"
+        version: ">=3.14"
+        install: "https://helm.sh/docs/intro/install/"
+    optional:
+      - tool: "ArgoCD CLI"
+        version: ">=2.10"
+        install: "https://argo-cd.readthedocs.io/en/stable/cli_installation/"
+
+  network:
+    description: "网络要求"
+    requirements:
+      - "VPC CIDR: 10.0.0.0/16 (可配置)"
+      - "至少 3 个可用区"
+      - "NAT Gateway (用于私有子网访问互联网)"
+      - "VPC Endpoints: S3, ECR, CloudWatch Logs, STS, SageMaker API"
+
+# ============================================================
+# 2. 基础设施部署步骤
+# ============================================================
+infrastructure_deployment:
+  description: "使用 AWS CDK 部署基础设施"
+
+  step_1_setup:
+    title: "环境准备"
+    commands:
+      - description: "配置 AWS CLI"
+        command: "aws configure --profile ai-platform"
+      - description: "克隆代码仓库"
+        command: "git clone <repo-url> && cd ai-studio-project"
+      - description: "安装 CDK 依赖"
+        command: "cd infrastructure/cdk && pip install -r requirements.txt"
+      - description: "Bootstrap CDK (首次部署)"
+        command: "cdk bootstrap aws://<ACCOUNT_ID>/us-east-1 --context env=dev"
+
+  step_2_deploy_foundation:
+    title: "部署基础层 (L1)"
+    description: "VPC、IAM 基础角色"
+    commands:
+      - description: "检查变更"
+        command: "cdk diff --context env=dev 'AiPlatform-Dev-Network' 'AiPlatform-Dev-Iam'"
+      - description: "部署网络和 IAM"
+        command: "cdk deploy --context env=dev 'AiPlatform-Dev-Network' 'AiPlatform-Dev-Iam' --require-approval broadening"
+    outputs:
+      - "VPC ID"
+      - "子网 ID (Public/PrivateApp/PrivateData)"
+      - "IAM 角色 ARN"
+
+  step_3_deploy_data:
+    title: "部署数据层 (L2)"
+    description: "Aurora MySQL、S3 存储桶"
+    commands:
+      - description: "部署数据库和存储"
+        command: "cdk deploy --context env=dev 'AiPlatform-Dev-Database' 'AiPlatform-Dev-Storage' --require-approval broadening"
+    outputs:
+      - "Aurora 集群端点"
+      - "S3 Bucket 名称 (datasets/models/checkpoints)"
+
+  step_4_deploy_compute:
+    title: "部署计算层 (L3)"
+    description: "EKS 集群、HyperPod"
+    commands:
+      - description: "部署 EKS 集群"
+        command: "cdk deploy --context env=dev 'AiPlatform-Dev-Eks' --require-approval broadening"
+      - description: "部署 HyperPod"
+        command: "cdk deploy --context env=dev 'AiPlatform-Dev-HyperPod' --require-approval broadening"
+      - description: "部署 HyperPod Add-ons"
+        command: "cdk deploy --context env=dev 'AiPlatform-Dev-HyperPodAddons' --require-approval broadening"
+    notes:
+      - "EKS 集群创建约需 15-20 分钟"
+      - "HyperPod Add-ons Helm Chart 安装超时设置为 15 分钟"
+    outputs:
+      - "EKS 集群名称和端点"
+      - "kubeconfig 更新命令"
+
+  step_5_deploy_observability:
+    title: "部署可观测性层 (L4)"
+    description: "AMP、Observability Add-on、CloudWatch 日志组"
+    commands:
+      - description: "部署可观测性"
+        command: "cdk deploy --context env=dev 'AiPlatform-Dev-Observability' --require-approval broadening"
+      - description: "部署 FSx Lustre"
+        command: "cdk deploy --context env=dev 'AiPlatform-Dev-FsxLustre' --require-approval broadening"
+
+  step_6_deploy_networking:
+    title: "部署网络接入层 (L5)"
+    description: "ALB"
+    commands:
+      - description: "部署 ALB"
+        command: "cdk deploy --context env=dev 'AiPlatform-Dev-Alb' --require-approval broadening"
+    outputs:
+      - "ALB DNS 名称"
+      - "Target Group ARN"
+
+  step_7_deploy_application:
+    title: "部署应用层 (L6)"
+    description: "ECR 仓库"
+    commands:
+      - description: "部署 ECR"
+        command: "cdk deploy --context env=dev 'AiPlatform-Dev-Application' --require-approval broadening"
+
+  post_deploy_verification:
+    title: "部署后验证"
+    commands:
+      - description: "更新 kubeconfig"
+        command: "aws eks update-kubeconfig --name ai-platform-dev-eks --region us-east-1"
+      - description: "验证节点状态"
+        command: "kubectl get nodes"
+      - description: "验证命名空间"
+        command: "kubectl get ns ai-platform"
+      - description: "验证 HyperPod Add-ons"
+        command: "kubectl get pods -n hyperpod-observability"
+
+# ============================================================
+# 3. 应用部署步骤
+# ============================================================
+application_deployment:
+  description: "将后端和前端应用部署到 EKS 集群"
+
+  step_1_build_images:
+    title: "构建容器镜像"
+    commands:
+      - description: "登录 ECR"
+        command: "aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin <ACCOUNT_ID>.dkr.ecr.us-east-1.amazonaws.com"
+      - description: "构建后端镜像"
+        command: "docker build -t ai-platform-backend:latest ./backend"
+      - description: "构建前端镜像"
+        command: "docker build -t ai-platform-frontend:latest ./frontend"
+      - description: "推送后端镜像"
+        command: |
+          docker tag ai-platform-backend:latest <ACCOUNT_ID>.dkr.ecr.us-east-1.amazonaws.com/ai-platform-dev-backend:v1.0.0
+          docker push <ACCOUNT_ID>.dkr.ecr.us-east-1.amazonaws.com/ai-platform-dev-backend:v1.0.0
+      - description: "推送前端镜像"
+        command: |
+          docker tag ai-platform-frontend:latest <ACCOUNT_ID>.dkr.ecr.us-east-1.amazonaws.com/ai-platform-dev-frontend:v1.0.0
+          docker push <ACCOUNT_ID>.dkr.ecr.us-east-1.amazonaws.com/ai-platform-dev-frontend:v1.0.0
+
+  step_2_configure_secrets:
+    title: "配置 Kubernetes Secrets"
+    commands:
+      - description: "创建后端 Secrets"
+        command: |
+          kubectl create secret generic backend-secrets \
+            --namespace ai-platform \
+            --from-literal=DATABASE_URL='mysql+aiomysql://user:password@host:3306/ai_platform' \
+            --from-literal=JWT_SECRET_KEY='<your-jwt-secret>' \
+            --from-literal=JWT_ALGORITHM='HS256'
+
+  step_3_apply_manifests:
+    title: "应用 Kubernetes 清单"
+    commands:
+      - description: "应用 dev 环境 (Kustomize)"
+        command: "kubectl apply -k infrastructure/k8s/overlays/dev"
+      - description: "验证部署状态"
+        command: "kubectl get pods -n ai-platform -w"
+      - description: "检查后端健康"
+        command: "kubectl exec -n ai-platform deploy/backend -- curl -s http://localhost:8000/health"
+
+  step_4_run_migration:
+    title: "执行数据库迁移"
+    commands:
+      - description: "运行迁移 Job"
+        command: "kubectl apply -f infrastructure/k8s/base/application/db-migration-job.yaml"
+      - description: "检查迁移状态"
+        command: "kubectl logs -n ai-platform job/db-migration -f"
+
+  step_5_verify:
+    title: "验证应用可用性"
+    commands:
+      - description: "获取 ALB 地址"
+        command: "kubectl get targetgroupbinding -n ai-platform"
+      - description: "测试 API 健康检查"
+        command: "curl -s http://<ALB_DNS>/api/v1/health"
+      - description: "测试前端页面"
+        command: "curl -s -o /dev/null -w '%{http_code}' http://<ALB_DNS>/"
+
+# ============================================================
+# 4. 多环境部署
+# ============================================================
+environments:
+  dev:
+    description: "开发环境"
+    cdk_context: "--context env=dev"
+    kustomize_overlay: "infrastructure/k8s/overlays/dev"
+    characteristics:
+      - "单副本部署"
+      - "最小资源配置"
+      - "日志留存 7 天"
+
+  staging:
+    description: "预发布环境"
+    cdk_context: "--context env=staging"
+    kustomize_overlay: "infrastructure/k8s/overlays/staging"
+    characteristics:
+      - "双副本部署"
+      - "与生产环境相同配置"
+      - "日志留存 30 天"
+
+  prod:
+    description: "生产环境"
+    cdk_context: "--context env=prod"
+    kustomize_overlay: "infrastructure/k8s/overlays/prod"
+    characteristics:
+      - "高可用部署 (多副本)"
+      - "严格安全策略 (PSA restricted)"
+      - "日志留存 365 天 (审计日志)"
+      - "KMS 加密必须启用"
+      - "CDK Nag 安全检查必须通过"
+
+# ============================================================
+# 5. 故障排查指南
+# ============================================================
+troubleshooting:
+
+  pod_not_starting:
+    symptom: "Pod 一直处于 Pending/CrashLoopBackOff 状态"
+    steps:
+      - description: "查看 Pod 事件"
+        command: "kubectl describe pod <pod-name> -n ai-platform"
+      - description: "查看 Pod 日志"
+        command: "kubectl logs <pod-name> -n ai-platform --previous"
+    common_causes:
+      - cause: "资源不足"
+        solution: "检查节点资源: kubectl top nodes"
+      - cause: "镜像拉取失败"
+        solution: "验证 ECR 权限和镜像标签是否正确"
+      - cause: "Secret 缺失"
+        solution: "确认 backend-secrets 已创建: kubectl get secret -n ai-platform"
+      - cause: "健康检查失败"
+        solution: "检查应用启动日志，确认 /health 端点可访问"
+
+  database_connection:
+    symptom: "后端无法连接数据库"
+    steps:
+      - description: "验证数据库连接"
+        command: "kubectl exec -n ai-platform deploy/backend -- python -c \"from sqlalchemy import create_engine; e=create_engine('...')\""
+      - description: "检查 Security Group"
+        command: "aws ec2 describe-security-groups --group-ids <sg-id>"
+    common_causes:
+      - cause: "Security Group 未放行 3306 端口"
+        solution: "确认 EKS 节点 SG 到 Aurora SG 的 3306 入站规则"
+      - cause: "VPC 子网路由问题"
+        solution: "确认 PrivateApp 子网可达 PrivateData 子网"
+      - cause: "密码错误"
+        solution: "确认 Secrets Manager 中的密码与 K8s Secret 一致"
+
+  alb_not_accessible:
+    symptom: "ALB 地址无法访问"
+    steps:
+      - description: "检查 Target Group 健康状态"
+        command: "aws elbv2 describe-target-health --target-group-arn <tg-arn>"
+      - description: "检查 TargetGroupBinding"
+        command: "kubectl get targetgroupbinding -n ai-platform -o yaml"
+    common_causes:
+      - cause: "Target Group 中无健康目标"
+        solution: "确认 Pod 正常运行且健康检查通过"
+      - cause: "Security Group 未放行"
+        solution: "确认 ALB SG 到 EKS 节点 SG 的入站规则"
+      - cause: "AWS Load Balancer Controller 未安装"
+        solution: "确认 aws-load-balancer-controller Pod 运行正常"
+
+  training_job_stuck:
+    symptom: "训练任务一直排队不执行"
+    steps:
+      - description: "检查 Kueue 队列状态"
+        command: "kubectl get workloads -A"
+      - description: "检查资源配额"
+        command: "kubectl describe clusterqueue"
+    common_causes:
+      - cause: "集群 GPU 资源不足"
+        solution: "检查 HyperPod 节点状态和 GPU 可用数量"
+      - cause: "Kueue 配额限制"
+        solution: "检查 ResourceFlavor 和 ClusterQueue 配置"
+      - cause: "Gang Scheduling 等待"
+        solution: "多节点训练需要同时满足所有节点的资源需求"
+
+  cloudwatch_no_logs:
+    symptom: "CloudWatch 中看不到应用日志"
+    steps:
+      - description: "检查日志组是否存在"
+        command: "aws logs describe-log-groups --log-group-name-prefix /aws/hyperpod/training-platform"
+      - description: "检查 Fluent Bit / CloudWatch Agent"
+        command: "kubectl get pods -n amazon-cloudwatch"
+    common_causes:
+      - cause: "日志代理未部署"
+        solution: "安装 AWS CloudWatch Agent 或 Fluent Bit DaemonSet"
+      - cause: "IAM 权限不足"
+        solution: "确认节点 IAM 角色具有 CloudWatchAgentServerPolicy"
+      - cause: "日志组名称不匹配"
+        solution: "确认应用日志输出与日志组名称配置一致"
+
+# ============================================================
+# 6. 最佳实践
+# ============================================================
+best_practices:
+
+  security:
+    - "所有 S3 存储桶启用 SSE-KMS 加密"
+    - "API 端点强制 TLS 1.2+"
+    - "使用 IRSA (IAM Roles for Service Accounts) 而非节点级权限"
+    - "启用 Kubernetes Pod Security Admission (baseline/restricted)"
+    - "定期轮换 KMS 密钥和数据库密码"
+    - "生产环境启用 CDK Nag 安全检查"
+
+  reliability:
+    - "生产环境至少 2 副本部署"
+    - "配置合理的 readinessProbe 和 livenessProbe"
+    - "数据库使用 Aurora Multi-AZ 部署"
+    - "训练任务配置检查点策略，支持自动恢复"
+    - "使用 PodDisruptionBudget 控制滚动更新影响"
+
+  cost_optimization:
+    - "Dev 环境使用最小实例规格"
+    - "S3 配置生命周期策略 (IA/Glacier 转换)"
+    - "CloudWatch 日志设置合理留存期"
+    - "GPU 实例使用 Kueue 调度提高利用率"
+    - "非工作时间考虑缩减 Dev 环境节点"
+
+  operations:
+    - "使用 GitOps (ArgoCD) 管理部署"
+    - "所有变更通过 Git PR 审核"
+    - "部署前执行 cdk diff 确认变更范围"
+    - "保持 Kustomize overlay 与 base 的分离"
+    - "使用标签 (Tags) 管理资源成本归属"
+
+  monitoring:
+    - "配置 CloudWatch 告警用于关键指标"
+    - "使用 Grafana 仪表盘监控集群和训练指标"
+    - "定期审查 CloudWatch Logs Insights 查询结果"
+    - "设置审计日志用于安全合规"
+    - "监控 Kueue 队列深度和等待时间"

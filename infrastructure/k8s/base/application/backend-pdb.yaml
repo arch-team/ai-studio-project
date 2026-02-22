@@ -1,0 +1,14 @@
+# 后端服务 PodDisruptionBudget
+# 确保滚动更新和节点维护期间至少有一个 Pod 可用
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: backend-pdb
+  namespace: ai-platform
+  labels:
+    app: backend
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: backend

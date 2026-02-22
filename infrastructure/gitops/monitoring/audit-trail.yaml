@@ -1,0 +1,172 @@
+# ArgoCD 审计追踪配置
+# 记录配置变更的 Git commit SHA、操作者、变更时间
+# 通过 ArgoCD Notifications 和 ConfigMap 持久化审计日志
+---
+
+# 1. 审计日志 CronJob - 定期收集 ArgoCD 操作历史
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: argocd-audit-collector
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: audit-collector
+    app.kubernetes.io/part-of: ai-training-platform
+    component: gitops-audit
+spec:
+  # 每小时收集一次审计日志
+  schedule: "0 * * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 5
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 1
+      activeDeadlineSeconds: 120
+      template:
+        metadata:
+          labels:
+            app: audit-collector
+        spec:
+          serviceAccountName: drift-detection-sa
+          restartPolicy: Never
+          containers:
+            - name: audit-collector
+              image: bitnami/kubectl:1.28
+              command:
+                - /bin/bash
+                - -c
+                - |
+                  set -euo pipefail
+
+                  echo "=========================================="
+                  echo "ArgoCD 审计日志收集 - $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+                  echo "=========================================="
+
+                  # 获取所有 ArgoCD Application 的操作历史
+                  APPS=$(kubectl get applications -n argocd -o json 2>/dev/null || echo '{"items":[]}')
+                  APP_COUNT=$(echo "$APPS" | jq '.items | length')
+
+                  AUDIT_LOG=""
+                  TIMESTAMP=$(date -u '+%Y-%m-%dT%H:%M:%SZ')
+
+                  for i in $(seq 0 $((APP_COUNT - 1))); do
+                    APP_NAME=$(echo "$APPS" | jq -r ".items[$i].metadata.name")
+                    SYNC_STATUS=$(echo "$APPS" | jq -r ".items[$i].status.sync.status // \"Unknown\"")
+                    HEALTH_STATUS=$(echo "$APPS" | jq -r ".items[$i].status.health.status // \"Unknown\"")
+                    REVISION=$(echo "$APPS" | jq -r ".items[$i].status.sync.revision // \"N/A\"")
+
+                    # 操作状态
+                    OP_PHASE=$(echo "$APPS" | jq -r ".items[$i].status.operationState.phase // \"N/A\"")
+                    OP_STARTED=$(echo "$APPS" | jq -r ".items[$i].status.operationState.startedAt // \"N/A\"")
+                    OP_FINISHED=$(echo "$APPS" | jq -r ".items[$i].status.operationState.finishedAt // \"N/A\"")
+                    OP_INITIATOR=$(echo "$APPS" | jq -r ".items[$i].status.operationState.operation.initiatedBy.username // \"auto-sync\"")
+
+                    ENTRY="${TIMESTAMP}|${APP_NAME}|${SYNC_STATUS}|${HEALTH_STATUS}|${REVISION:0:8}|${OP_PHASE}|${OP_INITIATOR}|${OP_STARTED}|${OP_FINISHED}"
+                    AUDIT_LOG="${AUDIT_LOG}${ENTRY}\n"
+
+                    echo "${APP_NAME}:"
+                    echo "  同步: ${SYNC_STATUS} | 健康: ${HEALTH_STATUS}"
+                    echo "  版本: ${REVISION:0:8} | 操作: ${OP_PHASE}"
+                    echo "  操作者: ${OP_INITIATOR}"
+                    echo "  开始: ${OP_STARTED} | 完成: ${OP_FINISHED}"
+                    echo ""
+                  done
+
+                  # 保存审计日志到 ConfigMap
+                  AUDIT_NAME="audit-log-$(date +%Y%m%d-%H)"
+                  kubectl create configmap "${AUDIT_NAME}" \
+                    --namespace argocd \
+                    --from-literal=timestamp="${TIMESTAMP}" \
+                    --from-literal=audit_log="$(echo -e "$AUDIT_LOG")" \
+                    --from-literal=format="timestamp|app_name|sync_status|health_status|revision|op_phase|initiator|started_at|finished_at" \
+                    -l app=argocd-audit \
+                    -l audit-date="$(date +%Y%m%d)" \
+                    --dry-run=client -o yaml | kubectl apply -f -
+
+                  echo "审计日志已保存: ${AUDIT_NAME}"
+
+                  # 清理超过 30 天的审计日志 ConfigMap
+                  CUTOFF_DATE=$(date -d "-30 days" +%Y%m%d 2>/dev/null || date -v-30d +%Y%m%d 2>/dev/null || echo "")
+                  if [[ -n "$CUTOFF_DATE" ]]; then
+                    OLD_AUDITS=$(kubectl get configmap -n argocd -l app=argocd-audit \
+                      -o jsonpath='{range .items[*]}{.metadata.name}{" "}{.metadata.labels.audit-date}{"\n"}{end}' | \
+                      awk -v cutoff="$CUTOFF_DATE" '$2 < cutoff {print $1}')
+
+                    if [[ -n "$OLD_AUDITS" ]]; then
+                      echo "清理过期审计日志..."
+                      echo "$OLD_AUDITS" | xargs -I{} kubectl delete configmap {} -n argocd
+                    fi
+                  fi
+
+              resources:
+                requests:
+                  cpu: 50m
+                  memory: 64Mi
+                limits:
+                  cpu: 100m
+                  memory: 128Mi
+
+---
+# 2. 审计日志查询 Service (可选 - 用于 Grafana 集成)
+# 通过 kubectl proxy 或自定义 API 暴露审计日志
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: audit-query-templates
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: audit-queries
+    app.kubernetes.io/part-of: ai-training-platform
+data:
+  # 查询最近的审计日志
+  query-recent.sh: |
+    #!/bin/bash
+    # 查询最近 24 小时的审计日志
+    kubectl get configmap -n argocd -l app=argocd-audit \
+      --sort-by=.metadata.creationTimestamp \
+      -o jsonpath='{range .items[*]}{.data.audit_log}{end}'
+
+  # 查询特定应用的变更历史
+  query-app-history.sh: |
+    #!/bin/bash
+    # 用法: ./query-app-history.sh <app-name>
+    APP_NAME="${1:?请指定应用名称}"
+    kubectl get configmap -n argocd -l app=argocd-audit \
+      -o jsonpath='{range .items[*]}{.data.audit_log}{end}' | \
+      grep "${APP_NAME}"
+
+  # 查询特定操作者的变更记录
+  query-by-initiator.sh: |
+    #!/bin/bash
+    # 用法: ./query-by-initiator.sh <username>
+    INITIATOR="${1:?请指定操作者}"
+    kubectl get configmap -n argocd -l app=argocd-audit \
+      -o jsonpath='{range .items[*]}{.data.audit_log}{end}' | \
+      grep "${INITIATOR}"
+
+  # 生成漂移报告
+  generate-drift-report.sh: |
+    #!/bin/bash
+    # 生成配置漂移统计报告
+    echo "=== ArgoCD 配置漂移报告 ==="
+    echo "生成时间: $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+    echo ""
+
+    # 统计 OutOfSync 事件
+    OUTOFSYNC_COUNT=$(kubectl get configmap -n argocd -l app=argocd-audit \
+      -o jsonpath='{range .items[*]}{.data.audit_log}{end}' | \
+      grep -c "OutOfSync" || echo "0")
+    echo "OutOfSync 事件总数: ${OUTOFSYNC_COUNT}"
+
+    # 统计 Degraded 事件
+    DEGRADED_COUNT=$(kubectl get configmap -n argocd -l app=argocd-audit \
+      -o jsonpath='{range .items[*]}{.data.audit_log}{end}' | \
+      grep -c "Degraded" || echo "0")
+    echo "Degraded 事件总数: ${DEGRADED_COUNT}"
+
+    # 当前状态概览
+    echo ""
+    echo "=== 当前应用状态 ==="
+    kubectl get applications -n argocd \
+      -o custom-columns=NAME:.metadata.name,SYNC:.status.sync.status,HEALTH:.status.health.status,REVISION:.status.sync.revision

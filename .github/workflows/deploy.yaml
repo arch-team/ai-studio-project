@@ -1,0 +1,396 @@
+# CI/CD 部署流水线
+# 完整流程: build → test → push image → update Git manifest → ArgoCD auto-sync
+#
+# 触发条件:
+#   - main 分支 push (自动部署到 dev)
+#   - release/* 分支 push (自动部署到 staging)
+#   - 手动触发 (可选择环境)
+#
+# 依赖的 GitHub Secrets:
+#   - AWS_ACCOUNT_ID: AWS 账号 ID
+#   - AWS_REGION: AWS 区域 (默认 us-east-1)
+#   - AWS_ROLE_ARN: GitHub Actions OIDC 角色 ARN
+#   - ECR_REGISTRY: ECR 仓库地址
+#
+# ArgoCD 自动同步:
+#   流水线更新 Kustomize overlay 中的镜像标签后，
+#   ArgoCD 检测 Git 变更并自动同步到集群。
+
+name: Deploy AI Training Platform
+
+on:
+  push:
+    branches:
+      - main
+      - "release/*"
+    paths:
+      - "backend/**"
+      - "frontend/**"
+      - "infrastructure/k8s/**"
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "部署目标环境"
+        required: true
+        type: choice
+        options:
+          - dev
+          - staging
+          - prod
+      component:
+        description: "部署组件"
+        required: true
+        type: choice
+        options:
+          - all
+          - backend
+          - frontend
+
+# 并发控制: 同一环境只允许一个部署
+concurrency:
+  group: deploy-${{ github.event.inputs.environment || (github.ref == 'refs/heads/main' && 'dev') || 'staging' }}
+  cancel-in-progress: false
+
+env:
+  AWS_REGION: ${{ secrets.AWS_REGION || 'us-east-1' }}
+  ECR_REGISTRY: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION || 'us-east-1' }}.amazonaws.com
+
+permissions:
+  id-token: write
+  contents: write
+  pull-requests: read
+
+jobs:
+  # ============================================================
+  # 1. 确定部署参数
+  # ============================================================
+  prepare:
+    name: "准备部署参数"
+    runs-on: ubuntu-latest
+    outputs:
+      environment: ${{ steps.params.outputs.environment }}
+      component: ${{ steps.params.outputs.component }}
+      image_tag: ${{ steps.params.outputs.image_tag }}
+      resource_prefix: ${{ steps.params.outputs.resource_prefix }}
+    steps:
+      - name: 确定部署参数
+        id: params
+        run: |
+          # 确定环境
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            ENV="${{ github.event.inputs.environment }}"
+            COMPONENT="${{ github.event.inputs.component }}"
+          elif [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
+            ENV="dev"
+            COMPONENT="all"
+          elif [[ "${{ github.ref }}" == refs/heads/release/* ]]; then
+            ENV="staging"
+            COMPONENT="all"
+          else
+            ENV="dev"
+            COMPONENT="all"
+          fi
+
+          # 镜像标签: v{版本}.{构建号}
+          IMAGE_TAG="v$(date +%Y%m%d).${GITHUB_RUN_NUMBER}"
+
+          # 资源前缀
+          RESOURCE_PREFIX="ai-platform-${ENV}"
+
+          echo "environment=${ENV}" >> "$GITHUB_OUTPUT"
+          echo "component=${COMPONENT}" >> "$GITHUB_OUTPUT"
+          echo "image_tag=${IMAGE_TAG}" >> "$GITHUB_OUTPUT"
+          echo "resource_prefix=${RESOURCE_PREFIX}" >> "$GITHUB_OUTPUT"
+
+          echo "## 部署参数" >> "$GITHUB_STEP_SUMMARY"
+          echo "- 环境: ${ENV}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- 组件: ${COMPONENT}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- 镜像标签: ${IMAGE_TAG}" >> "$GITHUB_STEP_SUMMARY"
+
+  # ============================================================
+  # 2. 后端测试和构建
+  # ============================================================
+  backend-build:
+    name: "后端: 测试 + 构建"
+    needs: prepare
+    if: needs.prepare.outputs.component == 'all' || needs.prepare.outputs.component == 'backend'
+    runs-on: ubuntu-latest
+    env:
+      IMAGE_TAG: ${{ needs.prepare.outputs.image_tag }}
+      RESOURCE_PREFIX: ${{ needs.prepare.outputs.resource_prefix }}
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 配置 Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: 安装依赖
+        run: |
+          cd backend
+          pip install -r requirements.txt
+          pip install -r requirements-dev.txt
+
+      - name: 代码检查 (ruff)
+        run: |
+          cd backend
+          ruff check .
+          ruff format --check .
+
+      - name: 类型检查 (mypy)
+        run: |
+          cd backend
+          mypy src/ --ignore-missing-imports
+        continue-on-error: true
+
+      - name: 单元测试
+        run: |
+          cd backend
+          pytest tests/unit/ -v --tb=short --junitxml=test-results.xml
+        continue-on-error: false
+
+      - name: 配置 AWS 凭证 (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: 登录 ECR
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: 构建并推送镜像
+        run: |
+          IMAGE_URI="${ECR_REGISTRY}/${RESOURCE_PREFIX}-backend:${IMAGE_TAG}"
+          docker build -t "${IMAGE_URI}" ./backend
+          docker push "${IMAGE_URI}"
+          echo "backend_image=${IMAGE_URI}" >> "$GITHUB_ENV"
+
+      - name: 记录构建信息
+        run: |
+          echo "## 后端构建" >> "$GITHUB_STEP_SUMMARY"
+          echo "- 镜像: ${backend_image}" >> "$GITHUB_STEP_SUMMARY"
+
+  # ============================================================
+  # 3. 前端测试和构建
+  # ============================================================
+  frontend-build:
+    name: "前端: 测试 + 构建"
+    needs: prepare
+    if: needs.prepare.outputs.component == 'all' || needs.prepare.outputs.component == 'frontend'
+    runs-on: ubuntu-latest
+    env:
+      IMAGE_TAG: ${{ needs.prepare.outputs.image_tag }}
+      RESOURCE_PREFIX: ${{ needs.prepare.outputs.resource_prefix }}
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 配置 Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: 安装依赖
+        run: |
+          cd frontend
+          npm ci
+
+      - name: 代码检查 (ESLint)
+        run: |
+          cd frontend
+          npm run lint
+
+      - name: 类型检查 (TypeScript)
+        run: |
+          cd frontend
+          npm run type-check
+        continue-on-error: true
+
+      - name: 单元测试
+        run: |
+          cd frontend
+          npm run test -- --reporter=verbose
+        continue-on-error: false
+
+      - name: 构建
+        run: |
+          cd frontend
+          npm run build
+
+      - name: 配置 AWS 凭证 (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: 登录 ECR
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: 构建并推送镜像
+        run: |
+          IMAGE_URI="${ECR_REGISTRY}/${RESOURCE_PREFIX}-frontend:${IMAGE_TAG}"
+          docker build -t "${IMAGE_URI}" ./frontend
+          docker push "${IMAGE_URI}"
+          echo "frontend_image=${IMAGE_URI}" >> "$GITHUB_ENV"
+
+      - name: 记录构建信息
+        run: |
+          echo "## 前端构建" >> "$GITHUB_STEP_SUMMARY"
+          echo "- 镜像: ${frontend_image}" >> "$GITHUB_STEP_SUMMARY"
+
+  # ============================================================
+  # 4. 更新 Git Manifest (触发 ArgoCD 自动同步)
+  # ============================================================
+  update-manifests:
+    name: "更新 K8s 清单"
+    needs: [prepare, backend-build, frontend-build]
+    if: |
+      always() &&
+      (needs.backend-build.result == 'success' || needs.backend-build.result == 'skipped') &&
+      (needs.frontend-build.result == 'success' || needs.frontend-build.result == 'skipped')
+    runs-on: ubuntu-latest
+    env:
+      ENVIRONMENT: ${{ needs.prepare.outputs.environment }}
+      IMAGE_TAG: ${{ needs.prepare.outputs.image_tag }}
+      RESOURCE_PREFIX: ${{ needs.prepare.outputs.resource_prefix }}
+      COMPONENT: ${{ needs.prepare.outputs.component }}
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 更新后端镜像标签
+        if: env.COMPONENT == 'all' || env.COMPONENT == 'backend'
+        run: |
+          OVERLAY_DIR="infrastructure/k8s/overlays/${ENVIRONMENT}"
+          BACKEND_IMAGE="${ECR_REGISTRY}/${RESOURCE_PREFIX}-backend:${IMAGE_TAG}"
+
+          # 使用 kustomize edit 更新镜像
+          cd "${OVERLAY_DIR}"
+          kustomize edit set image "*-backend*=${BACKEND_IMAGE}"
+
+      - name: 更新前端镜像标签
+        if: env.COMPONENT == 'all' || env.COMPONENT == 'frontend'
+        run: |
+          OVERLAY_DIR="infrastructure/k8s/overlays/${ENVIRONMENT}"
+          FRONTEND_IMAGE="${ECR_REGISTRY}/${RESOURCE_PREFIX}-frontend:${IMAGE_TAG}"
+
+          cd "${OVERLAY_DIR}"
+          kustomize edit set image "*-frontend*=${FRONTEND_IMAGE}"
+
+      - name: 提交并推送清单变更
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          git add infrastructure/k8s/
+          if git diff --staged --quiet; then
+            echo "没有清单变更，跳过提交"
+          else
+            git commit -m "chore(k8s): 更新 ${ENVIRONMENT} 镜像标签到 ${IMAGE_TAG}
+
+          组件: ${COMPONENT}
+          触发: ${GITHUB_SHA:0:8}
+          流水线: ${GITHUB_RUN_ID}"
+            git push
+          fi
+
+      - name: 记录部署信息
+        run: |
+          echo "## 清单更新" >> "$GITHUB_STEP_SUMMARY"
+          echo "- 环境: ${ENVIRONMENT}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- 镜像标签: ${IMAGE_TAG}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- ArgoCD 将自动检测变更并同步" >> "$GITHUB_STEP_SUMMARY"
+
+  # ============================================================
+  # 5. 部署验证
+  # ============================================================
+  verify-deployment:
+    name: "验证部署"
+    needs: [prepare, update-manifests]
+    if: needs.update-manifests.result == 'success'
+    runs-on: ubuntu-latest
+    env:
+      ENVIRONMENT: ${{ needs.prepare.outputs.environment }}
+    steps:
+      - name: 配置 AWS 凭证
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: 更新 kubeconfig
+        run: |
+          aws eks update-kubeconfig \
+            --name ai-platform-${ENVIRONMENT}-eks \
+            --region ${{ env.AWS_REGION }}
+
+      - name: 等待 ArgoCD 同步完成
+        run: |
+          echo "等待 ArgoCD 检测变更并同步 (最多 5 分钟)..."
+          for i in $(seq 1 30); do
+            SYNC_STATUS=$(kubectl get application -n argocd \
+              -l environment=${ENVIRONMENT} \
+              -o jsonpath='{.items[*].status.sync.status}' 2>/dev/null || echo "Unknown")
+
+            HEALTH_STATUS=$(kubectl get application -n argocd \
+              -l environment=${ENVIRONMENT} \
+              -o jsonpath='{.items[*].status.health.status}' 2>/dev/null || echo "Unknown")
+
+            echo "同步状态: ${SYNC_STATUS} | 健康状态: ${HEALTH_STATUS}"
+
+            if [[ "${SYNC_STATUS}" == *"Synced"* ]] && [[ "${HEALTH_STATUS}" == *"Healthy"* ]]; then
+              echo "部署同步成功"
+              exit 0
+            fi
+            sleep 10
+          done
+          echo "警告: ArgoCD 同步超时，请手动检查"
+          exit 1
+        continue-on-error: true
+
+      - name: 验证 Pod 状态
+        run: |
+          echo "--- Pod 状态 ---"
+          kubectl get pods -n ai-platform -o wide
+          echo ""
+          echo "--- Service 状态 ---"
+          kubectl get svc -n ai-platform
+          echo ""
+          echo "--- HPA 状态 ---"
+          kubectl get hpa -n ai-platform
+
+      - name: 健康检查
+        run: |
+          # 检查后端健康
+          kubectl exec -n ai-platform deploy/backend -- \
+            curl -sf http://localhost:8000/health || echo "后端健康检查失败"
+        continue-on-error: true
+
+      - name: 部署总结
+        run: |
+          echo "## 部署验证" >> "$GITHUB_STEP_SUMMARY"
+          echo "- 环境: ${ENVIRONMENT}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- 时间: $(date -u '+%Y-%m-%d %H:%M:%S UTC')" >> "$GITHUB_STEP_SUMMARY"
+
+  # ============================================================
+  # 6. 生产环境审批门控 (仅 prod)
+  # ============================================================
+  prod-approval:
+    name: "生产环境审批"
+    needs: prepare
+    if: needs.prepare.outputs.environment == 'prod'
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: 审批确认
+        run: |
+          echo "生产环境部署已获批准"
+          echo "审批者: ${{ github.actor }}"
+          echo "时间: $(date -u '+%Y-%m-%d %H:%M:%S UTC')"

@@ -1,0 +1,66 @@
+# ALB Ingress - AI Training Platform
+# 通过 AWS ALB Ingress Controller 路由流量到前端和后端服务
+# 路由规则: /api/* → backend, /* → frontend
+#
+# 注意: 当前环境使用 TargetGroupBinding 直接绑定 ALB Target Group。
+# 本 Ingress 清单作为完整 GitOps 工作流的补充，适用于新环境快速部署。
+# 两种方式二选一:
+#   - TargetGroupBinding: CDK 创建 ALB + Target Group，K8s 绑定 (当前方式)
+#   - Ingress: ALB Ingress Controller 自动创建 ALB (本清单)
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: ai-platform-ingress
+  namespace: ai-platform
+  labels:
+    app.kubernetes.io/part-of: ai-training-platform
+  annotations:
+    # ALB Ingress Controller 注解
+    kubernetes.io/ingress.class: alb
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+    # 监听 HTTP 和 HTTPS
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP":80},{"HTTPS":443}]'
+    # HTTP 重定向到 HTTPS
+    alb.ingress.kubernetes.io/ssl-redirect: "443"
+    # TLS 1.2+ 安全策略
+    alb.ingress.kubernetes.io/ssl-policy: ELBSecurityPolicy-TLS13-1-2-2021-06
+    # 健康检查配置
+    alb.ingress.kubernetes.io/healthcheck-path: /health
+    alb.ingress.kubernetes.io/healthcheck-interval-seconds: "15"
+    alb.ingress.kubernetes.io/healthcheck-timeout-seconds: "5"
+    alb.ingress.kubernetes.io/healthy-threshold-count: "2"
+    alb.ingress.kubernetes.io/unhealthy-threshold-count: "3"
+    # 资源标签
+    alb.ingress.kubernetes.io/tags: Environment=dev,Component=ingress,ManagedBy=gitops
+    # 请求超时
+    alb.ingress.kubernetes.io/load-balancer-attributes: idle_timeout.timeout_seconds=60
+spec:
+  ingressClassName: alb
+  rules:
+    - http:
+        paths:
+          # API 请求路由到后端
+          - path: /api
+            pathType: Prefix
+            backend:
+              service:
+                name: backend-svc
+                port:
+                  number: 8000
+          # 健康检查路由到后端
+          - path: /health
+            pathType: Exact
+            backend:
+              service:
+                name: backend-svc
+                port:
+                  number: 8000
+          # 其他请求路由到前端
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: frontend-svc
+                port:
+                  number: 3000
