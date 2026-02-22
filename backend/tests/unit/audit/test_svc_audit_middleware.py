@@ -628,33 +628,24 @@ class TestAuditMiddlewareResponseCapture:
 class TestAuditMiddlewareAsyncBehavior:
     """Tests for async write behavior."""
 
-    @pytest.mark.asyncio
-    async def test_writes_async_without_blocking(
+    def test_writes_via_background_task(
         self,
         mock_audit_repository: AsyncMock,
     ) -> None:
-        """Audit write should not block the response."""
+        """Audit write should execute via Starlette BackgroundTask after response is sent."""
         from src.modules.audit.api.middleware import AuditMiddleware
 
-        # Configure mock to delay
-        async def slow_create(*args, **kwargs):
-            await asyncio.sleep(1)  # Simulate slow write
-            return MagicMock(id=1)
-
-        mock_audit_repository.create = slow_create
+        mock_audit_repository.create = AsyncMock(return_value=MagicMock(id=1))
 
         app = self._create_test_app(AuditMiddleware, mock_audit_repository)
         client = TestClient(app)
 
-        import time
-
-        start = time.time()
         response = client.post("/api/v1/training-jobs", json={"name": "test"})
-        elapsed = time.time() - start
 
-        # Response should return before the slow write completes
+        # 响应成功
         assert response.status_code == 201
-        assert elapsed < 0.5  # Should not wait for the 1s delay
+        # BackgroundTask 在 TestClient 中同步执行，验证审计日志已被写入
+        mock_audit_repository.create.assert_called_once()
 
     def test_continues_on_write_failure(
         self,

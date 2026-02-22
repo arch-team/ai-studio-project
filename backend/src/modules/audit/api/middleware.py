@@ -1,12 +1,12 @@
 """审计日志中间件 - API 请求追踪."""
 
-import asyncio
 import json
 import re
 from collections.abc import Callable
 from typing import Any
 
 import structlog
+from starlette.background import BackgroundTask
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
@@ -121,14 +121,14 @@ class AuditMiddleware(BaseHTTPMiddleware):
         # 执行实际请求
         response = await self._safe_call_next(request, call_next)
 
-        # 异步写入审计日志（不阻塞主流程）
-        asyncio.create_task(
-            self._write_audit_log(
-                request=request,
-                response=response,
-                operation_type=operation_type,
-                request_data=request_data,
-            )
+        # 使用 Starlette BackgroundTask 在响应发送后写入审计日志
+        # 确保请求上下文（session、app.state）在任务执行期间仍然有效
+        response.background = BackgroundTask(
+            self._write_audit_log,
+            request=request,
+            response=response,
+            operation_type=operation_type,
+            request_data=request_data,
         )
 
         return response
@@ -263,7 +263,7 @@ class AuditMiddleware(BaseHTTPMiddleware):
                     await repo.create(audit_log)
                     await session.commit()
             else:
-                logger.debug("audit_repository_not_configured")
+                logger.warning("audit_repository_not_configured")
 
         except Exception as e:
             # 记录错误但不阻塞主流程（审计不应影响业务请求）
