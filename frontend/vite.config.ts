@@ -29,18 +29,26 @@ export default defineConfig({
   build: {
     outDir: "dist",
     sourcemap: true,
+    // 目标现代浏览器，启用更优压缩
+    target: "es2020",
+    // 压缩配置
+    minify: "esbuild",
     rollupOptions: {
       output: {
         manualChunks: {
-          // 将大型依赖拆分为独立 chunk，降低首屏 JS 体积
+          // 核心框架 (首屏必需)
           "vendor-react": ["react", "react-dom", "react-router-dom"],
+          // UI 组件库 (体积较大，单独分包)
           "vendor-cloudscape": [
             "@cloudscape-design/components",
             "@cloudscape-design/global-styles",
           ],
-          "vendor-query": ["@tanstack/react-query"],
+          // 数据层 (Query + 状态管理)
+          "vendor-data": ["@tanstack/react-query", "zustand"],
         },
       },
     },
+    // 输出文件大小警告阈值 (500KB)
+    chunkSizeWarningLimit: 500,
   },
 });

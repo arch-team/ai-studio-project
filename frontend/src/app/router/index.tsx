@@ -3,50 +3,106 @@
  * Router Configuration
  *
  * Task: T017 - 配置 React Router
- * TDD Step 2: Green - 实现代码
+ * Task: T103 - 前端性能优化 (路由级懒加载)
  *
- * 应用路由配置
+ * 应用路由配置 - 使用 React.lazy() 实现路由级代码分割
  */
 
+import { lazy, Suspense } from "react";
 import { createBrowserRouter, Navigate, Outlet } from "react-router-dom";
 import { MainLayout } from "@layouts/MainLayout";
 import { AuthGuard } from "./guards/AuthGuard";
 import { RoleGuard } from "./guards/RoleGuard";
 import { ROUTES } from "./routes";
+import { PageSpinner } from "@shared/components/feedback";
 
-// Training 模块页面
-import {
-  TrainingJobListPage,
-  CreateTrainingJobPage,
-  TrainingJobDetailPage,
-} from "@features/training";
+// === 懒加载页面组件 ===
 
-// Templates 模块页面
-import { TemplateListPage, TemplateDetailPage } from "@features/templates";
-
-// Models 模块页面
-import {
-  ModelListPage,
-  ModelDetailPage,
-  ModelVersionsPage,
-} from "@features/models";
-
-// Resource Quotas 模块页面
-import { ResourceQuotasPage } from "@features/resource-quotas";
-
-// Reports 模块页面
-import { CostAnalysisPage, ResourceUsageReportPage } from "@features/reports";
-
-// Datasets 模块页面
-import {
-  DatasetListPage,
-  CreateDatasetPage,
-  DatasetVersionsPage,
-} from "@features/datasets";
-
-// Auth 模块页面
+// Auth 模块 (登录页不懒加载，保证首屏体验)
 import { LoginPage } from "@features/auth";
 import { AuthLayout } from "@layouts/AuthLayout";
+
+// Training 模块页面
+const TrainingJobListPage = lazy(() =>
+  import("@features/training/pages/TrainingJobListPage").then((m) => ({
+    default: m.TrainingJobListPage,
+  })),
+);
+const CreateTrainingJobPage = lazy(() =>
+  import("@features/training/pages/CreateTrainingJobPage").then((m) => ({
+    default: m.CreateTrainingJobPage,
+  })),
+);
+const TrainingJobDetailPage = lazy(() =>
+  import("@features/training/pages/TrainingJobDetailPage").then((m) => ({
+    default: m.TrainingJobDetailPage,
+  })),
+);
+
+// Templates 模块页面
+const TemplateListPage = lazy(() =>
+  import("@features/templates/pages/TemplateListPage").then((m) => ({
+    default: m.TemplateListPage,
+  })),
+);
+const TemplateDetailPage = lazy(() =>
+  import("@features/templates/pages/TemplateDetailPage").then((m) => ({
+    default: m.TemplateDetailPage,
+  })),
+);
+
+// Models 模块页面
+const ModelListPage = lazy(() =>
+  import("@features/models/pages/ModelListPage").then((m) => ({
+    default: m.ModelListPage,
+  })),
+);
+const ModelDetailPage = lazy(() =>
+  import("@features/models/pages/ModelDetailPage").then((m) => ({
+    default: m.ModelDetailPage,
+  })),
+);
+const ModelVersionsPage = lazy(() =>
+  import("@features/models/pages/ModelVersionsPage").then((m) => ({
+    default: m.ModelVersionsPage,
+  })),
+);
+
+// Resource Quotas 模块页面
+const ResourceQuotasPage = lazy(() =>
+  import("@features/resource-quotas/ResourceQuotasPage").then((m) => ({
+    default: m.ResourceQuotasPage,
+  })),
+);
+
+// Reports 模块页面
+const CostAnalysisPage = lazy(() =>
+  import("@features/reports/pages/CostAnalysisPage").then((m) => ({
+    default: m.CostAnalysisPage,
+  })),
+);
+const ResourceUsageReportPage = lazy(() =>
+  import("@features/reports/pages/ResourceUsageReportPage").then((m) => ({
+    default: m.ResourceUsageReportPage,
+  })),
+);
+
+// Datasets 模块页面
+const DatasetListPage = lazy(() =>
+  import("@features/datasets/pages/DatasetListPage").then((m) => ({
+    default: m.DatasetListPage,
+  })),
+);
+const CreateDatasetPage = lazy(() =>
+  import("@features/datasets/pages/CreateDatasetPage").then((m) => ({
+    default: m.CreateDatasetPage,
+  })),
+);
+const DatasetVersionsPage = lazy(() =>
+  import("@features/datasets/pages/DatasetVersionsPage").then((m) => ({
+    default: m.DatasetVersionsPage,
+  })),
+);
 
 // 占位页面组件 (待实现)
 const HomePage = () => <div>首页</div>;
@@ -60,13 +116,15 @@ const UnauthorizedPage = () => <div>无权访问</div>;
 
 /**
  * 受保护的布局容器
- * 包含 AuthGuard 和 MainLayout
+ * 包含 AuthGuard、MainLayout 和 Suspense
  */
 function ProtectedLayout() {
   return (
     <AuthGuard>
       <MainLayout>
-        <Outlet />
+        <Suspense fallback={<PageSpinner />}>
+          <Outlet />
+        </Suspense>
       </MainLayout>
     </AuthGuard>
   );

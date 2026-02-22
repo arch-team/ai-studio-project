@@ -21,7 +21,69 @@ module.exports = {
     'no-restricted-imports': [
       'error',
       {
+        // === Cloudscape 合规性规则 (T106) ===
+        // 禁止使用非 Cloudscape UI 库
+        paths: [
+          {
+            name: '@mui/material',
+            message: '禁止使用 MUI，请使用 @cloudscape-design/components',
+          },
+          {
+            name: '@mui/icons-material',
+            message: '禁止使用 MUI Icons，请使用 Cloudscape 内置图标',
+          },
+          {
+            name: '@material-ui/core',
+            message: '禁止使用 Material UI，请使用 @cloudscape-design/components',
+          },
+          {
+            name: 'antd',
+            message: '禁止使用 Ant Design，请使用 @cloudscape-design/components',
+          },
+          {
+            name: '@ant-design/icons',
+            message: '禁止使用 Ant Design Icons，请使用 Cloudscape 内置图标',
+          },
+          {
+            name: '@chakra-ui/react',
+            message: '禁止使用 Chakra UI，请使用 @cloudscape-design/components',
+          },
+          {
+            name: '@mantine/core',
+            message: '禁止使用 Mantine，请使用 @cloudscape-design/components',
+          },
+          {
+            name: 'bootstrap',
+            message: '禁止使用 Bootstrap，请使用 @cloudscape-design/components',
+          },
+          {
+            name: 'react-bootstrap',
+            message: '禁止使用 React Bootstrap，请使用 @cloudscape-design/components',
+          },
+        ],
         patterns: [
+          // === Cloudscape 合规性规则 (T106) ===
+          {
+            group: ['@mui/*'],
+            message: '禁止使用 MUI 系列库，请使用 @cloudscape-design/components',
+          },
+          {
+            group: ['@material-ui/*'],
+            message: '禁止使用 Material UI，请使用 @cloudscape-design/components',
+          },
+          {
+            group: ['@ant-design/*'],
+            message: '禁止使用 Ant Design 系列库，请使用 @cloudscape-design/components',
+          },
+          {
+            group: ['@chakra-ui/*'],
+            message: '禁止使用 Chakra UI 系列库，请使用 @cloudscape-design/components',
+          },
+          {
+            group: ['@mantine/*'],
+            message: '禁止使用 Mantine 系列库，请使用 @cloudscape-design/components',
+          },
+          // === 架构合规规则 ===
           // 禁止导入其他 feature 模块的内部实现（非 index.ts）
           {
             group: ['@features/*/api/*', '!@features/*/api/index', '!@features/*/api'],

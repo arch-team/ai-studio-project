@@ -24,6 +24,7 @@
     "zustand": "^4.4.7"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.11.1",
     "@playwright/test": "^1.57.0",
     "@tanstack/react-query-devtools": "^5.91.2",
     "@testing-library/jest-dom": "^6.2.0",
