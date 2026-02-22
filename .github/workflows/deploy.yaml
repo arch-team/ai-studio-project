@@ -144,7 +144,6 @@ jobs:
         run: |
           cd backend
           mypy src/ --ignore-missing-imports
-        continue-on-error: true
 
       - name: 单元测试
         run: |
@@ -209,7 +208,6 @@ jobs:
         run: |
           cd frontend
           npm run type-check
-        continue-on-error: true
 
       - name: 单元测试
         run: |
@@ -293,7 +291,7 @@ jobs:
           if git diff --staged --quiet; then
             echo "没有清单变更，跳过提交"
           else
-            git commit -m "chore(k8s): 更新 ${ENVIRONMENT} 镜像标签到 ${IMAGE_TAG}
+            git commit -m "chore(k8s): 更新 ${ENVIRONMENT} 镜像标签到 ${IMAGE_TAG} [skip ci]
 
           组件: ${COMPONENT}
           触发: ${GITHUB_SHA:0:8}

@@ -1,9 +1,14 @@
-# ArgoCD 安装清单
-# 在 EKS 集群中安装 ArgoCD，使用 Helm 方式部署
+# ArgoCD 安装配置
 #
 # 安装步骤:
-#   kubectl apply -f install.yaml
-#   kubectl wait --for=condition=available deployment/argocd-server -n argocd --timeout=300s
+# 1. 安装 ArgoCD 核心组件 (使用官方 Helm Chart 或 manifest):
+#    kubectl create namespace argocd
+#    kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
+#
+# 2. 应用本配置文件 (覆盖默认配置):
+#    kubectl apply -f infrastructure/argocd/install.yaml
+#
+# 本文件仅包含自定义配置 (RBAC、通知、Ingress)，不包含 ArgoCD 核心 Deployment。
 #
 # 参考: https://argo-cd.readthedocs.io/en/stable/operator-manual/installation/
 ---

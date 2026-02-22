@@ -15,13 +15,17 @@
 import { test, expect } from "@playwright/test";
 import { loginViaUI } from "../utils/auth";
 
+// 判断是否为本地模式 (未设置 E2E_BASE_URL 即为本地)
+const isLocal = !process.env.E2E_BASE_URL;
+
 test.describe("Phase 8 质量保障测试", () => {
   // === 1. API 错误格式验证 (RFC 7807) ===
 
   test.describe("API 错误格式标准化", () => {
-    // 标记为 fixme: Dev 环境后端尚未部署 Phase 8 代码
-    // 本地验证通过后，待后端部署完成再启用
-    test.fixme("API 错误应返回 RFC 7807 格式", async ({ page, baseURL }) => {
+    test("API 错误应返回 RFC 7807 格式", async ({ page, baseURL }) => {
+      // RFC 7807 格式依赖后端部署 Phase 8 代码，远程环境可能尚未部署
+      test.skip(!isLocal, "此测试需要本地环境，远程环境后端可能尚未部署 Phase 8 代码");
+
       await loginViaUI(page);
 
       // 直接请求后端 API，检查 404 错误响应格式
@@ -34,8 +38,6 @@ test.describe("Phase 8 质量保障测试", () => {
       const body = await response.json();
 
       // 验证错误格式符合 RFC 7807 (Problem Details for HTTP APIs)
-      // 当前 Dev 环境返回 {"detail": "Not Found"} 而非 RFC 7807 格式
-      // 等待后端部署 Phase 8 代码后，应返回:
       // { "type": "...", "title": "...", "status": 404, "detail": "..." }
       expect(body).toHaveProperty("type");
       expect(body).toHaveProperty("title");
@@ -46,16 +48,16 @@ test.describe("Phase 8 质量保障测试", () => {
 
   // === 2. 前端重试逻辑验证 ===
 
-  test.describe("请求重试机制", () => {
-    // 远程模式下 route mock 不稳定，标记为 fixme
-    // 本地模式 (localhost:5173) 验证通过
-    test.fixme("5xx 错误应触发自动重试", async ({ page }) => {
+  test.describe("需要本地环境的 route mock 测试", () => {
+    test("5xx 错误应触发自动重试", async ({ page }) => {
+      test.skip(!isLocal, "此测试需要本地环境的 route mock 支持");
+
       await loginViaUI(page);
 
       let requestCount = 0;
 
       // 注意: 在远程模式下，route mock 可能在请求发出后才注册，导致拦截失败
-      // 建议在本地模式下运行此测试，或改为验证 TanStack Query 的 retry 配置
+      // 因此此测试仅在本地模式下运行
       await page.route("**/api/v1/training-jobs", async (route) => {
         requestCount++;
 
@@ -97,12 +99,13 @@ test.describe("Phase 8 质量保障测试", () => {
       await expect(errorMessage).not.toBeVisible();
     });
 
-    test.fixme("404 错误不应重试", async ({ page }) => {
+    test("404 错误不应重试", async ({ page }) => {
+      test.skip(!isLocal, "此测试需要本地环境的 route mock 支持");
+
       await loginViaUI(page);
 
       let requestCount = 0;
 
-      // 注意: 在远程模式下，route mock 可能不可靠
       await page.route("**/api/v1/training-jobs/999999", async (route) => {
         requestCount++;
         await route.fulfill({
@@ -128,13 +131,10 @@ test.describe("Phase 8 质量保障测试", () => {
       const errorMessage = page.getByText("训练任务不存在");
       await expect(errorMessage).toBeVisible();
     });
-  });
 
-  // === 3. 错误边界验证 ===
+    test("组件崩溃应被优雅捕获", async ({ page }) => {
+      test.skip(!isLocal, "此测试需要本地环境的 route mock 支持");
 
-  test.describe("错误边界组件", () => {
-    // 远程模式下 route mock 不稳定，标记为 fixme
-    test.fixme("组件崩溃应被优雅捕获", async ({ page }) => {
       await loginViaUI(page);
 
       // 监听控制台错误
