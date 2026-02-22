@@ -1,0 +1,109 @@
+# Alertmanager 配置 - 告警通知渠道和路由规则
+# 通过 Slack 通知渠道分发 critical/warning 级别告警
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: alertmanager-config
+  namespace: hyperpod-monitoring
+  labels:
+    app.kubernetes.io/name: alertmanager
+    app.kubernetes.io/component: alerting
+data:
+  alertmanager.yml: |
+    # 全局配置
+    global:
+      resolve_timeout: 5m
+
+    # 告警路由树
+    route:
+      receiver: 'default-slack'
+      # 按告警名称、集群、命名空间分组，避免告警风暴
+      group_by: ['alertname', 'cluster', 'namespace']
+      # 收到新告警后等待 30 秒收集同组告警再发送
+      group_wait: 30s
+      # 同组内新告警的批次间隔
+      group_interval: 5m
+      # 已发送告警的重复通知间隔
+      repeat_interval: 4h
+      routes:
+        # critical 级别: 发送到专用紧急频道，1 小时重复提醒
+        - match:
+            severity: critical
+          receiver: 'critical-slack'
+          repeat_interval: 1h
+          continue: false
+        # warning 级别: 发送到通用告警频道，4 小时重复提醒
+        - match:
+            severity: warning
+          receiver: 'warning-slack'
+          repeat_interval: 4h
+          continue: false
+
+    # 通知接收器
+    receivers:
+      # 默认接收器 - 未匹配路由的告警
+      - name: 'default-slack'
+        slack_configs:
+          - api_url_file: '/etc/alertmanager/secrets/slack-webhook-url'
+            channel: '#ai-platform-alerts'
+            title: '[{{ .Status | toUpper }}] {{ .CommonLabels.alertname }}'
+            text: >-
+              {{ range .Alerts -}}
+              *告警*: {{ .Labels.alertname }}
+              *级别*: {{ .Labels.severity }}
+              *分类*: {{ .Labels.category }}
+              *摘要*: {{ .Annotations.summary }}
+              *详情*: {{ .Annotations.description }}
+              *节点*: {{ .Labels.node }}
+              *命名空间*: {{ .Labels.namespace }}
+              {{ end }}
+            send_resolved: true
+            icon_emoji: ':bell:'
+
+      # critical 级别接收器 - 紧急告警专用频道
+      - name: 'critical-slack'
+        slack_configs:
+          - api_url_file: '/etc/alertmanager/secrets/slack-webhook-url'
+            channel: '#ai-platform-critical'
+            title: '🚨 [CRITICAL] {{ .CommonLabels.alertname }}'
+            text: >-
+              {{ range .Alerts -}}
+              *告警*: {{ .Labels.alertname }}
+              *级别*: {{ .Labels.severity }}
+              *分类*: {{ .Labels.category }}
+              *摘要*: {{ .Annotations.summary }}
+              *详情*: {{ .Annotations.description }}
+              *节点*: {{ .Labels.node }}
+              *命名空间*: {{ .Labels.namespace }}
+              {{ end }}
+            send_resolved: true
+            icon_emoji: ':rotating_light:'
+
+      # warning 级别接收器 - 通用告警频道
+      - name: 'warning-slack'
+        slack_configs:
+          - api_url_file: '/etc/alertmanager/secrets/slack-webhook-url'
+            channel: '#ai-platform-alerts'
+            title: '⚠️ [WARNING] {{ .CommonLabels.alertname }}'
+            text: >-
+              {{ range .Alerts -}}
+              *告警*: {{ .Labels.alertname }}
+              *级别*: {{ .Labels.severity }}
+              *分类*: {{ .Labels.category }}
+              *摘要*: {{ .Annotations.summary }}
+              *详情*: {{ .Annotations.description }}
+              *节点*: {{ .Labels.node }}
+              *命名空间*: {{ .Labels.namespace }}
+              {{ end }}
+            send_resolved: true
+            icon_emoji: ':warning:'
+
+    # 告警抑制规则 - critical 触发时抑制同源的 warning
+    inhibit_rules:
+      - source_match:
+          severity: 'critical'
+        target_match:
+          severity: 'warning'
+        # 相同告警名称、集群、命名空间时抑制
+        equal: ['alertname', 'cluster', 'namespace']

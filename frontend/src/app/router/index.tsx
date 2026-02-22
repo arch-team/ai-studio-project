@@ -13,7 +13,6 @@ import { createBrowserRouter, Navigate, Outlet } from "react-router-dom";
 import {
   Alert,
   Box,
-  Container,
   Header,
   SpaceBetween,
 } from "@cloudscape-design/components";
@@ -105,27 +104,51 @@ const CreateDatasetPage = lazy(() =>
     default: m.CreateDatasetPage,
   })),
 );
+const DatasetDetailPage = lazy(() =>
+  import("@features/datasets/pages/DatasetDetailPage").then((m) => ({
+    default: m.DatasetDetailPage,
+  })),
+);
 const DatasetVersionsPage = lazy(() =>
   import("@features/datasets/pages/DatasetVersionsPage").then((m) => ({
     default: m.DatasetVersionsPage,
   })),
 );
 
-// 占位页面组件 (待实现) - 使用 Cloudscape 统一样式
-const PlaceholderPage = ({ title }: { title: string }) => (
-  <Container header={<Header variant="h1">{title}</Header>}>
-    <Box textAlign="center" color="text-status-inactive" padding="xl">
-      功能开发中
-    </Box>
-  </Container>
+// Dashboard 模块页面
+const HomePage = lazy(() =>
+  import("@features/dashboard/pages/HomePage").then((m) => ({
+    default: m.HomePage,
+  })),
 );
 
-const HomePage = () => <PlaceholderPage title="首页" />;
-const DatasetDetailPage = () => <PlaceholderPage title="数据集详情" />;
-const CheckpointsPage = () => <PlaceholderPage title="检查点列表" />;
-const AdminPage = () => <PlaceholderPage title="管理后台" />;
-const ReportsPage = () => <PlaceholderPage title="报表" />;
-const IDEPage = () => <PlaceholderPage title="开发环境" />;
+// Checkpoints 页面
+const CheckpointsPage = lazy(() =>
+  import("@features/training/pages/CheckpointsPage").then((m) => ({
+    default: m.CheckpointsPage,
+  })),
+);
+
+// Admin 模块页面
+const AdminPage = lazy(() =>
+  import("@features/admin/pages/AdminPage").then((m) => ({
+    default: m.AdminPage,
+  })),
+);
+
+// Reports 入口页面
+const ReportsPage = lazy(() =>
+  import("@features/reports/pages/ReportsPage").then((m) => ({
+    default: m.ReportsPage,
+  })),
+);
+
+// IDE 开发空间页面
+const IDEPage = lazy(() =>
+  import("@features/spaces/pages/IDEPage").then((m) => ({
+    default: m.IDEPage,
+  })),
+);
 
 // 错误页面 - 使用 Cloudscape Alert 组件
 const NotFoundPage = () => (

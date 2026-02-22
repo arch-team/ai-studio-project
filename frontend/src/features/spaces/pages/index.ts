@@ -2,5 +2,6 @@
  * Spaces pages exports.
  */
 
-export { SpaceListPage } from './SpaceListPage';
-export { CreateSpacePage } from './CreateSpacePage';
+export { SpaceListPage } from "./SpaceListPage";
+export { CreateSpacePage } from "./CreateSpacePage";
+export { IDEPage } from "./IDEPage";

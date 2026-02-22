@@ -101,9 +101,14 @@ async def get_job_gpu_utilization(
     if start_time is None:
         start_time = end_time - timedelta(hours=1)
 
+    from src.shared.infrastructure import get_settings
+
+    settings = get_settings()
+    cluster_name = settings.hyperpod_cluster_name or "default"
+
     try:
         result = await prometheus_service.get_gpu_utilization(
-            cluster_name="default",  # TODO: 从任务获取集群名称
+            cluster_name=cluster_name,
             start_time=start_time,
             end_time=end_time,
         )

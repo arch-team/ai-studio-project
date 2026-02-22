@@ -7,6 +7,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.modules.quotas.infrastructure import QuotaCheckerImpl, ResourceQuotaRepository
 from src.modules.training.application.interfaces import IMetricsService
+from src.modules.training.application.interfaces.kueue_client import IKueueClient
+from src.modules.training.application.interfaces.log_client import ITrainingLogClient
 from src.modules.training.application.services import (
     CheckpointService,
     JobTemplateService,
@@ -14,7 +16,9 @@ from src.modules.training.application.services import (
     TrainingJobService,
     TrainingMetricsService,
 )
+from src.modules.training.infrastructure.cloudwatch import CloudWatchLogClient
 from src.modules.training.infrastructure.hyperpod import HyperPodClient
+from src.modules.training.infrastructure.kueue import KueueClient
 from src.modules.training.infrastructure.repositories import (
     CheckpointRepository,
     JobTemplateRepository,
@@ -93,3 +97,18 @@ def get_training_metrics_service() -> TrainingMetricsService:
     client = get_prometheus_client()
     prometheus_service = PrometheusService(client)
     return TrainingMetricsService(prometheus_service)
+
+
+@lru_cache(maxsize=1)
+def get_training_log_client() -> ITrainingLogClient:
+    """Singleton CloudWatch 训练日志客户端。"""
+    settings = get_settings()
+    return CloudWatchLogClient(
+        region=settings.aws_region,
+    )
+
+
+@lru_cache(maxsize=1)
+def get_kueue_client() -> IKueueClient:
+    """Singleton Kueue 队列状态客户端。"""
+    return KueueClient()

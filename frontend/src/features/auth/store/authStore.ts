@@ -4,10 +4,10 @@
  * 认证状态管理，供路由守卫和 API 客户端使用
  */
 
-import { create } from 'zustand';
-import type { User, UserRole } from '@/types/common';
-import type { LoginResponse, UserResponse } from '../types';
-import { fetchCurrentUser, logoutUser, refreshAccessToken } from '../api';
+import { create } from "zustand";
+import type { User, UserRole } from "@/types/common";
+import type { LoginResponse, UserResponse } from "../types";
+import { fetchCurrentUser, logoutUser, refreshAccessToken } from "../api";
 
 // === 类型 ===
 
@@ -17,7 +17,8 @@ interface AuthState {
   user: User | null;
   isLoading: boolean;
 
-  // Token (refresh_token 仅保存在内存)
+  // Token (均仅保存在内存，禁止持久化到 localStorage)
+  accessToken: string | null;
   refreshToken: string | null;
 
   // 操作
@@ -47,20 +48,19 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   isAuthenticated: false,
   user: null,
   isLoading: true,
+  accessToken: null,
   refreshToken: null,
 
   // 登录 - 保存 tokens 和用户信息
   login: (response: LoginResponse) => {
     const { tokens, user } = response;
 
-    // access_token 存 localStorage (ALB 反向代理场景)
-    localStorage.setItem('access_token', tokens.access_token);
-
     set({
       isAuthenticated: true,
       user: toUser(user),
       isLoading: false,
-      // refresh_token 仅保存在内存
+      // token 仅保存在内存，不使用 localStorage
+      accessToken: tokens.access_token,
       refreshToken: tokens.refresh_token,
     });
   },
@@ -71,11 +71,11 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       // 尝试通知后端（忽略错误）
       await logoutUser().catch(() => {});
     } finally {
-      localStorage.removeItem('access_token');
       set({
         isAuthenticated: false,
         user: null,
         isLoading: false,
+        accessToken: null,
         refreshToken: null,
       });
     }
@@ -86,15 +86,38 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
   // 应用启动时初始化认证状态
   initializeAuth: async () => {
-    const token = localStorage.getItem('access_token');
+    const { accessToken, refreshToken } = get();
 
-    if (!token) {
-      set({ isAuthenticated: false, user: null, isLoading: false });
+    if (!accessToken) {
+      // 内存中无 accessToken，尝试用 refreshToken 刷新
+      if (refreshToken) {
+        const refreshed = await get().tryRefreshToken();
+        if (refreshed) {
+          try {
+            const userResponse = await fetchCurrentUser();
+            set({
+              isAuthenticated: true,
+              user: toUser(userResponse),
+              isLoading: false,
+            });
+            return;
+          } catch {
+            // 刷新后仍然失败，清除状态
+          }
+        }
+      }
+      set({
+        isAuthenticated: false,
+        user: null,
+        isLoading: false,
+        accessToken: null,
+        refreshToken: null,
+      });
       return;
     }
 
     try {
-      // 用现有 token 验证用户身份
+      // 用内存中的 token 验证用户身份
       const userResponse = await fetchCurrentUser();
       set({
         isAuthenticated: true,
@@ -103,11 +126,11 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       });
     } catch {
       // token 无效或过期，清除状态
-      localStorage.removeItem('access_token');
       set({
         isAuthenticated: false,
         user: null,
         isLoading: false,
+        accessToken: null,
         refreshToken: null,
       });
     }
@@ -120,15 +143,17 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
     try {
       const tokens = await refreshAccessToken(refreshToken);
-      localStorage.setItem('access_token', tokens.access_token);
-      set({ refreshToken: tokens.refresh_token });
+      set({
+        accessToken: tokens.access_token,
+        refreshToken: tokens.refresh_token,
+      });
       return true;
     } catch {
       // 刷新失败，清除状态
-      localStorage.removeItem('access_token');
       set({
         isAuthenticated: false,
         user: null,
+        accessToken: null,
         refreshToken: null,
       });
       return false;

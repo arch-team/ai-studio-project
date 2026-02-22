@@ -21,6 +21,10 @@ resources:
   - dcgm-exporter.yaml
   # Alerting rules
   - alerting-rules.yaml
+  # Alertmanager 部署、配置和 Secret
+  - alertmanager-config.yaml
+  - alertmanager-deployment.yaml
+  - alertmanager-secret.yaml
 
 labels:
   - pairs:

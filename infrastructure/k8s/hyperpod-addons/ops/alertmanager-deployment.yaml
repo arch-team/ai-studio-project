@@ -1,0 +1,115 @@
+# Alertmanager 部署清单 - Deployment + Service
+# 接收 Prometheus 告警并通过配置的通知渠道分发
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: alertmanager
+  namespace: hyperpod-monitoring
+  labels:
+    app.kubernetes.io/name: alertmanager
+    app.kubernetes.io/component: alerting
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: alertmanager
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: alertmanager
+        app.kubernetes.io/component: alerting
+    spec:
+      serviceAccountName: alertmanager
+      containers:
+        - name: alertmanager
+          image: prom/alertmanager:v0.27.0
+          args:
+            - '--config.file=/etc/alertmanager/alertmanager.yml'
+            - '--storage.path=/alertmanager'
+            # 数据保留时间
+            - '--data.retention=120h'
+            # 集群监听地址（单副本模式，禁用集群）
+            - '--cluster.listen-address='
+          ports:
+            - name: http
+              containerPort: 9093
+              protocol: TCP
+          # 存活探针 - 检查 Alertmanager 进程是否存活
+          livenessProbe:
+            httpGet:
+              path: /-/healthy
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 15
+            timeoutSeconds: 5
+            failureThreshold: 3
+          # 就绪探针 - 检查 Alertmanager 是否准备接收流量
+          readinessProbe:
+            httpGet:
+              path: /-/ready
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 200m
+              memory: 256Mi
+          volumeMounts:
+            # 配置文件挂载
+            - name: config
+              mountPath: /etc/alertmanager
+              readOnly: true
+            # Secret 文件挂载（Slack webhook URL 等敏感信息）
+            - name: secrets
+              mountPath: /etc/alertmanager/secrets
+              readOnly: true
+            # 持久化存储（告警静默、通知日志）
+            - name: storage
+              mountPath: /alertmanager
+      volumes:
+        - name: config
+          configMap:
+            name: alertmanager-config
+        - name: secrets
+          secret:
+            secretName: alertmanager-secrets
+        - name: storage
+          emptyDir: {}
+
+---
+# Alertmanager Service
+# Prometheus 通过 alertmanager:9093 连接此 Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: alertmanager
+  namespace: hyperpod-monitoring
+  labels:
+    app.kubernetes.io/name: alertmanager
+    app.kubernetes.io/component: alerting
+spec:
+  type: ClusterIP
+  ports:
+    - name: http
+      port: 9093
+      targetPort: http
+      protocol: TCP
+  selector:
+    app.kubernetes.io/name: alertmanager
+
+---
+# Alertmanager ServiceAccount
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: alertmanager
+  namespace: hyperpod-monitoring
+  labels:
+    app.kubernetes.io/name: alertmanager
+    app.kubernetes.io/component: alerting

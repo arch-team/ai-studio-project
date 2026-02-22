@@ -8,7 +8,9 @@ from src.modules.auth.api.current_user import CurrentUser
 from src.modules.auth.api.dependencies import get_current_active_user
 from src.modules.auth.api.permissions import check_resource_owner_or_privileged
 from src.modules.training.api.dependencies import (
+    get_kueue_client,
     get_training_job_service,
+    get_training_log_client,
     get_training_metrics_service,
 )
 from src.modules.training.api.schemas import (
@@ -18,16 +20,18 @@ from src.modules.training.api.schemas import (
     KueueWorkloadStatus,
     LogEntry,
     MetricDataPoint,
+    PreemptionEvent,
     QueueInfo,
     TrainingLogsResponse,
     TrainingMetricsResponse,
 )
+from src.modules.training.application.interfaces.kueue_client import IKueueClient
+from src.modules.training.application.interfaces.log_client import ITrainingLogClient
 from src.modules.training.application.services import (
     TrainingJobService,
     TrainingMetricsService,
 )
 from src.modules.training.domain.value_objects import JobStatus
-from src.shared.utils import utc_now
 
 router = APIRouter()
 
@@ -133,26 +137,37 @@ async def get_training_job_logs(
     pod_name: str | None = Query(default=None, description="Filter by specific pod"),
     current_user: CurrentUser = Depends(get_current_active_user),
     service: TrainingJobService = Depends(get_training_job_service),
+    log_client: ITrainingLogClient = Depends(get_training_log_client),
 ) -> TrainingLogsResponse:
     """Get training job logs.
 
-    Retrieves logs from the training containers (stdout/stderr).
+    Retrieves logs from CloudWatch Logs (stdout/stderr).
     Supports filtering by time range, pattern, and specific pod.
+    开发环境无 CloudWatch 时 gracefully 降级返回提示信息。
     """
     job = await service.get_job(job_id)
     check_resource_owner_or_privileged(job.owner_id, current_user, "training job", "view logs of")
 
-    # TODO: Integrate with CloudWatch Logs or HyperPod log API
-    # For now, return a placeholder response
+    # 转换时间为毫秒时间戳（CloudWatch API 使用毫秒）
+    start_ms = int(start_time.timestamp() * 1000) if start_time else None
+    end_ms = int(end_time.timestamp() * 1000) if end_time else None
+
+    entries, next_token = await log_client.get_training_logs(
+        job_name=job.job_name,
+        start_time=start_ms,
+        end_time=end_ms,
+        limit=tail,
+        filter_pattern=filter_pattern,
+    )
+
+    # 如果指定了 pod_name，在应用层过滤
     logs = [
-        LogEntry(
-            timestamp=utc_now(),
-            pod_name=f"{job.job_name}-worker-0",
-            message=f"Training job {job.job_name} is in {job.status.value} state",
-        )
+        LogEntry(timestamp=e.timestamp, pod_name=e.pod_name, message=e.message)
+        for e in entries
+        if pod_name is None or e.pod_name == pod_name
     ]
 
-    return TrainingLogsResponse(logs=logs, next_token=None)
+    return TrainingLogsResponse(logs=logs, next_token=next_token)
 
 
 @router.get("/{job_id}/debug/kueue")
@@ -160,44 +175,81 @@ async def get_kueue_debug_info(
     job_id: int,
     current_user: CurrentUser = Depends(get_current_active_user),
     service: TrainingJobService = Depends(get_training_job_service),
+    kueue_client: IKueueClient = Depends(get_kueue_client),
 ) -> KueueDebugResponse:
     """Get Kueue Workload debug information.
 
-    Returns detailed Kueue scheduling status for troubleshooting.
-    Only accessible by job owner or admin.
+    从 Kueue API 获取真实调度状态用于排障。
+    开发环境无 K8s 集群时根据任务状态推断返回 fallback 数据。
     """
     job = await service.get_job(job_id)
     check_resource_owner_or_privileged(job.owner_id, current_user, "training job", "view debug info of")
 
-    # Build Kueue workload name
     workload_name = job.kueue_workload_name or f"job-{job_id}-workload"
 
-    # TODO: Integrate with Kueue API to get real status
-    # For now, return a placeholder based on job status
-    is_admitted = job.status in (JobStatus.RUNNING, JobStatus.PAUSED)
-    is_finished = job.status in (JobStatus.COMPLETED, JobStatus.FAILED)
-
-    response = KueueDebugResponse(
+    # 尝试从 Kueue API 获取真实状态
+    workload_data = await kueue_client.get_workload_status(
         workload_name=workload_name,
         namespace="training-jobs",
-        status=KueueWorkloadStatus(
-            admitted=is_admitted,
-            quota_reserved=is_admitted,
-            pods_ready=job.status == JobStatus.RUNNING,
-            evicted=job.status == JobStatus.PREEMPTED,
-            finished=is_finished,
-        ),
-        queue_info=QueueInfo(
-            local_queue=f"user-{job.owner_id}-queue",
-            cluster_queue="default-cluster-queue",
-            queue_position=None if is_admitted else 1,
-        ),
-        preemption_history=None,
-        raw_yaml=None,  # Only for admin
     )
 
-    # Include raw YAML only for admin
-    if current_user.is_admin:
-        response.raw_yaml = f"# Workload YAML for {workload_name}\n# (placeholder)"
+    if workload_data is not None:
+        # 真实 Kueue API 数据
+        preemption_history = None
+        if workload_data.preemption_history:
+            preemption_history = [
+                PreemptionEvent(
+                    preempted_at=ev["preempted_at"],
+                    preempting_workload=ev.get("preempting_workload"),
+                    reason=ev.get("reason"),
+                )
+                for ev in workload_data.preemption_history
+            ]
+
+        response = KueueDebugResponse(
+            workload_name=workload_data.workload_name,
+            namespace=workload_data.namespace,
+            status=KueueWorkloadStatus(
+                admitted=workload_data.admitted,
+                quota_reserved=workload_data.quota_reserved,
+                pods_ready=workload_data.pods_ready,
+                evicted=workload_data.evicted,
+                finished=workload_data.finished,
+            ),
+            queue_info=QueueInfo(
+                local_queue=workload_data.local_queue,
+                cluster_queue=workload_data.cluster_queue,
+                queue_position=workload_data.queue_position,
+            ),
+            preemption_history=preemption_history,
+            raw_yaml=None,
+        )
+    else:
+        # Fallback: 根据任务状态推断（开发环境或 Kueue 不可用）
+        is_admitted = job.status in (JobStatus.RUNNING, JobStatus.PAUSED)
+        is_finished = job.status in (JobStatus.COMPLETED, JobStatus.FAILED)
+
+        response = KueueDebugResponse(
+            workload_name=workload_name,
+            namespace="training-jobs",
+            status=KueueWorkloadStatus(
+                admitted=is_admitted,
+                quota_reserved=is_admitted,
+                pods_ready=job.status == JobStatus.RUNNING,
+                evicted=job.status == JobStatus.PREEMPTED,
+                finished=is_finished,
+            ),
+            queue_info=QueueInfo(
+                local_queue=f"user-{job.owner_id}-queue",
+                cluster_queue="default-cluster-queue",
+                queue_position=None if is_admitted else 1,
+            ),
+            preemption_history=None,
+            raw_yaml=None,
+        )
+
+    # 仅管理员可见 raw YAML
+    if current_user.is_admin and workload_data and workload_data.raw_yaml:
+        response.raw_yaml = workload_data.raw_yaml
 
     return response

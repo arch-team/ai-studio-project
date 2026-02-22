@@ -6,6 +6,40 @@
 
 import { AppError, ErrorCode, isApiErrorResponse } from "../types/errors";
 
+// === AuthStore 访问器（避免循环依赖） ===
+
+/**
+ * 延迟访问 authStore，避免 client.ts ↔ authStore.ts 循环依赖。
+ * 首次调用 getAccessToken() 时通过动态 import 缓存 store 引用。
+ */
+const authStoreAccessor = (() => {
+  let storeRef: { getState: () => { accessToken: string | null } } | null =
+    null;
+
+  // 预加载：模块加载后异步获取 store 引用
+  Promise.resolve().then(async () => {
+    try {
+      const mod = await import("@features/auth/store/authStore");
+      storeRef = mod.useAuthStore;
+    } catch {
+      // 测试环境或 store 尚未初始化时忽略
+    }
+  });
+
+  return {
+    getAccessToken: (): string | null => {
+      return storeRef?.getState().accessToken ?? null;
+    },
+    /** 由 handleTokenRefresh 调用，确保 store 引用已就绪 */
+    ensureLoaded: async () => {
+      if (!storeRef) {
+        const mod = await import("@features/auth/store/authStore");
+        storeRef = mod.useAuthStore;
+      }
+    },
+  };
+})();
+
 // === 配置 ===
 
 const API_BASE_URL =
@@ -124,8 +158,9 @@ class ApiClient {
       ...this.defaultHeaders,
       ...extra,
     };
-    if (!headers["Authorization"] && typeof localStorage !== "undefined") {
-      const token = localStorage.getItem("access_token");
+    if (!headers["Authorization"]) {
+      // 从 authStore 内存中读取 token（通过缓存引用避免循环依赖）
+      const token = authStoreAccessor.getAccessToken();
       if (token) {
         headers["Authorization"] = `Bearer ${token}`;
       }
@@ -157,7 +192,8 @@ class ApiClient {
 
     this.isRefreshing = true;
 
-    // 延迟导入避免循环依赖
+    // 确保 authStore 引用已加载
+    await authStoreAccessor.ensureLoaded();
     const { useAuthStore } = await import("@features/auth/store/authStore");
 
     this.refreshPromise = useAuthStore
@@ -175,7 +211,6 @@ class ApiClient {
    * 认证失败处理 - 清除状态并重定向到登录页
    */
   private handleAuthFailure(): void {
-    localStorage.removeItem("access_token");
     this.clearAuthToken();
 
     // 延迟导入避免循环依赖
