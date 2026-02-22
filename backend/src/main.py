@@ -7,6 +7,7 @@ import structlog
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from sqlalchemy import text
 
 from src.modules.audit.api.middleware import AuditMiddleware
 from src.router import api_router
@@ -183,11 +184,32 @@ def _configure_health_check(app: FastAPI, settings: Settings) -> None:
 
     @app.get("/health", tags=["Health"])
     async def _health_check() -> dict:
-        """Health check endpoint for load balancers and monitoring."""
+        """Liveness check - 应用进程存活。"""
         base: dict = {"status": "healthy"}
         if settings.environment == "development":
             base.update({"version": settings.app_version, "environment": settings.environment})
         return base
+
+    @app.get("/health/ready", tags=["Health"], response_model=None)
+    async def _readiness_check() -> JSONResponse | dict:
+        """Readiness check - 验证数据库连接等关键依赖可用。"""
+        checks: dict = {}
+        is_ready = True
+
+        try:
+            async with AsyncSessionLocal() as session:
+                await session.execute(text("SELECT 1"))
+            checks["database"] = "ok"
+        except Exception as e:
+            checks["database"] = f"error: {type(e).__name__}"
+            is_ready = False
+
+        if not is_ready:
+            return JSONResponse(
+                status_code=503,
+                content={"status": "not_ready", "checks": checks},
+            )
+        return {"status": "ready", "checks": checks}
 
 
 # Create the application instance
