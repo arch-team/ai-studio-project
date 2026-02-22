@@ -10,6 +10,7 @@
 import { QueryClient } from "@tanstack/react-query";
 import { queryRetryFn, queryRetryDelay } from "@lib/api/interceptors";
 import { AppError, getErrorMessage } from "@shared/types";
+import { eventBus } from "@shared/events/eventBus";
 
 /**
  * 创建全局 QueryClient 实例
@@ -38,7 +39,7 @@ export const queryClient = new QueryClient({
     mutations: {
       // Mutation 默认不重试 (写操作需谨慎)
       retry: false,
-      // Mutation 全局错误处理
+      // Mutation 全局错误处理: 控制台日志 + UI 通知
       onError: (error: Error) => {
         if (error instanceof AppError) {
           console.error(
@@ -48,6 +49,12 @@ export const queryClient = new QueryClient({
         } else {
           console.error(`[Mutation Error] ${getErrorMessage(error)}`);
         }
+
+        // 通过 EventBus 发布通知，让 UI 层显示错误提示
+        eventBus.publish("notification:show", {
+          type: "error",
+          message: getErrorMessage(error),
+        });
       },
     },
   },

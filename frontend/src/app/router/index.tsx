@@ -10,6 +10,13 @@
 
 import { lazy, Suspense } from "react";
 import { createBrowserRouter, Navigate, Outlet } from "react-router-dom";
+import {
+  Alert,
+  Box,
+  Container,
+  Header,
+  SpaceBetween,
+} from "@cloudscape-design/components";
 import { MainLayout } from "@layouts/MainLayout";
 import { AuthGuard } from "./guards/AuthGuard";
 import { RoleGuard } from "./guards/RoleGuard";
@@ -70,7 +77,7 @@ const ModelVersionsPage = lazy(() =>
 
 // Resource Quotas 模块页面
 const ResourceQuotasPage = lazy(() =>
-  import("@features/resource-quotas/ResourceQuotasPage").then((m) => ({
+  import("@features/resource-quotas").then((m) => ({
     default: m.ResourceQuotasPage,
   })),
 );
@@ -104,15 +111,44 @@ const DatasetVersionsPage = lazy(() =>
   })),
 );
 
-// 占位页面组件 (待实现)
-const HomePage = () => <div>首页</div>;
-const DatasetDetailPage = () => <div>数据集详情</div>;
-const CheckpointsPage = () => <div>检查点列表</div>;
-const AdminPage = () => <div>管理后台</div>;
-const ReportsPage = () => <div>报表</div>;
-const IDEPage = () => <div>开发环境</div>;
-const NotFoundPage = () => <div>404 - 页面未找到</div>;
-const UnauthorizedPage = () => <div>无权访问</div>;
+// 占位页面组件 (待实现) - 使用 Cloudscape 统一样式
+const PlaceholderPage = ({ title }: { title: string }) => (
+  <Container header={<Header variant="h1">{title}</Header>}>
+    <Box textAlign="center" color="text-status-inactive" padding="xl">
+      功能开发中
+    </Box>
+  </Container>
+);
+
+const HomePage = () => <PlaceholderPage title="首页" />;
+const DatasetDetailPage = () => <PlaceholderPage title="数据集详情" />;
+const CheckpointsPage = () => <PlaceholderPage title="检查点列表" />;
+const AdminPage = () => <PlaceholderPage title="管理后台" />;
+const ReportsPage = () => <PlaceholderPage title="报表" />;
+const IDEPage = () => <PlaceholderPage title="开发环境" />;
+
+// 错误页面 - 使用 Cloudscape Alert 组件
+const NotFoundPage = () => (
+  <Box padding="xxl">
+    <SpaceBetween size="l">
+      <Header variant="h1">页面未找到</Header>
+      <Alert type="error">
+        404 - 您访问的页面不存在，请检查 URL 是否正确。
+      </Alert>
+    </SpaceBetween>
+  </Box>
+);
+
+const UnauthorizedPage = () => (
+  <Box padding="xxl">
+    <SpaceBetween size="l">
+      <Header variant="h1">无权访问</Header>
+      <Alert type="warning">
+        您没有权限访问此页面，请联系管理员获取相应权限。
+      </Alert>
+    </SpaceBetween>
+  </Box>
+);
 
 /**
  * 受保护的布局容器

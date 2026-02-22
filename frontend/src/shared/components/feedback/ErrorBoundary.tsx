@@ -54,7 +54,10 @@ interface ErrorBoundaryState {
 
 // === 组件实现 ===
 
-export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
+export class ErrorBoundary extends Component<
+  ErrorBoundaryProps,
+  ErrorBoundaryState
+> {
   constructor(props: ErrorBoundaryProps) {
     super(props);
     this.state = { hasError: false, error: null, errorInfo: null };
@@ -130,9 +133,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
 
     return (
       <Box padding="xxl">
-        <Container
-          header={<Header variant="h1">{title}</Header>}
-        >
+        <Container header={<Header variant="h1">{title}</Header>}>
           <SpaceBetween size="l">
             <Alert type="error">
               应用遇到了意外错误。您可以尝试重试或刷新页面。
@@ -149,15 +150,11 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
               <ExpandableSection headerText="错误详情">
                 <SpaceBetween size="s">
                   <Box variant="code" fontSize="body-s">
-                    <pre style={{ whiteSpace: "pre-wrap", wordBreak: "break-all" }}>
-                      {this.state.error.stack}
-                    </pre>
+                    {this.state.error.stack}
                   </Box>
                   {this.state.errorInfo?.componentStack && (
                     <Box variant="code" fontSize="body-s">
-                      <pre style={{ whiteSpace: "pre-wrap", wordBreak: "break-all" }}>
-                        {this.state.errorInfo.componentStack}
-                      </pre>
+                      {this.state.errorInfo.componentStack}
                     </Box>
                   )}
                 </SpaceBetween>

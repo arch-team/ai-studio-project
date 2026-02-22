@@ -60,6 +60,19 @@ export function calculateRetryDelay(
  * - 401/403 认证/授权错误: 不可重试
  */
 export function isRetryableError(error: unknown): boolean {
+  // 原生 fetch 网络错误 (断网、DNS 失败等)
+  if (
+    error instanceof TypeError &&
+    error.message.toLowerCase().includes("fetch")
+  ) {
+    return true;
+  }
+
+  // 请求被中止 (超时等)
+  if (error instanceof DOMException && error.name === "AbortError") {
+    return true;
+  }
+
   if (error instanceof AppError) {
     // 网络错误可重试
     if (error.isNetworkError()) {
