@@ -19,6 +19,7 @@ from src.shared.api.middleware import AuthenticationMiddleware, TracingMiddlewar
 from src.shared.domain.exceptions import DomainError
 from src.shared.domain.problem import Problem
 from src.shared.infrastructure import configure_logging, get_settings
+from src.shared.infrastructure.database import AsyncSessionLocal
 from src.shared.infrastructure.config import Settings
 from src.shared.infrastructure.database import import_all_models
 from src.shared.infrastructure.security.exceptions import SecurityError
@@ -35,6 +36,9 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
     # 确保所有 ORM 模型在启动时被加载，解决 relationship 字符串引用问题
     import_all_models()
+
+    # 注入审计日志 session factory 到 app.state（中间件不在 DI 体系内）
+    app.state.audit_session_factory = AsyncSessionLocal
 
     logger.info(
         "application_started",

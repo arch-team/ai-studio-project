@@ -10,8 +10,9 @@ from src.shared.utils import utc_now
 
 from ...domain.entities import AuditLog
 from ...domain.repositories import IAuditLogRepository
-from ...domain.value_objects import OperationType, ResourceType
+from ...domain.value_objects import AuditStatus, OperationType, ResourceType
 from ..models import AuditLogModel
+from ..models import AuditStatus as ModelAuditStatus
 from ..models import OperationType as ModelOperationType
 from ..models import ResourceType as ModelResourceType
 
@@ -24,6 +25,44 @@ class AuditLogRepositoryImpl(PydanticRepository[AuditLog, AuditLogModel, int], I
 
     def __init__(self, session: AsyncSession):
         super().__init__(session, AuditLogModel)
+
+    def _to_model(self, entity: AuditLog) -> AuditLogModel:
+        """领域实体 → ORM 模型。
+
+        审计模块的 Domain VO 和 ORM Model 各自定义了独立的 Enum 类，
+        需要通过 .name 匹配进行跨类转换。
+        """
+        return AuditLogModel(
+            user_id=entity.user_id,
+            operation_type=ModelOperationType[entity.operation_type.name],
+            resource_type=ModelResourceType[entity.resource_type.name],
+            resource_id=entity.resource_id,
+            request_data=entity.request_data,
+            response_data=entity.response_data,
+            ip_address=entity.ip_address,
+            user_agent=entity.user_agent,
+            status=ModelAuditStatus[entity.status.name],
+            expires_at=getattr(entity, "expires_at", None),
+        )
+
+    def _to_entity(self, model: AuditLogModel) -> AuditLog:
+        """ORM 模型 → 领域实体。
+
+        将 ORM Model 的 Enum（大写 .name）转换为 Domain VO 的 Enum（小写 .value）。
+        """
+        return AuditLog(
+            id=model.id,
+            user_id=model.user_id,
+            operation_type=OperationType[model.operation_type.name],
+            resource_type=ResourceType[model.resource_type.name],
+            resource_id=model.resource_id,
+            request_data=model.request_data,
+            response_data=model.response_data,
+            ip_address=model.ip_address,
+            user_agent=model.user_agent,
+            status=AuditStatus[model.status.name],
+            created_at=model.created_at,
+        )
 
     # ========== IAuditLogRepository 基础方法 ==========
 

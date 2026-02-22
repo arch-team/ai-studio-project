@@ -5,7 +5,7 @@ from datetime import datetime
 from pydantic import Field
 
 from src.shared.domain import PydanticEntity
-from src.shared.utils import utc_now
+from src.shared.utils import ensure_aware, utc_now
 
 from ..value_objects import AuthType, UserRole, UserStatus
 
@@ -74,11 +74,11 @@ class User(PydanticEntity):
 
     def is_locked(self) -> bool:
         """Check if account is currently locked."""
-        return self.locked_until is not None and utc_now() < self.locked_until
+        return self.locked_until is not None and utc_now() < ensure_aware(self.locked_until)
 
     def is_password_expired(self) -> bool:
         """Check if password has expired."""
-        return self.password_expires_at is not None and utc_now() > self.password_expires_at
+        return self.password_expires_at is not None and utc_now() > ensure_aware(self.password_expires_at)
 
     def is_local_account(self) -> bool:
         """Check if this is a local authentication account."""

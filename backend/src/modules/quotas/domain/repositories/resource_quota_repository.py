@@ -44,3 +44,7 @@ class IResourceQuotaRepository(ABC):
     @abstractmethod
     async def exists_by_name(self, name: str) -> bool:
         """Check if quota with name exists."""
+
+    @abstractmethod
+    async def get_assigned_to_user(self, user_id: int) -> "ResourceQuota | None":
+        """Get the quota assigned to a user via users.resource_quota_id."""

@@ -13,31 +13,38 @@ from src.shared.utils import utc_now
 
 
 class OperationType(enum.Enum):
-    """操作类型枚举."""
+    """操作类型枚举.
 
-    CREATE = "create"
-    UPDATE = "update"
-    DELETE = "delete"
-    LOGIN = "login"
-    LOGOUT = "logout"
+    SQLAlchemy 2.0+ 默认使用 .name (大写) 存储到数据库，
+    因此 .value 必须与 DB ENUM 定义的值一致（大写）。
+    """
+
+    CREATE = "CREATE"
+    UPDATE = "UPDATE"
+    DELETE = "DELETE"
+    LOGIN = "LOGIN"
+    LOGOUT = "LOGOUT"
+    PAUSE = "PAUSE"
+    RESUME = "RESUME"
+    CANCEL = "CANCEL"
 
 
 class ResourceType(enum.Enum):
     """资源类型枚举."""
 
-    TRAINING_JOB = "training_job"
-    DATASET = "dataset"
-    MODEL = "model"
-    USER = "user"
-    QUOTA = "quota"
-    SPACE = "space"
+    TRAINING_JOB = "TRAINING_JOB"
+    DATASET = "DATASET"
+    MODEL = "MODEL"
+    USER = "USER"
+    QUOTA = "QUOTA"
+    SPACE = "SPACE"
 
 
 class AuditStatus(enum.Enum):
     """审计状态枚举."""
 
-    SUCCESS = "success"
-    FAILED = "failed"
+    SUCCESS = "SUCCESS"
+    FAILED = "FAILED"
 
 
 class AuditLogModel(Base):

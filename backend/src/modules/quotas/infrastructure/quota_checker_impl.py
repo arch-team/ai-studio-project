@@ -48,6 +48,25 @@ class QuotaCheckerImpl(IQuotaChecker):
         # In-memory tracking of consumed quotas (should be replaced with persistent storage)
         self._consumed_quotas: dict[int, dict[str, int]] = {}
 
+    async def _resolve_quota(self, user_id: int):
+        """按优先级查找用户配额: 用户分配 → 命名约定 → 系统默认。"""
+        # 优先: 用户通过 resource_quota_id 分配的配额
+        quota = await self._repository.get_assigned_to_user(user_id)
+        if quota is not None and quota.is_active():
+            return quota
+
+        # 回退: 按命名约定 user-{id}-quota
+        quota = await self._repository.get_by_name(f"user-{user_id}-quota")
+        if quota is not None and quota.is_active():
+            return quota
+
+        # 最后: 系统默认配额
+        quota = await self._repository.get_by_name("default-quota")
+        if quota is not None and quota.is_active():
+            return quota
+
+        return None
+
     async def check_quota(
         self,
         user_id: int,
@@ -55,16 +74,9 @@ class QuotaCheckerImpl(IQuotaChecker):
         amount: int,
     ) -> bool:
         """Check if user has sufficient quota for the requested resources."""
-        # Get user's quota (by name pattern 'user-{user_id}-quota')
-        quota_name = f"user-{user_id}-quota"
-        quota = await self._repository.get_by_name(quota_name)
-
-        if quota is None or not quota.is_active():
-            # No quota defined or inactive - check system default
-            default_quota = await self._repository.get_by_name("default-quota")
-            if default_quota is None or not default_quota.is_active():
-                return False
-            quota = default_quota
+        quota = await self._resolve_quota(user_id)
+        if quota is None:
+            return False
 
         # Get current consumed amount
         consumed = self._consumed_quotas.get(user_id, {}).get(resource_type, 0)
@@ -122,15 +134,9 @@ class QuotaCheckerImpl(IQuotaChecker):
         resource_type: str,
     ) -> int:
         """Get the available quota for a user and resource type."""
-        # Get user's quota
-        quota_name = f"user-{user_id}-quota"
-        quota = await self._repository.get_by_name(quota_name)
-
-        if quota is None or not quota.is_active():
-            default_quota = await self._repository.get_by_name("default-quota")
-            if default_quota is None or not default_quota.is_active():
-                return 0
-            quota = default_quota
+        quota = await self._resolve_quota(user_id)
+        if quota is None:
+            return 0
 
         # Get total limit for resource type
         if resource_type == "gpu":

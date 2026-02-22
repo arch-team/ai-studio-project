@@ -85,8 +85,8 @@ async def create_resource_quota(
         "max_gpu_count": data.max_gpu_count,
         "max_memory_gb": data.max_memory_gb,
         "max_concurrent_jobs": data.max_concurrent_jobs,
-        "gpu_types": data.gpu_types,
-        "created_by": current_user.id,
+        "gpu_types": data.gpu_types or [],
+        "created_by": current_user.user_id,
     }
 
     # Parse valid_until if provided

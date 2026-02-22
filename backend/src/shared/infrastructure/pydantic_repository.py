@@ -63,7 +63,10 @@ class PydanticRepository(Generic[EntityT, ModelT, IdT]):
         """领域实体 → ORM 模型。子类可覆盖。"""
         if self._entity_class is not None and hasattr(entity, "to_model_dict"):
             exclude = self._exclude_from_model.copy()
-            if getattr(entity, "id", None) is None:
+            # id=None 或 id=0 都视为"未分配"，排除后让数据库自增生成。
+            # 显式传入 id=0 会导致 MySQL 自增但 SQLAlchemy 内存中仍为 0，
+            # 后续 refresh(model) 以 id=0 查询会失败: "Could not refresh instance"
+            if not getattr(entity, "id", None):
                 exclude.add("id")
             # convert_enums=False: 保留 enum 对象传给 ORM。
             # SQLAlchemy Enum() 列直接接受 enum 成员，由 SA 处理到数据库值的转换。

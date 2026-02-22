@@ -17,6 +17,7 @@ from src.modules.audit.domain.value_objects import (
     OperationType,
     ResourceType,
 )
+from src.modules.audit.infrastructure.repositories import AuditLogRepositoryImpl
 from src.shared.infrastructure.security.paths import (
     AUDIT_EXEMPT_PATHS,
     AUDIT_EXEMPT_PREFIXES,
@@ -252,9 +253,15 @@ class AuditMiddleware(BaseHTTPMiddleware):
                 user_agent=request.headers.get("user-agent"),
             )
 
-            # 从应用状态获取仓库并持久化
+            # 持久化审计日志
+            # 优先使用注入的 repository（测试用），否则使用 session factory（生产用）
             if hasattr(request.app.state, "audit_repository"):
                 await request.app.state.audit_repository.create(audit_log)
+            elif hasattr(request.app.state, "audit_session_factory"):
+                async with request.app.state.audit_session_factory() as session:
+                    repo = AuditLogRepositoryImpl(session)
+                    await repo.create(audit_log)
+                    await session.commit()
             else:
                 logger.debug("audit_repository_not_configured")
 

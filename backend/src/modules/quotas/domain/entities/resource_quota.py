@@ -5,7 +5,7 @@ from datetime import datetime
 from pydantic import Field
 
 from src.shared.domain import PydanticEntity
-from src.shared.utils import utc_now
+from src.shared.utils import ensure_aware, utc_now
 
 from ..value_objects import QuotaStatus, QuotaType
 
@@ -58,9 +58,9 @@ class ResourceQuota(PydanticEntity):
         if self.status != QuotaStatus.ACTIVE:
             return False
         now = utc_now()
-        if now < self.valid_from:
+        if now < ensure_aware(self.valid_from):
             return False
-        if self.valid_until and now > self.valid_until:
+        if self.valid_until and now > ensure_aware(self.valid_until):
             return False
         return True
 
@@ -68,7 +68,7 @@ class ResourceQuota(PydanticEntity):
         """Check if quota has expired."""
         if self.valid_until is None:
             return False
-        return utc_now() > self.valid_until
+        return utc_now() > ensure_aware(self.valid_until)
 
     def can_allocate_gpu(self, requested: int) -> bool:
         """Check if GPU allocation is within quota limits."""

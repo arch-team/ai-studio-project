@@ -112,3 +112,16 @@ class ResourceQuotaRepository(PydanticRepository[ResourceQuota, ResourceQuotaMod
         result = await self._session.execute(stmt)
         count = result.scalar() or 0
         return count > 0
+
+    async def get_assigned_to_user(self, user_id: int) -> ResourceQuota | None:
+        """Get the quota assigned to a user via users.resource_quota_id."""
+        from src.modules.auth.infrastructure.models import UserModel
+
+        stmt = (
+            select(ResourceQuotaModel)
+            .join(UserModel, UserModel.resource_quota_id == ResourceQuotaModel.id)
+            .where(UserModel.id == user_id)
+        )
+        result = await self._session.execute(stmt)
+        model = result.scalar_one_or_none()
+        return self._to_entity(model) if model else None

@@ -323,9 +323,9 @@ class TestMiddlewareExecutionOrder:
         """
         import inspect
 
-        from src.main import create_app
+        from src.main import _configure_middleware
 
-        source = inspect.getsource(create_app)
+        source = inspect.getsource(_configure_middleware)
 
         # Find positions of add_middleware calls in the function body
         # We need to find the actual add_middleware calls, not imports
