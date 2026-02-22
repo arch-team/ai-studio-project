@@ -49,12 +49,10 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     from src.modules.audit.application import AuditCleanupService
     from src.modules.audit.infrastructure import AuditLogRepositoryImpl
 
-    # 创建一个临时 session 用于初始化 repository（后台任务会自行管理 session）
-    async with AsyncSessionLocal() as init_session:
-        cleanup_repo = AuditLogRepositoryImpl(init_session)
+    # 后台任务模式：通过工厂在每次清理时创建新的 session + repository
     cleanup_service = AuditCleanupService(
-        repository=cleanup_repo,
         session_factory=AsyncSessionLocal,
+        repository_factory=lambda session: AuditLogRepositoryImpl(session),
     )
     await cleanup_service.start_scheduled_cleanup()
 

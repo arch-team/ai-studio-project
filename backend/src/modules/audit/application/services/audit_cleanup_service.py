@@ -6,6 +6,7 @@
 """
 
 import asyncio
+from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
 
 import structlog
@@ -39,13 +40,15 @@ class AuditCleanupService:
 
     def __init__(
         self,
-        repository: IAuditLogRepository,
+        repository: IAuditLogRepository | None = None,
         alert_service: AlertService | None = None,
         session_factory: async_sessionmaker[AsyncSession] | None = None,
+        repository_factory: Callable[[AsyncSession], IAuditLogRepository] | None = None,
     ) -> None:
         self._repository = repository
         self._alert_service = alert_service
         self._session_factory = session_factory
+        self._repository_factory = repository_factory
         self._consecutive_failures = 0
         self._cleanup_task: asyncio.Task[None] | None = None
         self._last_cleanup_at: datetime | None = None
@@ -87,16 +90,17 @@ class AuditCleanupService:
         """
         start = datetime.now(UTC)
         try:
-            if self._session_factory:
-                # 后台任务模式：创建独立 session 避免连接泄漏
-                from src.modules.audit.infrastructure import AuditLogRepositoryImpl
-
+            if self._session_factory and self._repository_factory:
+                # 后台任务模式：通过工厂创建独立 session + repository，避免连接泄漏
                 async with self._session_factory() as session:
-                    repo = AuditLogRepositoryImpl(session)
+                    repo = self._repository_factory(session)
                     deleted_count = await repo.delete_expired()
                     await session.commit()
-            else:
+            elif self._repository:
+                # API 调用模式：使用注入的 repository
                 deleted_count = await self._repository.delete_expired()
+            else:
+                raise RuntimeError("必须提供 repository 或 session_factory + repository_factory")
 
             elapsed_ms = (datetime.now(UTC) - start).total_seconds() * 1000
             self._last_cleanup_at = start

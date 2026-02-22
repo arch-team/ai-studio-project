@@ -9,9 +9,7 @@ from fastapi import Request
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 from starlette.responses import JSONResponse, Response
 
-from src.shared.domain.exceptions import DomainError
 from src.shared.domain.problem import Problem
-from src.shared.infrastructure.security.exceptions import SecurityError
 
 logger = structlog.get_logger(__name__)
 
@@ -44,9 +42,12 @@ class ErrorHandlerMiddleware(BaseHTTPMiddleware):
 
     职责:
     - 捕获所有未被 FastAPI exception_handler 处理的异常
-    - 对 Problem / DomainError / SecurityError 返回对应 HTTP 状态码
+    - 对 Problem（含 DomainError / SecurityError 别名）返回对应 HTTP 状态码
     - 对未知异常返回 500 并隐藏内部错误信息
     - 使用 structlog 记录错误日志（包含 trace_id、请求路径等上下文）
+
+    注意: DomainError 和 SecurityError 均为 Problem 的别名，
+    无需分别捕获，统一由 except Problem 处理。
     """
 
     async def dispatch(
@@ -58,70 +59,33 @@ class ErrorHandlerMiddleware(BaseHTTPMiddleware):
         try:
             return await call_next(request)
         except Problem as exc:
-            return self._handle_problem(request, exc)
-        except DomainError as exc:
-            return self._handle_domain_error(request, exc)
-        except SecurityError as exc:
-            return self._handle_security_error(request, exc)
+            return self._handle_known_error(request, exc)
         except Exception as exc:
             return self._handle_unexpected_error(request, exc)
 
-    def _handle_problem(self, request: Request, exc: Problem) -> JSONResponse:
-        """处理 Problem 类异常。"""
-        trace_id = _get_trace_id(request)
-        logger.warning(
-            "problem_exception",
-            error_code=exc.error_code,
-            http_status=exc.http_status,
-            message=exc.message,
-            trace_id=trace_id,
-            path=request.url.path,
-            method=request.method,
-        )
-        return JSONResponse(
-            status_code=exc.http_status,
-            content=_build_error_body(
-                code=exc.error_code,
-                message=exc.message,
-                details=exc.get_details(),
-                trace_id=trace_id,
-            ),
-        )
+    def _handle_known_error(self, request: Request, exc: Problem) -> JSONResponse:
+        """处理 Problem 及其子类异常（含 DomainError / SecurityError）。
 
-    def _handle_domain_error(self, request: Request, exc: DomainError) -> JSONResponse:
-        """处理 DomainError 类异常（兼容旧异常体系）。"""
+        根据 HTTP 状态码区分日志级别: 4xx → info, 5xx → warning。
+        通过 type(exc).__name__ 区分日志事件名。
+        """
         trace_id = _get_trace_id(request)
-        logger.warning(
-            "domain_exception",
-            error_code=exc.error_code,
-            http_status=exc.http_status,
-            message=exc.message,
-            trace_id=trace_id,
-            path=request.url.path,
-            method=request.method,
-        )
-        return JSONResponse(
-            status_code=exc.http_status,
-            content=_build_error_body(
-                code=exc.error_code,
-                message=exc.message,
-                details=exc.get_details(),
-                trace_id=trace_id,
-            ),
-        )
+        event_name = f"{type(exc).__name__}_exception"
+        log_kwargs = {
+            "error_code": exc.error_code,
+            "http_status": exc.http_status,
+            "message": exc.message,
+            "trace_id": trace_id,
+            "path": request.url.path,
+            "method": request.method,
+        }
 
-    def _handle_security_error(self, request: Request, exc: SecurityError) -> JSONResponse:
-        """处理 SecurityError 类异常。"""
-        trace_id = _get_trace_id(request)
-        logger.warning(
-            "security_exception",
-            error_code=exc.error_code,
-            http_status=exc.http_status,
-            message=exc.message,
-            trace_id=trace_id,
-            path=request.url.path,
-            method=request.method,
-        )
+        # 4xx 客户端错误用 info，5xx 服务端错误用 warning
+        if exc.http_status >= 500:
+            logger.warning(event_name, **log_kwargs)
+        else:
+            logger.info(event_name, **log_kwargs)
+
         return JSONResponse(
             status_code=exc.http_status,
             content=_build_error_body(
