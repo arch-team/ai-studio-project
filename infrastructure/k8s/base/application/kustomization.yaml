@@ -6,6 +6,7 @@ kind: Kustomization
 resources:
   - namespace.yaml
   - backend-serviceaccount.yaml
+  - backend-rbac.yaml
   - backend-configmap.yaml
   - frontend-configmap.yaml
   - backend-deployment.yaml

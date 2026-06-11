@@ -1,0 +1,49 @@
+# Backend 服务 K8s RBAC
+# 后端通过 in-cluster ServiceAccount 调用 HyperPod SDK 提交/管理训练任务，
+# 需要 HyperPodPyTorchJob CRD 及关联资源（Pod 日志、Kueue 工作负载）的权限。
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: backend-service
+  labels:
+    app.kubernetes.io/part-of: ai-training-platform
+rules:
+  # HyperPod 训练任务 CRD
+  - apiGroups: ["sagemaker.amazonaws.com"]
+    resources: ["hyperpodpytorchjobs"]
+    verbs: ["create", "delete", "get", "list", "patch", "update", "watch"]
+  - apiGroups: ["sagemaker.amazonaws.com"]
+    resources: ["hyperpodpytorchjobs/status"]
+    verbs: ["get"]
+  # Kubeflow PyTorchJob（HyperPod SDK 底层创建）
+  - apiGroups: ["kubeflow.org"]
+    resources: ["pytorchjobs", "pytorchjobs/status"]
+    verbs: ["create", "delete", "get", "list", "patch", "update", "watch"]
+  # Kueue 调度状态查询（任务排队/抢占调试）
+  - apiGroups: ["kueue.x-k8s.io"]
+    resources: ["workloads", "localqueues", "clusterqueues"]
+    verbs: ["get", "list", "watch"]
+  # 训练 Pod 状态与日志
+  - apiGroups: [""]
+    resources: ["pods", "pods/log", "events"]
+    verbs: ["get", "list", "watch"]
+  # SDK 版本兼容性检查需要读取 API Server 版本（nonResourceURL /version 无需授权）
+  - apiGroups: [""]
+    resources: ["namespaces"]
+    verbs: ["get", "list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: backend-service
+  labels:
+    app.kubernetes.io/part-of: ai-training-platform
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: backend-service
+subjects:
+  - kind: ServiceAccount
+    name: backend-service-sa
+    namespace: ai-platform
