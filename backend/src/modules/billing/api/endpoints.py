@@ -3,9 +3,9 @@
 提供资源使用报表和成本分析报表查询接口。
 """
 
-import structlog
 from datetime import datetime
 
+import structlog
 from fastapi import APIRouter, Depends, Query
 
 from src.modules.auth.api.dependencies import get_current_active_user

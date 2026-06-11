@@ -1,5 +1,6 @@
 """Shared API - Common API utilities and middleware."""
 
+from .dependencies import OwnedResource, check_resource_ownership
 from .exception_handlers import (
     domain_exception_handler,
     problem_exception_handler,
@@ -18,7 +19,6 @@ from .pagination import (
     get_listing_params,
     get_pagination_params,
 )
-from .dependencies import OwnedResource, check_resource_ownership
 from .schemas import EntitySchema
 
 __all__ = [

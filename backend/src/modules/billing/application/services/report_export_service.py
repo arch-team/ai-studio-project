@@ -333,9 +333,7 @@ class ReportExportService:
             date_range = f"<p>结束日期: {end_date}</p>"
 
         # 汇总统计表格
-        summary_rows = "".join(
-            f"<tr><td>{key}</td><td>{value}</td></tr>" for key, value in summary.items()
-        )
+        summary_rows = "".join(f"<tr><td>{key}</td><td>{value}</td></tr>" for key, value in summary.items())
 
         return f"""<!DOCTYPE html>
 <html lang="zh-CN">

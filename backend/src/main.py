@@ -25,9 +25,8 @@ from src.shared.api.middleware import (
 from src.shared.domain.exceptions import DomainError
 from src.shared.domain.problem import Problem
 from src.shared.infrastructure import configure_logging, get_settings
-from src.shared.infrastructure.database import AsyncSessionLocal
 from src.shared.infrastructure.config import Settings
-from src.shared.infrastructure.database import import_all_models
+from src.shared.infrastructure.database import AsyncSessionLocal, import_all_models
 from src.shared.infrastructure.security.exceptions import SecurityError
 
 logger = structlog.get_logger(__name__)

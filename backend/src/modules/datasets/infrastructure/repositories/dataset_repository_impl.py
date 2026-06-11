@@ -97,9 +97,7 @@ class DatasetRepositoryImpl(PydanticRepository[Dataset, DatasetModel, int], IDat
 
         # 全文搜索 - 使用 MySQL MATCH...AGAINST（利用 ft_name_desc 索引）
         if search is not None:
-            ft_condition = text(
-                "MATCH(name, description) AGAINST(:search IN BOOLEAN MODE)"
-            ).bindparams(search=search)
+            ft_condition = text("MATCH(name, description) AGAINST(:search IN BOOLEAN MODE)").bindparams(search=search)
             query = query.where(ft_condition)
             count_query = count_query.where(ft_condition)
 

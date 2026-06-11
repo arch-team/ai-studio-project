@@ -106,6 +106,13 @@ async def list_datasets(
     )
 
 
+# 注意: 静态路径 /health 必须注册在参数路径 /{dataset_id} 之前，否则会被参数路由捕获
+@router.get("/health")
+async def health_check() -> dict[str, str]:
+    """健康检查端点。"""
+    return {"status": "ok"}
+
+
 @router.get("/{dataset_id}", response_model=DatasetDetail)
 async def get_dataset(
     dataset_id: int,
@@ -169,9 +176,3 @@ async def create_dataset_version(
         description=data.description,
     )
     return DatasetDetail.from_entity(new_dataset)
-
-
-@router.get("/health")
-async def health_check() -> dict[str, str]:
-    """健康检查端点。"""
-    return {"status": "ok"}

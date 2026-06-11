@@ -7,8 +7,12 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import TYPE_CHECKING
 
+import structlog
+
 if TYPE_CHECKING:
     from src.modules.monitoring.application.services import PrometheusService
+
+logger = structlog.get_logger(__name__)
 
 
 @dataclass
@@ -84,8 +88,12 @@ class TrainingMetricsService:
         if is_completed and cache_key in self._cache:
             return self._cache[cache_key]
 
-        # 查询 Prometheus
-        raw_metrics = await self._query_prometheus_metrics(metric_types, start_time, end_time, step)
+        # 查询 Prometheus（监控基础设施不可用时优雅降级为空数据，而非 500）
+        try:
+            raw_metrics = await self._query_prometheus_metrics(metric_types, start_time, end_time, step)
+        except Exception as e:
+            logger.warning("prometheus_unavailable_degraded", job_id=job_id, error=str(e))
+            raw_metrics = {}
 
         # 转换结果
         result = self._convert_to_training_metrics(job_id, metric_types, raw_metrics)

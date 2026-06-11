@@ -56,8 +56,8 @@ async def create_training_job(
 
 @router.get("", response_model=TrainingJobListResponse)
 async def list_training_jobs(
-    page: PageParam,
-    page_size: PageSizeParam,
+    page: PageParam = 1,
+    page_size: PageSizeParam = 20,
     status: JobStatusEnum | None = Query(default=None, description="Filter by status"),
     priority: JobPriorityEnum | None = Query(default=None, description="Filter by priority"),
     submitted_after: datetime | None = Query(default=None, description="Filter by submission date"),

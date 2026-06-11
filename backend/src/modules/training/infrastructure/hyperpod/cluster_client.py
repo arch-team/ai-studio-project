@@ -1,5 +1,6 @@
 """HyperPod 集群管理客户端。"""
 
+import os
 from typing import Any
 
 import aioboto3
@@ -13,19 +14,63 @@ try:
 except ImportError:
     set_cluster_context = None
 
+try:
+    from kubernetes import config as k8s_config
+except ImportError:
+    k8s_config = None
+
+
+def _mark_sdk_kubeconfig_loaded() -> None:
+    """标记 HyperPod SDK 的 kubeconfig 已加载，跳过其内部的 load_kube_config()。
+
+    SDK 的 verify_kube_config() 硬编码读取 kubeconfig 文件，
+    in-cluster 场景（ServiceAccount token）下该文件不存在。
+    """
+    try:
+        from sagemaker.hyperpod.training import HyperPodPytorchJob
+
+        HyperPodPytorchJob.is_kubeconfig_loaded = True
+    except ImportError:
+        pass
+
 
 class ClusterClient:
     """HyperPod 集群管理客户端。"""
 
     _cluster_contexts: set[str] = set()
+    _incluster_loaded: bool = False
 
     def __init__(self, session: aioboto3.Session, region: str, default_cluster_name: str | None = None):
         self._session = session
         self._region = region
         self._default_cluster_name = default_cluster_name
 
+    def _try_incluster_context(self) -> bool:
+        """在 K8s Pod 内时加载 in-cluster 配置，成功返回 True。"""
+        if ClusterClient._incluster_loaded:
+            return True
+        if not os.environ.get("KUBERNETES_SERVICE_HOST") or k8s_config is None:
+            return False
+
+        try:
+            k8s_config.load_incluster_config()
+            _mark_sdk_kubeconfig_loaded()
+            ClusterClient._incluster_loaded = True
+            logger.info("incluster_kube_config_loaded")
+            return True
+        except Exception as e:
+            logger.warning("incluster_kube_config_failed", error=str(e))
+            return False
+
     def ensure_cluster_context(self, cluster_name: str | None = None) -> None:
-        """确保集群上下文已设置。"""
+        """确保集群上下文已设置。
+
+        优先级：in-cluster 配置（Pod 内） > SDK set_cluster_context（本地开发）。
+        """
+        # Pod 内直接用 ServiceAccount，不依赖 aws eks update-kubeconfig
+        if self._try_incluster_context():
+            return
+
         target_cluster = cluster_name or self._default_cluster_name
 
         if not target_cluster:

@@ -49,8 +49,8 @@ async def create_job_template(
     response_model=JobTemplateListResponse,
 )
 async def list_job_templates(
-    page: PageParam,
-    page_size: PageSizeParam,
+    page: PageParam = 1,
+    page_size: PageSizeParam = 20,
     search: str | None = Query(default=None, description="Search by name"),
     sort_by: SortByParam = "usage_count",
     sort_order: SortOrderParam = SortOrder.DESC,

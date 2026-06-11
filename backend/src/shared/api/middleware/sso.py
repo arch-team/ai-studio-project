@@ -6,7 +6,6 @@
 import logging
 import time
 from dataclasses import dataclass, field
-from functools import lru_cache
 
 import jwt as pyjwt
 
@@ -91,9 +90,7 @@ class SSOService:
             if settings.environment in ("staging", "production"):
                 # 生产环境: 必须验证 JWT 签名
                 if not self._issuer_url:
-                    raise SSOError(
-                        message="SSO issuer_url 未配置，生产环境无法跳过签名验证"
-                    )
+                    raise SSOError(message="SSO issuer_url 未配置，生产环境无法跳过签名验证")
                 jwks_client = pyjwt.PyJWKClient(
                     f"{self._issuer_url}/.well-known/jwks.json",
                     cache_keys=True,

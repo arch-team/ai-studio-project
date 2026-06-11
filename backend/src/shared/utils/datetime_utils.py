@@ -1,6 +1,6 @@
 """Datetime utilities with timezone awareness."""
 
-from datetime import UTC, datetime, timezone
+from datetime import UTC, datetime
 
 
 def utc_now() -> datetime:
@@ -15,5 +15,5 @@ def ensure_aware(dt: datetime) -> datetime:
     本函数将 naive datetime 视为 UTC 并添加 tzinfo。
     """
     if dt.tzinfo is None:
-        return dt.replace(tzinfo=timezone.utc)
+        return dt.replace(tzinfo=UTC)
     return dt

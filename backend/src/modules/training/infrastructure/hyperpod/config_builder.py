@@ -60,16 +60,25 @@ def build_kueue_labels(queue_name: str | None, priority_class: str | None) -> di
     return labels
 
 
-def build_replica_spec(container: Any, node_count: int) -> Any:
-    """构建 ReplicaSpec 配置。"""
+def build_replica_spec(container: Any, node_count: int, instance_type: str | None = None) -> Any:
+    """构建 ReplicaSpec 配置。
+
+    SDK >=3.8 在容器声明 GPU 资源时强制要求 nodeSelector 携带
+    node.kubernetes.io/instance-type，否则 create() 抛 ValueError。
+    """
     from sagemaker.hyperpod.training.config.hyperpod_pytorch_job_unified_config import (
         ReplicaSpec,
         Spec,
         Template,
     )
 
+    spec_kwargs: dict[str, Any] = {"containers": [container]}
+    # Spec.nodeSelector 字段构造别名为 node_selector（extra=forbid，仅在字段存在时传入）
+    if instance_type and "nodeSelector" in Spec.model_fields:
+        spec_kwargs["node_selector"] = {"node.kubernetes.io/instance-type": instance_type}
+
     return ReplicaSpec(
         name="worker",
         replicas=node_count,
-        template=Template(spec=Spec(containers=[container])),
+        template=Template(spec=Spec(**spec_kwargs)),
     )

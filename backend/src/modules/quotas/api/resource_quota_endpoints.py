@@ -33,8 +33,8 @@ router = APIRouter()
 
 @router.get("", response_model=ResourceQuotaListResponse)
 async def list_resource_quotas(
-    page: PageParam,
-    page_size: PageSizeParam,
+    page: PageParam = 1,
+    page_size: PageSizeParam = 20,
     quota_type: QuotaTypeEnum | None = Query(default=None, description="Filter by quota type"),
     status: QuotaStatusEnum | None = Query(default=None, description="Filter by status"),
     sort_by: SortByParam = "created_at",

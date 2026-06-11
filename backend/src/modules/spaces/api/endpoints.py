@@ -57,8 +57,8 @@ async def create_space(
     responses={401: {"model": SpaceErrorResponse, "description": "Unauthorized"}},
 )
 async def list_spaces(
-    page: PageParam,
-    page_size: PageSizeParam,
+    page: PageParam = 1,
+    page_size: PageSizeParam = 20,
     status_filter: SpaceStatusEnum | None = Query(default=None, alias="status", description="Filter by status"),
     sort_by: SortByParam = "created_at",
     sort_order: SortOrderParam = SortOrder.DESC,

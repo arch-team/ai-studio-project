@@ -29,8 +29,8 @@ router = APIRouter()
 
 @router.get("", response_model=ResourceLimitConfigListResponse)
 async def list_resource_limit_configs(
-    page: PageParam,
-    page_size: PageSizeParam,
+    page: PageParam = 1,
+    page_size: PageSizeParam = 20,
     role: LimitRoleEnum | None = Query(default=None, description="Filter by role"),
     project_id: int | None = Query(default=None, description="Filter by project ID"),
     sort_by: SortByParam = "created_at",

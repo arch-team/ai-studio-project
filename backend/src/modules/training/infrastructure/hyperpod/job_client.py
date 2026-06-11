@@ -124,6 +124,7 @@ class JobClient:
             "env_dict": job_config.get("environment") or {},
             "gpu_count": job_config.get("gpu_count", 1),
             "node_count": job_config.get("node_count", 1),
+            "instance_type": job_config.get("instance_type"),
             "namespace": job_config.get("namespace", "default"),
             "queue_name": job_config.get("queue_name"),
             "priority_class": job_config.get("priority_class"),
@@ -137,7 +138,7 @@ class JobClient:
 
         # 构建配置组件
         container = build_container(config["image_uri"], config["command"], config["env_dict"], config["gpu_count"])
-        replica_spec = build_replica_spec(container, config["node_count"])
+        replica_spec = build_replica_spec(container, config["node_count"], config.get("instance_type"))
         labels = build_kueue_labels(config["queue_name"], config["priority_class"])
 
         # 构建元数据
