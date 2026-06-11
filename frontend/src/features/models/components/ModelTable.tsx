@@ -120,6 +120,15 @@ export function ModelTable({
           ? ({ detail }) => onSelectionChange(detail.selectedItems)
           : undefined
       }
+      ariaLabels={
+        selectable
+          ? {
+              selectionGroupLabel: '模型选择',
+              allItemsSelectionLabel: () => '全选',
+              itemSelectionLabel: (_data, row) => `选择 ${row.model_name} ${row.version}`,
+            }
+          : undefined
+      }
       header={
         <Header variant="h2" counter={totalCount ? `(${totalCount})` : undefined}>
           模型列表

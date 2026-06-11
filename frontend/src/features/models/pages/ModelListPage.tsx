@@ -183,6 +183,7 @@ export function ModelListPage() {
               onChange={({ detail }) => handleTrainingJobIdChange(detail.value)}
               placeholder="输入任务 ID"
               type="number"
+              ariaLabel="训练任务 ID"
             />
           </FormField>
         </SpaceBetween>

@@ -42,6 +42,12 @@ export function MainLayout({ children }: MainLayoutProps) {
         <TopNav />
       </div>
       <AppLayout
+        ariaLabels={{
+          navigation: '侧边导航',
+          navigationToggle: '打开导航',
+          navigationClose: '关闭导航',
+          notifications: '通知',
+        }}
         navigation={<Navigation />}
         navigationOpen={sidebarOpen}
         onNavigationChange={({ detail }) => setSidebarOpen(detail.open)}

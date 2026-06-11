@@ -41,6 +41,32 @@ function toUser(response: UserResponse): User {
   };
 }
 
+// refreshToken 使用 sessionStorage 持久化（标签页级别会话）：
+// - accessToken 仅内存，刷新页面即失效，泄露面最小
+// - refreshToken 存 sessionStorage，使整页刷新/导航后可静默续期，避免用户被登出
+// - 标签页关闭即清除，不使用 localStorage（见 .claude/rules/security.md）
+const REFRESH_TOKEN_KEY = "auth.refresh_token";
+
+function readStoredRefreshToken(): string | null {
+  try {
+    return sessionStorage.getItem(REFRESH_TOKEN_KEY);
+  } catch {
+    return null;
+  }
+}
+
+function writeStoredRefreshToken(token: string | null): void {
+  try {
+    if (token === null) {
+      sessionStorage.removeItem(REFRESH_TOKEN_KEY);
+    } else {
+      sessionStorage.setItem(REFRESH_TOKEN_KEY, token);
+    }
+  } catch {
+    // sessionStorage 不可用（隐私模式等）时退化为纯内存会话
+  }
+}
+
 // === Store ===
 
 export const useAuthStore = create<AuthState>((set, get) => ({
@@ -49,17 +75,18 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   user: null,
   isLoading: true,
   accessToken: null,
-  refreshToken: null,
+  refreshToken: readStoredRefreshToken(),
 
   // 登录 - 保存 tokens 和用户信息
   login: (response: LoginResponse) => {
     const { tokens, user } = response;
 
+    writeStoredRefreshToken(tokens.refresh_token);
     set({
       isAuthenticated: true,
       user: toUser(user),
       isLoading: false,
-      // token 仅保存在内存，不使用 localStorage
+      // accessToken 仅保存在内存
       accessToken: tokens.access_token,
       refreshToken: tokens.refresh_token,
     });
@@ -71,6 +98,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       // 尝试通知后端（忽略错误）
       await logoutUser().catch(() => {});
     } finally {
+      writeStoredRefreshToken(null);
       set({
         isAuthenticated: false,
         user: null,
@@ -106,6 +134,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           }
         }
       }
+      writeStoredRefreshToken(null);
       set({
         isAuthenticated: false,
         user: null,
@@ -126,6 +155,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       });
     } catch {
       // token 无效或过期，清除状态
+      writeStoredRefreshToken(null);
       set({
         isAuthenticated: false,
         user: null,
@@ -143,6 +173,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
     try {
       const tokens = await refreshAccessToken(refreshToken);
+      writeStoredRefreshToken(tokens.refresh_token);
       set({
         accessToken: tokens.access_token,
         refreshToken: tokens.refresh_token,
@@ -150,6 +181,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       return true;
     } catch {
       // 刷新失败，清除状态
+      writeStoredRefreshToken(null);
       set({
         isAuthenticated: false,
         user: null,

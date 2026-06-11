@@ -77,8 +77,8 @@ function getStrategyDescription(strategy: DistributionStrategy): string {
 const S3_URI_PATTERN = /^s3:\/\/[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]\/.+$/i;
 // 容器内路径格式验证正则
 const CONTAINER_PATH_PATTERN = /^\/[\w./-]+$/;
-// ECR 镜像 URI 格式验证正则
-const ECR_URI_PATTERN = /^\d{12}\.dkr\.ecr\.[a-z0-9-]+\.amazonaws\.com\/[\w./-]+$/;
+// ECR 镜像 URI 格式验证正则（路径部分支持 repo:tag 与 repo@sha256:digest）
+const ECR_URI_PATTERN = /^\d{12}\.dkr\.ecr\.[a-z0-9-]+\.amazonaws\.com\/[\w./-]+(?::[\w.-]+|@sha256:[a-f0-9]{64})?$/;
 
 /**
  * 验证训练脚本路径（支持 S3 URI 或容器内路径）
