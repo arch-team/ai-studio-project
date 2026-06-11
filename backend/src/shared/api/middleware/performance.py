@@ -17,7 +17,7 @@ logger = structlog.get_logger(__name__)
 P95_LATENCY_THRESHOLD_MS = 500.0
 
 # 不需要记录性能指标的路径
-_SKIP_PATHS = frozenset({"/health", "/docs", "/redoc", "/openapi.json", "/favicon.ico"})
+_SKIP_PATHS = frozenset({"/health", "/health/ready", "/docs", "/redoc", "/openapi.json", "/favicon.ico"})
 
 
 class PerformanceMiddleware(BaseHTTPMiddleware):

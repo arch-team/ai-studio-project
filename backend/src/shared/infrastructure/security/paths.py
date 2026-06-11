@@ -4,6 +4,7 @@
 AUTH_EXEMPT_PATHS: frozenset[str] = frozenset(
     {
         "/health",
+        "/health/ready",
         "/healthz",
         "/ready",
         "/docs",
@@ -23,6 +24,7 @@ AUTH_EXEMPT_PATTERNS: tuple[str, ...] = (r"^/api/v1/auth/password-reset/.*$",)
 AUDIT_EXEMPT_PATHS: frozenset[str] = frozenset(
     {
         "/health",
+        "/health/ready",
         "/healthz",
         "/ready",
         "/docs",

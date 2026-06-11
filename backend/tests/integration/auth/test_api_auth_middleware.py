@@ -16,6 +16,15 @@ class TestExemptPaths:
         assert "status" in response.json()
 
     @pytest.mark.asyncio
+    async def test_exempt_path_health_ready(self, client: AsyncClient) -> None:
+        """Test /health/ready is accessible without authentication (K8s readiness probe)."""
+        response = await client.get("/health/ready")
+
+        # 200 (就绪) 或 503 (依赖未就绪) 均可，关键是不能 401
+        assert response.status_code in [200, 503]
+        assert "status" in response.json()
+
+    @pytest.mark.asyncio
     async def test_exempt_path_docs(self, client: AsyncClient) -> None:
         """Test /docs is accessible without authentication."""
         response = await client.get("/docs")
