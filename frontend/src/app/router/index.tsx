@@ -150,6 +150,39 @@ const IDEPage = lazy(() =>
   })),
 );
 
+// Spaces 模块页面
+const SpaceListPage = lazy(() =>
+  import("@features/spaces/pages/SpaceListPage").then((m) => ({
+    default: m.SpaceListPage,
+  })),
+);
+const CreateSpacePage = lazy(() =>
+  import("@features/spaces/pages/CreateSpacePage").then((m) => ({
+    default: m.CreateSpacePage,
+  })),
+);
+
+// Monitoring 模块页面
+const MonitoringDashboardPage = lazy(() =>
+  import("@features/monitoring/pages/MonitoringDashboardPage").then((m) => ({
+    default: m.MonitoringDashboardPage,
+  })),
+);
+
+// Audit 模块页面
+const AuditLogsPage = lazy(() =>
+  import("@features/audit/pages/AuditLogsPage").then((m) => ({
+    default: m.AuditLogsPage,
+  })),
+);
+
+// Admin 用户管理页面
+const UserManagementPage = lazy(() =>
+  import("@features/admin/pages/UserManagementPage").then((m) => ({
+    default: m.UserManagementPage,
+  })),
+);
+
 // 错误页面 - 使用 Cloudscape Alert 组件
 const NotFoundPage = () => (
   <Box padding="xxl">
@@ -277,12 +310,46 @@ export const router = createBrowserRouter([
         element: <ResourceQuotasPage />,
       },
 
-      // 管理员路由（需要 admin 或 team_lead 角色）
+      // 开发空间
+      {
+        path: ROUTES.SPACES,
+        element: <SpaceListPage />,
+      },
+      {
+        path: ROUTES.SPACE_CREATE,
+        element: <CreateSpacePage />,
+      },
+
+      // 监控
+      {
+        path: ROUTES.MONITORING,
+        element: <MonitoringDashboardPage />,
+      },
+
+      // 审计日志（需要 admin 或 team_lead 角色）
+      {
+        path: ROUTES.AUDIT_LOGS,
+        element: (
+          <RoleGuard allowedRoles={["admin", "team_lead"]}>
+            <AuditLogsPage />
+          </RoleGuard>
+        ),
+      },
+
+      // 管理员路由（需要 admin 角色）
       {
         path: ROUTES.ADMIN,
         element: (
           <RoleGuard allowedRoles={["admin"]}>
             <AdminPage />
+          </RoleGuard>
+        ),
+      },
+      {
+        path: ROUTES.USER_MANAGEMENT,
+        element: (
+          <RoleGuard allowedRoles={["admin"]}>
+            <UserManagementPage />
           </RoleGuard>
         ),
       },

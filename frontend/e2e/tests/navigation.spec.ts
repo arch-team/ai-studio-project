@@ -42,15 +42,23 @@ test.describe('导航系统', () => {
   });
 
   test('顶部导航栏包含通知按钮', async ({ page }) => {
-    await expect(page.locator('text=通知').last()).toBeVisible();
+    // 通知为图标按钮，通过 aria-label 定位
+    await expect(page.locator('[aria-label="通知"]').last()).toBeVisible();
   });
 
   test('顶部导航栏包含帮助按钮', async ({ page }) => {
-    await expect(page.locator('text=帮助').last()).toBeVisible();
+    // 帮助为图标按钮，通过 aria-label 定位
+    await expect(page.locator('[aria-label="帮助文档"]').last()).toBeVisible();
+  });
+
+  test('顶部导航栏包含外观设置入口', async ({ page }) => {
+    // 主题/密度切换入口
+    await expect(page.locator('[aria-label="外观设置"]').last()).toBeVisible();
   });
 
   test('顶部导航栏包含用户菜单', async ({ page }) => {
-    await expect(page.locator('text=用户').last()).toBeVisible();
+    // 用户菜单通过 aria-label 定位（显示用户名而非固定文字"用户"）
+    await expect(page.locator('[aria-label="用户菜单"]').last()).toBeVisible();
   });
 
   test('侧边栏可以收起', async ({ page }) => {

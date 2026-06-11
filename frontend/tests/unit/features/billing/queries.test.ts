@@ -7,6 +7,7 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { renderHook, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+// eslint-disable-next-line no-restricted-imports -- 直接测试 queries 子模块（白盒单元测试）
 import {
   useCostReport,
   useUserCosts,
@@ -29,6 +30,7 @@ vi.mock("@features/billing/api/billingApi", () => ({
   exportBillingReport: vi.fn(),
 }));
 
+// eslint-disable-next-line no-restricted-imports -- 精确 mock 子模块以隔离 AbortSignal 兼容性问题
 import {
   fetchCostReport,
   fetchUserCosts,

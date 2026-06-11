@@ -48,8 +48,17 @@ export const ROUTES = {
   // 资源管理
   RESOURCE_QUOTAS: '/resource-quotas',
 
+  // 开发空间
+  SPACES: '/spaces',
+  SPACE_CREATE: '/spaces/create',
+
+  // 监控与审计
+  MONITORING: '/monitoring',
+  AUDIT_LOGS: '/audit-logs',
+
   // 管理员
   ADMIN: '/admin',
+  USER_MANAGEMENT: '/admin/users',
   REPORTS: '/reports',
   REPORTS_RESOURCE_USAGE: '/reports/resource-usage',
   REPORTS_COST_ANALYSIS: '/reports/cost-analysis',

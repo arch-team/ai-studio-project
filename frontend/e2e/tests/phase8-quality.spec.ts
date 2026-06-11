@@ -163,7 +163,7 @@ test.describe("Phase 8 质量保障测试", () => {
   // === 4. 路由懒加载验证 ===
 
   test.describe("路由懒加载", () => {
-    test("页面组件应按需加载", async ({ page, browser }) => {
+    test("页面组件应按需加载", async ({ page, _browser }) => {
       await loginViaUI(page);
 
       // 监听网络请求，收集加载的 JS chunk

@@ -59,7 +59,6 @@ describe("IDEFrame", () => {
     });
 
     it("javascript: 协议应该被拒绝", () => {
-      // eslint-disable-next-line no-script-url
       renderWithProviders(<IDEFrame url="javascript:alert(1)" />);
       expect(screen.getByText(/无效的 IDE 地址/)).toBeInTheDocument();
     });

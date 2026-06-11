@@ -3,14 +3,14 @@
  */
 
 import { renderHook, act, waitFor } from "@testing-library/react";
-import { vi, describe, it, expect, beforeEach } from "vitest";
+import { vi, describe, it, expect } from "vitest";
 import React from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
   useEntityMutations,
   useOptimisticUpdate,
   useBatchOperations,
-} from "@shared/hooks/useEntity";
+} from "@shared/hooks";
 
 // 创建 QueryClient 包装器
 function createWrapper() {

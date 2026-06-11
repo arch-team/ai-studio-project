@@ -3,8 +3,8 @@
  */
 
 import { vi, describe, it, expect, beforeEach } from 'vitest';
-import { EventBus } from '@shared/events/eventBus';
-import type { DomainEvent, NotificationEvent, TrainingJobCreatedEvent } from '@shared/events/eventBus';
+import { EventBus } from '@shared/events';
+import type { NotificationEvent, TrainingJobCreatedEvent } from '@shared/events';
 
 describe('EventBus', () => {
   let bus: EventBus;

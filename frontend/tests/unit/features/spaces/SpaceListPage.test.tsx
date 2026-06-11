@@ -5,7 +5,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { screen, waitFor, within, fireEvent } from "@testing-library/react";
+import { screen, waitFor, fireEvent } from "@testing-library/react";
 import { renderWithProviders } from "@tests/__utils__/test-utils";
 import { SpaceListPage } from "@features/spaces/pages";
 import type { SpaceListResponse } from "@features/spaces/types";

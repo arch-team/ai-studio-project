@@ -4,7 +4,7 @@
 
 import { renderHook, act } from '@testing-library/react';
 import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { eventBus } from '@shared/events/eventBus';
+import { eventBus } from '@shared/events';
 import {
   useEventSubscription,
   useEventPublisher,
@@ -12,7 +12,7 @@ import {
   useMultiEventSubscription,
   useEventHistory,
   useEventWaiter,
-} from '@shared/events/useEvent';
+} from '@shared/events';
 
 describe('useEvent hooks', () => {
   beforeEach(() => {

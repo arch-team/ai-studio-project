@@ -10,7 +10,6 @@
 
 import { test, expect, Page } from "@playwright/test";
 import { ResourceQuotasPage } from "../pages/ResourceQuotasPage";
-import { MockApi } from "../utils/mockApi";
 import { navigateWithAuth } from "../utils/auth";
 import {
   mockResourceLimitConfigs,
@@ -536,7 +535,7 @@ test.describe("资源配额管理 - 无障碍测试", () => {
     await expect(table).toBeVisible();
   });
 
-  test("按钮可通过键盘访问", async ({ page }) => {
+  test("按钮可通过键盘访问", async ({ page: _page }) => {
     // Tab 到新建按钮
     await quotasPage.createButton.focus();
     const isFocused = await quotasPage.createButton.evaluate(

@@ -3,7 +3,7 @@
  */
 
 import { renderHook, act } from '@testing-library/react';
-import { vi, describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import React from 'react';
 import { MemoryRouter } from 'react-router-dom';
 import {
@@ -11,7 +11,7 @@ import {
   calculateOffset,
   calculatePage,
   generatePageNumbers,
-} from '@shared/hooks/usePagination';
+} from '@shared/hooks';
 
 // MemoryRouter 包装器
 function createWrapper(initialEntries: string[] = ['/']) {

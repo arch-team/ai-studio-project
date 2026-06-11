@@ -5,7 +5,7 @@
  * TDD Step 1: Red - 编写测试
  */
 
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { BrowserRouter, MemoryRouter } from 'react-router-dom';
 import { Navigation } from '@layouts/MainLayout/Navigation';
@@ -16,6 +16,13 @@ vi.mock('@store/slices/uiSlice', () => ({
     sidebarOpen: true,
     toggleSidebar: vi.fn(),
   })),
+}));
+
+// Mock useAuthStore（Navigation 按角色过滤管理类入口）
+const mockUser: { role: string } | null = { role: 'viewer' };
+vi.mock('@features/auth', () => ({
+  useAuthStore: (selector: (s: { user: { role: string } | null }) => unknown) =>
+    selector({ user: mockUser }),
 }));
 
 describe('Navigation', () => {
@@ -142,6 +149,60 @@ describe('Navigation', () => {
       expectedItems.forEach((item) => {
         expect(screen.getByText(item)).toBeInTheDocument();
       });
+    });
+
+    it('should render newly added module sections', () => {
+      render(
+        <BrowserRouter>
+          <Navigation />
+        </BrowserRouter>
+      );
+      // 补全后的核心模块入口
+      const expectedItems = ['模型管理', '检查点', '我的空间', '在线 IDE', '资源监控'];
+      expectedItems.forEach((item) => {
+        expect(screen.getByText(item)).toBeInTheDocument();
+      });
+    });
+  });
+
+  describe('角色过滤', () => {
+    beforeEach(() => {
+      mockUser.role = 'viewer';
+    });
+
+    it('should hide admin sections for non-admin role', () => {
+      mockUser.role = 'viewer';
+      render(
+        <BrowserRouter>
+          <Navigation />
+        </BrowserRouter>
+      );
+      // viewer 不应看到系统管理与报表中心
+      expect(screen.queryByText('系统管理')).not.toBeInTheDocument();
+      expect(screen.queryByText('报表中心')).not.toBeInTheDocument();
+    });
+
+    it('should show admin sections for admin role', () => {
+      mockUser.role = 'admin';
+      render(
+        <BrowserRouter>
+          <Navigation />
+        </BrowserRouter>
+      );
+      expect(screen.getByText('系统管理')).toBeInTheDocument();
+      expect(screen.getByText('用户管理')).toBeInTheDocument();
+      expect(screen.getByText('报表中心')).toBeInTheDocument();
+    });
+
+    it('should show reports but not system management for team_lead', () => {
+      mockUser.role = 'team_lead';
+      render(
+        <BrowserRouter>
+          <Navigation />
+        </BrowserRouter>
+      );
+      expect(screen.getByText('报表中心')).toBeInTheDocument();
+      expect(screen.queryByText('系统管理')).not.toBeInTheDocument();
     });
   });
 });

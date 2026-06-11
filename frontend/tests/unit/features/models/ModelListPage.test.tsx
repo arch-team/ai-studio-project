@@ -5,7 +5,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { screen, fireEvent, waitFor } from '@testing-library/react';
+import { screen, fireEvent } from '@testing-library/react';
 import { renderWithProviders } from '@tests/__utils__/test-utils';
 import { ModelListPage } from '@features/models/pages';
 import type { ModelSummary, ModelListResponse } from '@features/models/types';

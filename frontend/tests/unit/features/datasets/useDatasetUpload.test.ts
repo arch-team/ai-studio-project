@@ -6,7 +6,7 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
-import { useDatasetUpload } from '@features/datasets/hooks/useDatasetUpload';
+import { useDatasetUpload } from '@features/datasets/hooks';
 
 // Mock apiClient
 vi.mock('@shared/api', () => ({

@@ -1,8 +1,8 @@
 /**
  * TopNavigation Tests
  *
- * Task: T018 - 创建 Cloudscape Layout
- * TDD Step 1: Red - 编写测试
+ * 验证顶部导航栏渲染：平台标识、全局搜索、图标按钮（通知/帮助）、
+ * 外观设置与用户菜单。
  */
 
 import { describe, it, expect } from 'vitest';
@@ -29,8 +29,8 @@ describe('TopNavigation', () => {
           <TopNav />
         </BrowserRouter>
       );
-      // Cloudscape TopNavigation 可能渲染多个搜索框实例
-      const searchInputs = screen.getAllByPlaceholderText('搜索...');
+      // 搜索框通过 aria-label 定位（比 placeholder 更稳健）
+      const searchInputs = screen.getAllByLabelText('全局搜索');
       expect(searchInputs.length).toBeGreaterThan(0);
     });
   });
@@ -42,8 +42,8 @@ describe('TopNavigation', () => {
           <TopNav />
         </BrowserRouter>
       );
-      // Cloudscape TopNavigation 用户菜单
-      const userMenus = screen.getAllByText('用户');
+      // 未登录时用户菜单显示「未登录」，通过 aria-label 定位触发器
+      const userMenus = screen.getAllByLabelText('用户菜单');
       expect(userMenus.length).toBeGreaterThan(0);
     });
   });
@@ -55,7 +55,8 @@ describe('TopNavigation', () => {
           <TopNav />
         </BrowserRouter>
       );
-      const helpItems = screen.getAllByText('帮助');
+      // 帮助为图标按钮，通过 aria-label 定位
+      const helpItems = screen.getAllByLabelText('帮助文档');
       expect(helpItems.length).toBeGreaterThan(0);
     });
 
@@ -65,8 +66,20 @@ describe('TopNavigation', () => {
           <TopNav />
         </BrowserRouter>
       );
-      const notificationItems = screen.getAllByText('通知');
+      // 通知为图标按钮，通过 aria-label 定位
+      const notificationItems = screen.getAllByLabelText('通知');
       expect(notificationItems.length).toBeGreaterThan(0);
+    });
+
+    it('should render appearance settings', () => {
+      render(
+        <BrowserRouter>
+          <TopNav />
+        </BrowserRouter>
+      );
+      // 外观设置（主题/密度切换）入口
+      const settingsItems = screen.getAllByLabelText('外观设置');
+      expect(settingsItems.length).toBeGreaterThan(0);
     });
   });
 

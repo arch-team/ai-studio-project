@@ -8,7 +8,9 @@
  */
 
 import { AppLayout, BreadcrumbGroup } from '@cloudscape-design/components';
+import { useNavigate } from 'react-router-dom';
 import { useUIStore } from '@store/slices/uiSlice';
+import { NotificationCenter } from '@shared/components';
 import { Navigation } from './Navigation';
 import { TopNav } from './TopNavigation';
 
@@ -26,7 +28,8 @@ interface MainLayoutProps {
  * - 内容区域 (Content)
  */
 export function MainLayout({ children }: MainLayoutProps) {
-  const { sidebarOpen, toggleSidebar, breadcrumbs } = useUIStore();
+  const navigate = useNavigate();
+  const { sidebarOpen, setSidebarOpen, breadcrumbs } = useUIStore();
 
   const breadcrumbItems = breadcrumbs.map((item) => ({
     text: item.text,
@@ -41,12 +44,21 @@ export function MainLayout({ children }: MainLayoutProps) {
       <AppLayout
         navigation={<Navigation />}
         navigationOpen={sidebarOpen}
-        onNavigationChange={() => toggleSidebar()}
+        onNavigationChange={({ detail }) => setSidebarOpen(detail.open)}
         breadcrumbs={
           breadcrumbItems.length > 0 ? (
-            <BreadcrumbGroup items={breadcrumbItems} />
+            <BreadcrumbGroup
+              items={breadcrumbItems}
+              ariaLabel="面包屑导航"
+              onFollow={(event) => {
+                event.preventDefault();
+                navigate(event.detail.href);
+              }}
+            />
           ) : undefined
         }
+        notifications={<NotificationCenter />}
+        stickyNotifications
         content={children}
         toolsHide={true}
         headerSelector="#top-navigation"

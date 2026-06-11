@@ -9,7 +9,7 @@ import {
   useDebouncedCallback,
   useThrottledCallback,
   useDebouncedSearch,
-} from '@shared/hooks/useDebounce';
+} from '@shared/hooks';
 
 // === useDebounce ===
 

@@ -36,6 +36,7 @@ vi.mock("@features/datasets/api/datasetApi", () => ({
   createDatasetVersion: vi.fn(),
 }));
 
+// eslint-disable-next-line no-restricted-imports -- 精确 mock 子模块以隔离 AbortSignal 兼容性问题
 import {
   fetchDataset,
   fetchDatasetVersions,

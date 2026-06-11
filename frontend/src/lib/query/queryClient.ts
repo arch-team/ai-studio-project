@@ -10,7 +10,7 @@
 import { QueryClient } from "@tanstack/react-query";
 import { queryRetryFn, queryRetryDelay } from "@lib/api/interceptors";
 import { AppError, getErrorMessage } from "@shared/types";
-import { eventBus } from "@shared/events/eventBus";
+import { eventBus } from "@shared/events";
 
 /**
  * 创建全局 QueryClient 实例
