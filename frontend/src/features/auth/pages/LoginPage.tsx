@@ -68,18 +68,24 @@ export function LoginPage() {
   };
 
   return (
-    <Container header={<Header variant="h2">登录</Header>}>
+    <Container
+      header={
+        <Header variant="h2" description="使用工作账号访问训练平台">
+          登录
+        </Header>
+      }
+    >
       <Form
         actions={
-          <SpaceBetween direction="horizontal" size="xs">
-            <Button
-              variant="primary"
-              loading={isSubmitting}
-              onClick={handleSubmit}
-            >
-              登录
-            </Button>
-          </SpaceBetween>
+          <Button
+            variant="primary"
+            loading={isSubmitting}
+            loadingText="正在登录"
+            fullWidth
+            onClick={handleSubmit}
+          >
+            登录
+          </Button>
         }
       >
         <SpaceBetween size="l">
@@ -95,6 +101,7 @@ export function LoginPage() {
               onChange={({ detail }) => setUsername(detail.value)}
               placeholder="请输入用户名"
               disabled={isSubmitting}
+              autoComplete="username"
               autoFocus
             />
           </FormField>
@@ -106,6 +113,7 @@ export function LoginPage() {
               onChange={({ detail }) => setPassword(detail.value)}
               placeholder="请输入密码"
               disabled={isSubmitting}
+              autoComplete="current-password"
               onKeyDown={({ detail }) => {
                 if (detail.key === "Enter") {
                   handleSubmit();

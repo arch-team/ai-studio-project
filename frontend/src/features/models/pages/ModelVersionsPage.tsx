@@ -7,7 +7,6 @@
 import {
   Alert,
   Box,
-  BreadcrumbGroup,
   Button,
   Container,
   Header,
@@ -15,8 +14,9 @@ import {
   SpaceBetween,
   Spinner,
 } from '@cloudscape-design/components';
-import { useState, useCallback } from 'react';
+import { useMemo, useState, useCallback } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import { PageLayout } from '@shared/components';
 import { useModel, useModelVersions, useRollbackModelVersion } from '../api';
 import { ModelVersionTable, ModelMetricsCompare } from '../components';
 
@@ -36,6 +36,17 @@ export function ModelVersionsPage() {
 
   // 获取模型详情
   const { data: model, isLoading: modelLoading } = useModel(modelId);
+
+  // 面包屑（模型名加载后更新）
+  const breadcrumbs = useMemo(
+    () => [
+      { text: '首页', href: '/' },
+      { text: '模型管理', href: '/models' },
+      { text: model?.model_name ?? '模型', href: `/models/${modelId}` },
+      { text: '版本历史', href: '#' },
+    ],
+    [model?.model_name, modelId],
+  );
 
   // 回滚 mutation
   const rollbackMutation = useRollbackModelVersion();
@@ -105,39 +116,22 @@ export function ModelVersionsPage() {
   }
 
   return (
+    <PageLayout
+      title={`${model.model_name} - 版本历史`}
+      description="模型版本对比与回滚管理"
+      breadcrumbs={breadcrumbs}
+      actions={
+        <SpaceBetween direction="horizontal" size="xs">
+          <Button iconName="refresh" onClick={() => refetch()}>
+            刷新
+          </Button>
+          <Button onClick={() => navigate(`/models/${modelId}`)}>
+            返回详情
+          </Button>
+        </SpaceBetween>
+      }
+    >
     <SpaceBetween size="l">
-      {/* 面包屑导航 */}
-      <BreadcrumbGroup
-        items={[
-          { text: '模型管理', href: '/models' },
-          { text: model.model_name, href: `/models/${modelId}` },
-          { text: '版本历史', href: '#' },
-        ]}
-        onFollow={(e) => {
-          e.preventDefault();
-          if (e.detail.href !== '#') {
-            navigate(e.detail.href);
-          }
-        }}
-      />
-
-      {/* 页面标题 */}
-      <Header
-        variant="h1"
-        actions={
-          <SpaceBetween direction="horizontal" size="xs">
-            <Button iconName="refresh" onClick={() => refetch()}>
-              刷新
-            </Button>
-            <Button onClick={() => navigate(`/models/${modelId}`)}>
-              返回详情
-            </Button>
-          </SpaceBetween>
-        }
-      >
-        {model.model_name} - 版本历史
-      </Header>
-
       {/* 对比结果 */}
       {showComparison && versionsData?.comparison && (
         <SpaceBetween size="m">
@@ -209,6 +203,7 @@ export function ModelVersionsPage() {
         </SpaceBetween>
       </Modal>
     </SpaceBetween>
+    </PageLayout>
   );
 }
 

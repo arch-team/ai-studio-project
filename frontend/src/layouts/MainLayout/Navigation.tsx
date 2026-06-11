@@ -13,15 +13,17 @@ import { SideNavigation, SideNavigationProps } from '@cloudscape-design/componen
 import { useMemo } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '@features/auth';
+import { BRAND_LOGO_ALT, BRAND_LOGO_SRC } from '@shared/theme';
 import type { UserRole } from '@/types/common';
 import { ROUTES } from '@app/router/routes';
 
 /**
- * 顶部 Header（平台标识）
+ * 顶部 Header（品牌 Logo + 平台标识）
  */
 const navHeader: SideNavigationProps['header'] = {
   href: ROUTES.HOME,
   text: 'AI 训练平台',
+  logo: { src: BRAND_LOGO_SRC, alt: BRAND_LOGO_ALT },
 };
 
 /**

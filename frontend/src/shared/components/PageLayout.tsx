@@ -8,15 +8,18 @@
  * - 一致的页头（标题 + 描述 + 操作区）
  * - 统一的面包屑联动
  * - 统一的内容间距
+ * - 可选的品牌 Hero 页头（深空渐变高对比背景，用于首页等门户型页面）
  */
 
 import {
   ContentLayout,
   Header,
+  SpaceBetween,
   type HeaderProps,
 } from '@cloudscape-design/components';
 import { useEffect } from 'react';
 import { useUIStore } from '@store/slices/uiSlice';
+import { heroHeaderBackground } from '@shared/theme';
 import type { BreadcrumbItem } from '@/types/common';
 
 export interface PageLayoutProps {
@@ -30,6 +33,13 @@ export interface PageLayoutProps {
   counter?: string;
   /** 标题层级，默认 h1 */
   headerVariant?: HeaderProps['variant'];
+  /**
+   * 品牌 Hero 页头。开启后页头使用深空渐变背景 + 高对比文字，
+   * 适用于首页 / 门户型页面，让关键页面更具品牌识别度。
+   */
+  hero?: boolean;
+  /** Hero 模式下显示在标题区的附加内容（如欢迎语下的指标摘要） */
+  heroExtra?: React.ReactNode;
   /**
    * 面包屑配置。传入后会自动同步到全局 UI Store，
    * MainLayout 会据此渲染 BreadcrumbGroup。
@@ -65,6 +75,8 @@ export function PageLayout({
   actions,
   counter,
   headerVariant = 'h1',
+  hero = false,
+  heroExtra,
   breadcrumbs,
   children,
 }: PageLayoutProps) {
@@ -78,15 +90,31 @@ export function PageLayout({
 
   return (
     <ContentLayout
+      headerVariant={hero ? 'high-contrast' : 'default'}
+      headerBackgroundStyle={hero ? heroHeaderBackground : undefined}
       header={
-        <Header
-          variant={headerVariant}
-          description={description}
-          counter={counter}
-          actions={actions}
-        >
-          {title}
-        </Header>
+        hero && heroExtra ? (
+          <SpaceBetween size="m">
+            <Header
+              variant={headerVariant}
+              description={description}
+              counter={counter}
+              actions={actions}
+            >
+              {title}
+            </Header>
+            {heroExtra}
+          </SpaceBetween>
+        ) : (
+          <Header
+            variant={headerVariant}
+            description={description}
+            counter={counter}
+            actions={actions}
+          >
+            {title}
+          </Header>
+        )
       }
     >
       {children}

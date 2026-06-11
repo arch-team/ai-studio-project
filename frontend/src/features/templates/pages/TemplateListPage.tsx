@@ -5,17 +5,24 @@
  */
 
 import {
+  Alert,
   Box,
   Button,
   Container,
-  Header,
   Input,
   Select,
   SpaceBetween,
 } from '@cloudscape-design/components';
 import { useCallback, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { PageLayout } from '@shared/components';
 import { useJobTemplates } from '../api';
+
+// 面包屑（模块级常量，避免每次渲染创建新引用）
+const BREADCRUMBS = [
+  { text: '首页', href: '/' },
+  { text: '任务模板', href: '/job-templates' },
+];
 import { PopularTemplates, TemplateTable } from '../components';
 import type { TemplateFilters, TemplateVisibility } from '../types';
 import { DEFAULT_PAGE_SIZE, VISIBILITY_LABELS } from '../types';
@@ -93,34 +100,31 @@ export function TemplateListPage() {
   // 错误处理
   if (error) {
     return (
-      <Container>
-        <Box textAlign="center" color="text-status-error" padding="xl">
-          加载失败: {error.message}
-        </Box>
-      </Container>
+      <PageLayout title="任务模板" breadcrumbs={BREADCRUMBS}>
+        <Alert type="error" header="加载失败">
+          {error.message}
+        </Alert>
+      </PageLayout>
     );
   }
 
   return (
+    <PageLayout
+      title="任务模板"
+      description="管理和复用训练任务配置模板"
+      breadcrumbs={BREADCRUMBS}
+      actions={
+        <SpaceBetween direction="horizontal" size="xs">
+          <Button iconName="refresh" onClick={() => refetch()}>
+            刷新
+          </Button>
+          <Button variant="primary" iconName="add-plus" onClick={handleCreateClick}>
+            创建模板
+          </Button>
+        </SpaceBetween>
+      }
+    >
     <SpaceBetween size="l">
-      {/* 标题和操作 */}
-      <Header
-        variant="h1"
-        actions={
-          <SpaceBetween direction="horizontal" size="xs">
-            <Button iconName="refresh" onClick={() => refetch()}>
-              刷新
-            </Button>
-            <Button variant="primary" onClick={handleCreateClick}>
-              创建模板
-            </Button>
-          </SpaceBetween>
-        }
-        description="管理和复用训练任务配置模板"
-      >
-        任务模板
-      </Header>
-
       {/* 热门模板推荐 */}
       <PopularTemplates limit={5} onUseTemplate={handleUseTemplate} />
 
@@ -170,6 +174,7 @@ export function TemplateListPage() {
         onUseTemplate={handleUseTemplate}
       />
     </SpaceBetween>
+    </PageLayout>
   );
 }
 

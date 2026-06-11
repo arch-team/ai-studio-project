@@ -8,6 +8,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { screen, waitFor, fireEvent } from "@testing-library/react";
 import { renderWithProviders } from "@tests/__utils__/test-utils";
 import { CreateDatasetPage } from "@features/datasets/pages";
+import { useUIStore } from "@store/slices/uiSlice";
 
 // Mock useNavigate
 const mockNavigate = vi.fn();
@@ -65,9 +66,9 @@ describe("CreateDatasetPage", () => {
 
     it("应渲染面包屑导航", () => {
       renderWithProviders(<CreateDatasetPage />);
-      // 面包屑中包含"数据集"文本（可能和其他元素共享文本）
-      const allDatasetTexts = screen.getAllByText("数据集");
-      expect(allDatasetTexts.length).toBeGreaterThanOrEqual(1);
+      // 面包屑经 PageLayout 同步到全局 UI Store，由 MainLayout 渲染
+      const breadcrumbs = useUIStore.getState().breadcrumbs;
+      expect(breadcrumbs.some((b) => b.text === "数据集")).toBe(true);
     });
 
     it("应渲染基本信息表单区域", () => {
@@ -208,14 +209,14 @@ describe("CreateDatasetPage", () => {
       expect(mockNavigate).toHaveBeenCalledWith("/datasets");
     });
 
-    it('点击面包屑"数据集"应导航回列表页', () => {
+    it('面包屑"数据集"应指向列表页', () => {
       renderWithProviders(<CreateDatasetPage />);
 
-      // 面包屑中的"数据集"链接
-      const breadcrumbItems = screen.getAllByText("数据集");
-      const breadcrumbLink = breadcrumbItems[0];
-      fireEvent.click(breadcrumbLink);
-      expect(mockNavigate).toHaveBeenCalledWith("/datasets");
+      // 面包屑跳转由 MainLayout 的 BreadcrumbGroup 统一处理，
+      // 此处验证 Store 中的面包屑项指向正确路径
+      const breadcrumbs = useUIStore.getState().breadcrumbs;
+      const datasetCrumb = breadcrumbs.find((b) => b.text === "数据集");
+      expect(datasetCrumb?.href).toBe("/datasets");
     });
   });
 

@@ -35,7 +35,14 @@ import {
   useAlerts,
   useMetricSeries,
 } from "../api";
+import { PageLayout } from "@shared/components";
 import { MetricsCharts } from "../components";
+
+// 面包屑（模块级常量，避免每次渲染创建新引用）
+const BREADCRUMBS = [
+  { text: "首页", href: "/" },
+  { text: "资源监控", href: "/monitoring" },
+];
 import {
   formatDateTimeShort,
   calculateTimeRange,
@@ -503,23 +510,20 @@ export function MonitoringDashboardPage() {
 
   // === 渲染 ===
   return (
+    <PageLayout
+      title="集群监控"
+      description="实时监控集群状态、资源利用率和告警信息"
+      breadcrumbs={BREADCRUMBS}
+      actions={
+        <TimeRangeSelector
+          value={dateRange}
+          onChange={setDateRange}
+          refreshInterval={refreshInterval}
+          onRefreshIntervalChange={setRefreshInterval}
+        />
+      }
+    >
     <SpaceBetween size="l" data-testid="monitoring-dashboard">
-      {/* 页面标题和时间选择器 */}
-      <Header
-        variant="h1"
-        description="实时监控集群状态、资源利用率和告警信息"
-        actions={
-          <TimeRangeSelector
-            value={dateRange}
-            onChange={setDateRange}
-            refreshInterval={refreshInterval}
-            onRefreshIntervalChange={setRefreshInterval}
-          />
-        }
-      >
-        集群监控
-      </Header>
-
       {isLoading ? (
         <Container>
           <Box textAlign="center" padding="l">
@@ -688,6 +692,7 @@ export function MonitoringDashboardPage() {
         />
       )}
     </SpaceBetween>
+    </PageLayout>
   );
 }
 

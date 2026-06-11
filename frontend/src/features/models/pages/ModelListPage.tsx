@@ -5,18 +5,24 @@
  */
 
 import {
-  Box,
+  Alert,
   Button,
   Container,
   FormField,
-  Header,
   Input,
   Select,
   SpaceBetween,
 } from '@cloudscape-design/components';
 import { useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { PageLayout } from '@shared/components';
 import { useModels, useBatchArchiveModels } from '../api';
+
+// 面包屑（模块级常量，避免每次渲染创建新引用）
+const BREADCRUMBS = [
+  { text: '首页', href: '/' },
+  { text: '模型管理', href: '/models' },
+];
 import { ModelTable } from '../components';
 import type { ModelStatus, ModelFramework, ModelFilters, ModelSummary } from '../types';
 import { MODEL_STATUS_LABELS, MODEL_FRAMEWORK_LABELS } from '../types';
@@ -113,40 +119,38 @@ export function ModelListPage() {
     refetch();
   }, [selectedItems, batchArchiveMutation, refetch]);
 
-  // 错误状态
-  if (error) {
-    return (
-      <Container>
-        <Box textAlign="center" color="text-status-error" padding="xl">
-          加载失败: {error.message}
-        </Box>
-      </Container>
-    );
-  }
-
   return (
-    <SpaceBetween size="l">
-      {/* 页面标题和操作 */}
-      <Header
-        variant="h1"
-        actions={
-          <SpaceBetween direction="horizontal" size="xs">
-            {selectedItems.length > 0 && (
-              <Button
-                onClick={handleBatchArchive}
-                loading={batchArchiveMutation.isPending}
-              >
-                批量归档 ({selectedItems.length})
-              </Button>
-            )}
-            <Button iconName="refresh" onClick={() => refetch()}>
-              刷新
+    <PageLayout
+      title="模型管理"
+      description="管理训练产出的模型及其版本"
+      breadcrumbs={BREADCRUMBS}
+      actions={
+        <SpaceBetween direction="horizontal" size="xs">
+          {selectedItems.length > 0 && (
+            <Button
+              onClick={handleBatchArchive}
+              loading={batchArchiveMutation.isPending}
+            >
+              批量归档 ({selectedItems.length})
             </Button>
-          </SpaceBetween>
-        }
-      >
-        模型管理
-      </Header>
+          )}
+          <Button iconName="refresh" onClick={() => refetch()}>
+            刷新
+          </Button>
+        </SpaceBetween>
+      }
+    >
+    <SpaceBetween size="l">
+      {/* 错误提示 */}
+      {error && (
+        <Alert
+          type="error"
+          header="加载失败"
+          action={<Button onClick={() => refetch()}>重试</Button>}
+        >
+          {error.message}
+        </Alert>
+      )}
 
       {/* 过滤器 */}
       <Container>
@@ -198,6 +202,7 @@ export function ModelListPage() {
         onSelectionChange={setSelectedItems}
       />
     </SpaceBetween>
+    </PageLayout>
   );
 }
 

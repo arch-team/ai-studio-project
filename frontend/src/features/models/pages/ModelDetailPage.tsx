@@ -6,7 +6,6 @@
 
 import {
   Box,
-  BreadcrumbGroup,
   Button,
   ColumnLayout,
   Container,
@@ -17,8 +16,9 @@ import {
   Spinner,
   Tabs,
 } from '@cloudscape-design/components';
-import { useCallback } from 'react';
+import { useCallback, useMemo } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import { PageLayout } from '@shared/components';
 import { useModel, useArchiveModel, useRestoreModel } from '../api';
 import { ModelStatusBadge, RegistrySyncStatus } from '../components';
 import { MODEL_FRAMEWORK_LABELS } from '../types';
@@ -57,6 +57,16 @@ export function ModelDetailPage() {
 
   // 获取模型详情
   const { data: model, isLoading, error, refetch } = useModel(modelId);
+
+  // 面包屑（模型名加载后更新）
+  const breadcrumbs = useMemo(
+    () => [
+      { text: '首页', href: '/' },
+      { text: '模型管理', href: '/models' },
+      { text: model?.model_name ?? '模型详情', href: '#' },
+    ],
+    [model?.model_name],
+  );
 
   // Mutations
   const archiveMutation = useArchiveModel();
@@ -103,52 +113,36 @@ export function ModelDetailPage() {
   }
 
   return (
+    <PageLayout
+      title={model.model_name}
+      description={model.description || '模型详情、指标与版本信息'}
+      breadcrumbs={breadcrumbs}
+      actions={
+        <SpaceBetween direction="horizontal" size="xs">
+          <Button iconName="refresh" onClick={() => refetch()}>
+            刷新
+          </Button>
+          <Button onClick={() => navigate(`/models/${modelId}/versions`)}>
+            版本历史
+          </Button>
+          {canArchive && (
+            <Button onClick={handleArchive} loading={archiveMutation.isPending}>
+              归档
+            </Button>
+          )}
+          {canRestore && (
+            <Button
+              variant="primary"
+              onClick={handleRestore}
+              loading={restoreMutation.isPending}
+            >
+              恢复
+            </Button>
+          )}
+        </SpaceBetween>
+      }
+    >
     <SpaceBetween size="l">
-      {/* 面包屑导航 */}
-      <BreadcrumbGroup
-        items={[
-          { text: '模型管理', href: '/models' },
-          { text: model.model_name, href: '#' },
-        ]}
-        onFollow={(e) => {
-          e.preventDefault();
-          if (e.detail.href !== '#') {
-            navigate(e.detail.href);
-          }
-        }}
-      />
-
-      {/* 页面标题和操作 */}
-      <Header
-        variant="h1"
-        actions={
-          <SpaceBetween direction="horizontal" size="xs">
-            <Button iconName="refresh" onClick={() => refetch()}>
-              刷新
-            </Button>
-            <Button onClick={() => navigate(`/models/${modelId}/versions`)}>
-              版本历史
-            </Button>
-            {canArchive && (
-              <Button onClick={handleArchive} loading={archiveMutation.isPending}>
-                归档
-              </Button>
-            )}
-            {canRestore && (
-              <Button
-                variant="primary"
-                onClick={handleRestore}
-                loading={restoreMutation.isPending}
-              >
-                恢复
-              </Button>
-            )}
-          </SpaceBetween>
-        }
-      >
-        {model.model_name}
-      </Header>
-
       {/* 概览信息 */}
       <Container header={<Header variant="h2">概览</Header>}>
         <ColumnLayout columns={4} variant="text-grid">
@@ -268,6 +262,7 @@ export function ModelDetailPage() {
         ]}
       />
     </SpaceBetween>
+    </PageLayout>
   );
 }
 

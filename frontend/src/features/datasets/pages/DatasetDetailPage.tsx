@@ -16,8 +16,9 @@ import {
   StatusIndicator,
   Table,
 } from '@cloudscape-design/components';
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { PageLayout } from '@shared/components';
 import { useDataset, useDatasetVersions } from '../api';
 import { formatDateTime } from '@shared/utils';
 import {
@@ -61,6 +62,16 @@ export function DatasetDetailPage() {
 
   const { data: dataset, isLoading, error } = useDataset(datasetId);
   const { data: versions, isLoading: loadingVersions } = useDatasetVersions(datasetId);
+
+  // 面包屑（数据集名加载后更新）
+  const breadcrumbs = useMemo(
+    () => [
+      { text: '首页', href: '/' },
+      { text: '数据集', href: '/datasets' },
+      { text: dataset?.name ?? '数据集详情', href: '#' },
+    ],
+    [dataset?.name],
+  );
 
   // 版本列表分页
   const [currentPage, setCurrentPage] = useState(1);
@@ -153,22 +164,20 @@ export function DatasetDetailPage() {
   const totalPages = Math.max(1, Math.ceil(allVersionItems.length / pageSize));
 
   return (
+    <PageLayout
+      title={dataset.name}
+      description={dataset.description || '数据集详情与版本历史'}
+      breadcrumbs={breadcrumbs}
+      actions={
+        <SpaceBetween direction="horizontal" size="xs">
+          <Button onClick={() => navigate('/datasets')}>返回列表</Button>
+          <Button onClick={() => navigate(`/datasets/${id}/versions`)}>
+            版本管理
+          </Button>
+        </SpaceBetween>
+      }
+    >
     <SpaceBetween size="l">
-      {/* 页面标题 */}
-      <Header
-        variant="h1"
-        actions={
-          <SpaceBetween direction="horizontal" size="xs">
-            <Button onClick={() => navigate('/datasets')}>返回列表</Button>
-            <Button onClick={() => navigate(`/datasets/${id}/versions`)}>
-              版本管理
-            </Button>
-          </SpaceBetween>
-        }
-      >
-        {dataset.name}
-      </Header>
-
       {/* 基本信息 */}
       <Container header={<Header variant="h2">基本信息</Header>}>
         <ColumnLayout columns={2} variant="text-grid">
@@ -254,6 +263,7 @@ export function DatasetDetailPage() {
         }
       />
     </SpaceBetween>
+    </PageLayout>
   );
 }
 

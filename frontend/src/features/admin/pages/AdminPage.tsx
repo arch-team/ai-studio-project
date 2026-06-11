@@ -13,7 +13,14 @@ import {
   Tabs,
 } from '@cloudscape-design/components';
 import { useState } from 'react';
+import { PageLayout } from '@shared/components';
 import { UserManagementPage } from './UserManagementPage';
+
+// 面包屑（模块级常量，避免每次渲染创建新引用）
+const BREADCRUMBS = [
+  { text: '首页', href: '/' },
+  { text: '管理后台', href: '/admin' },
+];
 
 /**
  * 管理后台页面
@@ -22,9 +29,12 @@ export function AdminPage() {
   const [activeTabId, setActiveTabId] = useState('users');
 
   return (
+    <PageLayout
+      title="管理后台"
+      description="用户、角色与系统管理"
+      breadcrumbs={BREADCRUMBS}
+    >
     <SpaceBetween size="l">
-      <Header variant="h1">管理后台</Header>
-
       <Tabs
         activeTabId={activeTabId}
         onChange={({ detail }) => setActiveTabId(detail.activeTabId)}
@@ -32,7 +42,7 @@ export function AdminPage() {
           {
             id: 'users',
             label: '用户管理',
-            content: <UserManagementPage />,
+            content: <UserManagementPage embedded />,
           },
           {
             id: 'roles',
@@ -75,6 +85,7 @@ export function AdminPage() {
         ]}
       />
     </SpaceBetween>
+    </PageLayout>
   );
 }
 

@@ -15,8 +15,9 @@ import {
   SpaceBetween,
   Spinner,
 } from '@cloudscape-design/components';
-import { useCallback } from 'react';
+import { useCallback, useMemo } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import { PageLayout } from '@shared/components';
 import { useDeleteJobTemplate, useJobTemplate } from '../api';
 import {
   DISTRIBUTION_STRATEGY_LABELS,
@@ -33,6 +34,16 @@ export function TemplateDetailPage() {
   const templateId = id ? parseInt(id, 10) : undefined;
 
   const { data: template, isLoading, error } = useJobTemplate(templateId);
+
+  // 面包屑（模板名加载后更新）
+  const breadcrumbs = useMemo(
+    () => [
+      { text: '首页', href: '/' },
+      { text: '任务模板', href: '/job-templates' },
+      { text: template?.name ?? '模板详情', href: '#' },
+    ],
+    [template?.name],
+  );
   const deleteTemplate = useDeleteJobTemplate();
 
   const handleUseTemplate = useCallback(() => {
@@ -86,29 +97,27 @@ export function TemplateDetailPage() {
   const config = template.training_config;
 
   return (
+    <PageLayout
+      title={template.name}
+      description={template.description || '训练任务配置模板详情'}
+      breadcrumbs={breadcrumbs}
+      actions={
+        <SpaceBetween direction="horizontal" size="xs">
+          <Button onClick={handleBack}>返回</Button>
+          <Button onClick={handleEditTemplate}>编辑</Button>
+          <Button
+            onClick={handleDeleteTemplate}
+            loading={deleteTemplate.isPending}
+          >
+            删除
+          </Button>
+          <Button variant="primary" onClick={handleUseTemplate}>
+            使用此模板
+          </Button>
+        </SpaceBetween>
+      }
+    >
     <SpaceBetween size="l">
-      {/* 标题和操作 */}
-      <Header
-        variant="h1"
-        actions={
-          <SpaceBetween direction="horizontal" size="xs">
-            <Button onClick={handleBack}>返回</Button>
-            <Button onClick={handleEditTemplate}>编辑</Button>
-            <Button
-              onClick={handleDeleteTemplate}
-              loading={deleteTemplate.isPending}
-            >
-              删除
-            </Button>
-            <Button variant="primary" onClick={handleUseTemplate}>
-              使用此模板
-            </Button>
-          </SpaceBetween>
-        }
-      >
-        {template.name}
-      </Header>
-
       {/* 基本信息 */}
       <Container header={<Header variant="h2">基本信息</Header>}>
         <ColumnLayout columns={2} variant="text-grid">
@@ -232,6 +241,7 @@ export function TemplateDetailPage() {
           </Container>
         )}
     </SpaceBetween>
+    </PageLayout>
   );
 }
 

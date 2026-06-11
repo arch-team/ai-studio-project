@@ -18,7 +18,14 @@ import {
   Table,
 } from "@cloudscape-design/components";
 import type { DateRangePickerProps } from "@cloudscape-design/components";
+import { PageLayout } from "@shared/components";
 import { useAuditLogs, useExportAuditLogs } from "../api";
+
+// 面包屑（模块级常量，避免每次渲染创建新引用）
+const BREADCRUMBS = [
+  { text: "首页", href: "/" },
+  { text: "审计日志", href: "/audit-logs" },
+];
 import {
   formatDateTime,
   DATE_RANGE_PICKER_I18N,
@@ -195,23 +202,22 @@ export function AuditLogsPage() {
   }
 
   return (
+    <PageLayout
+      title="审计日志"
+      description="平台操作审计追踪，支持按操作、资源与时间筛选"
+      breadcrumbs={BREADCRUMBS}
+      actions={
+        <Button
+          variant="primary"
+          onClick={handleExport}
+          loading={exportMutation.isPending}
+          iconName="download"
+        >
+          导出 CSV
+        </Button>
+      }
+    >
     <SpaceBetween size="l">
-      <Header
-        variant="h1"
-        actions={
-          <Button
-            variant="primary"
-            onClick={handleExport}
-            loading={exportMutation.isPending}
-            iconName="download"
-          >
-            导出 CSV
-          </Button>
-        }
-      >
-        审计日志
-      </Header>
-
       {/* 过滤器区域 */}
       <Container>
         <SpaceBetween direction="horizontal" size="m">
@@ -319,6 +325,7 @@ export function AuditLogsPage() {
         }
       />
     </SpaceBetween>
+    </PageLayout>
   );
 }
 

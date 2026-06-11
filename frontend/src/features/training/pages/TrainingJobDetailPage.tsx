@@ -6,7 +6,6 @@
 
 import {
   Box,
-  BreadcrumbGroup,
   Button,
   ColumnLayout,
   Container,
@@ -18,8 +17,9 @@ import {
   Table,
   Tabs,
 } from "@cloudscape-design/components";
-import { useState, useCallback } from "react";
+import { useState, useCallback, useMemo } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import { PageLayout } from "@shared/components";
 import {
   useTrainingJob,
   useTrainingJobCheckpoints,
@@ -134,6 +134,16 @@ export function TrainingJobDetailPage() {
     navigate("/training-jobs");
   }, [jobId, deleteMutation, navigate]);
 
+  // 面包屑（任务名加载后更新）
+  const breadcrumbs = useMemo(
+    () => [
+      { text: "首页", href: "/" },
+      { text: "训练任务", href: "/training-jobs" },
+      { text: job?.job_name ?? "任务详情", href: "#" },
+    ],
+    [job?.job_name],
+  );
+
   // 加载状态
   if (isLoading) {
     return (
@@ -156,55 +166,39 @@ export function TrainingJobDetailPage() {
   }
 
   return (
-    <SpaceBetween size="l">
-      {/* 面包屑导航 */}
-      <BreadcrumbGroup
-        items={[
-          { text: "训练任务", href: "/training-jobs" },
-          { text: job.job_name, href: "#" },
-        ]}
-        onFollow={(e) => {
-          e.preventDefault();
-          if (e.detail.href !== "#") {
-            navigate(e.detail.href);
-          }
-        }}
-      />
-
-      {/* 页面标题和操作 */}
-      <Header
-        variant="h1"
-        actions={
-          <SpaceBetween direction="horizontal" size="xs">
-            <Button iconName="refresh" onClick={() => refetch()}>
-              刷新
+    <PageLayout
+      title={job.job_name}
+      description={job.description || "训练任务详情、进度与运行日志"}
+      breadcrumbs={breadcrumbs}
+      actions={
+        <SpaceBetween direction="horizontal" size="xs">
+          <Button iconName="refresh" onClick={() => refetch()}>
+            刷新
+          </Button>
+          {canPause && (
+            <Button onClick={handlePause} loading={pauseMutation.isPending}>
+              暂停
             </Button>
-            {canPause && (
-              <Button onClick={handlePause} loading={pauseMutation.isPending}>
-                暂停
-              </Button>
-            )}
-            {canResume && (
-              <Button
-                variant="primary"
-                onClick={handleResume}
-                loading={resumeMutation.isPending}
-              >
-                恢复
-              </Button>
-            )}
+          )}
+          {canResume && (
             <Button
-              onClick={() => setShowDeleteModal(true)}
-              disabled={!canDelete}
+              variant="primary"
+              onClick={handleResume}
+              loading={resumeMutation.isPending}
             >
-              删除
+              恢复
             </Button>
-          </SpaceBetween>
-        }
-      >
-        {job.job_name}
-      </Header>
-
+          )}
+          <Button
+            onClick={() => setShowDeleteModal(true)}
+            disabled={!canDelete}
+          >
+            删除
+          </Button>
+        </SpaceBetween>
+      }
+    >
+    <SpaceBetween size="l">
       {/* 概览信息 */}
       <Container header={<Header variant="h2">概览</Header>}>
         <ColumnLayout columns={4} variant="text-grid">
@@ -437,6 +431,7 @@ export function TrainingJobDetailPage() {
         确定要删除训练任务 <b>{job.job_name}</b> 吗？此操作不可恢复。
       </Modal>
     </SpaceBetween>
+    </PageLayout>
   );
 }
 

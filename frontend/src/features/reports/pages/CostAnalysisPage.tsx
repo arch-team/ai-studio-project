@@ -29,7 +29,15 @@ import type {
   DateRangePickerProps,
   SelectProps,
 } from "@cloudscape-design/components";
+import { PageLayout } from "@shared/components";
 import { useCostAnalysis, useExportReport } from "../api";
+
+// 面包屑（模块级常量，避免每次渲染创建新引用）
+const BREADCRUMBS = [
+  { text: "首页", href: "/" },
+  { text: "报表中心", href: "/reports" },
+  { text: "成本分析", href: "/reports/cost-analysis" },
+];
 import { CostTrendChart } from "../components";
 import {
   formatCurrency,
@@ -310,33 +318,30 @@ export function CostAnalysisPage() {
 
   // === 渲染 ===
   return (
+    <PageLayout
+      title="成本分析"
+      description="分析和追踪平台资源使用成本"
+      breadcrumbs={BREADCRUMBS}
+      actions={
+        <SpaceBetween direction="horizontal" size="xs">
+          <Button
+            iconName="refresh"
+            onClick={handleRefresh}
+            loading={isLoading}
+          >
+            刷新
+          </Button>
+          <Button
+            iconName="download"
+            onClick={handleExport}
+            loading={exportMutation.isPending}
+          >
+            导出 CSV
+          </Button>
+        </SpaceBetween>
+      }
+    >
     <SpaceBetween size="l" data-testid="cost-analysis-page">
-      {/* 页面标题 */}
-      <Header
-        variant="h1"
-        description="分析和追踪平台资源使用成本"
-        actions={
-          <SpaceBetween direction="horizontal" size="xs">
-            <Button
-              iconName="refresh"
-              onClick={handleRefresh}
-              loading={isLoading}
-            >
-              刷新
-            </Button>
-            <Button
-              iconName="download"
-              onClick={handleExport}
-              loading={exportMutation.isPending}
-            >
-              导出 CSV
-            </Button>
-          </SpaceBetween>
-        }
-      >
-        成本分析
-      </Header>
-
       {/* 过滤器区域 */}
       <Container>
         <SpaceBetween direction="horizontal" size="m">
@@ -405,6 +410,7 @@ export function CostAnalysisPage() {
         <CostBreakdownTable breakdown={breakdown} loading={isLoading} />
       </ColumnLayout>
     </SpaceBetween>
+    </PageLayout>
   );
 }
 

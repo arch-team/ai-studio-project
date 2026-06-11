@@ -16,7 +16,20 @@ import {
   StatusIndicator,
   Table,
 } from "@cloudscape-design/components";
+import { PageLayout } from "@shared/components";
 import { useUsers, useCreateUser, useUpdateUser } from "../hooks";
+
+// 面包屑（模块级常量，避免每次渲染创建新引用）
+const BREADCRUMBS = [
+  { text: "首页", href: "/" },
+  { text: "管理后台", href: "/admin" },
+  { text: "用户管理", href: "/admin/users" },
+];
+
+interface UserManagementPageProps {
+  /** 作为 AdminPage Tab 内容嵌入时为 true，不渲染页头与面包屑 */
+  embedded?: boolean;
+}
 import { UserFormModal } from "../components";
 import { formatDateTime } from "@shared/utils";
 import type {
@@ -63,7 +76,7 @@ const statusFilterOptions = [
   })),
 ];
 
-export function UserManagementPage() {
+export function UserManagementPage({ embedded = false }: UserManagementPageProps = {}) {
   // 分页状态
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 20;
@@ -202,19 +215,8 @@ export function UserManagementPage() {
     );
   }
 
-  return (
+  const content = (
     <SpaceBetween size="l">
-      <Header
-        variant="h1"
-        actions={
-          <Button variant="primary" onClick={handleCreate}>
-            新建用户
-          </Button>
-        }
-      >
-        用户管理
-      </Header>
-
       {/* 过滤器区域 */}
       <Container>
         <SpaceBetween direction="horizontal" size="m">
@@ -294,6 +296,26 @@ export function UserManagementPage() {
         isLoading={createMutation.isPending || updateMutation.isPending}
       />
     </SpaceBetween>
+  );
+
+  // 嵌入模式（AdminPage Tab 内）不渲染页头，避免重复标题与面包屑
+  if (embedded) {
+    return content;
+  }
+
+  return (
+    <PageLayout
+      title="用户管理"
+      description="管理平台用户及其角色分配"
+      breadcrumbs={BREADCRUMBS}
+      actions={
+        <Button variant="primary" iconName="add-plus" onClick={handleCreate}>
+          新建用户
+        </Button>
+      }
+    >
+      {content}
+    </PageLayout>
   );
 }
 

@@ -6,7 +6,6 @@
 
 import {
   Box,
-  BreadcrumbGroup,
   Button,
   Container,
   Form,
@@ -18,7 +17,15 @@ import {
 } from '@cloudscape-design/components';
 import { useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { PageLayout } from '@shared/components';
 import { useCreateSpace } from '../api';
+
+// 面包屑（模块级常量，避免每次渲染创建新引用）
+const BREADCRUMBS = [
+  { text: '首页', href: '/' },
+  { text: '开发空间', href: '/spaces' },
+  { text: '创建开发空间', href: '#' },
+];
 import type { SpaceType, CreateSpaceRequest } from '../types';
 import { SPACE_TYPE_LABELS } from '../types';
 
@@ -137,24 +144,12 @@ export function CreateSpacePage() {
   }, [name, spaceType, instanceType, storageGb, createMutation, navigate]);
 
   return (
+    <PageLayout
+      title="创建开发空间"
+      description="启动交互式在线 IDE，支持 JupyterLab / Code Editor"
+      breadcrumbs={BREADCRUMBS}
+    >
     <SpaceBetween size="l">
-      {/* 面包屑导航 */}
-      <BreadcrumbGroup
-        items={[
-          { text: '在线开发环境', href: '/spaces' },
-          { text: '创建开发空间', href: '#' },
-        ]}
-        onFollow={(e) => {
-          e.preventDefault();
-          if (e.detail.href !== '#') {
-            navigate(e.detail.href);
-          }
-        }}
-      />
-
-      {/* 页面标题 */}
-      <Header variant="h1">创建开发空间</Header>
-
       {/* 创建表单 */}
       <Form
         actions={
@@ -249,6 +244,7 @@ export function CreateSpacePage() {
         </Container>
       )}
     </SpaceBetween>
+    </PageLayout>
   );
 }
 

@@ -7,6 +7,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { screen, waitFor, fireEvent } from "@testing-library/react";
 import { renderWithProviders } from "@tests/__utils__/test-utils";
+import { useUIStore } from "@store/slices/uiSlice";
 import { CreateSpacePage } from "@features/spaces/pages";
 
 // mock useNavigate
@@ -57,14 +58,10 @@ describe("CreateSpacePage", () => {
 
     it("应该渲染面包屑导航", () => {
       renderWithProviders(<CreateSpacePage />);
-      // BreadcrumbGroup 渲染为 nav 元素，包含链接
-      const breadcrumbNav = screen.getByRole("navigation");
-      expect(breadcrumbNav).toBeInTheDocument();
-      // 验证面包屑中的文本存在（可能有多个同名元素，使用 getAllByText）
-      const breadcrumbItems = screen.getAllByText("在线开发环境");
-      expect(breadcrumbItems.length).toBeGreaterThanOrEqual(1);
-      const createSpaceItems = screen.getAllByText("创建开发空间");
-      expect(createSpaceItems.length).toBeGreaterThanOrEqual(1);
+      // 面包屑经 PageLayout 同步到全局 UI Store，由 MainLayout 渲染
+      const breadcrumbs = useUIStore.getState().breadcrumbs;
+      expect(breadcrumbs.some((b) => b.text === "开发空间")).toBe(true);
+      expect(breadcrumbs.some((b) => b.text === "创建开发空间")).toBe(true);
     });
 
     it("应该渲染空间名称输入框", () => {

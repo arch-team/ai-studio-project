@@ -8,6 +8,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { screen, waitFor, fireEvent } from "@testing-library/react";
 import { renderWithProviders } from "@tests/__utils__/test-utils";
 import { DatasetVersionsPage } from "@features/datasets/pages";
+import { useUIStore } from "@store/slices/uiSlice";
 import type {
   DatasetDetail,
   DatasetVersionListResponse,
@@ -118,15 +119,11 @@ describe("DatasetVersionsPage", () => {
     it("应渲染面包屑导航", async () => {
       renderWithProviders(<DatasetVersionsPage />);
       await waitFor(() => {
-        // Cloudscape BreadcrumbGroup 会为每个项渲染多个包含相同文本的 span
-        const datasetItems = screen.getAllByText("数据集");
-        expect(datasetItems.length).toBeGreaterThanOrEqual(1);
-        expect(screen.getAllByText("测试数据集").length).toBeGreaterThanOrEqual(
-          1,
-        );
-        expect(screen.getAllByText("版本历史").length).toBeGreaterThanOrEqual(
-          1,
-        );
+        // 面包屑经 PageLayout 同步到全局 UI Store，由 MainLayout 渲染
+        const breadcrumbs = useUIStore.getState().breadcrumbs;
+        expect(breadcrumbs.some((b) => b.text === "数据集")).toBe(true);
+        expect(breadcrumbs.some((b) => b.text === "测试数据集")).toBe(true);
+        expect(breadcrumbs.some((b) => b.text === "版本历史")).toBe(true);
       });
     });
 
@@ -304,17 +301,16 @@ describe("DatasetVersionsPage", () => {
   });
 
   describe("导航", () => {
-    it('点击面包屑"数据集"应导航回列表页', async () => {
+    it('面包屑"数据集"应指向列表页', async () => {
       renderWithProviders(<DatasetVersionsPage />);
 
+      // 面包屑跳转由 MainLayout 的 BreadcrumbGroup 统一处理，
+      // 此处验证 Store 中的面包屑项指向正确路径
       await waitFor(() => {
-        const datasetItems = screen.getAllByText("数据集");
-        expect(datasetItems.length).toBeGreaterThanOrEqual(1);
+        const breadcrumbs = useUIStore.getState().breadcrumbs;
+        const datasetCrumb = breadcrumbs.find((b) => b.text === "数据集");
+        expect(datasetCrumb?.href).toBe("/datasets");
       });
-
-      const breadcrumbItems = screen.getAllByText("数据集");
-      fireEvent.click(breadcrumbItems[0]);
-      expect(mockNavigate).toHaveBeenCalledWith("/datasets");
     });
   });
 });

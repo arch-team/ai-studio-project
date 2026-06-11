@@ -6,9 +6,9 @@
 
 import { useState } from 'react';
 import {
+  Alert,
   Box,
   Button,
-  Container,
   Header,
   Pagination,
   SpaceBetween,
@@ -20,7 +20,14 @@ import {
   useCreateResourceLimitConfig,
   useUpdateResourceLimitConfig,
 } from './api';
+import { PageLayout } from '@shared/components';
 import { QuotaFormModal } from './components/QuotaFormModal';
+
+// 面包屑（模块级常量，避免每次渲染创建新引用）
+const BREADCRUMBS = [
+  { text: '首页', href: '/' },
+  { text: '配额管理', href: '/resource-quotas' },
+];
 import type {
   ResourceLimitConfig,
   CreateResourceLimitConfigRequest,
@@ -138,28 +145,23 @@ export function ResourceQuotasPage() {
     },
   ];
 
-  if (error) {
-    return (
-      <Container>
-        <Box textAlign="center" color="text-status-error" padding="xl">
-          加载失败: {error.message}
-        </Box>
-      </Container>
-    );
-  }
-
   return (
+    <PageLayout
+      title="资源配额管理"
+      description="按团队与角色配置 GPU / 节点资源上限"
+      breadcrumbs={BREADCRUMBS}
+      actions={
+        <Button variant="primary" iconName="add-plus" onClick={handleCreate}>
+          新建配置
+        </Button>
+      }
+    >
     <SpaceBetween size="l">
-      <Header
-        variant="h1"
-        actions={
-          <Button variant="primary" onClick={handleCreate}>
-            新建配置
-          </Button>
-        }
-      >
-        资源配额管理
-      </Header>
+      {error && (
+        <Alert type="error" header="加载失败">
+          {error.message}
+        </Alert>
+      )}
 
       <Table
         columnDefinitions={columnDefinitions}
@@ -200,6 +202,7 @@ export function ResourceQuotasPage() {
         isLoading={createMutation.isPending || updateMutation.isPending}
       />
     </SpaceBetween>
+    </PageLayout>
   );
 }
 

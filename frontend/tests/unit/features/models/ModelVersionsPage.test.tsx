@@ -7,6 +7,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { screen, fireEvent, waitFor } from "@testing-library/react";
 import { renderWithProviders } from "@tests/__utils__/test-utils";
+import { useUIStore } from "@store/slices/uiSlice";
 import { ModelVersionsPage } from "@features/models/pages";
 import type {
   ModelDetail,
@@ -120,10 +121,11 @@ describe("ModelVersionsPage", () => {
 
     it("应该渲染面包屑导航", () => {
       renderWithProviders(<ModelVersionsPage />);
-      // 面包屑中有"模型管理"，可能与其他元素重复
-      expect(screen.getAllByText("模型管理").length).toBeGreaterThan(0);
-      expect(screen.getAllByText("bert-base").length).toBeGreaterThan(0);
-      expect(screen.getAllByText("版本历史").length).toBeGreaterThan(0);
+      // 面包屑经 PageLayout 同步到全局 UI Store，由 MainLayout 渲染
+      const breadcrumbs = useUIStore.getState().breadcrumbs;
+      expect(breadcrumbs.some((b) => b.text === "模型管理")).toBe(true);
+      expect(breadcrumbs.some((b) => b.text === "bert-base")).toBe(true);
+      expect(breadcrumbs.some((b) => b.text === "版本历史")).toBe(true);
     });
 
     it("应该渲染刷新按钮", () => {

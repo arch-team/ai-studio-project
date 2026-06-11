@@ -7,7 +7,6 @@
 import {
   Alert,
   Box,
-  BreadcrumbGroup,
   Button,
   Container,
   Header,
@@ -16,8 +15,9 @@ import {
   Spinner,
   Table,
 } from '@cloudscape-design/components';
-import { useState, useCallback } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useMemo, useState, useCallback } from 'react';
+import { useParams } from 'react-router-dom';
+import { PageLayout } from '@shared/components';
 import { useDataset, useDatasetVersions, useCreateDatasetVersion } from '../api';
 import type { DatasetVersion } from '../types';
 
@@ -55,7 +55,6 @@ function formatDateTime(dateStr: string | null | undefined): string {
  * 数据集版本管理页面
  */
 export function DatasetVersionsPage() {
-  const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
   const datasetId = id ? parseInt(id, 10) : undefined;
 
@@ -74,6 +73,17 @@ export function DatasetVersionsPage() {
 
   // 创建新版本 mutation
   const createVersionMutation = useCreateDatasetVersion();
+
+  // 面包屑（数据集名加载后更新）
+  const breadcrumbs = useMemo(
+    () => [
+      { text: '首页', href: '/' },
+      { text: '数据集', href: '/datasets' },
+      { text: dataset?.name ?? '数据集', href: `/datasets/${datasetId}` },
+      { text: '版本历史', href: '#' },
+    ],
+    [dataset?.name, datasetId],
+  );
 
   // 打开创建新版本弹窗
   const handleOpenCreateModal = useCallback(() => {
@@ -152,39 +162,22 @@ export function DatasetVersionsPage() {
   }
 
   return (
+    <PageLayout
+      title={`${dataset.name} - 版本历史`}
+      description="数据集版本沿革，支持创建与回溯版本"
+      breadcrumbs={breadcrumbs}
+      actions={
+        <SpaceBetween direction="horizontal" size="xs">
+          <Button iconName="refresh" onClick={() => refetch()}>
+            刷新
+          </Button>
+          <Button variant="primary" iconName="add-plus" onClick={handleOpenCreateModal}>
+            创建新版本
+          </Button>
+        </SpaceBetween>
+      }
+    >
     <SpaceBetween size="l">
-      {/* 面包屑导航 */}
-      <BreadcrumbGroup
-        items={[
-          { text: '数据集', href: '/datasets' },
-          { text: dataset.name, href: `/datasets/${datasetId}` },
-          { text: '版本历史', href: '#' },
-        ]}
-        onFollow={(e) => {
-          e.preventDefault();
-          if (e.detail.href !== '#') {
-            navigate(e.detail.href);
-          }
-        }}
-      />
-
-      {/* 页面标题 */}
-      <Header
-        variant="h1"
-        actions={
-          <SpaceBetween direction="horizontal" size="xs">
-            <Button iconName="refresh" onClick={() => refetch()}>
-              刷新
-            </Button>
-            <Button variant="primary" onClick={handleOpenCreateModal}>
-              创建新版本
-            </Button>
-          </SpaceBetween>
-        }
-      >
-        {dataset.name} - 版本历史
-      </Header>
-
       {/* 版本列表 */}
       <Container
         header={
@@ -248,6 +241,7 @@ export function DatasetVersionsPage() {
         </SpaceBetween>
       </Modal>
     </SpaceBetween>
+    </PageLayout>
   );
 }
 

@@ -20,5 +20,8 @@ export * from "./events";
 // Components
 export * from "./components";
 
+// Theme
+export * from "./theme";
+
 // Utils
 export * from "./utils";

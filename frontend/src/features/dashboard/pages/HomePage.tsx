@@ -1,7 +1,12 @@
 /**
  * Home Page (首页仪表盘)
  *
- * 平台概览 - 关键指标、训练任务状态分布、快速入口
+ * 平台门户 - 品牌 Hero 页头、关键指标、训练任务状态分布、快速入口。
+ *
+ * 设计要点:
+ * - Hero 页头：深空渐变 + 时段问候，建立平台品牌氛围
+ * - 指标卡：图标 + 大数字（display-l），一眼读取关键数据
+ * - 状态饼图：使用品牌语义色，与全局主题一致
  */
 
 import {
@@ -12,17 +17,32 @@ import {
   ColumnLayout,
   Container,
   Header,
+  Icon,
   Link,
   PieChart,
   SpaceBetween,
   StatusIndicator,
+  type IconProps,
 } from '@cloudscape-design/components';
 import { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useAuthStore } from '@features/auth';
 import { useTrainingJobs } from '@features/training/api';
 import { useDatasets } from '@features/datasets/api';
 import { useModels } from '@features/models/api';
 import { PageLayout } from '@shared/components';
+import { JOB_STATUS_CHART_COLORS } from '@shared/theme';
+
+/**
+ * 根据当前时段生成问候语
+ */
+function greetingByHour(hour: number): string {
+  if (hour < 6) return '夜深了';
+  if (hour < 12) return '早上好';
+  if (hour < 14) return '中午好';
+  if (hour < 18) return '下午好';
+  return '晚上好';
+}
 
 /**
  * 关键指标卡片
@@ -31,20 +51,27 @@ interface MetricCardProps {
   label: string;
   value: number | undefined;
   loading: boolean;
+  iconName: IconProps.Name;
   description?: string;
   href: string;
   onNavigate: (href: string) => void;
 }
 
-function MetricCard({ label, value, loading, description, href, onNavigate }: MetricCardProps) {
+function MetricCard({ label, value, loading, iconName, description, href, onNavigate }: MetricCardProps) {
   return (
-    <Container>
-      <SpaceBetween size="xxs">
-        <Box variant="awsui-key-label">{label}</Box>
-        <Box variant="h1">{loading ? '—' : (value ?? 0)}</Box>
+    <Container fitHeight>
+      <SpaceBetween size="xs">
+        <SpaceBetween size="xs" direction="horizontal" alignItems="center">
+          <Icon name={iconName} size="medium" variant="link" />
+          <Box variant="awsui-key-label">{label}</Box>
+        </SpaceBetween>
+        <Box fontSize="display-l" fontWeight="bold" variant="span">
+          {loading ? '—' : (value ?? 0)}
+        </Box>
         {description && (
           <Link
             variant="primary"
+            fontSize="body-s"
             onFollow={(e) => {
               e.preventDefault();
               onNavigate(href);
@@ -63,14 +90,15 @@ interface QuickAction {
   name: string;
   description: string;
   href: string;
+  iconName: IconProps.Name;
   primary?: boolean;
 }
 
 const QUICK_ACTIONS: QuickAction[] = [
-  { name: '创建训练任务', description: '提交分布式训练任务（DDP / FSDP / DeepSpeed）', href: '/training-jobs/create', primary: true },
-  { name: '上传数据集', description: '注册并管理训练数据集与版本', href: '/datasets/create' },
-  { name: '打开开发空间', description: '启动在线 IDE 进行交互式开发', href: '/spaces' },
-  { name: '查看资源监控', description: '实时查看 GPU / 节点资源使用情况', href: '/monitoring' },
+  { name: '创建训练任务', description: '提交分布式训练任务（DDP / FSDP / DeepSpeed）', href: '/training-jobs/create', iconName: 'gen-ai', primary: true },
+  { name: '上传数据集', description: '注册并管理训练数据集与版本', href: '/datasets/create', iconName: 'upload' },
+  { name: '打开开发空间', description: '启动在线 IDE 进行交互式开发', href: '/spaces', iconName: 'command-prompt' },
+  { name: '查看资源监控', description: '实时查看 GPU / 节点资源使用情况', href: '/monitoring', iconName: 'multiscreen' },
 ];
 
 /**
@@ -79,6 +107,7 @@ const QUICK_ACTIONS: QuickAction[] = [
 export function HomePage() {
   const navigate = useNavigate();
   const goTo = (href: string) => navigate(href);
+  const userName = useAuthStore((s) => s.user?.name);
 
   // 各类统计（仅取 total，page_size=1 降低负载）
   const { data: allJobs, isLoading: loadingAll } = useTrainingJobs({ page: 1, page_size: 1 });
@@ -89,13 +118,13 @@ export function HomePage() {
   const { data: datasets, isLoading: loadingDatasets } = useDatasets({ page: 1, page_size: 1 });
   const { data: models, isLoading: loadingModels } = useModels({ page: 1, page_size: 1 });
 
-  // 任务状态分布（饼图）
+  // 任务状态分布（饼图，使用品牌语义色）
   const statusData = useMemo(() => {
     const data = [
-      { title: '运行中', value: runningJobs?.total ?? 0, color: '#0972d3' },
-      { title: '已完成', value: completedJobs?.total ?? 0, color: '#037f0c' },
-      { title: '已失败', value: failedJobs?.total ?? 0, color: '#d91515' },
-      { title: '已暂停', value: pausedJobs?.total ?? 0, color: '#8d6c9f' },
+      { title: '运行中', value: runningJobs?.total ?? 0, color: JOB_STATUS_CHART_COLORS.running },
+      { title: '已完成', value: completedJobs?.total ?? 0, color: JOB_STATUS_CHART_COLORS.completed },
+      { title: '已失败', value: failedJobs?.total ?? 0, color: JOB_STATUS_CHART_COLORS.failed },
+      { title: '已暂停', value: pausedJobs?.total ?? 0, color: JOB_STATUS_CHART_COLORS.paused },
     ];
     return data.filter((d) => d.value > 0);
   }, [runningJobs, completedJobs, failedJobs, pausedJobs]);
@@ -103,23 +132,38 @@ export function HomePage() {
   const totalJobs = allJobs?.total ?? 0;
   const chartLoading = loadingRunning || loadingCompleted;
 
+  const greeting = greetingByHour(new Date().getHours());
+  const heroTitle = userName ? `${greeting}，${userName}` : '平台概览';
+
   return (
     <PageLayout
-      title="平台概览"
+      hero
+      title={heroTitle}
       description="AI 训练平台运行状态与关键指标一览"
       actions={
         <Button variant="primary" iconName="add-plus" onClick={() => goTo('/training-jobs/create')}>
           创建训练任务
         </Button>
       }
+      heroExtra={
+        <SpaceBetween size="l" direction="horizontal">
+          <StatusIndicator type="success">平台服务运行正常</StatusIndicator>
+          <StatusIndicator type={(runningJobs?.total ?? 0) > 0 ? 'in-progress' : 'stopped'}>
+            {(runningJobs?.total ?? 0) > 0
+              ? `${runningJobs?.total} 个任务训练中`
+              : '当前无运行任务'}
+          </StatusIndicator>
+        </SpaceBetween>
+      }
     >
       <SpaceBetween size="l">
         {/* 关键指标 */}
-        <ColumnLayout columns={4} variant="text-grid">
+        <ColumnLayout columns={4} minColumnWidth={170}>
           <MetricCard
             label="训练任务总数"
             value={allJobs?.total}
             loading={loadingAll}
+            iconName="gen-ai"
             description="查看全部任务"
             href="/training-jobs"
             onNavigate={goTo}
@@ -128,6 +172,7 @@ export function HomePage() {
             label="运行中任务"
             value={runningJobs?.total}
             loading={loadingRunning}
+            iconName="status-in-progress"
             description="查看运行中"
             href="/training-jobs"
             onNavigate={goTo}
@@ -136,6 +181,7 @@ export function HomePage() {
             label="数据集数量"
             value={datasets?.total}
             loading={loadingDatasets}
+            iconName="folder-open"
             description="管理数据集"
             href="/datasets"
             onNavigate={goTo}
@@ -144,6 +190,7 @@ export function HomePage() {
             label="已注册模型"
             value={models?.total}
             loading={loadingModels}
+            iconName="share"
             description="查看模型库"
             href="/models"
             onNavigate={goTo}
@@ -153,6 +200,7 @@ export function HomePage() {
         {/* 状态分布 + 系统状态 */}
         <ColumnLayout columns={2}>
           <Container
+            fitHeight
             header={
               <Header variant="h2" description="按状态统计的训练任务分布">
                 训练任务状态分布
@@ -183,7 +231,7 @@ export function HomePage() {
             />
           </Container>
 
-          <Container header={<Header variant="h2">系统状态</Header>}>
+          <Container fitHeight header={<Header variant="h2">系统状态</Header>}>
             <SpaceBetween size="m">
               <ColumnLayout columns={2} variant="text-grid">
                 <SpaceBetween size="xxs">
@@ -220,19 +268,22 @@ export function HomePage() {
         </ColumnLayout>
 
         {/* 快速操作 */}
-        <Container header={<Header variant="h2">快速操作</Header>}>
+        <Container header={<Header variant="h2" description="一步直达常用工作流">快速操作</Header>}>
           <Cards
             cardDefinition={{
               header: (item) => (
-                <Link
-                  fontSize="heading-m"
-                  onFollow={(e) => {
-                    e.preventDefault();
-                    goTo(item.href);
-                  }}
-                >
-                  {item.name}
-                </Link>
+                <SpaceBetween size="xs" direction="horizontal" alignItems="center">
+                  <Icon name={item.iconName} size="medium" variant={item.primary ? 'link' : 'normal'} />
+                  <Link
+                    fontSize="heading-m"
+                    onFollow={(e) => {
+                      e.preventDefault();
+                      goTo(item.href);
+                    }}
+                  >
+                    {item.name}
+                  </Link>
+                </SpaceBetween>
               ),
               sections: [
                 {
@@ -244,6 +295,8 @@ export function HomePage() {
                   content: (item) => (
                     <Button
                       variant={item.primary ? 'primary' : 'normal'}
+                      iconName="arrow-right"
+                      iconAlign="right"
                       onClick={() => goTo(item.href)}
                     >
                       前往

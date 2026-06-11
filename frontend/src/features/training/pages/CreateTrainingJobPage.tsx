@@ -4,18 +4,20 @@
  * 创建训练任务页面
  */
 
-import {
-  Box,
-  BreadcrumbGroup,
-  Container,
-  Header,
-  SpaceBetween,
-} from '@cloudscape-design/components';
+import { Alert, SpaceBetween } from '@cloudscape-design/components';
 import { useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { PageLayout } from '@shared/components';
 import { useCreateTrainingJob } from '../api';
 import { TrainingJobForm } from '../components/TrainingJobForm';
 import type { CreateTrainingJobRequest } from '../types';
+
+// 面包屑（模块级常量，避免每次渲染创建新引用）
+const BREADCRUMBS = [
+  { text: '首页', href: '/' },
+  { text: '训练任务', href: '/training-jobs' },
+  { text: '创建训练任务', href: '#' },
+];
 
 /**
  * 创建训练任务页面
@@ -45,40 +47,27 @@ export function CreateTrainingJobPage() {
   );
 
   return (
-    <SpaceBetween size="l">
-      {/* 面包屑导航 */}
-      <BreadcrumbGroup
-        items={[
-          { text: '训练任务', href: '/training-jobs' },
-          { text: '创建训练任务', href: '#' },
-        ]}
-        onFollow={(e) => {
-          e.preventDefault();
-          if (e.detail.href !== '#') {
-            navigate(e.detail.href);
-          }
-        }}
-      />
+    <PageLayout
+      title="创建训练任务"
+      description="配置并提交 DDP / FSDP / DeepSpeed 分布式训练任务"
+      breadcrumbs={BREADCRUMBS}
+    >
+      <SpaceBetween size="l">
+        {/* 错误提示 */}
+        {createMutation.isError && (
+          <Alert type="error" header="创建失败">
+            {createMutation.error?.message || '未知错误'}
+          </Alert>
+        )}
 
-      {/* 页面标题 */}
-      <Header variant="h1">创建训练任务</Header>
-
-      {/* 创建表单 */}
-      <TrainingJobForm
-        onSubmit={handleSubmit}
-        onCancel={handleCancel}
-        isSubmitting={createMutation.isPending}
-      />
-
-      {/* 错误提示 */}
-      {createMutation.isError && (
-        <Container>
-          <Box color="text-status-error">
-            创建失败: {createMutation.error?.message || '未知错误'}
-          </Box>
-        </Container>
-      )}
-    </SpaceBetween>
+        {/* 创建表单 */}
+        <TrainingJobForm
+          onSubmit={handleSubmit}
+          onCancel={handleCancel}
+          isSubmitting={createMutation.isPending}
+        />
+      </SpaceBetween>
+    </PageLayout>
   );
 }
 

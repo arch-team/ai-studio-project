@@ -26,7 +26,15 @@ import type {
   DateRangePickerProps,
   SelectProps,
 } from "@cloudscape-design/components";
+import { PageLayout } from "@shared/components";
 import { useResourceUsage, useExportReport } from "../api";
+
+// 面包屑（模块级常量，避免每次渲染创建新引用）
+const BREADCRUMBS = [
+  { text: "首页", href: "/" },
+  { text: "报表中心", href: "/reports" },
+  { text: "资源使用报表", href: "/reports/resource-usage" },
+];
 import {
   formatNumber,
   calculateDateRange,
@@ -277,34 +285,31 @@ export function ResourceUsageReportPage() {
 
   // === 渲染 ===
   return (
+    <PageLayout
+      title="资源使用报表"
+      description="查看用户和项目的资源使用统计"
+      breadcrumbs={BREADCRUMBS}
+      actions={
+        <SpaceBetween direction="horizontal" size="s">
+          <Button
+            iconName="refresh"
+            onClick={handleRefresh}
+            loading={isLoading}
+          >
+            刷新
+          </Button>
+          <Button
+            variant="primary"
+            iconName="download"
+            onClick={handleExport}
+            loading={exportMutation.isPending}
+          >
+            导出 CSV
+          </Button>
+        </SpaceBetween>
+      }
+    >
     <SpaceBetween size="l" data-testid="resource-usage-report-page">
-      {/* 页面标题和操作按钮 */}
-      <Header
-        variant="h1"
-        description="查看用户和项目的资源使用统计"
-        actions={
-          <SpaceBetween direction="horizontal" size="s">
-            <Button
-              iconName="refresh"
-              onClick={handleRefresh}
-              loading={isLoading}
-            >
-              刷新
-            </Button>
-            <Button
-              variant="primary"
-              iconName="download"
-              onClick={handleExport}
-              loading={exportMutation.isPending}
-            >
-              导出 CSV
-            </Button>
-          </SpaceBetween>
-        }
-      >
-        资源使用报表
-      </Header>
-
       {/* 过滤器区域 */}
       <Container>
         <SpaceBetween direction="horizontal" size="m">
@@ -401,6 +406,7 @@ export function ResourceUsageReportPage() {
         </>
       )}
     </SpaceBetween>
+    </PageLayout>
   );
 }
 

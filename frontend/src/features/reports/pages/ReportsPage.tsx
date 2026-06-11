@@ -15,7 +15,14 @@ import {
   StatusIndicator,
 } from '@cloudscape-design/components';
 import { useNavigate } from 'react-router-dom';
+import { PageLayout } from '@shared/components';
 import { useResourceUsage } from '../api';
+
+// 面包屑（模块级常量，避免每次渲染创建新引用）
+const BREADCRUMBS = [
+  { text: '首页', href: '/' },
+  { text: '报表中心', href: '/reports' },
+];
 
 /**
  * 报表中心页面
@@ -29,9 +36,12 @@ export function ReportsPage() {
   const summary = data?.summary;
 
   return (
+    <PageLayout
+      title="报表中心"
+      description="资源使用、成本分析与审计汇总"
+      breadcrumbs={BREADCRUMBS}
+    >
     <SpaceBetween size="l">
-      <Header variant="h1">报表中心</Header>
-
       {/* 资源使用摘要 */}
       <Container header={<Header variant="h2">资源使用概览</Header>}>
         {error ? (
@@ -140,6 +150,7 @@ export function ReportsPage() {
         </SpaceBetween>
       </Container>
     </SpaceBetween>
+    </PageLayout>
   );
 }
 

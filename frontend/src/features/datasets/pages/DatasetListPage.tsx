@@ -5,15 +5,15 @@
  */
 
 import {
-  Box,
+  Alert,
   Button,
   Container,
-  Header,
   Select,
   SpaceBetween,
 } from '@cloudscape-design/components';
 import { useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { PageLayout } from '@shared/components';
 import { useDatasets } from '../api';
 import { DatasetTable } from '../components';
 import type {
@@ -29,6 +29,12 @@ import {
   DATASET_STATUS_LABELS,
   VISIBILITY_LABELS,
 } from '../types';
+
+// 面包屑（模块级常量，避免每次渲染创建新引用）
+const BREADCRUMBS = [
+  { text: '首页', href: '/' },
+  { text: '数据集', href: '/datasets' },
+];
 
 // 存储类型过滤选项
 const storageTypeOptions = [
@@ -143,35 +149,33 @@ export function DatasetListPage() {
     navigate('/datasets/create');
   }, [navigate]);
 
-  // 错误状态
-  if (error) {
-    return (
-      <Container>
-        <Box textAlign="center" color="text-status-error" padding="xl">
-          加载失败: {error.message}
-        </Box>
-      </Container>
-    );
-  }
-
   return (
+    <PageLayout
+      title="数据集管理"
+      description="注册、版本化并管理训练数据集"
+      breadcrumbs={BREADCRUMBS}
+      actions={
+        <SpaceBetween direction="horizontal" size="xs">
+          <Button iconName="refresh" onClick={() => refetch()}>
+            刷新
+          </Button>
+          <Button variant="primary" iconName="add-plus" onClick={handleCreateClick}>
+            注册数据集
+          </Button>
+        </SpaceBetween>
+      }
+    >
     <SpaceBetween size="l">
-      {/* 页面标题和操作 */}
-      <Header
-        variant="h1"
-        actions={
-          <SpaceBetween direction="horizontal" size="xs">
-            <Button iconName="refresh" onClick={() => refetch()}>
-              刷新
-            </Button>
-            <Button variant="primary" onClick={handleCreateClick}>
-              注册数据集
-            </Button>
-          </SpaceBetween>
-        }
-      >
-        数据集管理
-      </Header>
+      {/* 错误提示 */}
+      {error && (
+        <Alert
+          type="error"
+          header="加载失败"
+          action={<Button onClick={() => refetch()}>重试</Button>}
+        >
+          {error.message}
+        </Alert>
+      )}
 
       {/* 过滤器 */}
       <Container>
@@ -237,6 +241,7 @@ export function DatasetListPage() {
         onDatasetClick={handleDatasetClick}
       />
     </SpaceBetween>
+    </PageLayout>
   );
 }
 

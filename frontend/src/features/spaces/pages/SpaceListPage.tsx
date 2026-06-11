@@ -5,10 +5,10 @@
  */
 
 import {
+  Alert,
   Box,
   Button,
   Container,
-  Header,
   Link,
   Modal,
   Pagination,
@@ -25,9 +25,16 @@ import {
   useDeleteSpace,
   useOpenSpace,
 } from '../api';
+import { PageLayout } from '@shared/components';
 import { SpaceStatusBadge } from '../components/SpaceStatusBadge';
 import type { SpaceStatus, SpaceFilters, SpaceSummary } from '../types';
 import { SPACE_STATUS_LABELS, SPACE_TYPE_LABELS } from '../types';
+
+// 面包屑（模块级常量，避免每次渲染创建新引用）
+const BREADCRUMBS = [
+  { text: '首页', href: '/' },
+  { text: '开发空间', href: '/spaces' },
+];
 
 // 状态过滤选项
 const statusOptions = [
@@ -247,36 +254,34 @@ export function SpaceListPage() {
     ]
   );
 
-  // 错误状态
-  if (error) {
-    return (
-      <Container>
-        <Box textAlign="center" color="text-status-error" padding="xl">
-          加载失败: {error.message}
-        </Box>
-      </Container>
-    );
-  }
-
   return (
+    <PageLayout
+      title="在线开发环境"
+      description="管理交互式开发空间（在线 IDE / Notebook）"
+      counter={data ? `(${data.total})` : undefined}
+      breadcrumbs={BREADCRUMBS}
+      actions={
+        <SpaceBetween direction="horizontal" size="xs">
+          <Button iconName="refresh" onClick={() => refetch()}>
+            刷新
+          </Button>
+          <Button variant="primary" iconName="add-plus" onClick={handleCreateClick}>
+            创建开发空间
+          </Button>
+        </SpaceBetween>
+      }
+    >
     <SpaceBetween size="l">
-      {/* 页面标题和操作 */}
-      <Header
-        variant="h1"
-        actions={
-          <SpaceBetween direction="horizontal" size="xs">
-            <Button iconName="refresh" onClick={() => refetch()}>
-              刷新
-            </Button>
-            <Button variant="primary" onClick={handleCreateClick}>
-              创建开发空间
-            </Button>
-          </SpaceBetween>
-        }
-        counter={data ? `(${data.total})` : undefined}
-      >
-        在线开发环境
-      </Header>
+      {/* 错误提示 */}
+      {error && (
+        <Alert
+          type="error"
+          header="加载失败"
+          action={<Button onClick={() => refetch()}>重试</Button>}
+        >
+          {error.message}
+        </Alert>
+      )}
 
       {/* 过滤器 */}
       <Container>
@@ -343,6 +348,7 @@ export function SpaceListPage() {
         确定要删除开发空间 <b>{spaceToDelete?.name}</b> 吗？此操作不可撤销。
       </Modal>
     </SpaceBetween>
+    </PageLayout>
   );
 }
 

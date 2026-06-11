@@ -7,7 +7,6 @@
 import {
   Alert,
   Box,
-  BreadcrumbGroup,
   Button,
   Container,
   Form,
@@ -22,7 +21,15 @@ import {
 } from '@cloudscape-design/components';
 import { useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { PageLayout } from '@shared/components';
 import { useCreateDataset } from '../api';
+
+// 面包屑（模块级常量，避免每次渲染创建新引用）
+const BREADCRUMBS = [
+  { text: '首页', href: '/' },
+  { text: '数据集', href: '/datasets' },
+  { text: '注册数据集', href: '#' },
+];
 import type {
   CreateDatasetRequest,
   StorageType,
@@ -198,24 +205,12 @@ export function CreateDatasetPage() {
   ]);
 
   return (
+    <PageLayout
+      title="注册数据集"
+      description="注册数据集元数据并指定存储位置与可见范围"
+      breadcrumbs={BREADCRUMBS}
+    >
     <SpaceBetween size="l">
-      {/* 面包屑导航 */}
-      <BreadcrumbGroup
-        items={[
-          { text: '数据集', href: '/datasets' },
-          { text: '注册数据集', href: '#' },
-        ]}
-        onFollow={(e) => {
-          e.preventDefault();
-          if (e.detail.href !== '#') {
-            navigate(e.detail.href);
-          }
-        }}
-      />
-
-      {/* 页面标题 */}
-      <Header variant="h1">注册数据集</Header>
-
       {/* 创建表单 */}
       <Form
         actions={
@@ -411,6 +406,7 @@ export function CreateDatasetPage() {
         </Alert>
       )}
     </SpaceBetween>
+    </PageLayout>
   );
 }
 

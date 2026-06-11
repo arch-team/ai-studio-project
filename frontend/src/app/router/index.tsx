@@ -10,17 +10,11 @@
 
 import { lazy, Suspense } from "react";
 import { createBrowserRouter, Navigate, Outlet } from "react-router-dom";
-import {
-  Alert,
-  Box,
-  Header,
-  SpaceBetween,
-} from "@cloudscape-design/components";
 import { MainLayout } from "@layouts/MainLayout";
 import { AuthGuard } from "./guards/AuthGuard";
 import { RoleGuard } from "./guards/RoleGuard";
 import { ROUTES } from "./routes";
-import { PageSpinner } from "@shared/components/feedback";
+import { ErrorPage, PageSpinner } from "@shared/components/feedback";
 
 // === 懒加载页面组件 ===
 
@@ -183,27 +177,21 @@ const UserManagementPage = lazy(() =>
   })),
 );
 
-// 错误页面 - 使用 Cloudscape Alert 组件
+// 错误页面 - 居中大字号错误码 + 行动按钮
 const NotFoundPage = () => (
-  <Box padding="xxl">
-    <SpaceBetween size="l">
-      <Header variant="h1">页面未找到</Header>
-      <Alert type="error">
-        404 - 您访问的页面不存在，请检查 URL 是否正确。
-      </Alert>
-    </SpaceBetween>
-  </Box>
+  <ErrorPage
+    code="404"
+    title="页面未找到"
+    description="您访问的页面不存在或已被移动，请检查 URL 是否正确。"
+  />
 );
 
 const UnauthorizedPage = () => (
-  <Box padding="xxl">
-    <SpaceBetween size="l">
-      <Header variant="h1">无权访问</Header>
-      <Alert type="warning">
-        您没有权限访问此页面，请联系管理员获取相应权限。
-      </Alert>
-    </SpaceBetween>
-  </Box>
+  <ErrorPage
+    code="403"
+    title="无权访问"
+    description="您没有权限访问此页面，请联系管理员获取相应权限。"
+  />
 );
 
 /**

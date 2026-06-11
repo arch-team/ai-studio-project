@@ -5,6 +5,7 @@
  */
 
 import {
+  Alert,
   Box,
   Container,
   Header,
@@ -14,9 +15,16 @@ import {
   Table,
 } from '@cloudscape-design/components';
 import { useState, useCallback, useMemo } from 'react';
+import { PageLayout } from '@shared/components';
 import { useTrainingJobs, useTrainingJobCheckpoints } from '../api';
 import { formatDateTime } from '@shared/utils';
 import type { Checkpoint, CheckpointStatus, CheckpointType } from '../types';
+
+// 面包屑（模块级常量，避免每次渲染创建新引用）
+const BREADCRUMBS = [
+  { text: '首页', href: '/' },
+  { text: '检查点', href: '/checkpoints' },
+];
 
 // 检查点状态标签
 const CHECKPOINT_STATUS_LABELS: Record<CheckpointStatus, string> = {
@@ -161,21 +169,19 @@ export function CheckpointsPage() {
   // 获取检查点列表 items
   const checkpointItems = checkpointsData?.items ?? checkpointsData?.checkpoints ?? [];
 
-  // 错误状态
-  if (error) {
-    return (
-      <Container>
-        <Box textAlign="center" color="text-status-error" padding="xl">
-          加载失败: {error.message}
-        </Box>
-      </Container>
-    );
-  }
-
   return (
+    <PageLayout
+      title="检查点管理"
+      description="浏览各训练任务产生的检查点，支持分层存储与恢复"
+      breadcrumbs={BREADCRUMBS}
+    >
     <SpaceBetween size="l">
-      {/* 页面标题 */}
-      <Header variant="h1">检查点管理</Header>
+      {/* 错误提示 */}
+      {error && (
+        <Alert type="error" header="加载失败">
+          {error.message}
+        </Alert>
+      )}
 
       {/* 过滤器 */}
       <Container>
@@ -233,6 +239,7 @@ export function CheckpointsPage() {
         />
       )}
     </SpaceBetween>
+    </PageLayout>
   );
 }
 

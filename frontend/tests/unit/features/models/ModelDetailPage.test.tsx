@@ -7,6 +7,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { screen } from "@testing-library/react";
 import { renderWithProviders } from "@tests/__utils__/test-utils";
+import { useUIStore } from "@store/slices/uiSlice";
 import { ModelDetailPage } from "@features/models/pages";
 import type { ModelDetail } from "@features/models/types";
 
@@ -91,8 +92,9 @@ describe("ModelDetailPage", () => {
 
     it("应该渲染面包屑导航", () => {
       renderWithProviders(<ModelDetailPage />);
-      // 面包屑和 Header 中都有"模型管理"文本
-      expect(screen.getAllByText("模型管理").length).toBeGreaterThan(0);
+      // 面包屑经 PageLayout 同步到全局 UI Store，由 MainLayout 渲染
+      const breadcrumbs = useUIStore.getState().breadcrumbs;
+      expect(breadcrumbs.some((b) => b.text === "模型管理")).toBe(true);
     });
 
     it("应该渲染刷新按钮", () => {
