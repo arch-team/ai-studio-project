@@ -35,8 +35,16 @@ class SpaceRepository(
         super().__init__(session, DevelopmentSpaceModel)
 
     def _to_model(self, entity: Space) -> DevelopmentSpaceModel:
-        """Override to handle UUID generation for new entities."""
-        data = entity.to_model_dict(exclude={"id"} if entity.id is None else None)
+        """Override to handle UUID generation for new entities.
+
+        convert_enums=False: 数据库枚举列以名称 (如 ML_T3_MEDIUM) 持久化，
+        必须传枚举对象由 SQLAlchemy 按 .name 写入；若转为值 (ml.t3.medium)
+        会因不匹配列定义而写入失败。
+        """
+        data = entity.to_model_dict(
+            exclude={"id"} if entity.id is None else None,
+            convert_enums=False,
+        )
         if entity.id is None:
             data["id"] = str(uuid.uuid4())
         return self._model_class(**data)

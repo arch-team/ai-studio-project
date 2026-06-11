@@ -77,12 +77,15 @@ class SageMakerSpacesClient(ISageMakerSpacesClient):
             async with self._session.client("sagemaker", region_name=self._region) as sm:
                 # 获取 SageMaker Domain ID (从环境配置或自动发现)
                 domain_id = await self._get_domain_id(sm)
+                owner_profile = await self._get_owner_user_profile(sm, domain_id)
 
+                # SageMaker API 要求 OwnershipSettings 与 SpaceSharingSettings 必须成对提供
                 response: dict[str, Any] = await sm.create_space(
                     DomainId=domain_id,
                     SpaceName=name,
                     SpaceSettings=space_settings,
-                    OwnershipSettings={"OwnerUserProfileName": "default"},
+                    OwnershipSettings={"OwnerUserProfileName": owner_profile},
+                    SpaceSharingSettings={"SharingType": "Private"},
                     SpaceDisplayName=name,
                 )
 
@@ -200,6 +203,26 @@ class SageMakerSpacesClient(ISageMakerSpacesClient):
             raise SpaceError(message="未找到可用的 SageMaker Studio Domain")
 
         return domains[0]["DomainId"]
+
+    async def _get_owner_user_profile(self, sm_client: Any, domain_id: str) -> str:
+        """获取 Space 所属的 User Profile 名称.
+
+        从环境配置获取，若未配置则自动发现 Domain 下第一个 User Profile。
+
+        Raises:
+            SpaceError: Domain 下无可用 User Profile
+        """
+        settings = get_settings()
+        profile_name = getattr(settings, "sagemaker_user_profile", None)
+        if profile_name:
+            return str(profile_name)
+
+        response = await sm_client.list_user_profiles(DomainIdEquals=domain_id, MaxResults=1)
+        profiles = response.get("UserProfiles", [])
+        if not profiles:
+            raise SpaceError(message=f"SageMaker Domain {domain_id} 下未找到可用的 User Profile")
+
+        return str(profiles[0]["UserProfileName"])
 
     def _extract_instance_type(self, response: dict[str, Any]) -> str:
         """从 Space 响应中提取实例类型."""
