@@ -109,6 +109,10 @@ class EksConfig:
     gpu_instance_group: GpuInstanceGroupConfig = field(
         default_factory=GpuInstanceGroupConfig
     )
+    # 集群 OIDC issuer ID（issuer URL 末段）。IRSA 信任策略必须包含完整
+    # provider 路径 oidc.eks.{region}.amazonaws.com/id/{ID}，缺少该段时
+    # AssumeRoleWithWebIdentity 会被拒绝。集群创建后回填。
+    oidc_provider_id: str | None = None
 
 
 @dataclass(frozen=True)
@@ -205,6 +209,7 @@ class EnvironmentConfig:
         eks_max_nodes: int,
         gpu_instance_count: int = 1,
         gpu_enabled: bool = True,
+        eks_oidc_provider_id: str | None = None,
     ) -> "EnvironmentConfig":
         return cls(
             name=name,
@@ -230,6 +235,7 @@ class EnvironmentConfig:
                     instance_count=gpu_instance_count,
                     enabled=gpu_enabled,
                 ),
+                oidc_provider_id=eks_oidc_provider_id,
             ),
             protection=_PROTECTION_FACTORY[name](),
         )
@@ -251,6 +257,8 @@ class EnvironmentConfig:
             eks_min_nodes=1,
             eks_max_nodes=10,
             gpu_instance_count=1,  # 开发环境: 1 个 GPU 实例
+            # ai-platform-dev-eks 集群的 OIDC issuer ID（集群重建后需更新）
+            eks_oidc_provider_id="9B32D5FDA9125DC3BFE04FB2834F95FF",
         )
 
     @classmethod

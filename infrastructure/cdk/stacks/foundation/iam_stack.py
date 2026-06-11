@@ -44,6 +44,16 @@ class IamStack(cdk.Stack):
 
         self._create_outputs()
 
+    def _oidc_provider_path(self) -> str:
+        """IRSA OIDC provider 路径。
+
+        信任策略必须使用含 /id/{ID} 的完整路径；仅写域名前缀会导致
+        sts:AssumeRoleWithWebIdentity 被拒绝（provider 不匹配）。
+        """
+        base = f"oidc.eks.{self.env_config.region}.amazonaws.com"
+        oidc_id = self.env_config.eks.oidc_provider_id
+        return f"{base}/id/{oidc_id}" if oidc_id else base
+
     def _create_eks_node_role(self) -> iam.Role:
         """创建 EKS 工作节点 IAM 角色 (ECR/CloudWatch/SSM)。"""
         role = iam.Role(
@@ -151,11 +161,11 @@ class IamStack(cdk.Stack):
             assumed_by=iam.CompositePrincipal(
                 # IRSA: OIDC 条件防止 Confused Deputy 攻击
                 iam.FederatedPrincipal(
-                    federated=f"arn:aws:iam::{self.env_config.account}:oidc-provider/oidc.eks.{self.env_config.region}.amazonaws.com",
+                    federated=f"arn:aws:iam::{self.env_config.account}:oidc-provider/{self._oidc_provider_path()}",
                     conditions={
                         "StringEquals": {
-                            f"oidc.eks.{self.env_config.region}.amazonaws.com:sub": "system:serviceaccount:training-jobs:training-execution-sa",
-                            f"oidc.eks.{self.env_config.region}.amazonaws.com:aud": "sts.amazonaws.com",
+                            f"{self._oidc_provider_path()}:sub": "system:serviceaccount:training-jobs:training-execution-sa",
+                            f"{self._oidc_provider_path()}:aud": "sts.amazonaws.com",
                         }
                     },
                     assume_role_action="sts:AssumeRoleWithWebIdentity",
@@ -240,11 +250,11 @@ class IamStack(cdk.Stack):
             role_name=f"{self.env_config.resource_prefix}-backend-service-role",
             description="IAM role for backend FastAPI application",
             assumed_by=iam.FederatedPrincipal(
-                federated=f"arn:aws:iam::{self.env_config.account}:oidc-provider/oidc.eks.{self.env_config.region}.amazonaws.com",
+                federated=f"arn:aws:iam::{self.env_config.account}:oidc-provider/{self._oidc_provider_path()}",
                 conditions={
                     "StringEquals": {
-                        f"oidc.eks.{self.env_config.region}.amazonaws.com:sub": "system:serviceaccount:ai-platform:backend-service-sa",
-                        f"oidc.eks.{self.env_config.region}.amazonaws.com:aud": "sts.amazonaws.com",
+                        f"{self._oidc_provider_path()}:sub": "system:serviceaccount:ai-platform:backend-service-sa",
+                        f"{self._oidc_provider_path()}:aud": "sts.amazonaws.com",
                     }
                 },
                 assume_role_action="sts:AssumeRoleWithWebIdentity",
@@ -263,6 +273,41 @@ class IamStack(cdk.Stack):
                     "sagemaker:ListTrainingJobs",
                 ],
                 resources=self._sagemaker_resource_arns("cluster", "training-job"),
+            )
+        )
+
+        role.add_to_policy(
+            iam.PolicyStatement(
+                sid="SageMakerSpacesManagement",
+                effect=iam.Effect.ALLOW,
+                actions=[
+                    "sagemaker:CreateSpace",
+                    "sagemaker:DescribeSpace",
+                    "sagemaker:UpdateSpace",
+                    "sagemaker:DeleteSpace",
+                    "sagemaker:ListSpaces",
+                    "sagemaker:CreateApp",
+                    "sagemaker:DescribeApp",
+                    "sagemaker:DeleteApp",
+                    "sagemaker:ListApps",
+                    "sagemaker:CreatePresignedDomainUrl",
+                ],
+                resources=self._sagemaker_resource_arns("space", "app", "user-profile"),
+            )
+        )
+
+        # ListDomains 不支持资源级限制，Domain 自动发现必需
+        role.add_to_policy(
+            iam.PolicyStatement(
+                sid="SageMakerDomainDiscovery",
+                effect=iam.Effect.ALLOW,
+                actions=[
+                    "sagemaker:ListDomains",
+                    "sagemaker:DescribeDomain",
+                    "sagemaker:ListUserProfiles",
+                    "sagemaker:DescribeUserProfile",
+                ],
+                resources=["*"],
             )
         )
 
