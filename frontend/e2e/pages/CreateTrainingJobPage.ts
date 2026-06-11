@@ -60,8 +60,9 @@ export class CreateTrainingJobPage extends BasePage {
 
     // Instance Config
     this.instanceTypeSelect = page.locator('[class*="form-field"]:has-text("实例类型")').locator('button').first();
-    this.nodeCountInput = page.locator('[class*="form-field"]:has-text("节点数量")').locator('input');
-    this.gpuPerNodeInput = page.locator('[class*="form-field"]:has-text("每节点 GPU 数量")').locator('input');
+    // Cloudscape Input type=number 渲染为 role=spinbutton，aria-label 来自 FormField label
+    this.nodeCountInput = page.getByRole('spinbutton', { name: '节点数量' });
+    this.gpuPerNodeInput = page.getByRole('spinbutton', { name: '每节点 GPU 数量' });
 
     // Actions
     this.createButton = page.locator('button:has-text("创建任务")');

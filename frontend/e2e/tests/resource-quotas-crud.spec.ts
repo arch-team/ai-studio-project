@@ -415,9 +415,10 @@ test.describe("资源配额 CRUD - 真实 Dev 环境", () => {
     // 打开编辑 Modal
     await quotasPage.clickEditAtRow(0);
 
-    // 验证预填数据
-    const inputValue = await quotasPage.configNameInput.inputValue();
-    expect(inputValue).toBe(originalName?.trim());
+    // 验证预填数据（toHaveValue 自动重试，等待 React 完成状态回填）
+    await expect(quotasPage.configNameInput).toHaveValue(originalName?.trim() ?? "", {
+      timeout: 5000,
+    });
 
     // 修改 GPU 数量
     const originalGpu = await quotasPage.maxGpuInput.inputValue();

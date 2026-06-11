@@ -232,8 +232,10 @@ test.describe("资源配额管理 - 编辑 Modal 交互", () => {
 
     const configName = await quotasPage.getConfigNameAtRow(0);
     await quotasPage.clickEditAtRow(0);
-    const inputValue = await quotasPage.configNameInput.inputValue();
-    expect(inputValue).toBe(configName?.trim());
+    // toHaveValue 自动重试，等待 React 完成状态回填
+    await expect(quotasPage.configNameInput).toHaveValue(configName?.trim() ?? "", {
+      timeout: 5000,
+    });
   });
 
   test("编辑 Modal 可以取消", async () => {

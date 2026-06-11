@@ -1,7 +1,12 @@
 import { test, expect } from '@playwright/test';
+import { loginViaAPI } from '../utils/auth';
 
 test.describe('模型管理', () => {
+  let accessToken: string;
+
   test.beforeEach(async ({ page }) => {
+    const loginData = await loginViaAPI(page);
+    accessToken = loginData.tokens.access_token;
     // 导航到模型列表页
     await page.goto('/models');
     // 等待页面加载
@@ -45,8 +50,18 @@ test.describe('模型管理', () => {
   });
 
   test('模型详情页显示正确', async ({ page }) => {
-    // 直接导航到模型详情页 (id=4 是 llama2 v3)
-    await page.goto('/models/4');
+    // 通过 API 动态获取 llama2 v3 的 ID，不依赖数据库自增值
+    const resp = await page.request.get('/api/v1/models', {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+    const data = await resp.json();
+    const llamaV3 = data.items.find(
+      (m: { model_name: string; version: string }) =>
+        m.model_name === 'llama2-finetune-model' && m.version === 'v3',
+    );
+    expect(llamaV3).toBeTruthy();
+
+    await page.goto(`/models/${llamaV3.id}`);
     await page.waitForLoadState('networkidle');
 
     // 验证模型名称显示 (使用 h1 选择器)
@@ -62,14 +77,23 @@ test.describe('模型管理', () => {
   });
 
   test('模型版本对比页面正确渲染', async ({ page }) => {
-    // 导航到版本对比页
-    await page.goto('/models/4/versions');
+    // 通过 API 动态获取 llama2 任一版本的 ID
+    const resp = await page.request.get('/api/v1/models', {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+    const data = await resp.json();
+    const llama = data.items.find(
+      (m: { model_name: string }) => m.model_name === 'llama2-finetune-model',
+    );
+    expect(llama).toBeTruthy();
+
+    await page.goto(`/models/${llama.id}/versions`);
     await page.waitForLoadState('networkidle');
 
     // 验证版本列表存在
-    await expect(page.locator('text=v1')).toBeVisible();
-    await expect(page.locator('text=v2')).toBeVisible();
-    await expect(page.locator('text=v3')).toBeVisible();
+    await expect(page.locator('text=v1').first()).toBeVisible();
+    await expect(page.locator('text=v2').first()).toBeVisible();
+    await expect(page.locator('text=v3').first()).toBeVisible();
   });
 
   test('版本对比功能正常', async ({ page }) => {

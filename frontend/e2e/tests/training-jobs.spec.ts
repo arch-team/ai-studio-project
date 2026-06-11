@@ -1,11 +1,13 @@
 import { test, expect } from '@playwright/test';
 import { TrainingJobListPage } from '../pages/TrainingJobListPage';
 import { MockApi } from '../utils/mockApi';
+import { loginViaAPI } from '../utils/auth';
 
 test.describe('训练任务列表', () => {
   let trainingJobListPage: TrainingJobListPage;
 
   test.beforeEach(async ({ page }) => {
+    await loginViaAPI(page);
     trainingJobListPage = new TrainingJobListPage(page);
     await trainingJobListPage.goto();
   });

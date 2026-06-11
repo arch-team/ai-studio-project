@@ -40,14 +40,15 @@ test.describe('UI 增强 - 导航可达性', () => {
   });
 
   test('开发空间分组正确显示', async ({ page }) => {
-    await expect(page.locator('text=开发空间')).toBeVisible();
+    // 侧边导航分组标题渲染为 h3
+    await expect(page.getByRole('heading', { name: '开发空间' })).toBeVisible();
   });
 
   test('进入训练任务详情后父级导航项保持高亮', async ({ page }) => {
     await page.goto('/training-jobs');
     await page.waitForLoadState('networkidle');
-    // SideNavigation 选中项带 aria-current
-    const activeLink = page.locator('[aria-current="page"]');
+    // SideNavigation 选中项带 aria-current（面包屑也有，限定在 a 标签）
+    const activeLink = page.locator('a[aria-current="page"]');
     await expect(activeLink).toContainText('训练任务');
   });
 });
@@ -61,7 +62,7 @@ test.describe('UI 增强 - 主题切换', () => {
 
   test('可切换到暗色主题', async ({ page }) => {
     // 打开外观设置下拉
-    await page.locator('[aria-label="外观设置"]').last().click();
+    await page.locator('button[aria-label="外观设置"]:visible').first().click();
     await page.click('text=主题');
     await page.click('text=暗黑');
 
@@ -70,7 +71,7 @@ test.describe('UI 增强 - 主题切换', () => {
   });
 
   test('主题切换后刷新页面保持（持久化）', async ({ page }) => {
-    await page.locator('[aria-label="外观设置"]').last().click();
+    await page.locator('button[aria-label="外观设置"]:visible').first().click();
     await page.click('text=主题');
     await page.click('text=暗黑');
     await expect(page.locator('body')).toHaveClass(/awsui-dark-mode/, { timeout: 5000 });
@@ -82,7 +83,7 @@ test.describe('UI 增强 - 主题切换', () => {
   });
 
   test('可切换到紧凑密度', async ({ page }) => {
-    await page.locator('[aria-label="外观设置"]').last().click();
+    await page.locator('button[aria-label="外观设置"]:visible').first().click();
     await page.click('text=密度');
     await page.click('text=紧凑');
 
@@ -98,7 +99,7 @@ test.describe('UI 增强 - 全局通知', () => {
     await page.waitForLoadState('networkidle');
 
     // 切换主题触发 info 通知（useNotification.info）
-    await page.locator('[aria-label="外观设置"]').last().click();
+    await page.locator('button[aria-label="外观设置"]:visible').first().click();
     await page.click('text=主题');
     await page.click('text=明亮');
 

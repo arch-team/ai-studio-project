@@ -9,11 +9,14 @@ import { TrainingJobListPage } from '../pages/TrainingJobListPage';
 import { TrainingJobDetailPage } from '../pages/TrainingJobDetailPage';
 import { CreateTrainingJobPage } from '../pages/CreateTrainingJobPage';
 import { MockApi } from '../utils/mockApi';
+import { loginViaAPI } from '../utils/auth';
 
 test.describe('训练任务 CRUD 流程', () => {
   let mockApi: MockApi;
 
   test.beforeEach(async ({ page }) => {
+    // 真实登录获取会话（auth 接口不被 mock），业务接口由 MockApi 拦截
+    await loginViaAPI(page);
     mockApi = new MockApi(page);
     await mockApi.setupDefaultMocks();
   });
@@ -35,6 +38,8 @@ test.describe('训练任务 CRUD 流程', () => {
         imageUri: '123456789012.dkr.ecr.us-west-2.amazonaws.com/training:v1',
         entryPoint: '/opt/ml/code/train.py',
       });
+      // 默认 8 GPU/节点会超出 dev 环境配额（engineer 上限 4），降到配额内
+      await createPage.fillGpuPerNode(1);
 
       // 提交并验证跳转
       await createPage.submitAndWaitForRedirect();
@@ -115,16 +120,18 @@ test.describe('训练任务 CRUD 流程', () => {
       const createPage = new CreateTrainingJobPage(page);
       await createPage.goto();
 
+      // 必须通过前端校验（合法 ECR URI / 路径 / 配额内 GPU），请求才会发出并收到 mock 的 400
       await createPage.fillRequiredFields({
         jobName: 'duplicate-name',
-        imageUri: 'image:v1',
-        entryPoint: 'train.py',
+        imageUri: '123456789012.dkr.ecr.us-west-2.amazonaws.com/training:v1',
+        entryPoint: '/opt/ml/code/train.py',
       });
+      await createPage.fillGpuPerNode(1);
 
       await createPage.clickCreate();
 
-      // 等待并验证错误信息
-      await expect(page.locator('text=任务名称已存在')).toBeVisible({ timeout: 5000 });
+      // 等待并验证错误信息（Flashbar 含 header 与 content 两个同文本节点，取第一个）
+      await expect(page.locator('text=任务名称已存在').first()).toBeVisible({ timeout: 5000 });
     });
   });
 

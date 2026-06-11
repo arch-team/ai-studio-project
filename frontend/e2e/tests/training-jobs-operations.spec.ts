@@ -7,9 +7,15 @@
 import { test, expect } from '@playwright/test';
 import { TrainingJobDetailPage } from '../pages/TrainingJobDetailPage';
 import { MockApi } from '../utils/mockApi';
+import { loginViaAPI } from '../utils/auth';
 
 test.describe('训练任务操作', () => {
   let mockApi: MockApi;
+
+  // 真实登录获取会话（auth 接口不被 mock），业务接口由 MockApi 拦截
+  test.beforeEach(async ({ page }) => {
+    await loginViaAPI(page);
+  });
 
   // =========================================
   // 暂停任务

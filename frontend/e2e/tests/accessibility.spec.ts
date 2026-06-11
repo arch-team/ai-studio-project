@@ -74,17 +74,20 @@ test.describe('无障碍访问测试 (WCAG 2.1 AA)', () => {
       );
       expect(firstFocused).toBeTruthy();
 
-      // 验证可以通过 Tab 到达提交按钮
-      // 依次 Tab: 用户名输入框 → 密码输入框 → 登录按钮
-      await page.keyboard.press('Tab');
-      await page.keyboard.press('Tab');
-
-      const buttonFocused = await page.evaluate(() => {
-        const el = document.activeElement;
-        return el?.tagName.toLowerCase() === 'button' ||
-               el?.getAttribute('role') === 'button';
-      });
-      // 焦点应该能够到达某个可交互元素
+      // 验证可以通过 Tab 到达提交按钮。
+      // 页面可能有 autofocus（起始焦点不固定），按 Tab 最多 5 次直至焦点落在按钮上
+      let buttonFocused = false;
+      for (let i = 0; i < 5 && !buttonFocused; i++) {
+        buttonFocused = await page.evaluate(() => {
+          const el = document.activeElement;
+          return el?.tagName.toLowerCase() === 'button' ||
+                 el?.getAttribute('role') === 'button';
+        });
+        if (!buttonFocused) {
+          await page.keyboard.press('Tab');
+        }
+      }
+      // 焦点应该能够到达提交按钮
       expect(buttonFocused).toBeTruthy();
     });
   });

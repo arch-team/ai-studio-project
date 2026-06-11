@@ -1,7 +1,9 @@
 import { test, expect } from '@playwright/test';
+import { loginViaAPI } from '../utils/auth';
 
 test.describe('导航系统', () => {
   test.beforeEach(async ({ page }) => {
+    await loginViaAPI(page);
     await page.goto('/');
     await page.waitForLoadState('networkidle');
   });
@@ -42,8 +44,10 @@ test.describe('导航系统', () => {
   });
 
   test('顶部导航栏包含通知按钮', async ({ page }) => {
-    // 通知为图标按钮，通过 aria-label 定位
-    await expect(page.locator('[aria-label="通知"]').last()).toBeVisible();
+    // TopNavigation utility 渲染为 <a>；AppLayout 通知区域是 <div>，排除后取可见的链接/按钮
+    await expect(
+      page.locator('a[aria-label="通知"]:visible, button[aria-label="通知"]:visible').first(),
+    ).toBeVisible();
   });
 
   test('顶部导航栏包含帮助按钮', async ({ page }) => {
@@ -52,13 +56,13 @@ test.describe('导航系统', () => {
   });
 
   test('顶部导航栏包含外观设置入口', async ({ page }) => {
-    // 主题/密度切换入口
-    await expect(page.locator('[aria-label="外观设置"]').last()).toBeVisible();
+    // 主题/密度切换入口（TopNavigation 渲染桌面/移动两份，断言可见的那个）
+    await expect(page.locator('[aria-label="外观设置"]:visible').first()).toBeVisible();
   });
 
   test('顶部导航栏包含用户菜单', async ({ page }) => {
     // 用户菜单通过 aria-label 定位（显示用户名而非固定文字"用户"）
-    await expect(page.locator('[aria-label="用户菜单"]').last()).toBeVisible();
+    await expect(page.locator('[aria-label="用户菜单"]:visible').first()).toBeVisible();
   });
 
   test('侧边栏可以收起', async ({ page }) => {

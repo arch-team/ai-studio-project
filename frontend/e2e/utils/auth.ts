@@ -46,21 +46,19 @@ export async function loginViaUI(
 }
 
 /**
- * 通过 API 登录并设置 Token
+ * 通过 API 登录并注入认证状态
  *
- * 直接调用后端 API 获取 token，然后在页面中注入认证状态
- * 比 UI 登录更快，适合大量测试场景
+ * 调用后端 API 获取 refresh token，通过 addInitScript 写入 sessionStorage。
+ * 应用启动时 initializeAuth 会用 refreshToken 静默续期并恢复登录态。
+ * 比 UI 登录快约 5 秒/测试，适合大量测试场景。
+ *
+ * 注意：必须在 page.goto() 之前调用。
  */
 export async function loginViaAPI(
   page: Page,
   credentials: { username: string; password: string } = TEST_CREDENTIALS,
 ) {
-  // 先获取 baseURL
-  const baseURL = page.url() || '';
-  const apiBase = baseURL.replace(/\/$/, '');
-
-  // 通过 API 获取 token
-  const response = await page.request.post(`${apiBase}/api/v1/auth/login`, {
+  const response = await page.request.post('/api/v1/auth/login', {
     data: {
       username: credentials.username,
       password: credentials.password,
@@ -72,14 +70,12 @@ export async function loginViaAPI(
   }
 
   const loginData = await response.json();
+  const refreshToken: string = loginData.tokens.refresh_token;
 
-  // 在页面中注入认证状态到 Zustand store
-  await page.goto('/');
-  await page.evaluate((data) => {
-    // 设置 localStorage 或直接调用 store
-    // Zustand 不持久化 token，需要通过 API 设置
-    window.__TEST_AUTH_DATA__ = data;
-  }, loginData);
+  // 每次导航前注入 refreshToken，与 authStore 的 sessionStorage key 保持一致
+  await page.addInitScript((token: string) => {
+    sessionStorage.setItem('auth.refresh_token', token);
+  }, refreshToken);
 
   return loginData;
 }
