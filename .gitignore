@@ -152,3 +152,12 @@ infrastructure/tests/reports/*.log
 # 自动生成的工具产物
 .reports/
 codemaps/
+
+# Serena 工具配置（随工具版本自动重写，不入库）
+**/.serena/project.yml
+
+# 前端 E2E 测试截图产物
+frontend/e2e/artifacts/
+
+# 误命名/临时产物
+login-result

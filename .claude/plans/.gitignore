@@ -1,0 +1,4 @@
+# 规划过程产物默认不入库；如需保留特定计划，用 git add -f 或在下方 !取消忽略
+*.md
+!.gitignore
+!aws-deploy-e2e.md

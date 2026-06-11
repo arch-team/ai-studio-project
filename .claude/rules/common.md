@@ -140,14 +140,14 @@ specs/{feature}/
 
 | 文件 | 生成命令 | 职责 |
 |------|---------|------|
-| `constitution.md` | `/speckit.constitution` | 不可违反的核心原则和技术约束 |
-| `spec.md` | `/speckit.specify` | 用户故事、验收标准、术语定义 |
-| `plan.md` | `/speckit.plan` | 技术选型、架构设计、里程碑 |
-| `tasks.md` | `/speckit.tasks` | 可执行的原子任务清单 (0.5-2人日/任务) |
+| `constitution.md` | `/speckit-constitution` | 不可违反的核心原则和技术约束 |
+| `spec.md` | `/speckit-specify` | 用户故事、验收标准、术语定义 |
+| `plan.md` | `/speckit-plan` | 技术选型、架构设计、里程碑 |
+| `tasks.md` | `/speckit-tasks` | 可执行的原子任务清单 (0.5-2人日/任务) |
 | `data-model.md` | (plan 附带) | 数据库表结构、持久化策略 |
 | `research.md` | (plan 附带) | SDK 可行性验证、技术决策依据 |
 | `contracts/*.yaml` | (plan 附带) | OpenAPI 3.0 API 接口规范 |
-| `checklists/*.md` | `/speckit.checklist` | 架构/安全/UX 质量验证清单 |
+| `checklists/*.md` | `/speckit-checklist` | 架构/安全/UX 质量验证清单 |
 
 ### 工作流程
 ```
@@ -155,4 +155,4 @@ constitution → specify → [clarify] → plan → [checklist] → tasks → im
 ```
 
 ### 一致性检查
-运行 `/speckit.analyze` 检查 spec.md、plan.md、tasks.md 之间的一致性。
+运行 `/speckit-analyze` 检查 spec.md、plan.md、tasks.md 之间的一致性。
