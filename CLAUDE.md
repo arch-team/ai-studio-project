@@ -93,4 +93,5 @@ AI Training Platform - 基于 AWS SageMaker HyperPod 构建的企业级 AI 训�
 <!-- SPECKIT START -->
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read the current plan
+at specs/001-ai-training-platform/plan.md
 <!-- SPECKIT END -->

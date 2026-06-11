@@ -34,7 +34,7 @@
 - 规范基于已有的 `cc-doc/plans/2026-01-25-spec-md-完整性改进计划.md` 生成
 - 所有 9 项改进内容已转换为标准的用户故事和功能需求格式
 - 需求编号沿用现有 `specs/001-ai-training-platform/spec.md` 的编号体系（如 FR-027、FR-028、FR-029 等）
-- 可进入下一阶段：`/speckit.clarify` 或 `/speckit.plan`
+- 可进入下一阶段：`/speckit-clarify` 或 `/speckit-plan`
 
 ## Validation Summary
 
