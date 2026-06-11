@@ -23,7 +23,6 @@ import {
   useStartSpace,
   useStopSpace,
   useDeleteSpace,
-  useOpenSpace,
 } from '../api';
 import { PageLayout } from '@shared/components';
 import { SpaceStatusBadge } from '../components/SpaceStatusBadge';
@@ -87,7 +86,6 @@ export function SpaceListPage() {
   const startMutation = useStartSpace();
   const stopMutation = useStopSpace();
   const deleteMutation = useDeleteSpace();
-  const openMutation = useOpenSpace();
 
   // 处理分页变化
   const handlePageChange = useCallback(
@@ -110,7 +108,7 @@ export function SpaceListPage() {
 
   // 启动空间
   const handleStartSpace = useCallback(
-    (id: number) => {
+    (id: string) => {
       startMutation.mutate(id);
     },
     [startMutation]
@@ -118,18 +116,10 @@ export function SpaceListPage() {
 
   // 停止空间
   const handleStopSpace = useCallback(
-    (id: number) => {
+    (id: string) => {
       stopMutation.mutate(id);
     },
     [stopMutation]
-  );
-
-  // 打开 IDE
-  const handleOpenSpace = useCallback(
-    (id: number) => {
-      openMutation.mutate(id);
-    },
-    [openMutation]
   );
 
   // 显示删除确认弹窗
@@ -160,7 +150,7 @@ export function SpaceListPage() {
   const columnDefinitions = useMemo(
     () => [
       {
-        id: 'name',
+        id: 'space_name',
         header: '名称',
         cell: (item: SpaceSummary) => (
           <Link
@@ -169,10 +159,10 @@ export function SpaceListPage() {
               navigate(`/spaces/${item.id}`);
             }}
           >
-            {item.name}
+            {item.space_name}
           </Link>
         ),
-        sortingField: 'name',
+        sortingField: 'space_name',
       },
       {
         id: 'space_type',
@@ -221,15 +211,6 @@ export function SpaceListPage() {
                 停止
               </Button>
             )}
-            {item.status === 'running' && item.url && (
-              <Button
-                variant="link"
-                onClick={() => handleOpenSpace(item.id)}
-                loading={openMutation.isPending}
-              >
-                打开 IDE
-              </Button>
-            )}
             {(item.status === 'stopped' || item.status === 'failed') && (
               <Button
                 variant="link"
@@ -246,11 +227,9 @@ export function SpaceListPage() {
       navigate,
       handleStartSpace,
       handleStopSpace,
-      handleOpenSpace,
       handleDeleteClick,
       startMutation.isPending,
       stopMutation.isPending,
-      openMutation.isPending,
     ]
   );
 
@@ -345,7 +324,7 @@ export function SpaceListPage() {
           </Box>
         }
       >
-        确定要删除开发空间 <b>{spaceToDelete?.name}</b> 吗？此操作不可撤销。
+        确定要删除开发空间 <b>{spaceToDelete?.space_name}</b> 吗？此操作不可撤销。
       </Modal>
     </SpaceBetween>
     </PageLayout>

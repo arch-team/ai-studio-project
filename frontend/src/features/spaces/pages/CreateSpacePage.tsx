@@ -26,39 +26,21 @@ const BREADCRUMBS = [
   { text: '开发空间', href: '/spaces' },
   { text: '创建开发空间', href: '#' },
 ];
-import type { SpaceType, CreateSpaceRequest } from '../types';
-import { SPACE_TYPE_LABELS } from '../types';
+import type { SpaceType, SpaceInstanceType, CreateSpaceRequest } from '../types';
+import { SPACE_TYPE_LABELS, INSTANCE_TYPE_LABELS } from '../types';
 
-// IDE 类型选项
-const spaceTypeOptions = Object.entries(SPACE_TYPE_LABELS)
-  .filter(([key]) => key !== 'custom')
-  .map(([value, label]) => ({
-    label,
-    value,
-  }));
+// IDE 类型选项（与后端 SpaceTypeEnum 一致）
+const spaceTypeOptions = Object.entries(SPACE_TYPE_LABELS).map(
+  ([value, label]) => ({ label, value })
+);
 
-// 实例类型选项（含资源规格说明）
-const instanceTypeOptions = [
-  {
-    label: 'ml.g5.xlarge (4 vCPU, 16 GB, 1x NVIDIA A10G)',
-    value: 'ml.g5.xlarge',
-  },
-  {
-    label: 'ml.g5.2xlarge (8 vCPU, 32 GB, 1x NVIDIA A10G)',
-    value: 'ml.g5.2xlarge',
-  },
-  {
-    label: 'ml.g5.4xlarge (16 vCPU, 64 GB, 1x NVIDIA A10G)',
-    value: 'ml.g5.4xlarge',
-  },
-  {
-    label: 'ml.g5.8xlarge (32 vCPU, 128 GB, 1x NVIDIA A10G)',
-    value: 'ml.g5.8xlarge',
-  },
-];
+// 实例类型选项（与后端 SpaceInstanceTypeEnum 一致，越界值会被 422 拒绝）
+const instanceTypeOptions = Object.entries(INSTANCE_TYPE_LABELS).map(
+  ([value, label]) => ({ label, value })
+);
 
 /**
- * 表单验证
+ * 表单验证（约束与后端 CreateSpaceRequest 对齐: 名称 3-63 字符）
  */
 function validateForm(values: {
   name: string;
@@ -70,6 +52,8 @@ function validateForm(values: {
 
   if (!values.name.trim()) {
     errors.name = '请输入空间名称';
+  } else if (values.name.length < 3) {
+    errors.name = '空间名称至少 3 个字符';
   } else if (values.name.length > 63) {
     errors.name = '空间名称不能超过 63 个字符';
   } else if (!/^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/.test(values.name)) {
@@ -128,10 +112,10 @@ export function CreateSpacePage() {
     setErrors({});
 
     const request: CreateSpaceRequest = {
-      name,
+      space_name: name,
       space_type: spaceType as SpaceType,
-      instance_type: instanceType,
-      storage_gb: parseInt(storageGb, 10),
+      instance_type: instanceType as SpaceInstanceType,
+      storage_size_gb: parseInt(storageGb, 10),
     };
 
     try {
@@ -176,7 +160,7 @@ export function CreateSpacePage() {
             <FormField
               label="空间名称"
               errorText={errors.name}
-              constraintText="必填，小写字母、数字和连字符，最多 63 个字符"
+              constraintText="必填，3-63 个字符，小写字母、数字和连字符"
             >
               <Input
                 value={name}

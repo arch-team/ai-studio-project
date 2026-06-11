@@ -179,10 +179,10 @@ describe("CreateSpacePage", () => {
 
       await waitFor(() => {
         expect(mockMutateAsync).toHaveBeenCalledWith({
-          name: "my-test-space",
+          space_name: "my-test-space",
           space_type: "jupyter",
           instance_type: "ml.g5.xlarge",
-          storage_gb: 10,
+          storage_size_gb: 10,
         });
       });
 

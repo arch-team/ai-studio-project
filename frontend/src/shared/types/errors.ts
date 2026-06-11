@@ -139,6 +139,10 @@ export class AppError extends Error {
 
   /**
    * 从 HTTP 响应创建 AppError
+   *
+   * 支持两种后端错误格式:
+   * - 业务错误: { error: { code, message, ... } }
+   * - FastAPI 422 验证错误: { detail: [{ loc, msg, type }] }
    */
   static async fromResponse(response: Response): Promise<AppError> {
     try {
@@ -146,9 +150,28 @@ export class AppError extends Error {
       if (data.error) {
         return AppError.fromApiResponse(data);
       }
+      // FastAPI RequestValidationError: detail 为字段错误数组
+      if (Array.isArray(data.detail)) {
+        const fieldErrors: FieldError[] = data.detail.map(
+          (item: { loc?: (string | number)[]; msg?: string; type?: string }) => ({
+            // loc 形如 ["body", "space_name"]，取末段作为字段名
+            field: String(item.loc?.[item.loc.length - 1] ?? ''),
+            message: item.msg ?? '验证失败',
+            code: item.type,
+          })
+        );
+        const summary = fieldErrors
+          .map((e) => (e.field ? `${e.field}: ${e.message}` : e.message))
+          .join('；');
+        return new AppError(
+          ErrorCode.VALIDATION_ERROR,
+          summary || '输入数据验证失败',
+          { fieldErrors }
+        );
+      }
       return new AppError(
         ErrorCode.UNKNOWN,
-        data.message || response.statusText
+        data.message || (typeof data.detail === 'string' ? data.detail : '') || response.statusText
       );
     } catch {
       return new AppError(ErrorCode.UNKNOWN, response.statusText);

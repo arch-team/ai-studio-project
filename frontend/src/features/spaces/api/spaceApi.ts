@@ -1,5 +1,8 @@
 /**
  * Space API client functions.
+ *
+ * 契约对齐后端 src/modules/spaces/api/endpoints.py：
+ * Space ID 为 UUID 字符串；后端无独立 /open 端点。
  */
 
 import { apiClient } from '@shared/api';
@@ -19,9 +22,7 @@ export async function fetchSpaces(
 ): Promise<SpaceListResponse> {
   return apiClient.get<SpaceListResponse>('/spaces', {
     params: {
-      space_type: filters.space_type,
       status: filters.status,
-      owner_id: filters.owner_id,
       page: filters.page,
       page_size: filters.page_size,
       sort_by: filters.sort_by,
@@ -33,7 +34,7 @@ export async function fetchSpaces(
 /**
  * Fetch a single space by ID.
  */
-export async function fetchSpace(id: number): Promise<SpaceDetail> {
+export async function fetchSpace(id: string): Promise<SpaceDetail> {
   return apiClient.get<SpaceDetail>(`/spaces/${id}`);
 }
 
@@ -50,7 +51,7 @@ export async function createSpace(
  * Update an existing space.
  */
 export async function updateSpace(
-  id: number,
+  id: string,
   data: UpdateSpaceRequest
 ): Promise<SpaceDetail> {
   return apiClient.patch<SpaceDetail>(`/spaces/${id}`, data);
@@ -59,27 +60,20 @@ export async function updateSpace(
 /**
  * Delete a space.
  */
-export async function deleteSpace(id: number): Promise<void> {
+export async function deleteSpace(id: string): Promise<void> {
   return apiClient.delete(`/spaces/${id}`);
 }
 
 /**
  * Start a stopped space.
  */
-export async function startSpace(id: number): Promise<SpaceDetail> {
+export async function startSpace(id: string): Promise<SpaceDetail> {
   return apiClient.post<SpaceDetail>(`/spaces/${id}/start`);
 }
 
 /**
  * Stop a running space.
  */
-export async function stopSpace(id: number): Promise<SpaceDetail> {
+export async function stopSpace(id: string): Promise<SpaceDetail> {
   return apiClient.post<SpaceDetail>(`/spaces/${id}/stop`);
-}
-
-/**
- * Open space URL (redirect to JupyterLab/VS Code).
- */
-export async function openSpace(id: number): Promise<{ url: string }> {
-  return apiClient.post<{ url: string }>(`/spaces/${id}/open`);
 }

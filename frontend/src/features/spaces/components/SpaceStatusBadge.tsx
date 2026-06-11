@@ -11,11 +11,11 @@ import { SPACE_STATUS_LABELS } from '../types';
 
 // 状态到 StatusIndicator 类型的映射
 const SPACE_STATUS_TYPE_MAP: Record<SpaceStatus, StatusIndicatorProps['type']> = {
-  creating: 'in-progress',
+  pending: 'in-progress',
   running: 'success',
   stopped: 'stopped',
   failed: 'error',
-  deleting: 'in-progress',
+  deleted: 'stopped',
 };
 
 interface SpaceStatusBadgeProps {

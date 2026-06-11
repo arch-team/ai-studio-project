@@ -21,11 +21,11 @@ describe('SpaceStatusBadge', () => {
 
   describe('状态映射', () => {
     const statusCases: { status: SpaceStatus; label: string }[] = [
-      { status: 'creating', label: '创建中' },
+      { status: 'pending', label: '创建中' },
       { status: 'running', label: '运行中' },
       { status: 'stopped', label: '已停止' },
       { status: 'failed', label: '失败' },
-      { status: 'deleting', label: '删除中' },
+      { status: 'deleted', label: '已删除' },
     ];
 
     it.each(statusCases)(
@@ -38,11 +38,11 @@ describe('SpaceStatusBadge', () => {
 
     it('应该覆盖所有 SpaceStatus 类型', () => {
       const allStatuses: SpaceStatus[] = [
-        'creating',
+        'pending',
         'running',
         'stopped',
         'failed',
-        'deleting',
+        'deleted',
       ];
       for (const status of allStatuses) {
         expect(SPACE_STATUS_LABELS[status]).toBeDefined();

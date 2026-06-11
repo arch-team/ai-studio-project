@@ -1,92 +1,67 @@
 /**
  * Spaces (Development Spaces) module type definitions.
- * Maps to backend schemas: src/modules/spaces/
+ * Maps to backend schemas: src/modules/spaces/api/schemas/
+ *
+ * 契约对齐说明（与后端 requests.py / responses.py 一一对应）:
+ * - id 为 UUID 字符串（Space 是唯一使用 str ID 的实体）
+ * - 字段名: space_name / storage_size_gb
+ * - 状态机: pending → running / stopped / failed / deleted
  */
 
 // === Enums ===
 
-export type SpaceStatus = 'creating' | 'running' | 'stopped' | 'failed' | 'deleting';
+export type SpaceStatus = 'pending' | 'running' | 'stopped' | 'failed' | 'deleted';
 
-export type SpaceType = 'jupyter' | 'vscode' | 'custom';
+export type SpaceType = 'jupyter' | 'vscode' | 'rstudio';
 
-export type InstanceSize = 'small' | 'medium' | 'large' | 'xlarge';
+export type SpaceInstanceType =
+  | 'ml.t3.medium'
+  | 'ml.t3.large'
+  | 'ml.g4dn.xlarge'
+  | 'ml.g5.xlarge'
+  | 'ml.g5.2xlarge';
 
 // === Space Types ===
 
 export interface SpaceSummary {
-  id: number;
-  name: string;
-  description: string | null;
+  id: string;
+  space_name: string;
+  owner_id: number;
+  instance_type: SpaceInstanceType;
   space_type: SpaceType;
   status: SpaceStatus;
-  instance_type: string;
-  instance_size: InstanceSize;
-  owner_id: number;
-  owner_username: string | null;
-  url: string | null;
   created_at: string;
-  started_at: string | null;
-  stopped_at: string | null;
-  last_activity_at: string | null;
 }
 
 export interface SpaceDetail extends SpaceSummary {
-  // 资源配置
-  cpu_cores: number;
-  memory_gb: number;
-  gpu_count: number;
-  gpu_type: string | null;
-  storage_gb: number;
-
-  // 环境配置
-  image_uri: string;
-  environment_variables: Record<string, string> | null;
-
-  // 挂载配置
-  datasets_mounted: number[];
-  fsx_mount_path: string | null;
-
-  // 运行信息
-  pod_name: string | null;
-  pod_status: string | null;
-
-  // 费用估算
-  estimated_cost_per_hour: number | null;
-  total_running_hours: number | null;
-  total_cost_usd: number | null;
-
+  storage_size_gb: number;
+  lifecycle_config_arn: string | null;
+  sagemaker_space_arn: string | null;
   updated_at: string;
+  deleted_at: string | null;
 }
 
 // === Request Types ===
 
 export interface CreateSpaceRequest {
-  name: string;
-  description?: string | null;
-  space_type: SpaceType;
-  instance_type: string;
-  instance_size?: InstanceSize;
-  image_uri?: string;
-  environment_variables?: Record<string, string> | null;
-  storage_gb?: number;
-  datasets_to_mount?: number[];
+  space_name: string;
+  instance_type?: SpaceInstanceType;
+  space_type?: SpaceType;
+  storage_size_gb?: number;
 }
 
 export interface UpdateSpaceRequest {
-  name?: string;
-  description?: string | null;
-  environment_variables?: Record<string, string> | null;
+  space_name?: string;
+  instance_type?: SpaceInstanceType;
 }
 
 // === Filter Types ===
 
 export interface SpaceFilters {
-  space_type?: SpaceType;
   status?: SpaceStatus;
-  owner_id?: number;
   page?: number;
   page_size?: number;
-  sort_by?: 'created_at' | 'name' | 'last_activity_at';
+  sort_by?: 'created_at' | 'space_name';
   sort_order?: 'asc' | 'desc';
 }
 
@@ -103,33 +78,34 @@ export interface SpaceListResponse {
 // === UI Helper Types ===
 
 export const SPACE_STATUS_LABELS: Record<SpaceStatus, string> = {
-  creating: '创建中',
+  pending: '创建中',
   running: '运行中',
   stopped: '已停止',
   failed: '失败',
-  deleting: '删除中',
+  deleted: '已删除',
 };
 
 export const SPACE_STATUS_COLORS: Record<
   SpaceStatus,
   'blue' | 'green' | 'grey' | 'red' | 'pending'
 > = {
-  creating: 'blue',
+  pending: 'blue',
   running: 'green',
   stopped: 'grey',
   failed: 'red',
-  deleting: 'pending',
+  deleted: 'grey',
 };
 
 export const SPACE_TYPE_LABELS: Record<SpaceType, string> = {
   jupyter: 'JupyterLab',
-  vscode: 'VS Code Server',
-  custom: '自定义',
+  vscode: 'Code Editor (VS Code)',
+  rstudio: 'RStudio',
 };
 
-export const INSTANCE_SIZE_LABELS: Record<InstanceSize, string> = {
-  small: '小型 (2 vCPU, 8 GB)',
-  medium: '中型 (4 vCPU, 16 GB)',
-  large: '大型 (8 vCPU, 32 GB)',
-  xlarge: '超大型 (16 vCPU, 64 GB)',
+export const INSTANCE_TYPE_LABELS: Record<SpaceInstanceType, string> = {
+  'ml.t3.medium': 'ml.t3.medium (2 vCPU, 4 GB)',
+  'ml.t3.large': 'ml.t3.large (2 vCPU, 8 GB)',
+  'ml.g4dn.xlarge': 'ml.g4dn.xlarge (4 vCPU, 16 GB, 1x NVIDIA T4)',
+  'ml.g5.xlarge': 'ml.g5.xlarge (4 vCPU, 16 GB, 1x NVIDIA A10G)',
+  'ml.g5.2xlarge': 'ml.g5.2xlarge (8 vCPU, 32 GB, 1x NVIDIA A10G)',
 };

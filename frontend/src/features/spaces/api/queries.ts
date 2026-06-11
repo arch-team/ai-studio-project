@@ -1,5 +1,7 @@
 /**
  * TanStack Query hooks for Spaces.
+ *
+ * Space ID 为 UUID 字符串（契约对齐后端）。
  */
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -17,7 +19,6 @@ import {
   deleteSpace,
   startSpace,
   stopSpace,
-  openSpace,
 } from './spaceApi';
 
 // === Query Hooks ===
@@ -35,9 +36,9 @@ export function useSpaces(filters: SpaceFilters = {}) {
 /**
  * Fetch a single space by ID.
  */
-export function useSpace(id: number | undefined) {
+export function useSpace(id: string | undefined) {
   return useQuery({
-    queryKey: queryKeys.spaces.detail(String(id!)),
+    queryKey: queryKeys.spaces.detail(id!),
     queryFn: () => fetchSpace(id!),
     enabled: id !== undefined,
   });
@@ -66,10 +67,10 @@ export function useUpdateSpace() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ id, data }: { id: number; data: UpdateSpaceRequest }) =>
+    mutationFn: ({ id, data }: { id: string; data: UpdateSpaceRequest }) =>
       updateSpace(id, data),
     onSuccess: (result) => {
-      queryClient.setQueryData(queryKeys.spaces.detail(String(result.id)), result);
+      queryClient.setQueryData(queryKeys.spaces.detail(result.id), result);
       queryClient.invalidateQueries({ queryKey: queryKeys.spaces.lists() });
     },
   });
@@ -82,9 +83,9 @@ export function useDeleteSpace() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (id: number) => deleteSpace(id),
+    mutationFn: (id: string) => deleteSpace(id),
     onSuccess: (_result, id) => {
-      queryClient.removeQueries({ queryKey: queryKeys.spaces.detail(String(id)) });
+      queryClient.removeQueries({ queryKey: queryKeys.spaces.detail(id) });
       queryClient.invalidateQueries({ queryKey: queryKeys.spaces.lists() });
     },
   });
@@ -97,9 +98,9 @@ export function useStartSpace() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (id: number) => startSpace(id),
+    mutationFn: (id: string) => startSpace(id),
     onSuccess: (result) => {
-      queryClient.setQueryData(queryKeys.spaces.detail(String(result.id)), result);
+      queryClient.setQueryData(queryKeys.spaces.detail(result.id), result);
       queryClient.invalidateQueries({ queryKey: queryKeys.spaces.lists() });
     },
   });
@@ -112,23 +113,10 @@ export function useStopSpace() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (id: number) => stopSpace(id),
+    mutationFn: (id: string) => stopSpace(id),
     onSuccess: (result) => {
-      queryClient.setQueryData(queryKeys.spaces.detail(String(result.id)), result);
+      queryClient.setQueryData(queryKeys.spaces.detail(result.id), result);
       queryClient.invalidateQueries({ queryKey: queryKeys.spaces.lists() });
-    },
-  });
-}
-
-/**
- * Open space URL.
- */
-export function useOpenSpace() {
-  return useMutation({
-    mutationFn: (id: number) => openSpace(id),
-    onSuccess: (result) => {
-      // 在新窗口打开空间
-      window.open(result.url, '_blank');
     },
   });
 }

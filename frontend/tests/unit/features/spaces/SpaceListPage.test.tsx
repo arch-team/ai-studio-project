@@ -25,7 +25,6 @@ const mockUseSpaces = vi.fn();
 const mockStartMutate = vi.fn();
 const mockStopMutate = vi.fn();
 const mockDeleteMutate = vi.fn();
-const mockOpenMutate = vi.fn();
 
 vi.mock("@features/spaces/api", () => ({
   useSpaces: (...args: unknown[]) => mockUseSpaces(...args),
@@ -41,62 +40,37 @@ vi.mock("@features/spaces/api", () => ({
     mutate: mockDeleteMutate,
     isPending: false,
   }),
-  useOpenSpace: () => ({
-    mutate: mockOpenMutate,
-    isPending: false,
-  }),
 }));
 
-// 模拟空间列表数据
+// 模拟空间列表数据（与后端 SpaceResponse 契约一致：id 为 UUID 字符串）
 const mockSpaceListResponse: SpaceListResponse = {
   items: [
     {
-      id: 1,
-      name: "dev-space-1",
-      description: "开发空间 1",
+      id: "uuid-0001",
+      space_name: "dev-space-1",
       space_type: "jupyter",
       status: "running",
       instance_type: "ml.g5.xlarge",
-      instance_size: "small",
       owner_id: 1,
-      owner_username: "user1",
-      url: "https://jupyter.example.com/1",
       created_at: "2025-01-01T00:00:00Z",
-      started_at: "2025-01-01T01:00:00Z",
-      stopped_at: null,
-      last_activity_at: "2025-01-01T02:00:00Z",
     },
     {
-      id: 2,
-      name: "dev-space-2",
-      description: "开发空间 2",
+      id: "uuid-0002",
+      space_name: "dev-space-2",
       space_type: "vscode",
       status: "stopped",
       instance_type: "ml.g5.2xlarge",
-      instance_size: "medium",
       owner_id: 1,
-      owner_username: "user1",
-      url: null,
       created_at: "2025-01-02T00:00:00Z",
-      started_at: null,
-      stopped_at: "2025-01-02T05:00:00Z",
-      last_activity_at: null,
     },
     {
-      id: 3,
-      name: "dev-space-3",
-      description: null,
+      id: "uuid-0003",
+      space_name: "dev-space-3",
       space_type: "jupyter",
       status: "failed",
       instance_type: "ml.g5.xlarge",
-      instance_size: "small",
       owner_id: 2,
-      owner_username: "user2",
-      url: null,
       created_at: "2025-01-03T00:00:00Z",
-      started_at: null,
-      stopped_at: null,
-      last_activity_at: null,
     },
   ],
   total: 3,
@@ -171,7 +145,7 @@ describe("SpaceListPage", () => {
       // IDE 类型标签在 Table 的 cell 中渲染
       const jupyterLabCells = screen.getAllByText("JupyterLab");
       expect(jupyterLabCells.length).toBeGreaterThanOrEqual(1);
-      expect(screen.getByText("VS Code Server")).toBeInTheDocument();
+      expect(screen.getByText("Code Editor (VS Code)")).toBeInTheDocument();
     });
 
     it("应该显示状态徽章", () => {
@@ -245,11 +219,11 @@ describe("SpaceListPage", () => {
       expect(stopButton).toBeInTheDocument();
     });
 
-    it("运行中且有 URL 的空间应该显示打开 IDE 按钮", () => {
+    // 契约对齐后 SpaceSummary 不再携带 url 字段，"打开 IDE" 入口移至详情页
+    it("运行中的空间不显示启动按钮", () => {
       renderWithProviders(<SpaceListPage />);
-      // 使用 getByRole 查找按钮
-      const openButton = screen.getByRole("button", { name: /打开 IDE/i });
-      expect(openButton).toBeInTheDocument();
+      const stopButton = screen.getByRole("button", { name: /停止/i });
+      expect(stopButton).toBeInTheDocument();
     });
 
     it("已停止的空间应该显示启动和删除按钮", () => {
