@@ -205,11 +205,11 @@ class ObservabilityStack(cdk.Stack):
             "HyperPod Observability add-on name",
         )
 
-        # 平台日志组输出
+        # 平台日志组输出 (ID 加 Name 后缀，避免与 LogGroup construct ID 冲突)
         for key, log_group in self._platform_log_groups.items():
             create_output(
                 self,
-                f"PlatformLogGroup{key.title().replace('_', '')}",
+                f"PlatformLogGroup{key.title().replace('_', '')}Name",
                 log_group.log_group_name,
                 f"Platform log group for {key}",
             )

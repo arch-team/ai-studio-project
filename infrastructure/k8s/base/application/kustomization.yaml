@@ -17,7 +17,9 @@ resources:
   - backend-hpa.yaml
   - frontend-hpa.yaml
   - backend-pdb.yaml
-  - ingress.yaml
+  # ingress.yaml 不在部署清单中: 当前环境使用 TargetGroupBinding 绑定 CDK 创建的 ALB，
+  # 启用 Ingress 会让 LB Controller 额外创建一个 ALB (且因无 ACM 证书 HTTPS 监听器创建失败)。
+  # 新环境如需 Ingress 方式，单独 kubectl apply -f ingress.yaml 并配置证书。
 
 commonLabels:
   app.kubernetes.io/part-of: ai-training-platform
