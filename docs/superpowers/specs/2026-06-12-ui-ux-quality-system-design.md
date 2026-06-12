@@ -2,7 +2,7 @@
 
 > 日期: 2026-06-12
 > 状态: 已确认（用户逐节审批通过）
-> 范围: `frontend/` 子项目（React + Cloudscape，12 个 feature 模块）
+> 范围: `frontend/` 子项目（React + Cloudscape，13 个 feature 模块 = 12 个业务模块 + dashboard）
 
 ---
 
@@ -36,25 +36,30 @@
 ## 2. 总体架构：审计驱动五阶段
 
 ```
-阶段 0: 审计基础设施          阶段 1: 全量审计           阶段 2: 靶向规范
-┌──────────────────┐      ┌──────────────────┐      ┌──────────────────┐
-│ 截图流水线        │      │ 12 模块全页面      │      │ Design Tokens    │
-│ (Playwright)     │ ───► │ 四维度评分         │ ───► │ 页面模板          │
-│ 评分框架定义      │      │ 问题清单+审计报告   │      │ UX 文案规范       │
-└──────────────────┘      └──────────────────┘      │ 交互状态矩阵       │
-                                                    └──────────────────┘
-                                                             │
-阶段 4: 批量修复+回归          阶段 3: 工作流固化              ▼
+阶段 0: 审计基础设施              阶段 1: 全量审计           阶段 2: 靶向规范
+┌──────────────────────┐      ┌──────────────────┐      ┌──────────────────┐
+│ 截图流水线 (Playwright)│      │ 13 模块全页面      │      │ Design Tokens    │
+│ 评分框架定义           │ ───► │ 四维度评分         │ ───► │ 页面模板          │
+│ /ui-audit skill      │      │ 问题清单+审计报告   │      │ UX 文案规范       │
+│ design-reviewer agent│      │ (= /ui-audit 首跑) │      │ 交互状态矩阵       │
+└──────────────────────┘      └──────────────────┘      └──────────────────┘
+                                                                 │
+阶段 4: 批量修复+回归          阶段 3: 工作流固化                  ▼
 ┌──────────────────┐      ┌──────────────────┐
 │ 三批次修复         │ ◄─── │ rules 增强        │
-│ 每批审计回归       │      │ /ui-audit skill  │
-│ DoD: ≥4.0+抽查    │      │ /ui-fix skill    │
-└──────────────────┘      │ design-reviewer  │
-                          │ agent            │
-                          └──────────────────┘
+│ 每批审计回归       │      │ /ui-fix skill    │
+│ DoD: 见 §7        │      │ (引用阶段2规范)    │
+└──────────────────┘      └──────────────────┘
 ```
 
 **核心逻辑**：先用真实截图建立"现状基线"，让规范针对实际问题而非凭空制定；规范固化为 Claude Code 可执行机制后，修复过程本身就是对闭环的持续验证。
+
+**阶段职责澄清**（评分独立性与刻度可比性的保障）：
+
+- **`/ui-audit` skill 和 `design-reviewer` agent 在阶段 0 创建**——基线评分（阶段 1）与后续回归评分（阶段 4）必须出自同一把尺子（同一 agent + 同一评分 prompt），否则前后分数不可比。
+- 阶段 1 的全量审计即 `/ui-audit` 的首次运行，评分全程由 design-reviewer agent 在独立上下文完成，主上下文不评分。
+- 阶段 0 创建的 agent 评分依据为 §3.2 评分框架 + 锚点（此时阶段 2 规范尚未存在，属预期行为：基线衡量"现状离商用直觉有多远"）；阶段 2 规范产出后更新 agent 的评审输入清单，阶段 4 回归评分增加"是否符合四份规范"的判定依据。
+- `/ui-fix` skill 依赖阶段 2 的规范与模板，故在阶段 3 创建。
 
 ---
 
@@ -67,7 +72,7 @@
 ```
 frontend/e2e/audit/
 ├── screenshot-pipeline.spec.ts   # 遍历所有路由 × 关键状态截图
-├── routes-manifest.ts            # 路由清单（12 模块全页面 + 状态变体）
+├── routes-manifest.ts            # 路由清单（13 模块全页面 + 状态变体）
 └── audit-output/                 # 截图产出（gitignore，按日期归档）
     └── 2026-06-12/
         ├── training-list-default.png
@@ -76,7 +81,7 @@ frontend/e2e/audit/
         └── ...
 ```
 
-**截图覆盖矩阵**：每个页面 × 4 种状态（默认有数据 / 空状态 / 加载中 / 错误）× 2 主题（Light/Dark）。状态通过 MockApi 注入（复用 e2e 现有 route interception 设施）。
+**截图覆盖矩阵**：每个页面 × 4 种状态（默认有数据 / 空状态 / 加载中 / 错误）× 2 主题（Light/Dark）。状态通过 MockApi 注入（复用 e2e 现有 route interception 设施）。对页面类型不适用的状态按 §5.4 状态矩阵中的 "-" 豁免（如表单页无列表空状态），不机械凑数。
 
 ### 3.2 四维度评分框架
 
@@ -106,7 +111,7 @@ frontend/docs/audit/
 ├── 2026-06-12-baseline/
 │   ├── audit-report.md          # 总报告：每页评分表 + Top 问题归类
 │   ├── findings.md              # 问题清单（每条含截图引用、严重度、所属维度）
-│   └── score-matrix.md          # 12 模块 × 4 维度评分矩阵
+│   └── score-matrix.md          # 13 模块 × 4 维度评分矩阵
 ```
 
 问题按严重度分级：**P0**（破坏可用性/可信度，如错误状态白屏）、**P1**（明显不专业，如空状态只有一行字）、**P2**（打磨项，如间距不齐）。
@@ -115,8 +120,8 @@ frontend/docs/audit/
 
 ## 4. 阶段 1：全量审计执行
 
-- 用截图流水线对 12 个模块（training, datasets, models, spaces, audit, billing, monitoring, templates, reports, admin, auth, resource-quotas + dashboard）的全部页面生成基线截图
-- Claude 逐页按评分框架打分，输出审计报告三件套
+- 运行 `/ui-audit all`：截图流水线对 13 个模块（training, datasets, models, spaces, audit, billing, monitoring, templates, reports, admin, auth, resource-quotas, dashboard）的全部页面生成基线截图
+- design-reviewer agent 逐页按评分框架打分（独立上下文），输出审计报告三件套
 - 审计结论直接驱动阶段 2 的规范内容优先级：**问题出现频率最高的模式优先写入规范**
 
 ---
@@ -174,28 +179,30 @@ frontend/src/app/theme/
 
 ---
 
-## 6. 阶段 3：Claude Code 工作流固化
+## 6. Claude Code 工作流组件（阶段 0 与阶段 3 分批交付）
 
-### 6.1 rules 增强
+### 6.1 rules 增强（阶段 3）
 
 - `frontend/.claude/rules/component-design.md` → 引用四大页面模板，新增"新页面必须声明所属模式"规则
 - `frontend/.claude/rules/checklist.md` → 注入四维度评分自检条目
-- `frontend/.claude/CLAUDE.md` → 文档导航表加入 `specs/design-system/` 四份规范
+- `frontend/CLAUDE.md` → 文档导航表加入 `specs/design-system/` 四份规范；同时清理表中失效的 `../specs/frontend-design-guide.md` 引用（该文件不存在，职责由 `specs/design-system/` 取代）
 
 ### 6.2 两个自定义 skill
 
 ```
 .claude/skills/
-├── ui-audit/SKILL.md    # /ui-audit [模块名|all]
-└── ui-fix/SKILL.md      # /ui-fix [页面路径]
+├── ui-audit/SKILL.md    # /ui-audit [模块名|all]   （阶段 0 创建）
+└── ui-fix/SKILL.md      # /ui-fix [页面路径]        （阶段 3 创建）
 ```
 
-- **`/ui-audit`**：对指定模块（或全量）运行截图流水线 → 按评分框架逐页打分 → 产出/更新审计报告。阶段 1 的全量审计就是此 skill 的首次运行，后续每批修复的回归审计复用。
-- **`/ui-fix`**：对指定页面执行"读审计 findings → 对照页面模板与状态矩阵改造 → 截图自检 → 重新评分 → 输出 before/after 对比"的完整闭环。
+- **`/ui-audit`**（阶段 0 创建）：对指定模块（或全量）运行截图流水线 → 委派 design-reviewer agent 逐页打分 → 产出/更新审计报告。阶段 1 的全量审计是其首次运行，阶段 4 每批修复的回归审计复用。
+- **`/ui-fix`**（阶段 3 创建，依赖阶段 2 规范）：对指定页面执行"读审计 findings → 对照页面模板与状态矩阵改造 → 截图自检 → 委派 design-reviewer 重新评分 → 输出 before/after 对比"的完整闭环。
 
-### 6.3 一个 design-reviewer agent
+### 6.3 一个 design-reviewer agent（阶段 0 创建）
 
-`.claude/agents/design-reviewer.md`：独立上下文的设计评审 agent，输入为页面截图（多状态×双主题）+ 四份设计规范，输出结构化评分报告（四维度分项分 + 问题清单 + 修复建议）。`/ui-audit` 和 `/ui-fix` 的评分环节均委派给此 agent，保证评分独立性（写代码的上下文不给自己打分）。
+`.claude/agents/design-reviewer.md`：独立上下文的设计评审 agent，输入为页面截图（多状态×双主题）+ 评分框架（§3.2），输出结构化评分报告（四维度分项分 + 问题清单 + 修复建议）。`/ui-audit` 和 `/ui-fix` 的评分环节均委派给此 agent，保证评分独立性（写代码的上下文不给自己打分）。
+
+**评审输入随阶段演进**：阶段 0-1 仅依据评分框架与锚点；阶段 2 规范产出后，将四份规范加入 agent 的评审输入清单（agent 定义中以引用方式声明，避免内容复制漂移）。
 
 ---
 
@@ -211,13 +218,13 @@ frontend/src/app/theme/
 
 **每批次 DoD（完成定义）**：
 
-1. 批内全部页面综合评分 ≥ 4.0（design-reviewer agent 评定）
-2. 四态覆盖完整（截图流水线可证）
+1. 批内全部页面综合评分达标（design-reviewer agent 评定）：**批次 1 ≥ 4.5，批次 2/3 ≥ 4.0**（批次 1 是平台门面与核心流程，门槛对齐 §10 成功标准）
+2. 四态覆盖完整（截图流水线可证，按 §5.4 矩阵豁免不适用状态）
 3. Light/Dark 双主题截图无瑕疵
 4. 既有单元/集成/E2E 测试全绿，`npm run lint` 与 `tsc --noEmit` 通过
 5. before/after 截图对比报告产出，**用户抽查关键页面通过**
 
-**修复顺序**：每批内先 P0 → P1 → P2；P2 在评分已达 4.0 时可降级为 backlog。
+**修复顺序**：每批内先 P0 → P1 → P2；P2 在评分已达该批次门槛时可降级为 backlog。
 
 ---
 
@@ -239,12 +246,12 @@ frontend/src/app/theme/
 | Theming 定制引发暗色模式回归 | 截图矩阵强制双主题覆盖；theme.ts 改动必须全量跑截图流水线 |
 | 修复破坏既有功能 | DoD 包含全量测试绿 + lint/类型检查；遵循现有 TDD 工作流 |
 | 截图流水线对远程环境依赖不稳定 | 截图走 MockApi 注入状态（复用 e2e 设施），不依赖真实后端数据 |
-| 规范文档与实际代码漂移 | 规范中的代码骨架来自实际改造后的页面反向提炼（阶段 2 在审计后执行的原因） |
+| 规范文档与实际代码漂移 | 阶段 2 基于审计发现给出初版代码骨架；阶段 4 各批次完成后用实际改造代码反向校准回填模板，保持规范与代码同步 |
 
 ---
 
 ## 10. 成功标准
 
-1. 12 个模块全部页面综合评分 ≥ 4.0，核心页面（批次 1）≥ 4.5
+1. 13 个模块全部页面综合评分 ≥ 4.0，批次 1 页面（training/dashboard/全局导航）≥ 4.5（与 §7 DoD 一致）
 2. 任意新页面开发时，Claude Code 能通过规范 + 模板 + `/ui-fix` 闭环产出首次即 ≥ 4.0 的页面
 3. 用户抽查通过率：批次验收时抽查页面无 P0/P1 级新发现
