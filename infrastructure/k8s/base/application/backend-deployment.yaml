@@ -18,7 +18,7 @@ spec:
       serviceAccountName: backend-service-sa
       containers:
         - name: backend
-          image: 897473508751.dkr.ecr.us-east-1.amazonaws.com/ai-platform-dev-backend:v1.2.16
+          image: 897473508751.dkr.ecr.us-east-1.amazonaws.com/ai-platform-dev-backend:v1.2.18
           ports:
             - containerPort: 8000
               protocol: TCP

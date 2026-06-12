@@ -17,7 +17,7 @@ spec:
       restartPolicy: Never
       containers:
         - name: db-migration
-          image: 897473508751.dkr.ecr.us-east-1.amazonaws.com/ai-platform-dev-backend:v1.2.16
+          image: 897473508751.dkr.ecr.us-east-1.amazonaws.com/ai-platform-dev-backend:v1.2.18
           command: ["alembic", "upgrade", "head"]
           envFrom:
             - configMapRef:
