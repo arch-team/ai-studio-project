@@ -17,6 +17,26 @@ import {
   getMockTrainingJobDetail,
   createPaginatedResponse,
 } from '../fixtures/trainingJobs';
+import {
+  datasetListResponse,
+  datasetDetailResponse,
+  datasetVersionListResponse,
+  emptyDatasetVersionListResponse,
+} from './fixtures/datasets';
+import {
+  modelListResponse,
+  modelDetailResponse,
+  modelVersionsResponse,
+  emptyModelVersionsResponse,
+} from './fixtures/models';
+import {
+  templateListResponse,
+  templateDetailResponse,
+  popularTemplatesResponse,
+} from './fixtures/templates';
+import { auditLogListResponse } from './fixtures/auditLogs';
+import { userListResponse } from './fixtures/users';
+import { checkpointListResponse } from './fixtures/checkpoints';
 
 export type AuditState = 'default' | 'empty' | 'loading' | 'error';
 export type PageType = 'list' | 'detail' | 'form' | 'dashboard' | 'special';
@@ -79,23 +99,151 @@ export const AUDIT_PAGES: PageSpec[] = [
       defaultBody: getMockTrainingJobDetail(1),
     },
   },
-  // checkpoints 的 primary 留待 Task 6（fixtures/checkpoints.ts）
-  { module: 'training', pageName: 'checkpoints', route: '/checkpoints', pageType: 'list', states: LIST_STATES },
+  // 注意：CheckpointsPage 初始渲染不发 checkpoints 请求（需先选任务，enabled 守卫），
+  // 静态截图呈现"请选择训练任务"初始态；primary 仍按页面主数据语义指向 checkpoints 端点，
+  // 任务下拉数据由 extras 提供。
+  {
+    module: 'training',
+    pageName: 'checkpoints',
+    route: '/checkpoints',
+    pageType: 'list',
+    states: LIST_STATES,
+    primary: {
+      pattern: /\/api\/v1\/training-jobs\/(\d+)\/checkpoints$/,
+      defaultBody: checkpointListResponse,
+    },
+    extras: [
+      {
+        pattern: /\/api\/v1\/training-jobs(\?.*)?$/,
+        defaultBody: createPaginatedResponse(mockTrainingJobs, 1, 100),
+      },
+    ],
+  },
 
   // === templates ===
-  { module: 'templates', pageName: 'template-list', route: '/job-templates', pageType: 'list', states: LIST_STATES },
-  { module: 'templates', pageName: 'template-detail', route: '/job-templates/1', pageType: 'detail', states: DETAIL_STATES },
+  {
+    module: 'templates',
+    pageName: 'template-list',
+    route: '/job-templates',
+    pageType: 'list',
+    states: LIST_STATES,
+    primary: {
+      pattern: /\/api\/v1\/job-templates(\?.*)?$/,
+      defaultBody: templateListResponse,
+    },
+    extras: [
+      {
+        // 热门模板卡片（返回裸数组，非分页对象）
+        pattern: /\/api\/v1\/job-templates\/popular(\?.*)?$/,
+        defaultBody: popularTemplatesResponse,
+      },
+    ],
+  },
+  {
+    module: 'templates',
+    pageName: 'template-detail',
+    route: '/job-templates/1',
+    pageType: 'detail',
+    states: DETAIL_STATES,
+    primary: {
+      pattern: /\/api\/v1\/job-templates\/(\d+)$/,
+      defaultBody: templateDetailResponse,
+    },
+  },
 
   // === models ===
-  { module: 'models', pageName: 'model-list', route: '/models', pageType: 'list', states: LIST_STATES },
-  { module: 'models', pageName: 'model-detail', route: '/models/1', pageType: 'detail', states: DETAIL_STATES },
-  { module: 'models', pageName: 'model-versions', route: '/models/1/versions', pageType: 'list', states: LIST_STATES },
+  {
+    module: 'models',
+    pageName: 'model-list',
+    route: '/models',
+    pageType: 'list',
+    states: LIST_STATES,
+    primary: {
+      pattern: /\/api\/v1\/models(\?.*)?$/,
+      defaultBody: modelListResponse,
+    },
+  },
+  {
+    module: 'models',
+    pageName: 'model-detail',
+    route: '/models/1',
+    pageType: 'detail',
+    states: DETAIL_STATES,
+    primary: {
+      pattern: /\/api\/v1\/models\/(\d+)$/,
+      defaultBody: modelDetailResponse,
+    },
+  },
+  {
+    module: 'models',
+    pageName: 'model-versions',
+    route: '/models/1/versions',
+    pageType: 'list',
+    states: LIST_STATES,
+    primary: {
+      // 响应形状为 { model_name, versions, comparison }，empty 态需显式声明
+      pattern: /\/api\/v1\/models\/(\d+)\/versions(\?.*)?$/,
+      defaultBody: modelVersionsResponse,
+      emptyBody: emptyModelVersionsResponse,
+    },
+    extras: [
+      {
+        pattern: /\/api\/v1\/models\/(\d+)$/,
+        defaultBody: modelDetailResponse,
+      },
+    ],
+  },
 
   // === datasets ===
-  { module: 'datasets', pageName: 'dataset-list', route: '/datasets', pageType: 'list', states: LIST_STATES },
+  {
+    module: 'datasets',
+    pageName: 'dataset-list',
+    route: '/datasets',
+    pageType: 'list',
+    states: LIST_STATES,
+    primary: {
+      pattern: /\/api\/v1\/datasets(\?.*)?$/,
+      defaultBody: datasetListResponse,
+    },
+  },
   { module: 'datasets', pageName: 'dataset-create', route: '/datasets/create', pageType: 'form', states: ['default'] },
-  { module: 'datasets', pageName: 'dataset-detail', route: '/datasets/1', pageType: 'detail', states: DETAIL_STATES },
-  { module: 'datasets', pageName: 'dataset-versions', route: '/datasets/1/versions', pageType: 'list', states: LIST_STATES },
+  {
+    module: 'datasets',
+    pageName: 'dataset-detail',
+    route: '/datasets/1',
+    pageType: 'detail',
+    states: DETAIL_STATES,
+    primary: {
+      pattern: /\/api\/v1\/datasets\/(\d+)$/,
+      defaultBody: datasetDetailResponse,
+    },
+    extras: [
+      {
+        // 详情页版本 Tab 请求，显式声明保证 default 截图信息完整
+        pattern: /\/api\/v1\/datasets\/(\d+)\/versions$/,
+        defaultBody: datasetVersionListResponse,
+      },
+    ],
+  },
+  {
+    module: 'datasets',
+    pageName: 'dataset-versions',
+    route: '/datasets/1/versions',
+    pageType: 'list',
+    states: LIST_STATES,
+    primary: {
+      // 响应形状为 { items, total }（无分页字段）
+      pattern: /\/api\/v1\/datasets\/(\d+)\/versions$/,
+      defaultBody: datasetVersionListResponse,
+      emptyBody: emptyDatasetVersionListResponse,
+    },
+    extras: [
+      {
+        pattern: /\/api\/v1\/datasets\/(\d+)$/,
+        defaultBody: datasetDetailResponse,
+      },
+    ],
+  },
 
   // === resource-quotas ===
   { module: 'resource-quotas', pageName: 'resource-quotas', route: '/resource-quotas', pageType: 'list', states: LIST_STATES },
@@ -110,11 +258,31 @@ export const AUDIT_PAGES: PageSpec[] = [
   { module: 'monitoring', pageName: 'monitoring', route: '/monitoring', pageType: 'dashboard', states: DASHBOARD_STATES },
 
   // === audit ===
-  { module: 'audit', pageName: 'audit-logs', route: '/audit-logs', pageType: 'list', states: LIST_STATES },
+  {
+    module: 'audit',
+    pageName: 'audit-logs',
+    route: '/audit-logs',
+    pageType: 'list',
+    states: LIST_STATES,
+    primary: {
+      pattern: /\/api\/v1\/audit-logs(\?.*)?$/,
+      defaultBody: auditLogListResponse,
+    },
+  },
 
   // === admin ===
   { module: 'admin', pageName: 'admin-home', route: '/admin', pageType: 'dashboard', states: ['default'] },
-  { module: 'admin', pageName: 'user-management', route: '/admin/users', pageType: 'list', states: LIST_STATES },
+  {
+    module: 'admin',
+    pageName: 'user-management',
+    route: '/admin/users',
+    pageType: 'list',
+    states: LIST_STATES,
+    primary: {
+      pattern: /\/api\/v1\/users(\?.*)?$/,
+      defaultBody: userListResponse,
+    },
+  },
 
   // === reports ===
   { module: 'reports', pageName: 'reports-home', route: '/reports', pageType: 'dashboard', states: ['default'] },
