@@ -17,7 +17,11 @@ function json(body: unknown, status = 200) {
   return { status, contentType: 'application/json', body: JSON.stringify(body) };
 }
 
-/** 兜底：未声明的 GET API 返回空列表形状，避免页面因未 mock 的请求而崩溃 */
+/**
+ * 兜底：未声明的 GET API 返回空列表形状，避免页面因未 mock 的请求而崩溃。
+ * 非 GET 请求 fallback 后若无更低优先级 handler 会放行到真实网络——
+ * 审计场景下可接受：auth 的 POST 由更高优先级的 setupAuditAuth 拦截，页面初始渲染基本只发 GET。
+ */
 export async function setupCatchAll(page: Page) {
   await page.route('**/api/v1/**', (route, request) => {
     if (request.method() !== 'GET') return route.fallback();
@@ -25,7 +29,10 @@ export async function setupCatchAll(page: Page) {
   });
 }
 
-/** 按页面声明与目标状态注册 mock */
+/**
+ * 按页面声明与目标状态注册 mock。
+ * 无主数据 API 的页面（spec.primary 为 undefined，如登录页/404/IDE）仅注册 extras。
+ */
 export async function setupStateMocks(page: Page, spec: PageSpec, state: AuditState) {
   for (const extra of spec.extras ?? []) {
     await page.route(extra.pattern, (route, request) => {
