@@ -72,6 +72,15 @@ export async function startSpace(id: string): Promise<SpaceDetail> {
 }
 
 /**
+ * 签发空间 IDE 的免登录访问 URL（约 5 分钟内有效，仅供即时跳转）.
+ */
+export async function fetchSpaceAccessUrl(
+  id: string
+): Promise<{ url: string }> {
+  return apiClient.post<{ url: string }>(`/spaces/${id}/access-url`);
+}
+
+/**
  * Stop a running space.
  */
 export async function stopSpace(id: string): Promise<SpaceDetail> {

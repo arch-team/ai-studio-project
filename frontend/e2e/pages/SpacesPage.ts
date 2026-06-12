@@ -136,7 +136,7 @@ export class SpacesPage extends BasePage {
   }
 
   /** 行内操作按钮 */
-  async clickRowAction(spaceName: string, action: '启动' | '停止' | '删除') {
+  async clickRowAction(spaceName: string, action: '启动' | '停止' | '删除' | '打开') {
     await this.rowByName(spaceName)
       .getByRole('button', { name: action })
       .click();
@@ -145,7 +145,7 @@ export class SpacesPage extends BasePage {
   /** 行内是否存在某操作按钮 */
   async hasRowAction(
     spaceName: string,
-    action: '启动' | '停止' | '删除',
+    action: '启动' | '停止' | '删除' | '打开',
   ): Promise<boolean> {
     return (
       (await this.rowByName(spaceName)

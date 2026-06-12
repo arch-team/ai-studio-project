@@ -25,6 +25,7 @@ const mockUseSpaces = vi.fn();
 const mockStartMutate = vi.fn();
 const mockStopMutate = vi.fn();
 const mockDeleteMutate = vi.fn();
+const mockOpenIDEMutate = vi.fn();
 
 vi.mock("@features/spaces/api", () => ({
   useSpaces: (...args: unknown[]) => mockUseSpaces(...args),
@@ -39,6 +40,12 @@ vi.mock("@features/spaces/api", () => ({
   useDeleteSpace: () => ({
     mutate: mockDeleteMutate,
     isPending: false,
+  }),
+  useOpenSpaceIDE: () => ({
+    mutate: mockOpenIDEMutate,
+    isPending: false,
+    isError: false,
+    error: null,
   }),
 }));
 
@@ -217,6 +224,14 @@ describe("SpaceListPage", () => {
       // 使用 getByRole 查找按钮
       const stopButton = screen.getByRole("button", { name: /停止/i });
       expect(stopButton).toBeInTheDocument();
+    });
+
+    it("运行中的空间应该显示打开按钮并触发签发跳转", () => {
+      renderWithProviders(<SpaceListPage />);
+      const openButton = screen.getByRole("button", { name: /打开/i });
+      expect(openButton).toBeInTheDocument();
+      fireEvent.click(openButton);
+      expect(mockOpenIDEMutate).toHaveBeenCalledWith("uuid-0001");
     });
 
     // 契约对齐后 SpaceSummary 不再携带 url 字段，"打开 IDE" 入口移至详情页

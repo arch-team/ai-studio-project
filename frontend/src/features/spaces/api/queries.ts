@@ -14,6 +14,7 @@ import type {
 import {
   fetchSpaces,
   fetchSpace,
+  fetchSpaceAccessUrl,
   createSpace,
   updateSpace,
   deleteSpace,
@@ -107,6 +108,38 @@ export function useStartSpace() {
     onSuccess: (result) => {
       queryClient.setQueryData(queryKeys.spaces.detail(result.id), result);
       queryClient.invalidateQueries({ queryKey: queryKeys.spaces.lists() });
+    },
+  });
+}
+
+/**
+ * 打开空间 IDE：签发 presigned URL 并在新标签页打开。
+ *
+ * window.open 必须在用户手势同步触发后调用，否则被浏览器拦截；
+ * 先同步开空白窗口占位，URL 返回后再写入地址。
+ */
+export function useOpenSpaceIDE() {
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const win = window.open('about:blank', '_blank', 'noopener');
+      try {
+        const { url } = await fetchSpaceAccessUrl(id);
+        // 仅允许跳转 SageMaker Studio 域，防止开放重定向
+        const parsed = new URL(url);
+        const isTrusted =
+          parsed.protocol === 'https:' &&
+          parsed.hostname.endsWith('.sagemaker.aws');
+        if (!isTrusted) {
+          throw new Error('访问地址不可信，已阻止跳转');
+        }
+        if (win) {
+          win.location.href = url;
+        }
+        return url;
+      } catch (error) {
+        win?.close();
+        throw error;
+      }
     },
   });
 }

@@ -23,6 +23,7 @@ import {
   useStartSpace,
   useStopSpace,
   useDeleteSpace,
+  useOpenSpaceIDE,
 } from '../api';
 import { PageLayout } from '@shared/components';
 import { SpaceStatusBadge } from '../components/SpaceStatusBadge';
@@ -86,6 +87,7 @@ export function SpaceListPage() {
   const startMutation = useStartSpace();
   const stopMutation = useStopSpace();
   const deleteMutation = useDeleteSpace();
+  const openIDEMutation = useOpenSpaceIDE();
 
   // 处理分页变化
   const handlePageChange = useCallback(
@@ -120,6 +122,14 @@ export function SpaceListPage() {
       stopMutation.mutate(id);
     },
     [stopMutation]
+  );
+
+  // 打开 IDE（新标签页）
+  const handleOpenIDE = useCallback(
+    (id: string) => {
+      openIDEMutation.mutate(id);
+    },
+    [openIDEMutation]
   );
 
   // 显示删除确认弹窗
@@ -205,6 +215,16 @@ export function SpaceListPage() {
             {item.status === 'running' && (
               <Button
                 variant="link"
+                iconName="external"
+                onClick={() => handleOpenIDE(item.id)}
+                loading={openIDEMutation.isPending}
+              >
+                打开
+              </Button>
+            )}
+            {item.status === 'running' && (
+              <Button
+                variant="link"
                 onClick={() => handleStopSpace(item.id)}
                 loading={stopMutation.isPending}
               >
@@ -227,9 +247,11 @@ export function SpaceListPage() {
       navigate,
       handleStartSpace,
       handleStopSpace,
+      handleOpenIDE,
       handleDeleteClick,
       startMutation.isPending,
       stopMutation.isPending,
+      openIDEMutation.isPending,
     ]
   );
 
@@ -259,6 +281,13 @@ export function SpaceListPage() {
           action={<Button onClick={() => refetch()}>重试</Button>}
         >
           {error.message}
+        </Alert>
+      )}
+
+      {/* 打开 IDE 失败提示 */}
+      {openIDEMutation.isError && (
+        <Alert type="error" header="打开开发环境失败" dismissible>
+          {openIDEMutation.error?.message || '请稍后重试'}
         </Alert>
       )}
 

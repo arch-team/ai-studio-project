@@ -218,6 +218,33 @@ test.describe('开发空间 - 远程环境完整生命周期', () => {
     await expect(page.getByText('SageMaker ARN')).toBeVisible();
   });
 
+  test('4c. 打开 IDE: access-url 返回真实可达的 Studio 地址', async ({
+    page,
+    request,
+  }) => {
+    // API 契约: 签发 presigned URL
+    const res = await request.post(`/api/v1/spaces/${spaceId}/access-url`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    expect(res.ok(), `access-url 失败: ${res.status()}`).toBe(true);
+    const { url } = await res.json();
+    expect(url).toMatch(/^https:\/\/.+\.sagemaker\.aws\/auth\?token=/);
+
+    // URL 真实可达（跳转后落在 Studio 域，而非 AWS 登录页）
+    const resp = await page.goto(url, { waitUntil: 'domcontentloaded' });
+    expect(resp?.status(), 'presigned URL 应可访问').toBeLessThan(400);
+    await page.waitForLoadState('networkidle').catch(() => {});
+    expect(page.url()).toContain('sagemaker.aws');
+    expect(page.url()).not.toContain('signin.aws.amazon.com');
+
+    // UI 入口: 列表页运行中行有「打开」按钮
+    const spacesPage = new SpacesPage(page);
+    await loginViaUI(page);
+    await spacesPage.goto();
+    await spacesPage.waitForPageReady();
+    expect(await spacesPage.hasRowAction(spaceName, '打开')).toBe(true);
+  });
+
   test('5. UI 停止空间 → 状态变为已停止且 AWS 侧实例真实释放', async ({
     page,
   }) => {
