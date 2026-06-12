@@ -12,6 +12,12 @@
  * 注意：billing 模块无独立页面（src/features/billing/pages/ 为空），不在清单内。
  */
 
+import {
+  mockTrainingJobs,
+  getMockTrainingJobDetail,
+  createPaginatedResponse,
+} from '../fixtures/trainingJobs';
+
 export type AuditState = 'default' | 'empty' | 'loading' | 'error';
 export type PageType = 'list' | 'detail' | 'form' | 'dashboard' | 'special';
 
@@ -50,9 +56,30 @@ export const AUDIT_PAGES: PageSpec[] = [
   { module: 'auth', pageName: 'login', route: '/login', pageType: 'special', states: ['default'], requiresAuth: false },
 
   // === training ===
-  { module: 'training', pageName: 'training-list', route: '/training-jobs', pageType: 'list', states: LIST_STATES },
+  {
+    module: 'training',
+    pageName: 'training-list',
+    route: '/training-jobs',
+    pageType: 'list',
+    states: LIST_STATES,
+    primary: {
+      pattern: /\/api\/v1\/training-jobs(\?.*)?$/,
+      defaultBody: createPaginatedResponse(mockTrainingJobs, 1, 20),
+    },
+  },
   { module: 'training', pageName: 'training-create', route: '/training-jobs/create', pageType: 'form', states: ['default'] },
-  { module: 'training', pageName: 'training-detail', route: '/training-jobs/1', pageType: 'detail', states: DETAIL_STATES },
+  {
+    module: 'training',
+    pageName: 'training-detail',
+    route: '/training-jobs/1',
+    pageType: 'detail',
+    states: DETAIL_STATES,
+    primary: {
+      pattern: /\/api\/v1\/training-jobs\/(\d+)$/,
+      defaultBody: getMockTrainingJobDetail(1),
+    },
+  },
+  // checkpoints 的 primary 留待 Task 6（fixtures/checkpoints.ts）
   { module: 'training', pageName: 'checkpoints', route: '/checkpoints', pageType: 'list', states: LIST_STATES },
 
   // === templates ===
