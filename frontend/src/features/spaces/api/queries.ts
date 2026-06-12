@@ -117,11 +117,17 @@ export function useStartSpace() {
  *
  * window.open 必须在用户手势同步触发后调用，否则被浏览器拦截；
  * 先同步开空白窗口占位，URL 返回后再写入地址。
+ * 注意不能传 'noopener' 特性——按规范会使 window.open 返回 null，
+ * 拿不到引用就无法写入 URL（新页停留空白）；改为手动置空 opener。
  */
 export function useOpenSpaceIDE() {
   return useMutation({
     mutationFn: async (id: string) => {
-      const win = window.open('about:blank', '_blank', 'noopener');
+      const win = window.open('about:blank', '_blank');
+      if (!win) {
+        throw new Error('浏览器拦截了弹出窗口，请允许本站点打开新窗口后重试');
+      }
+      win.opener = null;
       try {
         const { url } = await fetchSpaceAccessUrl(id);
         // 仅允许跳转 SageMaker Studio 域，防止开放重定向
@@ -132,12 +138,10 @@ export function useOpenSpaceIDE() {
         if (!isTrusted) {
           throw new Error('访问地址不可信，已阻止跳转');
         }
-        if (win) {
-          win.location.href = url;
-        }
+        win.location.href = url;
         return url;
       } catch (error) {
-        win?.close();
+        win.close();
         throw error;
       }
     },

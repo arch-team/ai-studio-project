@@ -237,12 +237,20 @@ test.describe('开发空间 - 远程环境完整生命周期', () => {
     expect(page.url()).toContain('sagemaker.aws');
     expect(page.url()).not.toContain('signin.aws.amazon.com');
 
-    // UI 入口: 列表页运行中行有「打开」按钮
+    // UI 真实点击: 「打开」必须实际弹出新页并导航到 Studio 域。
+    // 回归缺陷: window.open 带 noopener 返回 null 导致新页停留 about:blank
     const spacesPage = new SpacesPage(page);
     await loginViaUI(page);
     await spacesPage.goto();
     await spacesPage.waitForPageReady();
     expect(await spacesPage.hasRowAction(spaceName, '打开')).toBe(true);
+
+    const popupPromise = page.waitForEvent('popup', { timeout: 30_000 });
+    await spacesPage.clickRowAction(spaceName, '打开');
+    const popup = await popupPromise;
+    await popup.waitForURL(/sagemaker\.aws/, { timeout: 30_000 });
+    expect(popup.url()).toContain('sagemaker.aws');
+    await popup.close();
   });
 
   test('5. UI 停止空间 → 状态变为已停止且 AWS 侧实例真实释放', async ({
