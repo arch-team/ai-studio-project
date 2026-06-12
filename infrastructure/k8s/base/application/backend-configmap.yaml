@@ -10,6 +10,9 @@ data:
   AWS_REGION: "us-east-1"
   S3_BUCKET_NAME: "ai-platform-dev-datasets"
   HYPERPOD_CLUSTER_NAME: "ai-platform-dev-hyperpod"
+  # Spaces 专用 Domain：显式指定，避免自动发现命中共享 Unified Studio 域
+  SAGEMAKER_DOMAIN_ID: "d-i3e6cqfdqszw"
+  SAGEMAKER_USER_PROFILE: "studio-user"
   CORS_ORIGINS: '["http://ai-platform-dev-alb-1343863355.us-east-1.elb.amazonaws.com"]'
   LOG_LEVEL: "INFO"
   FSX_MOUNT_PATH: "/fsx"
