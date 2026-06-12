@@ -7,7 +7,11 @@
 
 import { Page } from '@playwright/test';
 
-/** Mock 认证端点并注入登录态（admin 角色，保证可访问全部页面） */
+/**
+ * Mock 认证端点并注入登录态（admin 角色，保证可访问全部页面）
+ *
+ * 注意：必须在 page.goto() 之前调用（addInitScript 仅对后续导航生效）。
+ */
 export async function setupAuditAuth(page: Page) {
   await page.route('**/api/v1/auth/token/refresh', (route) =>
     route.fulfill({
@@ -43,7 +47,7 @@ export async function setupAuditAuth(page: Page) {
   });
 }
 
-/** 注入主题偏好（zustand persist 格式，key 与 store/slices/uiSlice.ts 一致） */
+/** 注入主题偏好（zustand persist 格式，key 与 store/slices/uiSlice.ts 一致）。必须在 page.goto() 之前调用。 */
 export async function setTheme(page: Page, theme: 'light' | 'dark') {
   await page.addInitScript((t: string) => {
     localStorage.setItem(
