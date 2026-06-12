@@ -225,7 +225,7 @@ test.describe('开发空间 - 列表展示 (Mock 模式)', () => {
   test('状态徽章中文文案正确', async () => {
     expect(await spacesPage.getStatusOfSpace('running-jupyter-space')).toContain('运行中');
     expect(await spacesPage.getStatusOfSpace('stopped-vscode-space')).toContain('已停止');
-    expect(await spacesPage.getStatusOfSpace('pending-new-space')).toContain('创建中');
+    expect(await spacesPage.getStatusOfSpace('pending-new-space')).toContain('启动中');
     expect(await spacesPage.getStatusOfSpace('failed-rstudio-space')).toContain('失败');
   });
 

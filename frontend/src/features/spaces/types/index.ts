@@ -78,7 +78,7 @@ export interface SpaceListResponse {
 // === UI Helper Types ===
 
 export const SPACE_STATUS_LABELS: Record<SpaceStatus, string> = {
-  pending: '创建中',
+  pending: '启动中',
   running: '运行中',
   stopped: '已停止',
   failed: '失败',

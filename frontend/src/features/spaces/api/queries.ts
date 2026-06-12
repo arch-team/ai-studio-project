@@ -30,6 +30,11 @@ export function useSpaces(filters: SpaceFilters = {}) {
   return useQuery({
     queryKey: queryKeys.spaces.list(filters as Record<string, unknown>),
     queryFn: () => fetchSpaces(filters),
+    // 启动/创建后 App 拉起需 1-3 分钟，存在启动中条目时轮询推进状态
+    refetchInterval: (query) => {
+      const items = query.state.data?.items ?? [];
+      return items.some((s) => s.status === 'pending') ? 10_000 : false;
+    },
   });
 }
 
