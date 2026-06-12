@@ -180,8 +180,12 @@ class SpaceService(BaseApplicationService[Space, str]):
         sort_by: str = "created_at",
         sort_order: str = "desc",
     ) -> tuple[list[Space], int]:
-        """列出开发空间 (支持过滤和分页)."""
-        return await self._space_repository.list_spaces(
+        """列出开发空间 (支持过滤和分页)，返回前对齐 SageMaker 实际状态.
+
+        无后台轮询时列表页是用户主要观察入口，不同步会让状态滞留 pending。
+        逐空间并发同步，单个失败不影响整体返回。
+        """
+        spaces, total = await self._space_repository.list_spaces(
             owner_id=owner_id,
             status=status,
             page=page,
@@ -189,6 +193,8 @@ class SpaceService(BaseApplicationService[Space, str]):
             sort_by=sort_by,
             sort_order=sort_order,
         )
+        synced = await asyncio.gather(*(self._sync_status_from_sagemaker(space) for space in spaces))
+        return list(synced), total
 
     async def start_space(self, space_id: str) -> Space:
         """启动开发空间."""
