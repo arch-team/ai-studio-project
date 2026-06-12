@@ -18,10 +18,9 @@ botocore>=1.35.3
 aioboto3>=13.0.0  # 原生异步 S3 客户端
 
 # HyperPod SDK (训练任务提交必需，缺失时 POST /training-jobs 返回 503)
-sagemaker-hyperpod>=3.8.0
-# 钉死 33.1.0: 36.0.0 的 in-cluster BearerToken 认证损坏（authsettings 键不匹配，请求不带 Authorization 头）；
-# 修复版 36.0.1+ 需要 pyyaml>=6.0.3，与 sagemaker-hyperpod 钉死的 pyyaml==6.0.2 冲突
-kubernetes==33.1.0
+# 3.9.0 起官方排除 kubernetes 36.0.0（in-cluster BearerToken 认证损坏）并放宽 pyyaml
+sagemaker-hyperpod>=3.9.0
+kubernetes>=36.0.1
 
 # Authentication
 passlib[bcrypt]>=1.7.4

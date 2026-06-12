@@ -41,6 +41,12 @@ class Settings(BaseSettings):
     # HyperPod
     hyperpod_cluster_name: str | None = None
 
+    # SageMaker Studio Spaces（开发空间）
+    # 未配置时 spaces 模块会自动发现账号下第一个 Domain——多 Domain 账号（如共享
+    # Unified Studio 域）下行为不确定，部署环境应显式指定专用 Domain
+    sagemaker_domain_id: str | None = None
+    sagemaker_user_profile: str | None = None
+
     # FSx for Lustre
     fsx_filesystem_id: str = "fs-placeholder"
     fsx_mount_path: str = "/fsx"
