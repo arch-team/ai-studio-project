@@ -170,11 +170,36 @@ export class AppError extends Error {
         );
       }
       return new AppError(
-        ErrorCode.UNKNOWN,
+        AppError.codeFromStatus(response.status),
         data.message || (typeof data.detail === 'string' ? data.detail : '') || response.statusText
       );
     } catch {
-      return new AppError(ErrorCode.UNKNOWN, response.statusText);
+      return new AppError(AppError.codeFromStatus(response.status), response.statusText);
+    }
+  }
+
+  /**
+   * 根据 HTTP 状态码推断错误码
+   *
+   * 后端非结构化错误（如 FastAPI 默认 {detail: "..."}）缺少业务错误码，
+   * 按状态码映射保证 isNotFound() 等判断和 Query 重试策略正确生效。
+   */
+  static codeFromStatus(status: number): ErrorCode {
+    switch (status) {
+      case 401:
+        return ErrorCode.UNAUTHORIZED;
+      case 403:
+        return ErrorCode.FORBIDDEN;
+      case 404:
+        return ErrorCode.NOT_FOUND;
+      case 409:
+        return ErrorCode.CONFLICT;
+      case 422:
+        return ErrorCode.VALIDATION_ERROR;
+      case 429:
+        return ErrorCode.RATE_LIMITED;
+      default:
+        return ErrorCode.UNKNOWN;
     }
   }
 

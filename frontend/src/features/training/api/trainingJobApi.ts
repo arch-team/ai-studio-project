@@ -129,8 +129,17 @@ export async function fetchTrainingJobLogs(
   });
 }
 
+/** 后端 metrics 原始响应：按指标名分组的时间序列 */
+interface BackendMetricsResponse {
+  job_id: number;
+  metrics: Record<string, Array<{ timestamp: string; value: number }>>;
+}
+
 /**
  * Fetch training metrics for a job.
+ *
+ * 后端返回 {metrics: {loss: [{timestamp, value}]}}，此处展平为
+ * TrainingMetric[] 供图表组件按 metric_name 过滤、按 step 排序。
  */
 export async function fetchTrainingJobMetrics(
   jobId: number,
@@ -141,12 +150,26 @@ export async function fetchTrainingJobMetrics(
     step?: number;
   }
 ): Promise<TrainingMetricsResponse> {
-  return apiClient.get<TrainingMetricsResponse>(`/training-jobs/${jobId}/metrics`, {
-    params: {
-      metric_names: options?.metric_names,
-      start_time: options?.start_time,
-      end_time: options?.end_time,
-      step: options?.step,
-    },
-  });
+  const raw = await apiClient.get<BackendMetricsResponse>(
+    `/training-jobs/${jobId}/metrics`,
+    {
+      params: {
+        metric_names: options?.metric_names,
+        start_time: options?.start_time,
+        end_time: options?.end_time,
+        step: options?.step,
+      },
+    }
+  );
+
+  const metrics = Object.entries(raw.metrics ?? {}).flatMap(([name, points]) =>
+    (points ?? []).map((point, index) => ({
+      metric_name: name,
+      step: index,
+      value: point.value,
+      timestamp: point.timestamp,
+    }))
+  );
+
+  return { metrics };
 }

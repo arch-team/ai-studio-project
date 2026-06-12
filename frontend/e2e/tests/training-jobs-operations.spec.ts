@@ -273,11 +273,11 @@ test.describe('训练任务操作', () => {
       await expect(detailPage.deleteButton).toBeEnabled({ timeout: 5000 });
     });
 
-    test.skip('删除操作失败显示错误', async ({ page }) => {
-      // TODO: 需要更复杂的错误处理验证
+    test('删除操作失败显示错误', async ({ page }) => {
       mockApi = new MockApi(page);
       await mockApi.mockTrainingJobsList();
       await mockApi.mockTrainingJobWithStatus('completed');
+      await mockApi.mockCheckpoints();
       await mockApi.mockDeleteTrainingJob({
         error: { status: 500, message: '删除失败，请稍后重试' },
       });
@@ -289,9 +289,11 @@ test.describe('训练任务操作', () => {
       await detailPage.openDeleteModal();
       await detailPage.confirmDelete();
 
-      // 等待错误处理
-      await page.waitForTimeout(500);
-      // 应该仍在详情页
+      // 全局 mutation onError 会通过通知中心展示错误信息
+      await expect(page.locator('text=删除失败，请稍后重试').first()).toBeVisible({
+        timeout: 5000,
+      });
+      // 删除失败不应跳转，仍在详情页
       await expect(page).toHaveURL(/\/training-jobs\/2/);
     });
   });

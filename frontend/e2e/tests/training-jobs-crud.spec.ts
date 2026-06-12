@@ -46,11 +46,11 @@ test.describe('训练任务 CRUD 流程', () => {
       await expect(page).toHaveURL(/\/training-jobs\/\d+/);
     });
 
-    test.skip('成功创建训练任务 - 完整配置', async ({ page }) => {
-      // TODO: 需要为 Cloudscape Select 组件添加 data-testid 后启用
+    test('成功创建训练任务 - 完整配置', async ({ page }) => {
       const createPage = new CreateTrainingJobPage(page);
       await createPage.goto();
 
+      // 节点/GPU 受 dev 配额限制（engineer 上限 4 GPU），用配额内组合
       await createPage.fillCompleteForm({
         jobName: 'llama2-finetuning',
         description: 'LLaMA 2 微调训练任务',
@@ -58,8 +58,8 @@ test.describe('训练任务 CRUD 流程', () => {
         imageUri: '123456789012.dkr.ecr.us-west-2.amazonaws.com/training:v1',
         entryPoint: '/opt/ml/code/train.py',
         distributionStrategy: 'fsdp',
-        nodeCount: 4,
-        gpuPerNode: 8,
+        nodeCount: 2,
+        gpuPerNode: 2,
       });
 
       await createPage.submitAndWaitForRedirect();
@@ -139,29 +139,16 @@ test.describe('训练任务 CRUD 流程', () => {
   // 查看任务列表
   // =========================================
   test.describe('查看任务列表', () => {
-    test.skip('显示任务列表数据', async ({ page }) => {
-      // TODO: 列表页 Mock 需要更复杂的设置，暂时跳过
-      // Mock 必须在页面导航前设置，以拦截初始 API 请求
-      mockApi = new MockApi(page);
-      await mockApi.mockTrainingJobsList();
-
-      // 导航到列表页（Mock 会拦截 API 请求）
+    test('显示任务列表数据', async ({ page }) => {
+      // 表格名称列渲染 job_name（非 display_name），断言以 job_name 为准
       await page.goto('/training-jobs');
       await page.waitForLoadState('networkidle');
 
-      // 等待表格数据加载（可能是空状态或实际数据）
-      await page.waitForTimeout(1000);
-
-      // 验证任务列表显示（使用 display_name 字段）
-      await expect(page.locator('text=LLaMA 2 微调训练')).toBeVisible({ timeout: 10000 });
-      await expect(page.locator('text=BERT 预训练')).toBeVisible({ timeout: 10000 });
+      await expect(page.locator('text=llama2-finetune-001')).toBeVisible({ timeout: 10000 });
+      await expect(page.locator('text=bert-pretrain-002')).toBeVisible({ timeout: 10000 });
     });
 
-    test.skip('状态筛选 - 运行中', async ({ page }) => {
-      // TODO: 筛选功能需要后端配合或更复杂的 Mock 逻辑
-      mockApi = new MockApi(page);
-      await mockApi.mockTrainingJobsList();
-
+    test('状态筛选 - 运行中', async ({ page }) => {
       const listPage = new TrainingJobListPage(page);
       await listPage.goto();
       await listPage.waitForTableLoad();
@@ -169,16 +156,12 @@ test.describe('训练任务 CRUD 流程', () => {
       await listPage.selectStatusFilter('运行中');
 
       // 验证只显示运行中的任务
-      await expect(page.locator('text=LLaMA 2 微调训练')).toBeVisible();
+      await expect(page.locator('text=llama2-finetune-001')).toBeVisible();
       // 已完成的任务不应显示
-      await expect(page.locator('text=BERT 预训练')).not.toBeVisible();
+      await expect(page.locator('text=bert-pretrain-002')).not.toBeVisible();
     });
 
-    test.skip('状态筛选 - 已完成', async ({ page }) => {
-      // TODO: 筛选功能需要后端配合或更复杂的 Mock 逻辑
-      mockApi = new MockApi(page);
-      await mockApi.mockTrainingJobsList();
-
+    test('状态筛选 - 已完成', async ({ page }) => {
       const listPage = new TrainingJobListPage(page);
       await listPage.goto();
       await listPage.waitForTableLoad();
@@ -186,16 +169,12 @@ test.describe('训练任务 CRUD 流程', () => {
       await listPage.selectStatusFilter('已完成');
 
       // 验证只显示已完成的任务
-      await expect(page.locator('text=BERT 预训练')).toBeVisible();
+      await expect(page.locator('text=bert-pretrain-002')).toBeVisible();
       // 运行中的任务不应显示
-      await expect(page.locator('text=LLaMA 2 微调训练')).not.toBeVisible();
+      await expect(page.locator('text=llama2-finetune-001')).not.toBeVisible();
     });
 
-    test.skip('优先级筛选 - 高优先级', async ({ page }) => {
-      // TODO: 筛选功能需要后端配合或更复杂的 Mock 逻辑
-      mockApi = new MockApi(page);
-      await mockApi.mockTrainingJobsList();
-
+    test('优先级筛选 - 高优先级', async ({ page }) => {
       const listPage = new TrainingJobListPage(page);
       await listPage.goto();
       await listPage.waitForTableLoad();
@@ -203,30 +182,21 @@ test.describe('训练任务 CRUD 流程', () => {
       await listPage.selectPriorityFilter('高');
 
       // 验证只显示高优先级任务
-      await expect(page.locator('text=LLaMA 2 微调训练')).toBeVisible();
+      await expect(page.locator('text=llama2-finetune-001')).toBeVisible();
     });
 
-    test.skip('点击任务跳转到详情页', async ({ page }) => {
-      // TODO: 需要列表页 Mock 工作后才能测试
-      mockApi = new MockApi(page);
-      await mockApi.mockTrainingJobsList();
-      await mockApi.mockTrainingJobDetail();
-
+    test('点击任务跳转到详情页', async ({ page }) => {
       const listPage = new TrainingJobListPage(page);
       await listPage.goto();
       await listPage.waitForTableLoad();
 
-      await listPage.clickJobLink('LLaMA 2 微调训练');
+      await listPage.clickJobLink('llama2-finetune-001');
 
       // 验证跳转到详情页
       await expect(page).toHaveURL(/\/training-jobs\/1/);
     });
 
-    test.skip('刷新列表', async ({ page }) => {
-      // TODO: 需要列表页 Mock 工作后才能测试
-      mockApi = new MockApi(page);
-      await mockApi.mockTrainingJobsList();
-
+    test('刷新列表', async ({ page }) => {
       const listPage = new TrainingJobListPage(page);
       await listPage.goto();
       await listPage.waitForTableLoad();
@@ -236,7 +206,7 @@ test.describe('训练任务 CRUD 流程', () => {
       // 验证仍在列表页
       await expect(page).toHaveURL('/training-jobs');
       // 验证数据仍然显示
-      await expect(page.locator('text=LLaMA 2 微调训练')).toBeVisible({ timeout: 5000 });
+      await expect(page.locator('text=llama2-finetune-001')).toBeVisible({ timeout: 5000 });
     });
 
     test('点击创建按钮跳转到创建页', async ({ page }) => {
@@ -320,16 +290,15 @@ test.describe('训练任务 CRUD 流程', () => {
       expect(hasTable || hasEmpty).toBeTruthy();
     });
 
-    test.skip('任务不存在显示错误', async ({ page }) => {
-      // TODO: 需要更精确的 Mock 设置
-      // 设置 Mock 返回 404
-      mockApi = new MockApi(page);
-      await mockApi.mockApiError('training-jobs/999', 404, '任务不存在');
+    test('任务不存在显示错误', async ({ page }) => {
+      // 真实后端对不存在 ID 返回 404，详情页应渲染错误信息而非一直 loading
+      await page.goto('/training-jobs/99999');
+      await page.waitForLoadState('networkidle');
 
-      await page.goto('/training-jobs/999');
-
-      // 验证错误信息
-      await expect(page.locator('text=任务不存在')).toBeVisible({ timeout: 5000 });
+      // 验证错误信息（详情页错误态渲染 error.message）
+      await expect(
+        page.locator('text=/不存在|not found|加载失败/i').first()
+      ).toBeVisible({ timeout: 15000 });
     });
 
     test('刷新任务详情', async ({ page }) => {
@@ -352,12 +321,7 @@ test.describe('训练任务 CRUD 流程', () => {
   // 从列表导航到详情再返回
   // =========================================
   test.describe('列表与详情页导航', () => {
-    test.skip('完整导航流程', async ({ page }) => {
-      // TODO: 需要列表页 Mock 工作后才能测试
-      mockApi = new MockApi(page);
-      await mockApi.mockTrainingJobsList();
-      await mockApi.mockTrainingJobDetail();
-
+    test('完整导航流程', async ({ page }) => {
       // 1. 打开列表页
       const listPage = new TrainingJobListPage(page);
       await listPage.goto();
@@ -365,11 +329,14 @@ test.describe('训练任务 CRUD 流程', () => {
       await expect(page).toHaveURL('/training-jobs');
 
       // 2. 点击任务进入详情页
-      await listPage.clickJobLink('LLaMA 2 微调训练');
+      await listPage.clickJobLink('llama2-finetune-001');
       await expect(page).toHaveURL(/\/training-jobs\/1/);
 
-      // 3. 通过面包屑返回列表页
-      await page.click('text=训练任务');
+      // 3. 通过面包屑返回列表页（侧边导航有同名链接，限定在面包屑区域内）
+      await page
+        .locator('nav[aria-label="面包屑导航"]')
+        .getByRole('link', { name: '训练任务' })
+        .click();
       await expect(page).toHaveURL('/training-jobs');
     });
 
