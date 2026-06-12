@@ -155,6 +155,11 @@ const CreateSpacePage = lazy(() =>
     default: m.CreateSpacePage,
   })),
 );
+const SpaceDetailPage = lazy(() =>
+  import("@features/spaces/pages/SpaceDetailPage").then((m) => ({
+    default: m.SpaceDetailPage,
+  })),
+);
 
 // Monitoring 模块页面
 const MonitoringDashboardPage = lazy(() =>
@@ -306,6 +311,10 @@ export const router = createBrowserRouter([
       {
         path: ROUTES.SPACE_CREATE,
         element: <CreateSpacePage />,
+      },
+      {
+        path: ROUTES.SPACE_DETAIL,
+        element: <SpaceDetailPage />,
       },
 
       // 监控

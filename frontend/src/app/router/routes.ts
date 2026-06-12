@@ -51,6 +51,7 @@ export const ROUTES = {
   // 开发空间
   SPACES: '/spaces',
   SPACE_CREATE: '/spaces/create',
+  SPACE_DETAIL: '/spaces/:id',
 
   // 监控与审计
   MONITORING: '/monitoring',
