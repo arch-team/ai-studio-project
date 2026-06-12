@@ -78,6 +78,21 @@ test.describe('训练管理真实数据冒烟', () => {
     });
   });
 
+  test('真实暂停 → 恢复闭环 (running 种子任务)', async ({ page }) => {
+    // job 3 (bert-pretrain-001) 是 running 种子任务；
+    // 用例结束时恢复 running 原状，避免污染共享环境
+    await page.goto('/training-jobs/3');
+    await page.waitForLoadState('networkidle');
+
+    // 1. 暂停（修复前 K8s CR 不存在时此操作 500）
+    await page.getByRole('button', { name: '暂停', exact: true }).click();
+    await expect(page.getByText('已暂停').first()).toBeVisible({ timeout: 15000 });
+
+    // 2. 恢复（真实向 HyperPod 重新提交任务）
+    await page.getByRole('button', { name: '恢复', exact: true }).click();
+    await expect(page.getByText('运行中').first()).toBeVisible({ timeout: 20000 });
+  });
+
   test('真实创建 → 详情展示 → 删除闭环', async ({ page }) => {
     const jobName = `e2e-smoke-${Date.now()}`;
 

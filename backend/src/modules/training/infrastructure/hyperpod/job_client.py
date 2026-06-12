@@ -5,7 +5,10 @@ from typing import Any
 
 import structlog
 
-from src.modules.training.domain.exceptions import HyperPodSDKUnavailableError
+from src.modules.training.domain.exceptions import (
+    HyperPodOperationError,
+    HyperPodSDKUnavailableError,
+)
 
 from .cluster_client import ClusterClient
 from .config_builder import build_container, build_kueue_labels, build_replica_spec
@@ -194,7 +197,14 @@ class JobClient:
         return await loop.run_in_executor(None, _get_status)
 
     async def stop_training_job(self, cluster_name: str, job_name: str, namespace: str = "default") -> dict[str, Any]:
-        """停止训练任务。"""
+        """停止训练任务。
+
+        K8s 中 CR 已不存在时视为幂等成功（DB 状态与集群可能漂移，
+        如 CR 被手动清理或从未成功创建），返回 status="not_found"。
+
+        Raises:
+            HyperPodOperationError: SDK 调用失败（非 not-found）时。
+        """
 
         def _stop() -> dict[str, Any]:
             if HyperPodPytorchJob is None:
@@ -202,8 +212,24 @@ class JobClient:
 
             self._cluster.ensure_cluster_context(cluster_name)
 
-            job = HyperPodPytorchJob.get(name=job_name, namespace=namespace)
-            job.delete()
+            try:
+                job = HyperPodPytorchJob.get(name=job_name, namespace=namespace)
+                job.delete()
+            except Exception as e:
+                if "not found" in str(e).lower():
+                    logger.warning(
+                        "hyperpod_job_already_absent",
+                        job_name=job_name,
+                        namespace=namespace,
+                        cluster_name=cluster_name,
+                    )
+                    return {
+                        "job_name": job_name,
+                        "status": "not_found",
+                        "cluster_name": cluster_name,
+                        "namespace": namespace,
+                    }
+                raise HyperPodOperationError(operation="stop", reason=str(e), job_name=job_name) from e
 
             return {
                 "job_name": job_name,

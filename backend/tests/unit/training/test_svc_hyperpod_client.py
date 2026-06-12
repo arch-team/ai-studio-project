@@ -300,6 +300,35 @@ class TestHyperPodClient:
         assert result["status"] == "stopped"
         mock_job.delete.assert_called_once()
 
+    @pytest.mark.asyncio
+    async def test_stop_training_job_not_found_is_idempotent(
+        self,
+        hyperpod_client: "HyperPodClient",
+        mock_hyperpod_pytorch_job: MagicMock,
+    ) -> None:
+        """K8s 中 CR 不存在时停止视为幂等成功（DB 状态与集群漂移场景）."""
+        mock_hyperpod_pytorch_job.get.side_effect = Exception(
+            "Resource 'test-training-job' not found in namespace 'default'. "
+            "Please check the resource name and namespace."
+        )
+
+        result = await hyperpod_client.stop_training_job(cluster_name="test-cluster", job_name="test-training-job")
+
+        assert result["job_name"] == "test-training-job"
+        assert result["status"] == "not_found"
+
+    @pytest.mark.asyncio
+    async def test_stop_training_job_other_error_raises_domain_error(
+        self,
+        hyperpod_client: "HyperPodClient",
+        mock_hyperpod_pytorch_job: MagicMock,
+    ) -> None:
+        """非 not-found 的 SDK 错误转换为 HyperPodOperationError 域异常."""
+        mock_hyperpod_pytorch_job.get.side_effect = Exception("connection refused")
+
+        with pytest.raises(HyperPodOperationError):
+            await hyperpod_client.stop_training_job(cluster_name="test-cluster", job_name="test-training-job")
+
     # ==================== Status Mapping ====================
 
     def _create_mock_job_with_status(
