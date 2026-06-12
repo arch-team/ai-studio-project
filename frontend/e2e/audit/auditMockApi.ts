@@ -37,7 +37,7 @@ export async function setupStateMocks(page: Page, spec: PageSpec, state: AuditSt
   for (const extra of spec.extras ?? []) {
     await page.route(extra.pattern, (route, request) => {
       if (request.method() !== 'GET') return route.fallback();
-      return route.fulfill(json(extra.defaultBody));
+      return route.fulfill(json(extra.resolveBody?.(request.url()) ?? extra.defaultBody));
     });
   }
 
@@ -48,7 +48,7 @@ export async function setupStateMocks(page: Page, spec: PageSpec, state: AuditSt
     if (request.method() !== 'GET') return route.fallback();
     switch (state) {
       case 'default':
-        return route.fulfill(json(primary.defaultBody));
+        return route.fulfill(json(primary.resolveBody?.(request.url()) ?? primary.defaultBody));
       case 'empty':
         return route.fulfill(json(primary.emptyBody ?? EMPTY_LIST));
       case 'error':

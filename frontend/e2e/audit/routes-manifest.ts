@@ -37,6 +37,18 @@ import {
 import { auditLogListResponse } from './fixtures/auditLogs';
 import { userListResponse } from './fixtures/users';
 import { checkpointListResponse } from './fixtures/checkpoints';
+import { mockSpaces, createSpaceListResponse } from '../fixtures/spaces';
+import { createResourceLimitConfigResponse } from '../fixtures/resourceQuotas';
+import {
+  dashboardJobStats,
+  resolveDashboardJobStats,
+  clusterListResponse,
+  resourceUtilization,
+  alertListResponse,
+  metricSeriesResponse,
+  resourceUsageResponse,
+  costAnalysisResponse,
+} from './fixtures/metrics';
 
 export type AuditState = 'default' | 'empty' | 'loading' | 'error';
 export type PageType = 'list' | 'detail' | 'form' | 'dashboard' | 'special';
@@ -48,6 +60,11 @@ export interface ApiMock {
   defaultBody: unknown;
   /** empty 状态返回体（缺省用标准空列表） */
   emptyBody?: unknown;
+  /**
+   * 可选：按请求 URL 动态解析 default 返回体（优先于 defaultBody）。
+   * 用于同一端点按查询参数返回不同数据的页面（如首页按 status 统计任务数）。
+   */
+  resolveBody?: (url: string) => unknown;
 }
 
 export interface PageSpec {
@@ -70,7 +87,30 @@ const DASHBOARD_STATES: AuditState[] = ['default', 'loading', 'error'];
 
 export const AUDIT_PAGES: PageSpec[] = [
   // === dashboard ===
-  { module: 'dashboard', pageName: 'home', route: '/', pageType: 'dashboard', states: DASHBOARD_STATES },
+  // 首页对同一端点发 5 个统计查询（全量 + 4 状态，page_size=1 仅取 total），
+  // 用 resolveBody 按 status 参数分流；loading/error 作用于全部统计查询。
+  {
+    module: 'dashboard',
+    pageName: 'home',
+    route: '/',
+    pageType: 'dashboard',
+    states: DASHBOARD_STATES,
+    primary: {
+      pattern: /\/api\/v1\/training-jobs(\?.*)?$/,
+      defaultBody: dashboardJobStats.all,
+      resolveBody: resolveDashboardJobStats,
+    },
+    extras: [
+      {
+        pattern: /\/api\/v1\/datasets(\?.*)?$/,
+        defaultBody: datasetListResponse,
+      },
+      {
+        pattern: /\/api\/v1\/models(\?.*)?$/,
+        defaultBody: modelListResponse,
+      },
+    ],
+  },
 
   // === auth ===
   { module: 'auth', pageName: 'login', route: '/login', pageType: 'special', states: ['default'], requiresAuth: false },
@@ -246,16 +286,86 @@ export const AUDIT_PAGES: PageSpec[] = [
   },
 
   // === resource-quotas ===
-  { module: 'resource-quotas', pageName: 'resource-quotas', route: '/resource-quotas', pageType: 'list', states: LIST_STATES },
+  {
+    module: 'resource-quotas',
+    pageName: 'resource-quotas',
+    route: '/resource-quotas',
+    pageType: 'list',
+    states: LIST_STATES,
+    primary: {
+      pattern: /\/api\/v1\/resource-limit-configs(\?.*)?$/,
+      defaultBody: createResourceLimitConfigResponse(),
+    },
+  },
 
   // === spaces ===
-  { module: 'spaces', pageName: 'space-list', route: '/spaces', pageType: 'list', states: LIST_STATES },
+  // 注意：空间 ID 为 UUID 字符串，detail 路由用真实 mock 的首个 UUID。
+  {
+    module: 'spaces',
+    pageName: 'space-list',
+    route: '/spaces',
+    pageType: 'list',
+    states: LIST_STATES,
+    primary: {
+      pattern: /\/api\/v1\/spaces(\?.*)?$/,
+      defaultBody: createSpaceListResponse(mockSpaces),
+    },
+  },
   { module: 'spaces', pageName: 'space-create', route: '/spaces/create', pageType: 'form', states: ['default'] },
-  { module: 'spaces', pageName: 'space-detail', route: '/spaces/1', pageType: 'detail', states: DETAIL_STATES },
-  { module: 'spaces', pageName: 'ide', route: '/ide', pageType: 'special', states: ['default'] },
+  {
+    module: 'spaces',
+    pageName: 'space-detail',
+    route: `/spaces/${mockSpaces[0].id}`,
+    pageType: 'detail',
+    states: DETAIL_STATES,
+    primary: {
+      pattern: /\/api\/v1\/spaces\/[0-9a-f-]+$/,
+      defaultBody: mockSpaces[0],
+    },
+  },
+  // IDE 页直接复用 SpaceListPage 组件，数据依赖与 space-list 相同（仅 default 态）
+  {
+    module: 'spaces',
+    pageName: 'ide',
+    route: '/ide',
+    pageType: 'special',
+    states: ['default'],
+    primary: {
+      pattern: /\/api\/v1\/spaces(\?.*)?$/,
+      defaultBody: createSpaceListResponse(mockSpaces),
+    },
+  },
 
   // === monitoring ===
-  { module: 'monitoring', pageName: 'monitoring', route: '/monitoring', pageType: 'dashboard', states: DASHBOARD_STATES },
+  // /monitoring/utilization 与 /monitoring/metrics 返回裸数组（MetricSeries[]/ResourceUtilization[]），
+  // 不可落入 catch-all 的 {items} 兜底，必须显式声明。
+  // 页面把 clusters/utilization/alerts/metrics 四个查询的 loading 合并渲染，
+  // primary 指向 clusters（错误态也由它驱动）。
+  {
+    module: 'monitoring',
+    pageName: 'monitoring',
+    route: '/monitoring',
+    pageType: 'dashboard',
+    states: DASHBOARD_STATES,
+    primary: {
+      pattern: /\/api\/v1\/clusters(\?.*)?$/,
+      defaultBody: clusterListResponse,
+    },
+    extras: [
+      {
+        pattern: /\/api\/v1\/monitoring\/utilization(\?.*)?$/,
+        defaultBody: resourceUtilization,
+      },
+      {
+        pattern: /\/api\/v1\/monitoring\/alerts(\?.*)?$/,
+        defaultBody: alertListResponse,
+      },
+      {
+        pattern: /\/api\/v1\/monitoring\/metrics(\?.*)?$/,
+        defaultBody: metricSeriesResponse,
+      },
+    ],
+  },
 
   // === audit ===
   {
@@ -285,9 +395,41 @@ export const AUDIT_PAGES: PageSpec[] = [
   },
 
   // === reports ===
-  { module: 'reports', pageName: 'reports-home', route: '/reports', pageType: 'dashboard', states: ['default'] },
-  { module: 'reports', pageName: 'resource-usage', route: '/reports/resource-usage', pageType: 'dashboard', states: DASHBOARD_STATES },
-  { module: 'reports', pageName: 'cost-analysis', route: '/reports/cost-analysis', pageType: 'dashboard', states: DASHBOARD_STATES },
+  // /reports/* 返回 { summary, breakdown, daily_* } 复合对象（非列表形状），
+  // 落入 catch-all 会让摘要卡/图表全部空白，必须显式声明。
+  {
+    module: 'reports',
+    pageName: 'reports-home',
+    route: '/reports',
+    pageType: 'dashboard',
+    states: ['default'],
+    primary: {
+      pattern: /\/api\/v1\/reports\/resource-usage(\?.*)?$/,
+      defaultBody: resourceUsageResponse,
+    },
+  },
+  {
+    module: 'reports',
+    pageName: 'resource-usage',
+    route: '/reports/resource-usage',
+    pageType: 'dashboard',
+    states: DASHBOARD_STATES,
+    primary: {
+      pattern: /\/api\/v1\/reports\/resource-usage(\?.*)?$/,
+      defaultBody: resourceUsageResponse,
+    },
+  },
+  {
+    module: 'reports',
+    pageName: 'cost-analysis',
+    route: '/reports/cost-analysis',
+    pageType: 'dashboard',
+    states: DASHBOARD_STATES,
+    primary: {
+      pattern: /\/api\/v1\/reports\/cost-analysis(\?.*)?$/,
+      defaultBody: costAnalysisResponse,
+    },
+  },
 
   // === 错误页 ===
   { module: 'shared', pageName: 'not-found', route: '/404', pageType: 'special', states: ['default'], requiresAuth: false },
