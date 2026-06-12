@@ -315,6 +315,57 @@ class TestDeleteTrainingJobEndpoint:
         assert response.status_code == 422
 
 
+class TestListJobCheckpointsEndpoint:
+    """Tests for GET /api/v1/training-jobs/{job_id}/checkpoints endpoint."""
+
+    @pytest.mark.asyncio
+    async def test_list_checkpoints_requires_auth(self, client: AsyncClient) -> None:
+        """Test listing checkpoints requires authentication."""
+        response = await client.get("/api/v1/training-jobs/1/checkpoints")
+        assert response.status_code == 401
+
+    @pytest.mark.asyncio
+    async def test_list_checkpoints_job_not_found(
+        self,
+        client: AsyncClient,
+        engineer_auth_headers: dict[str, str],
+    ) -> None:
+        """Test listing checkpoints of non-existent job returns 404."""
+        response = await client.get(
+            "/api/v1/training-jobs/99999/checkpoints",
+            headers=engineer_auth_headers,
+        )
+        assert response.status_code in [404, 500]
+
+    @pytest.mark.asyncio
+    async def test_list_checkpoints_returns_items_and_checkpoints_keys(
+        self,
+        client: AsyncClient,
+        engineer_auth_headers: dict[str, str],
+        create_job_request_data: dict[str, Any],
+    ) -> None:
+        """Test checkpoint list response carries both items (frontend) and checkpoints (contract) keys."""
+        create_response = await client.post(
+            "/api/v1/training-jobs",
+            json={**create_job_request_data, "job_name": "ckpt-list-test-job"},
+            headers=engineer_auth_headers,
+        )
+        if create_response.status_code != 201:
+            pytest.skip(f"Job creation unavailable in test env: {create_response.status_code}")
+
+        job_id = create_response.json()["id"]
+        response = await client.get(
+            f"/api/v1/training-jobs/{job_id}/checkpoints",
+            headers=engineer_auth_headers,
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert "items" in data
+        assert "checkpoints" in data
+        assert "total" in data
+        assert data["items"] == data["checkpoints"]
+
+
 class TestTrainingJobsResponseFormat:
     """Tests for training jobs API response format."""
 

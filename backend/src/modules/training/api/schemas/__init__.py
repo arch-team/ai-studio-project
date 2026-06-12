@@ -10,6 +10,7 @@ from .requests import (
     UpdateTrainingJobRequest,
 )
 from .responses import (
+    CheckpointListResponse,
     CheckpointResponse,
     CheckpointStatusEnum,
     CheckpointTypeEnum,
@@ -61,6 +62,7 @@ __all__ = [
     "TrainingJobSummary",
     "TrainingJobDetail",
     "TrainingJobListResponse",
+    "CheckpointListResponse",
     "CheckpointResponse",
     "JobTemplateSummary",
     "JobTemplateDetail",

@@ -2,8 +2,9 @@
 
 import re
 from enum import Enum
+from typing import Self
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 
 class DistributionStrategyEnum(str, Enum):
@@ -24,18 +25,25 @@ class JobPriorityEnum(str, Enum):
 
 
 class CreateTrainingJobRequest(BaseModel):
-    """Request body for creating a training job."""
+    """Request body for creating a training job.
+
+    entry_point/gpu_per_node 是前端契约别名：
+    - entry_point (脚本路径) -> entrypoint_command = ["python", entry_point]
+    - gpu_per_node -> tasks_per_node
+    """
 
     job_name: str = Field(..., min_length=1, max_length=128, description="Job name")
     image_uri: str = Field(..., description="Docker image URI")
     instance_type: str = Field(..., description="Instance type (e.g., ml.p4d.24xlarge)")
-    entrypoint_command: list[str] = Field(..., description="Entrypoint command")
+    entrypoint_command: list[str] | None = Field(None, description="Entrypoint command")
+    entry_point: str | None = Field(None, description="Training script path (alias for entrypoint_command)")
 
     display_name: str | None = Field(None, max_length=256, description="Display name")
     description: str | None = Field(None, description="Job description")
 
     node_count: int = Field(default=1, ge=1, le=256, description="Number of nodes")
-    tasks_per_node: int = Field(default=1, ge=1, description="Tasks per node")
+    tasks_per_node: int | None = Field(None, ge=1, description="Tasks per node")
+    gpu_per_node: int | None = Field(None, ge=1, le=8, description="GPUs per node (alias for tasks_per_node)")
 
     environment_variables: dict | None = Field(None, description="Environment variables")
     hyperparameters: dict | None = Field(None, description="Hyperparameters")
@@ -69,6 +77,21 @@ class CreateTrainingJobRequest(BaseModel):
                 "Job name must be lowercase alphanumeric with hyphens, " "start and end with alphanumeric characters"
             )
         return v
+
+    @model_validator(mode="after")
+    def normalize_aliases(self) -> Self:
+        """归一化前端契约别名并校验必填组合。
+
+        Raises:
+            ValueError: entrypoint_command 与 entry_point 均未提供时。
+        """
+        if self.entrypoint_command is None:
+            if self.entry_point is None:
+                raise ValueError("Either entrypoint_command or entry_point is required")
+            self.entrypoint_command = ["python", self.entry_point]
+        if self.tasks_per_node is None:
+            self.tasks_per_node = self.gpu_per_node if self.gpu_per_node is not None else 1
+        return self
 
 
 class CreateCheckpointRequest(BaseModel):

@@ -61,6 +61,10 @@ class CheckpointService:
         """获取训练任务的最新检查点."""
         return await self._base_service.get_latest_checkpoint(training_job_id)
 
+    async def count_checkpoints_for_job(self, training_job_id: int) -> int:
+        """统计训练任务的检查点数量."""
+        return await self._base_service.count_checkpoints_for_job(training_job_id)
+
     async def archive_checkpoint(self, checkpoint_id: int) -> Checkpoint:
         """归档检查点（移至冷存储）."""
         return await self._base_service.archive_checkpoint(checkpoint_id)

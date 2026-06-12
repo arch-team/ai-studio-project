@@ -11,6 +11,7 @@ from src.modules.auth.api.permissions import (
     get_owner_filter,
 )
 from src.modules.training.api.dependencies import (
+    get_checkpoint_service,
     get_job_template_service,
     get_training_job_service,
 )
@@ -25,6 +26,7 @@ from src.modules.training.api.schemas import (
     UpdateTrainingJobRequest,
 )
 from src.modules.training.application.services import (
+    CheckpointService,
     JobTemplateService,
     TrainingJobService,
 )
@@ -143,11 +145,13 @@ async def get_training_job(
     job_id: int,
     current_user: CurrentUser = Depends(get_current_active_user),
     service: TrainingJobService = Depends(get_training_job_service),
+    checkpoint_service: CheckpointService = Depends(get_checkpoint_service),
 ) -> TrainingJobDetail:
     """Get training job details by ID."""
     job = await service.get_job(job_id)
     check_resource_owner_or_privileged(job.owner_id, current_user, "training job", "view")
-    response = TrainingJobDetail.from_entity(job)
+    checkpoints_count = await checkpoint_service.count_checkpoints_for_job(job_id)
+    response = TrainingJobDetail.from_entity(job, checkpoints_count=checkpoints_count)
     # CE-03-09: hyperpod_job_arn is only visible to admin
     if not current_user.is_admin:
         response.hyperpod_job_arn = None

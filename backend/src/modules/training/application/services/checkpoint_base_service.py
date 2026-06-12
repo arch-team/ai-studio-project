@@ -25,6 +25,10 @@ class CheckpointBaseService(BaseApplicationService[Checkpoint, int]):
         """获取训练任务的最新检查点."""
         return await self._repository.get_latest_by_training_job_id(training_job_id)
 
+    async def count_checkpoints_for_job(self, training_job_id: int) -> int:
+        """统计训练任务的检查点数量."""
+        return await self._repository.count_by_training_job_id(training_job_id)
+
     async def archive_checkpoint(self, checkpoint_id: int) -> Checkpoint:
         """归档检查点（移至冷存储）."""
         checkpoint = await self.get_checkpoint(checkpoint_id)

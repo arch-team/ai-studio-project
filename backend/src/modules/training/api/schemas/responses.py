@@ -1,16 +1,21 @@
 """训练模块 API 响应 Schema."""
 
+from collections.abc import Callable
 from datetime import datetime
 from decimal import Decimal
 from enum import Enum
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Annotated, Any, ClassVar
 
-from pydantic import BaseModel
+from pydantic import BaseModel, PlainSerializer
 
 from src.shared.api.schemas import EntitySchema
 
 if TYPE_CHECKING:
     from src.modules.training.domain.entities import Checkpoint, JobTemplate, TrainingJob  # noqa: F401
+
+# OpenAPI 契约中 loss/cost 等为 number；Pydantic v2 默认把 Decimal 序列化为
+# JSON 字符串，会破坏前端 number 类型契约（如 loss.toFixed 抛 TypeError）
+ApiDecimal = Annotated[Decimal, PlainSerializer(float, return_type=float, when_used="json")]
 
 
 class JobStatusEnum(str, Enum):
@@ -71,6 +76,7 @@ class TrainingJobSummary(EntitySchema["TrainingJob"]):
     """训练任务列表摘要.
 
     枚举映射由 EntitySchema 自动从字段类型推断。
+    gpu_per_node/total_epochs 是 tasks_per_node/max_epochs 的 API 别名（前端契约）。
     """
 
     id: int
@@ -80,36 +86,70 @@ class TrainingJobSummary(EntitySchema["TrainingJob"]):
     priority: JobPriorityEnum
     instance_type: str
     node_count: int
+    gpu_per_node: int = 1
+    distribution_strategy: DistributionStrategyEnum | None = None
     current_epoch: int | None = None
-    latest_loss: Decimal | None = None
+    total_epochs: int | None = None
+    latest_loss: ApiDecimal | None = None
     preemption_count: int = 0
     created_at: datetime
+    submitted_at: datetime | None = None
     started_at: datetime | None = None
+    completed_at: datetime | None = None
+    duration_seconds: int | None = None
+    estimated_cost_usd: ApiDecimal | None = None
+
+    _custom_mappings: ClassVar[dict[str, Callable[[Any], Any]]] = {
+        "gpu_per_node": lambda e: e.tasks_per_node,
+        "total_epochs": lambda e: e.max_epochs,
+    }
 
 
 class TrainingJobDetail(TrainingJobSummary):
     """训练任务详情 - 继承 TrainingJobSummary 扩展更多字段.
 
     自动继承父类枚举映射，新增枚举字段自动推断。
+    entry_point 为 entrypoint_command 的展示形式（前端契约）。
     """
 
     description: str | None = None
     owner_id: int
     image_uri: str
     tasks_per_node: int
-    distribution_strategy: DistributionStrategyEnum
+    entry_point: str | None = None
+    entrypoint_command: list[str] = []
+    environment_variables: dict | None = None
+    dataset_id: int | None = None
+    data_mount_path: str | None = None
+    checkpoint_mount_path: str | None = None
+    hyperparameters: dict | None = None
+    max_epochs: int | None = None
+    batch_size: int | None = None
+    learning_rate: float | None = None
     mixed_precision: bool
     use_spot_instances: bool
+    total_pods: int | None = None
+    running_pods: int = 0
+    failed_pods: int = 0
     current_step: int | None = None
-    latest_accuracy: Decimal | None = None
+    latest_accuracy: ApiDecimal | None = None
     duration_seconds: int | None = None
-    total_gpu_hours: Decimal | None = None
-    estimated_cost_usd: Decimal | None = None
+    total_gpu_hours: ApiDecimal | None = None
+    estimated_cost_usd: ApiDecimal | None = None
     hyperpod_job_arn: str | None = None  # 仅管理员可见
+    hyperpod_status: str | None = None
     kueue_status: str | None = None
     kueue_workload_name: str | None = None
     error_message: str | None = None
-    completed_at: datetime | None = None
+    failure_reason: str | None = None
+    checkpoints_count: int = 0
+    updated_at: datetime | None = None
+
+    _custom_mappings: ClassVar[dict[str, Callable[[Any], Any]]] = {
+        "gpu_per_node": lambda e: e.tasks_per_node,
+        "total_epochs": lambda e: e.max_epochs,
+        "entry_point": lambda e: " ".join(e.entrypoint_command) if e.entrypoint_command else None,
+    }
 
 
 class TrainingJobListResponse(BaseModel):
@@ -120,6 +160,17 @@ class TrainingJobListResponse(BaseModel):
     page: int
     page_size: int
     total_pages: int
+
+
+class CheckpointListResponse(BaseModel):
+    """检查点列表响应.
+
+    items 与 checkpoints 内容相同：items 对齐前端分页约定，checkpoints 对齐 OpenAPI 契约。
+    """
+
+    items: list["CheckpointResponse"]
+    checkpoints: list["CheckpointResponse"]
+    total: int
 
 
 class CheckpointResponse(EntitySchema["Checkpoint"]):
@@ -136,8 +187,8 @@ class CheckpointResponse(EntitySchema["Checkpoint"]):
     epoch: int | None = None
     step: int | None = None
     size_bytes: int
-    loss: Decimal | None = None
-    accuracy: Decimal | None = None
+    loss: ApiDecimal | None = None
+    accuracy: ApiDecimal | None = None
     storage_tier: StorageTierEnum
     status: CheckpointStatusEnum
     metadata: dict | None = None
