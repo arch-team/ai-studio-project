@@ -1,7 +1,7 @@
 /**
  * UI/UX 审计页面清单
  *
- * 数据源：frontend/src/app/router/routes.ts（28 个可审计页面）
+ * 数据源：frontend/src/app/router/routes.ts（29 个可审计页面）
  * 状态豁免规则见 spec §3.1/§5.4：
  * - 列表页: default/empty/loading/error 四态
  * - 详情页: default/loading/error 三态（error 用 404）
@@ -76,6 +76,7 @@ export const AUDIT_PAGES: PageSpec[] = [
   // === spaces ===
   { module: 'spaces', pageName: 'space-list', route: '/spaces', pageType: 'list', states: LIST_STATES },
   { module: 'spaces', pageName: 'space-create', route: '/spaces/create', pageType: 'form', states: ['default'] },
+  { module: 'spaces', pageName: 'space-detail', route: '/spaces/1', pageType: 'detail', states: DETAIL_STATES },
   { module: 'spaces', pageName: 'ide', route: '/ide', pageType: 'special', states: ['default'] },
 
   // === monitoring ===
