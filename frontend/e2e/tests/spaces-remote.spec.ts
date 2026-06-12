@@ -153,7 +153,8 @@ test.describe('开发空间 - 远程环境完整生命周期', () => {
 
     await spacesPage.fillCreateForm({
       name: spaceName,
-      // 默认 jupyter + ml.g5.xlarge，存储用最小 5GB 控制成本
+      // CPU 小实例: 启动快（GPU 冷启动 >5min 会超时）且控制成本
+      instanceTypeLabel: 'ml.t3.medium (2 vCPU, 4 GB)',
       storageGb: '5',
     });
     await spacesPage.submitCreateForm();
