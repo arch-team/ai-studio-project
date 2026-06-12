@@ -74,6 +74,14 @@ class Space(PydanticEntity):
             raise InvalidStateTransitionError("Space", self.status.value, SpaceStatus.RUNNING.value)
         self.transition_to(SpaceStatus.RUNNING)
 
+    def mark_starting(self) -> None:
+        """标记空间为启动中（App 拉起阶段）。PENDING 时幂等。"""
+        if self.status == SpaceStatus.PENDING:
+            return
+        if not self.can_start():
+            raise InvalidStateTransitionError("Space", self.status.value, SpaceStatus.PENDING.value)
+        self.transition_to(SpaceStatus.PENDING)
+
     def stop(self) -> None:
         """Stop the space."""
         if not self.can_stop():

@@ -69,3 +69,53 @@ class ISageMakerSpacesClient(ABC):
         Returns:
             包含 Space 状态详情的字典，不存在时返回 None
         """
+
+    @abstractmethod
+    async def create_app(
+        self,
+        space_name: str,
+        ide_type: str,
+        instance_type: str,
+        lifecycle_config_arn: str | None = None,
+    ) -> dict[str, Any]:
+        """在 Space 内创建 App（真实拉起计算实例）.
+
+        Args:
+            space_name: Space 名称
+            ide_type: IDE 类型 (jupyterlab/vscode)
+            instance_type: 实例类型 (如 ml.g5.xlarge)
+            lifecycle_config_arn: 生命周期配置 ARN
+
+        Returns:
+            包含 App 信息的字典 (arn, status 等)
+
+        Raises:
+            SpaceError: SageMaker API 调用失败
+        """
+
+    @abstractmethod
+    async def delete_app(self, space_name: str, ide_type: str) -> None:
+        """删除 Space 内的 App（停止并释放计算实例，EBS 文件保留）.
+
+        App 不存在时幂等返回，不抛异常。
+
+        Args:
+            space_name: Space 名称
+            ide_type: IDE 类型 (jupyterlab/vscode)
+
+        Raises:
+            SpaceError: SageMaker API 调用失败
+        """
+
+    @abstractmethod
+    async def describe_app(self, space_name: str, ide_type: str) -> dict[str, Any] | None:
+        """查询 Space 内 App（计算实例）的状态.
+
+        Args:
+            space_name: Space 名称
+            ide_type: IDE 类型 (jupyterlab/vscode)
+
+        Returns:
+            包含 App 状态的字典 (status: Pending/InService/Deleting/Deleted/Failed)，
+            App 不存在时返回 None
+        """

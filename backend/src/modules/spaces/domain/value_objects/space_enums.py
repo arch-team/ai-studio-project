@@ -32,10 +32,11 @@ class SpaceStatus(Enum):
 
 
 # Valid state transitions
+# STOPPED -> PENDING: 重启拉起 SageMaker App 需要时间，先进入启动中
 SPACE_STATE_TRANSITIONS = {
-    SpaceStatus.PENDING: {SpaceStatus.RUNNING, SpaceStatus.FAILED},
+    SpaceStatus.PENDING: {SpaceStatus.RUNNING, SpaceStatus.STOPPED, SpaceStatus.FAILED},
     SpaceStatus.RUNNING: {SpaceStatus.STOPPED, SpaceStatus.FAILED},
-    SpaceStatus.STOPPED: {SpaceStatus.RUNNING, SpaceStatus.FAILED, SpaceStatus.DELETED},
+    SpaceStatus.STOPPED: {SpaceStatus.PENDING, SpaceStatus.RUNNING, SpaceStatus.FAILED, SpaceStatus.DELETED},
     SpaceStatus.FAILED: {SpaceStatus.PENDING, SpaceStatus.DELETED},
     SpaceStatus.DELETED: set(),  # Terminal state
 }
