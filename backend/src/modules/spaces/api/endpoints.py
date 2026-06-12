@@ -11,6 +11,7 @@ from src.modules.auth.api.permissions import (
 from src.modules.spaces.api.dependencies import get_space_service
 from src.modules.spaces.api.schemas import (
     CreateSpaceRequest,
+    SpaceAccessUrlResponse,
     SpaceDetail,
     SpaceErrorResponse,
     SpaceListResponse,
@@ -143,6 +144,26 @@ async def stop_space(
     check_resource_owner_or_privileged(space.owner_id, current_user, "space", "stop")
     space = await service.stop_space(space_id)
     return SpaceDetail.from_entity(space)
+
+
+@router.post(
+    "/{space_id}/access-url",
+    response_model=SpaceAccessUrlResponse,
+    responses={
+        404: {"model": SpaceErrorResponse, "description": "Space not found"},
+        409: {"model": SpaceErrorResponse, "description": "Space is not running"},
+    },
+)
+async def get_space_access_url(
+    space_id: str,
+    current_user: CurrentUser = Depends(get_current_active_user),
+    service: SpaceService = Depends(get_space_service),
+) -> SpaceAccessUrlResponse:
+    """签发开发空间 IDE 的免登录访问 URL（约 5 分钟内有效）."""
+    space = await service.get_space(space_id)
+    check_resource_owner_or_privileged(space.owner_id, current_user, "space", "open")
+    url = await service.get_space_access_url(space_id)
+    return SpaceAccessUrlResponse(url=url)
 
 
 @router.delete(

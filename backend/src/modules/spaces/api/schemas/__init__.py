@@ -7,6 +7,7 @@ from .requests import (
     UpdateSpaceRequest,
 )
 from .responses import (
+    SpaceAccessUrlResponse,
     SpaceDetail,
     SpaceErrorResponse,
     SpaceListResponse,
@@ -22,6 +23,7 @@ __all__ = [
     "SpaceSummary",
     "SpaceDetail",
     "SpaceListResponse",
+    "SpaceAccessUrlResponse",
     "SpaceErrorResponse",
     # Enums
     "SpaceInstanceTypeEnum",

@@ -320,6 +320,30 @@ class SageMakerSpacesClient(ISageMakerSpacesClient):
             logger.error("sagemaker_app_describe_failed", space_name=space_name, error=str(e))
             raise SpaceError(message=f"查询 SageMaker App 状态失败: {e}") from e
 
+    async def create_presigned_url(self, space_name: str, ide_type: str) -> str:
+        """为 Space 签发免登录访问 URL（直达 IDE）."""
+        # LandingUri 直达对应 IDE 应用，免去 Studio 首页二次点击
+        landing_app = "JupyterLab" if ide_type == "jupyterlab" else "CodeEditor"
+
+        try:
+            async with self._session.client("sagemaker", region_name=self._region) as sm:
+                domain_id = await self._get_domain_id(sm)
+                owner_profile = await self._get_owner_user_profile(sm, domain_id)
+
+                response: dict[str, Any] = await sm.create_presigned_domain_url(
+                    DomainId=domain_id,
+                    UserProfileName=owner_profile,
+                    SpaceName=space_name,
+                    LandingUri=f"app:{landing_app}:",
+                )
+
+                logger.info("sagemaker_presigned_url_created", space_name=space_name)
+                return str(response.get("AuthorizedUrl", ""))
+
+        except Exception as e:
+            logger.error("sagemaker_presigned_url_failed", space_name=space_name, error=str(e))
+            raise SpaceError(message=f"签发 Space 访问 URL 失败: {e}") from e
+
     async def _get_domain_id(self, sm_client: Any) -> str:
         """获取 SageMaker Studio Domain ID.
 

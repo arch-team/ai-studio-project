@@ -119,3 +119,20 @@ class ISageMakerSpacesClient(ABC):
             包含 App 状态的字典 (status: Pending/InService/Deleting/Deleted/Failed)，
             App 不存在时返回 None
         """
+
+    @abstractmethod
+    async def create_presigned_url(self, space_name: str, ide_type: str) -> str:
+        """为 Space 签发免登录访问 URL（直达 IDE）.
+
+        URL 默认 5 分钟内有效，仅供即时跳转使用，不应持久化。
+
+        Args:
+            space_name: Space 名称
+            ide_type: IDE 类型 (jupyterlab/vscode)，决定落地页应用
+
+        Returns:
+            presigned 访问 URL
+
+        Raises:
+            SpaceError: SageMaker API 调用失败
+        """

@@ -307,3 +307,43 @@ class TestAppDeletingGuard:
         with pytest.raises(InvalidSpaceStateError):
             await service.delete_space(space.id)
         mock_sagemaker.delete_space.assert_not_awaited()
+
+
+class TestGetSpaceAccessUrl:
+    """打开 IDE: 仅运行中的空间可签发 presigned 访问 URL."""
+
+    async def test_running_space_returns_presigned_url(
+        self, service: SpaceService, mock_repo: AsyncMock, mock_sagemaker: AsyncMock
+    ) -> None:
+        space = _make_space("a1111111-1111-1111-1111-111111111111", SpaceStatus.RUNNING)
+        mock_repo.get_by_id.return_value = space
+        mock_sagemaker.describe_app.return_value = {"status": "InService"}
+        mock_sagemaker.create_presigned_url.return_value = "https://x.studio.us-east-1.sagemaker.aws/auth?token=t"
+
+        url = await service.get_space_access_url(space.id)
+
+        assert url.startswith("https://")
+        _, kwargs = mock_sagemaker.create_presigned_url.await_args
+        assert kwargs["space_name"] == space.space_name
+        assert kwargs["ide_type"] == "jupyterlab"
+
+    async def test_stopped_space_raises_conflict(
+        self, service: SpaceService, mock_repo: AsyncMock, mock_sagemaker: AsyncMock
+    ) -> None:
+        space = _make_space("a2222222-2222-2222-2222-222222222222", SpaceStatus.STOPPED)
+        mock_repo.get_by_id.return_value = space
+        mock_sagemaker.describe_app.return_value = None
+
+        with pytest.raises(InvalidSpaceStateError):
+            await service.get_space_access_url(space.id)
+        mock_sagemaker.create_presigned_url.assert_not_awaited()
+
+    async def test_pending_space_raises_conflict(
+        self, service: SpaceService, mock_repo: AsyncMock, mock_sagemaker: AsyncMock
+    ) -> None:
+        space = _make_space("a3333333-3333-3333-3333-333333333333", SpaceStatus.PENDING)
+        mock_repo.get_by_id.return_value = space
+        mock_sagemaker.describe_app.return_value = {"status": "Pending"}
+
+        with pytest.raises(InvalidSpaceStateError):
+            await service.get_space_access_url(space.id)

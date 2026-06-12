@@ -302,6 +302,27 @@ class SpaceService(BaseApplicationService[Space, str]):
 
         return await self._space_repository.update(space)
 
+    async def get_space_access_url(self, space_id: str) -> str:
+        """签发空间 IDE 的免登录访问 URL（仅运行中可用）.
+
+        Raises:
+            InvalidSpaceStateError: 空间非运行中（无可访问的计算实例）
+        """
+        space = await self._get_or_raise(space_id)
+        space = await self._sync_status_from_sagemaker(space)
+
+        if space.status != SpaceStatus.RUNNING:
+            raise InvalidSpaceStateError(
+                space_id=space.id or "",
+                current_state=space.status.value,
+                operation="open",
+            )
+
+        return await self._sagemaker_client.create_presigned_url(
+            space_name=space.space_name,
+            ide_type=self._ide_type_of(space),
+        )
+
     async def delete_space(self, space_id: str) -> None:
         """删除开发空间——清理 App 后删除 SageMaker Space（含 EBS 数据）."""
         space = await self._get_or_raise(space_id)

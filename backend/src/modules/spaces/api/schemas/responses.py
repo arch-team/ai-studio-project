@@ -77,6 +77,12 @@ class SpaceListResponse(BaseModel):
     total_pages: int
 
 
+class SpaceAccessUrlResponse(BaseModel):
+    """Space IDE 免登录访问 URL（约 5 分钟内有效，仅供即时跳转）."""
+
+    url: str
+
+
 class SpaceErrorResponse(BaseModel):
     """Space operation error response."""
 
