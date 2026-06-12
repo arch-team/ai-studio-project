@@ -286,7 +286,10 @@ class SageMakerSpacesClient(ISageMakerSpacesClient):
                 logger.info("sagemaker_app_deleted", space_name=space_name)
         except Exception as e:
             error_code = getattr(e, "response", {}).get("Error", {}).get("Code", "")
-            if error_code in ("ResourceNotFound", "ResourceNotFoundException"):
+            # Deleted 状态的 App 元数据保留 24h，重复删除返回
+            # ValidationException "has already been deleted"，同样视为幂等成功
+            already_deleted = "already been deleted" in str(e)
+            if error_code in ("ResourceNotFound", "ResourceNotFoundException") or already_deleted:
                 logger.warning("sagemaker_app_already_deleted", space_name=space_name)
                 return
             logger.error("sagemaker_app_delete_failed", space_name=space_name, error=str(e))
