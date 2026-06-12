@@ -34,6 +34,15 @@ export default defineConfig({
     {
       name: 'chromium',
       use: { ...devices['Desktop Chrome'] },
+      testIgnore: /audit\//,
+    },
+    {
+      name: 'audit',
+      use: {
+        ...devices['Desktop Chrome'],
+        viewport: { width: 1440, height: 900 },
+      },
+      testMatch: /audit\/.*\.spec\.ts/,
     },
   ],
 
