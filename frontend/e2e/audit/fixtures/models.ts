@@ -60,6 +60,7 @@ export const modelVersionsResponse = {
     { id: 10, version: 'v3.0.0', status: 'registered', metrics: { accuracy: 0.902, f1: 0.871 }, hyperparameters: { learning_rate: 0.00003, batch_size: 32 }, created_at: '2026-03-25T12:00:00Z', registered_at: '2026-03-26T02:00:00Z' },
     { id: 9, version: 'v2.4.1', status: 'archived', metrics: { accuracy: 0.886, f1: 0.852 }, hyperparameters: { learning_rate: 0.00005, batch_size: 32 }, created_at: '2026-02-10T07:30:00Z', registered_at: '2026-02-11T00:00:00Z' },
     { id: 8, version: 'v2.4.0', status: 'failed', metrics: null, hyperparameters: { learning_rate: 0.0001, batch_size: 32 }, created_at: '2026-02-02T10:00:00Z', registered_at: null },
+    { id: 21, version: 'v2.3.0', status: 'archived', metrics: { accuracy: 0.879, f1: 0.845 }, hyperparameters: { learning_rate: 0.0001, batch_size: 16 }, created_at: '2026-01-15T06:20:00Z', registered_at: '2026-01-16T01:40:00Z' },
   ],
   comparison: null,
 };

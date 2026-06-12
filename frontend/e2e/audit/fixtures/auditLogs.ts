@@ -22,8 +22,8 @@ export const mockAuditLogs = [
 
 export const auditLogListResponse = {
   items: mockAuditLogs,
-  total: 247,
+  total: mockAuditLogs.length,
   page: 1,
   page_size: 20,
-  total_pages: 13,
+  total_pages: 1,
 };
