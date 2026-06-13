@@ -8,6 +8,7 @@ from sqlalchemy.dialects.mysql import CHAR
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from src.modules.spaces.domain.value_objects import (
+    SpaceBackend,
     SpaceInstanceType,
     SpaceStatus,
     SpaceType,
@@ -60,6 +61,30 @@ class DevelopmentSpaceModel(Base, TimestampMixin, SoftDeleteMixin):
         nullable=False,
         default=SpaceType.JUPYTER,
         comment="空间类型",
+    )
+    backend: Mapped[SpaceBackend] = mapped_column(
+        Enum(SpaceBackend),
+        nullable=False,
+        default=SpaceBackend.STUDIO,
+        index=True,
+        comment="开发环境后端类型",
+    )
+
+    # HyperPod backend 专属字段（仅 backend=HYPERPOD 使用）
+    namespace: Mapped[str | None] = mapped_column(
+        String(255),
+        nullable=True,
+        comment="HyperPod CRD namespace",
+    )
+    queue_name: Mapped[str | None] = mapped_column(
+        String(255),
+        nullable=True,
+        comment="Kueue local queue",
+    )
+    workspace_template: Mapped[str | None] = mapped_column(
+        String(255),
+        nullable=True,
+        comment="WorkspaceTemplate 引用",
     )
 
     # Status
