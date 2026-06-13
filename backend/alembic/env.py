@@ -8,24 +8,24 @@ from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import async_engine_from_config
 
 from alembic import context
-
-# Import your models' metadata
-from src.shared.infrastructure.database import Base
-from src.shared.infrastructure.config import get_settings
+from src.modules.audit.infrastructure.models import AuditLogModel  # noqa: F401
 
 # Import all models to register them with Base.metadata (required for autogenerate)
 from src.modules.auth.infrastructure.models import UserModel  # noqa: F401
+from src.modules.models.infrastructure.models import ModelModel  # noqa: F401
 from src.modules.quotas.infrastructure.models import (  # noqa: F401
-    ResourceQuotaModel,
     ResourceLimitConfigModel,
+    ResourceQuotaModel,
 )
-from src.modules.audit.infrastructure.models import AuditLogModel  # noqa: F401
 from src.modules.spaces.infrastructure.models import DevelopmentSpaceModel  # noqa: F401
 from src.modules.training.infrastructure.models import (  # noqa: F401
-    TrainingJobModel,
     CheckpointModel,
+    TrainingJobModel,
 )
-from src.modules.models.infrastructure.models import ModelModel  # noqa: F401
+from src.shared.infrastructure.config import get_settings
+
+# Import your models' metadata
+from src.shared.infrastructure.database import Base
 
 # this is the Alembic Config object
 config = context.config

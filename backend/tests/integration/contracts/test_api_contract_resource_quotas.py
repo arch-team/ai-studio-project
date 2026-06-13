@@ -27,40 +27,28 @@ class TestResourceQuotasContractPaths:
     """验证 resource-quotas API 路径存在性。"""
 
     @pytest.mark.asyncio
-    async def test_openapi_schema_contains_resource_quotas_list_path(
-        self, openapi_paths: dict[str, Any]
-    ) -> None:
+    async def test_openapi_schema_contains_resource_quotas_list_path(self, openapi_paths: dict[str, Any]) -> None:
         """验证 OpenAPI schema 包含 /api/v1/resource-quotas 列表路径。"""
         expected = f"{API_PREFIX}/resource-quotas"
         matching = [p for p in openapi_paths if p == expected]
-        assert len(matching) == 1, (
-            f"期望路径 {expected} 在 OpenAPI schema 中存在"
-        )
+        assert len(matching) == 1, f"期望路径 {expected} 在 OpenAPI schema 中存在"
 
     @pytest.mark.asyncio
-    async def test_openapi_schema_contains_resource_quotas_detail_path(
-        self, openapi_paths: dict[str, Any]
-    ) -> None:
+    async def test_openapi_schema_contains_resource_quotas_detail_path(self, openapi_paths: dict[str, Any]) -> None:
         """验证 OpenAPI schema 包含 /api/v1/resource-quotas/{{quota_id}} 详情路径。"""
         matching = [
             p
             for p in openapi_paths
-            if p.startswith(f"{API_PREFIX}/resource-quotas/{{")
-            and p.endswith("}")
-            and "usage" not in p
+            if p.startswith(f"{API_PREFIX}/resource-quotas/{{") and p.endswith("}") and "usage" not in p
         ]
-        assert len(matching) >= 1, (
-            "期望至少有一个 resource-quotas/{id} 路径"
-        )
+        assert len(matching) >= 1, "期望至少有一个 resource-quotas/{id} 路径"
 
 
 class TestResourceQuotasContractMethods:
     """验证 resource-quotas API 端点支持的 HTTP 方法。"""
 
     @pytest.mark.asyncio
-    async def test_resource_quotas_list_supports_get(
-        self, openapi_paths: dict[str, Any]
-    ) -> None:
+    async def test_resource_quotas_list_supports_get(self, openapi_paths: dict[str, Any]) -> None:
         """验证 GET /resource-quotas 方法存在。"""
         path = f"{API_PREFIX}/resource-quotas"
         assert path in openapi_paths, f"路径 {path} 不存在"
@@ -68,9 +56,7 @@ class TestResourceQuotasContractMethods:
         assert "get" in methods, "GET /resource-quotas 方法缺失"
 
     @pytest.mark.asyncio
-    async def test_resource_quotas_list_supports_post(
-        self, openapi_paths: dict[str, Any]
-    ) -> None:
+    async def test_resource_quotas_list_supports_post(self, openapi_paths: dict[str, Any]) -> None:
         """验证 POST /resource-quotas 方法存在。"""
         path = f"{API_PREFIX}/resource-quotas"
         assert path in openapi_paths, f"路径 {path} 不存在"
@@ -78,17 +64,13 @@ class TestResourceQuotasContractMethods:
         assert "post" in methods, "POST /resource-quotas 方法缺失"
 
     @pytest.mark.asyncio
-    async def test_resource_quotas_detail_supports_get(
-        self, openapi_paths: dict[str, Any]
-    ) -> None:
+    async def test_resource_quotas_detail_supports_get(self, openapi_paths: dict[str, Any]) -> None:
         """验证 GET /resource-quotas/{{quota_id}} 方法存在。"""
         detail_path = next(
             (
                 p
                 for p in openapi_paths
-                if p.startswith(f"{API_PREFIX}/resource-quotas/{{")
-                and p.endswith("}")
-                and "usage" not in p
+                if p.startswith(f"{API_PREFIX}/resource-quotas/{{") and p.endswith("}") and "usage" not in p
             ),
             None,
         )
@@ -119,16 +101,11 @@ class TestResourceQuotasContractConsistency:
 
         for contract_path in contract_paths:
             full_path = f"{API_PREFIX}{contract_path}"
-            found = any(
-                self._paths_match(full_path, openapi_path)
-                for openapi_path in openapi_paths
-            )
+            found = any(self._paths_match(full_path, openapi_path) for openapi_path in openapi_paths)
             if not found:
                 missing_paths.append(contract_path)
 
-        assert not missing_paths, (
-            f"以下 contract 路径在 OpenAPI schema 中不存在: {missing_paths}"
-        )
+        assert not missing_paths, f"以下 contract 路径在 OpenAPI schema 中不存在: {missing_paths}"
 
     @pytest.mark.asyncio
     async def test_all_contract_methods_exist_in_openapi(
@@ -143,11 +120,7 @@ class TestResourceQuotasContractConsistency:
         for contract_path, methods in contract_paths.items():
             full_path = f"{API_PREFIX}{contract_path}"
             openapi_path = next(
-                (
-                    p
-                    for p in openapi_paths
-                    if self._paths_match(full_path, p)
-                ),
+                (p for p in openapi_paths if self._paths_match(full_path, p)),
                 None,
             )
             if openapi_path is None:
@@ -156,13 +129,9 @@ class TestResourceQuotasContractConsistency:
             openapi_methods = set(openapi_paths[openapi_path].keys())
             for method in methods:
                 if method.lower() not in openapi_methods:
-                    missing_methods.append(
-                        f"{method.upper()} {contract_path}"
-                    )
+                    missing_methods.append(f"{method.upper()} {contract_path}")
 
-        assert not missing_methods, (
-            f"以下 contract 方法在 OpenAPI schema 中不存在: {missing_methods}"
-        )
+        assert not missing_methods, f"以下 contract 方法在 OpenAPI schema 中不存在: {missing_methods}"
 
     @staticmethod
     def _paths_match(path_a: str, path_b: str) -> bool:

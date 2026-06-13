@@ -18,15 +18,13 @@ from src.infrastructure.config.settings import get_settings
 async def seed_admin_user(session: AsyncSession) -> None:
     """Create admin user if not exists."""
     # Check if admin exists
-    result = await session.execute(
-        text("SELECT id FROM users WHERE username = 'admin'")
-    )
+    result = await session.execute(text("SELECT id FROM users WHERE username = 'admin'"))
     if result.scalar_one_or_none():
         print("Admin user already exists")
         return
 
     # Create admin user
-    password_hash = bcrypt.hashpw("Admin123!".encode(), bcrypt.gensalt()).decode()
+    password_hash = bcrypt.hashpw(b"Admin123!", bcrypt.gensalt()).decode()
     await session.execute(
         text("""
             INSERT INTO users (username, email, password_hash, status, role, auth_type, created_at, updated_at)
@@ -46,9 +44,7 @@ async def seed_resource_quotas(session: AsyncSession) -> None:
         return
 
     # Get admin user id
-    result = await session.execute(
-        text("SELECT id FROM users WHERE username = 'admin'")
-    )
+    result = await session.execute(text("SELECT id FROM users WHERE username = 'admin'"))
     admin_id = result.scalar_one_or_none()
 
     await session.execute(

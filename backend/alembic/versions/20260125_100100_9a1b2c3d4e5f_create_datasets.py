@@ -8,17 +8,18 @@ Creates the datasets table for storing training data set metadata,
 supporting FSx for Lustre, S3, and EFS storage backends.
 """
 
-from typing import Sequence, Union
+from collections.abc import Sequence
 
 import sqlalchemy as sa
-from alembic import op
 from sqlalchemy.dialects import mysql
+
+from alembic import op
 
 # revision identifiers, used by Alembic.
 revision: str = "9a1b2c3d4e5f"
-down_revision: Union[str, None] = "8f2g3h4i5j6k"
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+down_revision: str | None = "8f2g3h4i5j6k"
+branch_labels: str | Sequence[str] | None = None
+depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
@@ -83,10 +84,7 @@ def upgrade() -> None:
         # Dataset type
         sa.Column(
             "dataset_type",
-            sa.Enum(
-                "IMAGE", "TEXT", "AUDIO", "VIDEO", "TABULAR", "CUSTOM",
-                name="datasettype"
-            ),
+            sa.Enum("IMAGE", "TEXT", "AUDIO", "VIDEO", "TABULAR", "CUSTOM", name="datasettype"),
             nullable=False,
             comment="数据集类型: IMAGE=图像, TEXT=文本, AUDIO=音频, VIDEO=视频, TABULAR=表格, CUSTOM=自定义",
         ),
@@ -196,9 +194,7 @@ def upgrade() -> None:
     )
 
     # Create fulltext index for name and description search
-    op.execute(
-        "ALTER TABLE datasets ADD FULLTEXT INDEX ft_datasets_name_desc (name, description)"
-    )
+    op.execute("ALTER TABLE datasets ADD FULLTEXT INDEX ft_datasets_name_desc (name, description)")
 
 
 def downgrade() -> None:

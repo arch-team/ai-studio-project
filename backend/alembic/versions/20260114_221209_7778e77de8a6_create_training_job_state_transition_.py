@@ -16,16 +16,17 @@ State Transitions:
 - Failed → (terminal state)
 """
 
-from typing import Sequence, Union
+from collections.abc import Sequence
 
 import sqlalchemy as sa
+
 from alembic import op
 
 # revision identifiers, used by Alembic.
 revision: str = "7778e77de8a6"
-down_revision: Union[str, None] = "206d5baf77c1"
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+down_revision: str | None = "206d5baf77c1"
+branch_labels: str | Sequence[str] | None = None
+depends_on: str | Sequence[str] | None = None
 
 # Valid state transitions based on spec.md Training Job State Model
 STATE_TRANSITIONS = [

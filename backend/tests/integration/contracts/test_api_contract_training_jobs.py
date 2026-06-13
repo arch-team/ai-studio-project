@@ -27,20 +27,14 @@ class TestTrainingJobsContractPaths:
     """验证 training-jobs API 路径存在性。"""
 
     @pytest.mark.asyncio
-    async def test_openapi_schema_contains_training_jobs_list_path(
-        self, openapi_paths: dict[str, Any]
-    ) -> None:
+    async def test_openapi_schema_contains_training_jobs_list_path(self, openapi_paths: dict[str, Any]) -> None:
         """验证 OpenAPI schema 包含 /api/v1/training-jobs 列表路径。"""
         expected = f"{API_PREFIX}/training-jobs"
         matching = [p for p in openapi_paths if p == expected]
-        assert len(matching) == 1, (
-            f"期望路径 {expected} 在 OpenAPI schema 中存在"
-        )
+        assert len(matching) == 1, f"期望路径 {expected} 在 OpenAPI schema 中存在"
 
     @pytest.mark.asyncio
-    async def test_openapi_schema_contains_training_jobs_detail_path(
-        self, openapi_paths: dict[str, Any]
-    ) -> None:
+    async def test_openapi_schema_contains_training_jobs_detail_path(self, openapi_paths: dict[str, Any]) -> None:
         """验证 OpenAPI schema 包含 /api/v1/training-jobs/{{job_id}} 详情路径。"""
         # FastAPI 使用 {job_id} 格式
         matching = [
@@ -57,58 +51,32 @@ class TestTrainingJobsContractPaths:
             and "cancel" not in p
             and "template" not in p
         ]
-        assert len(matching) >= 1, (
-            "期望至少有一个 training-jobs/{id} 路径"
-        )
+        assert len(matching) >= 1, "期望至少有一个 training-jobs/{id} 路径"
 
     @pytest.mark.asyncio
-    async def test_openapi_schema_contains_training_jobs_logs_path(
-        self, openapi_paths: dict[str, Any]
-    ) -> None:
+    async def test_openapi_schema_contains_training_jobs_logs_path(self, openapi_paths: dict[str, Any]) -> None:
         """验证 OpenAPI schema 包含 training-jobs 日志路径。"""
-        matching = [
-            p for p in openapi_paths if "training-jobs" in p and "logs" in p
-        ]
-        assert len(matching) >= 1, (
-            "期望 training-jobs 日志路径在 OpenAPI schema 中存在"
-        )
+        matching = [p for p in openapi_paths if "training-jobs" in p and "logs" in p]
+        assert len(matching) >= 1, "期望 training-jobs 日志路径在 OpenAPI schema 中存在"
 
     @pytest.mark.asyncio
-    async def test_openapi_schema_contains_training_jobs_metrics_path(
-        self, openapi_paths: dict[str, Any]
-    ) -> None:
+    async def test_openapi_schema_contains_training_jobs_metrics_path(self, openapi_paths: dict[str, Any]) -> None:
         """验证 OpenAPI schema 包含 training-jobs 指标路径。"""
-        matching = [
-            p
-            for p in openapi_paths
-            if "training-jobs" in p and "metrics" in p
-        ]
-        assert len(matching) >= 1, (
-            "期望 training-jobs 指标路径在 OpenAPI schema 中存在"
-        )
+        matching = [p for p in openapi_paths if "training-jobs" in p and "metrics" in p]
+        assert len(matching) >= 1, "期望 training-jobs 指标路径在 OpenAPI schema 中存在"
 
     @pytest.mark.asyncio
-    async def test_openapi_schema_contains_training_jobs_checkpoints_path(
-        self, openapi_paths: dict[str, Any]
-    ) -> None:
+    async def test_openapi_schema_contains_training_jobs_checkpoints_path(self, openapi_paths: dict[str, Any]) -> None:
         """验证 OpenAPI schema 包含 training-jobs 检查点路径。"""
-        matching = [
-            p
-            for p in openapi_paths
-            if "training-jobs" in p and "checkpoints" in p
-        ]
-        assert len(matching) >= 1, (
-            "期望 training-jobs 检查点路径在 OpenAPI schema 中存在"
-        )
+        matching = [p for p in openapi_paths if "training-jobs" in p and "checkpoints" in p]
+        assert len(matching) >= 1, "期望 training-jobs 检查点路径在 OpenAPI schema 中存在"
 
 
 class TestTrainingJobsContractMethods:
     """验证 training-jobs API 端点支持的 HTTP 方法。"""
 
     @pytest.mark.asyncio
-    async def test_training_jobs_list_supports_get(
-        self, openapi_paths: dict[str, Any]
-    ) -> None:
+    async def test_training_jobs_list_supports_get(self, openapi_paths: dict[str, Any]) -> None:
         """验证 GET /training-jobs 方法存在。"""
         path = f"{API_PREFIX}/training-jobs"
         assert path in openapi_paths, f"路径 {path} 不存在"
@@ -116,9 +84,7 @@ class TestTrainingJobsContractMethods:
         assert "get" in methods, "GET /training-jobs 方法缺失"
 
     @pytest.mark.asyncio
-    async def test_training_jobs_list_supports_post(
-        self, openapi_paths: dict[str, Any]
-    ) -> None:
+    async def test_training_jobs_list_supports_post(self, openapi_paths: dict[str, Any]) -> None:
         """验证 POST /training-jobs 方法存在。"""
         path = f"{API_PREFIX}/training-jobs"
         assert path in openapi_paths, f"路径 {path} 不存在"
@@ -126,9 +92,7 @@ class TestTrainingJobsContractMethods:
         assert "post" in methods, "POST /training-jobs 方法缺失"
 
     @pytest.mark.asyncio
-    async def test_training_jobs_detail_supports_get(
-        self, openapi_paths: dict[str, Any]
-    ) -> None:
+    async def test_training_jobs_detail_supports_get(self, openapi_paths: dict[str, Any]) -> None:
         """验证 GET /training-jobs/{{job_id}} 方法存在。"""
         detail_path = next(
             (
@@ -152,9 +116,7 @@ class TestTrainingJobsContractMethods:
         assert "get" in methods, "GET /training-jobs/{id} 方法缺失"
 
     @pytest.mark.asyncio
-    async def test_training_jobs_detail_supports_delete(
-        self, openapi_paths: dict[str, Any]
-    ) -> None:
+    async def test_training_jobs_detail_supports_delete(self, openapi_paths: dict[str, Any]) -> None:
         """验证 DELETE /training-jobs/{{job_id}} 方法存在。"""
         detail_path = next(
             (
@@ -196,16 +158,11 @@ class TestTrainingJobsContractConsistency:
             # OpenAPI 路径格式: /api/v1/training-jobs/{job_id}
             full_path = f"{API_PREFIX}{contract_path}"
             # 匹配时需要考虑路径参数名差异
-            found = any(
-                self._paths_match(full_path, openapi_path)
-                for openapi_path in openapi_paths
-            )
+            found = any(self._paths_match(full_path, openapi_path) for openapi_path in openapi_paths)
             if not found:
                 missing_paths.append(contract_path)
 
-        assert not missing_paths, (
-            f"以下 contract 路径在 OpenAPI schema 中不存在: {missing_paths}"
-        )
+        assert not missing_paths, f"以下 contract 路径在 OpenAPI schema 中不存在: {missing_paths}"
 
     @pytest.mark.xfail(
         reason="已知差异: GET /checkpoints (列表) 尚未实现，当前仅有 POST (创建)",
@@ -231,11 +188,7 @@ class TestTrainingJobsContractConsistency:
             full_path = f"{API_PREFIX}{contract_path}"
             # 查找匹配的 OpenAPI 路径
             openapi_path = next(
-                (
-                    p
-                    for p in openapi_paths
-                    if self._paths_match(full_path, p)
-                ),
+                (p for p in openapi_paths if self._paths_match(full_path, p)),
                 None,
             )
             if openapi_path is None:
@@ -247,17 +200,11 @@ class TestTrainingJobsContractConsistency:
                 # patch/put 视为等价
                 if method_lower in update_equivalents:
                     if not (openapi_methods & update_equivalents):
-                        missing_methods.append(
-                            f"{method.upper()} {contract_path}"
-                        )
+                        missing_methods.append(f"{method.upper()} {contract_path}")
                 elif method_lower not in openapi_methods:
-                    missing_methods.append(
-                        f"{method.upper()} {contract_path}"
-                    )
+                    missing_methods.append(f"{method.upper()} {contract_path}")
 
-        assert not missing_methods, (
-            f"以下 contract 方法在 OpenAPI schema 中不存在: {missing_methods}"
-        )
+        assert not missing_methods, f"以下 contract 方法在 OpenAPI schema 中不存在: {missing_methods}"
 
     @staticmethod
     def _paths_match(path_a: str, path_b: str) -> bool:

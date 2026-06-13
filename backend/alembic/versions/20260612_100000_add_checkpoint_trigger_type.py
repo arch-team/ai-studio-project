@@ -8,15 +8,16 @@ CheckpointModel 已定义 trigger_type 列（5 种检查点触发场景），
 但建表迁移 20260115_100100 未包含，导致 ORM 查询 1054 Unknown column。
 """
 
-from typing import Sequence, Union
+from collections.abc import Sequence
 
 import sqlalchemy as sa
+
 from alembic import op
 
 revision: str = "i9j0k1l2m3n4"
-down_revision: Union[str, None] = "h8i9j0k1l2m3"
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+down_revision: str | None = "h8i9j0k1l2m3"
+branch_labels: str | Sequence[str] | None = None
+depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:

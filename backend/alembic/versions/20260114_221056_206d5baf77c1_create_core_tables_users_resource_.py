@@ -6,17 +6,18 @@ Create Date: 2026-01-14 22:10:56.157123
 
 """
 
-from typing import Sequence, Union
+from collections.abc import Sequence
 
 import sqlalchemy as sa
-from alembic import op
 from sqlalchemy.dialects import mysql
+
+from alembic import op
 
 # revision identifiers, used by Alembic.
 revision: str = "206d5baf77c1"
-down_revision: Union[str, None] = None
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+down_revision: str | None = None
+branch_labels: str | Sequence[str] | None = None
+depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
@@ -87,9 +88,7 @@ def upgrade() -> None:
         sa.Column("username", sa.String(length=64), nullable=False, comment="用户名(IAM用户名)"),
         sa.Column("email", sa.String(length=255), nullable=False, comment="邮箱地址"),
         sa.Column("display_name", sa.String(length=128), nullable=True, comment="显示名称"),
-        sa.Column(
-            "iam_identity_id", sa.String(length=255), nullable=True, comment="AWS IAM Identity Center用户ID"
-        ),
+        sa.Column("iam_identity_id", sa.String(length=255), nullable=True, comment="AWS IAM Identity Center用户ID"),
         sa.Column("iam_groups", mysql.JSON(), nullable=True, comment="IAM用户组列表"),
         sa.Column(
             "status",
@@ -119,9 +118,7 @@ def upgrade() -> None:
             nullable=False,
             comment="更新时间",
         ),
-        sa.ForeignKeyConstraint(
-            ["resource_quota_id"], ["resource_quotas.id"], ondelete="SET NULL"
-        ),
+        sa.ForeignKeyConstraint(["resource_quota_id"], ["resource_quotas.id"], ondelete="SET NULL"),
         sa.PrimaryKeyConstraint("id"),
         sa.UniqueConstraint("email"),
         sa.UniqueConstraint("iam_identity_id"),
@@ -186,7 +183,9 @@ def upgrade() -> None:
     op.create_index(
         op.f("ix_resource_limit_configs_config_name"), "resource_limit_configs", ["config_name"], unique=False
     )
-    op.create_index(op.f("ix_resource_limit_configs_project_id"), "resource_limit_configs", ["project_id"], unique=False)
+    op.create_index(
+        op.f("ix_resource_limit_configs_project_id"), "resource_limit_configs", ["project_id"], unique=False
+    )
     op.create_index(op.f("ix_resource_limit_configs_role"), "resource_limit_configs", ["role"], unique=False)
 
     # Create audit_logs table (depends on users)

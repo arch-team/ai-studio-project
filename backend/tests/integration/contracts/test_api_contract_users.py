@@ -27,62 +27,37 @@ class TestUsersContractPaths:
     """验证 users API 路径存在性。"""
 
     @pytest.mark.asyncio
-    async def test_openapi_schema_contains_auth_login_path(
-        self, openapi_paths: dict[str, Any]
-    ) -> None:
+    async def test_openapi_schema_contains_auth_login_path(self, openapi_paths: dict[str, Any]) -> None:
         """验证 OpenAPI schema 包含 /api/v1/auth/login 路径。"""
         # 登录路径可能有多种形式, 检查包含 login 的路径
-        matching = [
-            p for p in openapi_paths if "auth" in p and "login" in p
-        ]
-        assert len(matching) >= 1, (
-            "期望 auth/login 路径在 OpenAPI schema 中存在"
-        )
+        matching = [p for p in openapi_paths if "auth" in p and "login" in p]
+        assert len(matching) >= 1, "期望 auth/login 路径在 OpenAPI schema 中存在"
 
     @pytest.mark.asyncio
-    async def test_openapi_schema_contains_users_me_path(
-        self, openapi_paths: dict[str, Any]
-    ) -> None:
+    async def test_openapi_schema_contains_users_me_path(self, openapi_paths: dict[str, Any]) -> None:
         """验证 OpenAPI schema 包含当前用户信息路径 (/auth/me 或 /users/me)。"""
         matching = [p for p in openapi_paths if p.endswith("/me")]
-        assert len(matching) >= 1, (
-            "期望 /me 路径在 OpenAPI schema 中存在"
-        )
+        assert len(matching) >= 1, "期望 /me 路径在 OpenAPI schema 中存在"
 
     @pytest.mark.asyncio
-    async def test_openapi_schema_contains_users_list_path(
-        self, openapi_paths: dict[str, Any]
-    ) -> None:
+    async def test_openapi_schema_contains_users_list_path(self, openapi_paths: dict[str, Any]) -> None:
         """验证 OpenAPI schema 包含 /api/v1/users 列表路径。"""
         expected = f"{API_PREFIX}/users"
         matching = [p for p in openapi_paths if p == expected]
-        assert len(matching) == 1, (
-            f"期望路径 {expected} 在 OpenAPI schema 中存在"
-        )
+        assert len(matching) == 1, f"期望路径 {expected} 在 OpenAPI schema 中存在"
 
     @pytest.mark.asyncio
-    async def test_openapi_schema_contains_users_detail_path(
-        self, openapi_paths: dict[str, Any]
-    ) -> None:
+    async def test_openapi_schema_contains_users_detail_path(self, openapi_paths: dict[str, Any]) -> None:
         """验证 OpenAPI schema 包含 /api/v1/users/{{user_id}} 详情路径。"""
-        matching = [
-            p
-            for p in openapi_paths
-            if p.startswith(f"{API_PREFIX}/users/{{")
-            and p.endswith("}")
-        ]
-        assert len(matching) >= 1, (
-            "期望至少有一个 users/{id} 路径"
-        )
+        matching = [p for p in openapi_paths if p.startswith(f"{API_PREFIX}/users/{{") and p.endswith("}")]
+        assert len(matching) >= 1, "期望至少有一个 users/{id} 路径"
 
 
 class TestUsersContractMethods:
     """验证 users API 端点支持的 HTTP 方法。"""
 
     @pytest.mark.asyncio
-    async def test_auth_login_supports_post(
-        self, openapi_paths: dict[str, Any]
-    ) -> None:
+    async def test_auth_login_supports_post(self, openapi_paths: dict[str, Any]) -> None:
         """验证 POST /auth/login 方法存在。"""
         login_path = next(
             (p for p in openapi_paths if "auth" in p and "login" in p),
@@ -93,9 +68,7 @@ class TestUsersContractMethods:
         assert "post" in methods, "POST /auth/login 方法缺失"
 
     @pytest.mark.asyncio
-    async def test_users_me_supports_get(
-        self, openapi_paths: dict[str, Any]
-    ) -> None:
+    async def test_users_me_supports_get(self, openapi_paths: dict[str, Any]) -> None:
         """验证 GET /me 方法存在。"""
         me_path = next(
             (p for p in openapi_paths if p.endswith("/me")),
@@ -106,9 +79,7 @@ class TestUsersContractMethods:
         assert "get" in methods, "GET /me 方法缺失"
 
     @pytest.mark.asyncio
-    async def test_users_list_supports_get(
-        self, openapi_paths: dict[str, Any]
-    ) -> None:
+    async def test_users_list_supports_get(self, openapi_paths: dict[str, Any]) -> None:
         """验证 GET /users 方法存在。"""
         path = f"{API_PREFIX}/users"
         assert path in openapi_paths, f"路径 {path} 不存在"
@@ -116,17 +87,10 @@ class TestUsersContractMethods:
         assert "get" in methods, "GET /users 方法缺失"
 
     @pytest.mark.asyncio
-    async def test_users_detail_supports_get(
-        self, openapi_paths: dict[str, Any]
-    ) -> None:
+    async def test_users_detail_supports_get(self, openapi_paths: dict[str, Any]) -> None:
         """验证 GET /users/{{user_id}} 方法存在。"""
         detail_path = next(
-            (
-                p
-                for p in openapi_paths
-                if p.startswith(f"{API_PREFIX}/users/{{")
-                and p.endswith("}")
-            ),
+            (p for p in openapi_paths if p.startswith(f"{API_PREFIX}/users/{{") and p.endswith("}")),
             None,
         )
         assert detail_path is not None, "users 详情路径不存在"
@@ -157,26 +121,18 @@ class TestUsersContractConsistency:
 
             if contract_path.startswith("/auth"):
                 full_path = f"{API_PREFIX}{contract_path}"
-                found = any(
-                    self._paths_match(full_path, p) for p in openapi_paths
-                )
+                found = any(self._paths_match(full_path, p) for p in openapi_paths)
             elif contract_path == "/users/me":
                 # /users/me 在实际实现中可能在 /auth/me
-                found = any(
-                    p.endswith("/me") for p in openapi_paths
-                )
+                found = any(p.endswith("/me") for p in openapi_paths)
             else:
                 full_path = f"{API_PREFIX}{contract_path}"
-                found = any(
-                    self._paths_match(full_path, p) for p in openapi_paths
-                )
+                found = any(self._paths_match(full_path, p) for p in openapi_paths)
 
             if not found:
                 missing_paths.append(contract_path)
 
-        assert not missing_paths, (
-            f"以下 contract 路径在 OpenAPI schema 中不存在: {missing_paths}"
-        )
+        assert not missing_paths, f"以下 contract 路径在 OpenAPI schema 中不存在: {missing_paths}"
 
     @pytest.mark.asyncio
     async def test_all_contract_methods_exist_in_openapi(
@@ -202,19 +158,13 @@ class TestUsersContractConsistency:
                     openapi_methods = set(openapi_paths[openapi_path].keys())
                     for method in methods:
                         if method.lower() not in openapi_methods:
-                            missing_methods.append(
-                                f"{method.upper()} {contract_path}"
-                            )
+                            missing_methods.append(f"{method.upper()} {contract_path}")
                 continue
             else:
                 full_path = f"{API_PREFIX}{contract_path}"
 
             openapi_path = next(
-                (
-                    p
-                    for p in openapi_paths
-                    if self._paths_match(full_path, p)
-                ),
+                (p for p in openapi_paths if self._paths_match(full_path, p)),
                 None,
             )
             if openapi_path is None:
@@ -223,13 +173,9 @@ class TestUsersContractConsistency:
             openapi_methods = set(openapi_paths[openapi_path].keys())
             for method in methods:
                 if method.lower() not in openapi_methods:
-                    missing_methods.append(
-                        f"{method.upper()} {contract_path}"
-                    )
+                    missing_methods.append(f"{method.upper()} {contract_path}")
 
-        assert not missing_methods, (
-            f"以下 contract 方法在 OpenAPI schema 中不存在: {missing_methods}"
-        )
+        assert not missing_methods, f"以下 contract 方法在 OpenAPI schema 中不存在: {missing_methods}"
 
     @staticmethod
     def _paths_match(path_a: str, path_b: str) -> bool:

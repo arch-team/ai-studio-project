@@ -53,7 +53,10 @@ class TestUsageAggregatorServiceIntegration:
             # Act & Assert
             with pytest.raises(ValueError, match="Invalid period"):
                 await service.aggregate_by_time_period(
-                    user_id=1, start_date=start_date, end_date=end_date, period="invalid"  # type: ignore
+                    user_id=1,
+                    start_date=start_date,
+                    end_date=end_date,
+                    period="invalid",  # type: ignore
                 )
 
     @pytest.mark.asyncio

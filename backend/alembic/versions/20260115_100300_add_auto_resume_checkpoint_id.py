@@ -7,16 +7,17 @@ Create Date: 2026-01-15 10:03:00.000000
 Adds auto_resume_checkpoint_id column for HyperPod Elastic Agent auto-recovery.
 """
 
-from typing import Sequence, Union
+from collections.abc import Sequence
 
 import sqlalchemy as sa
+
 from alembic import op
 
 # revision identifiers, used by Alembic.
 revision: str = "7e1f2g5h4i6j"
-down_revision: Union[str, None] = "6d0e1f4a3b5c"
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+down_revision: str | None = "6d0e1f4a3b5c"
+branch_labels: str | Sequence[str] | None = None
+depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
