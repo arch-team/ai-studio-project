@@ -1,0 +1,457 @@
+openapi: 3.0.3
+info:
+  title: Development Spaces API
+  version: 1.0.0
+  description: |
+    开发空间管理 API，为算法工程师提供两种在线开发环境（IDE）创建方式。
+
+    **核心功能**:
+    - 创建开发空间（JupyterLab / Code Editor）
+    - 两种后端，由用户按场景选择（backend 字段判别）:
+      - `studio`: SageMaker Studio Spaces，独立计费实例，不占 HyperPod 集群算力
+      - `hyperpod`: HyperPod 原生 Spaces，运行在集群节点，纳入 Kueue Task Governance
+    - 生命周期管理（启动/停止/删除）
+    - 签发免登录访问 URL（直达 IDE）
+
+    **对应 User Story**: 开发空间管理
+
+  contact:
+    name: AI Training Platform Team
+    email: ai-platform@example.com
+
+servers:
+  - url: https://api.ai-training-platform.example.com/v1
+    description: 生产环境
+  - url: http://localhost:8000/v1
+    description: 开发环境
+
+tags:
+  - name: Spaces
+    description: 开发空间管理
+
+security:
+  - BearerAuth: []
+
+paths:
+  /spaces:
+    get:
+      tags:
+        - Spaces
+      summary: 查询开发空间列表
+      description: |
+        分页查询开发空间列表，支持按状态筛选。
+
+        **权限**: 普通用户只能查看自己的空间，管理员可查看所有空间。
+        返回前会对齐底层资源（SageMaker App / HyperPod Workspace CRD）的实际状态。
+      operationId: listSpaces
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+            minimum: 1
+        - name: page_size
+          in: query
+          schema:
+            type: integer
+            default: 20
+            maximum: 100
+        - name: status
+          in: query
+          description: 按状态筛选
+          schema:
+            $ref: '#/components/schemas/SpaceStatus'
+        - name: sort_by
+          in: query
+          schema:
+            type: string
+            default: created_at
+        - name: sort_order
+          in: query
+          schema:
+            type: string
+            enum: [asc, desc]
+            default: desc
+      responses:
+        '200':
+          description: 成功返回分页列表
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SpaceListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    post:
+      tags:
+        - Spaces
+      summary: 创建开发空间
+      description: |
+        创建一个新的开发空间。`backend` 字段决定后端类型：
+
+        - `studio`（默认）: 独立计费实例，不占集群配额。
+        - `hyperpod`: 运行在 HyperPod 集群节点，**创建时校验团队配额**（GPU），
+          纳入 Kueue 调度（优先级 100，可抢占低优先级任务）；配额不足返回 429。
+
+        **权限**: 需要 engineer 角色。
+      operationId: createSpace
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateSpaceRequest'
+      responses:
+        '201':
+          description: 创建成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SpaceDetail'
+        '409':
+          description: 空间名称已存在
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SpaceError'
+        '422':
+          description: 参数验证失败
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SpaceError'
+        '429':
+          description: 集群资源配额不足（仅 hyperpod 后端）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SpaceError'
+        '503':
+          description: 后端不可达（add-on 未安装 / 集群不可达）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SpaceError'
+
+  /spaces/{space_id}:
+    get:
+      tags:
+        - Spaces
+      summary: 查询开发空间详情
+      operationId: getSpace
+      parameters:
+        - $ref: '#/components/parameters/SpaceId'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SpaceDetail'
+        '404':
+          $ref: '#/components/responses/SpaceNotFound'
+    delete:
+      tags:
+        - Spaces
+      summary: 删除开发空间
+      description: |
+        删除开发空间。清理底层计算资源后删除空间（含存储数据）。
+
+        **权限**: 需要 engineer 角色（且为资源所有者或具备特权）。
+      operationId: deleteSpace
+      parameters:
+        - $ref: '#/components/parameters/SpaceId'
+      responses:
+        '204':
+          description: 删除成功
+        '404':
+          $ref: '#/components/responses/SpaceNotFound'
+        '409':
+          description: 状态非法（如底层资源删除中）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SpaceError'
+
+  /spaces/{space_id}/start:
+    post:
+      tags:
+        - Spaces
+      summary: 启动开发空间
+      description: 真实拉起底层计算实例。hyperpod 后端会重新经 Kueue 调度准入。
+      operationId: startSpace
+      parameters:
+        - $ref: '#/components/parameters/SpaceId'
+      responses:
+        '200':
+          description: 启动中
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SpaceDetail'
+        '404':
+          $ref: '#/components/responses/SpaceNotFound'
+        '409':
+          description: 状态转换非法
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SpaceError'
+
+  /spaces/{space_id}/stop:
+    post:
+      tags:
+        - Spaces
+      summary: 停止开发空间
+      description: 释放计算实例，保留存储。
+      operationId: stopSpace
+      parameters:
+        - $ref: '#/components/parameters/SpaceId'
+      responses:
+        '200':
+          description: 已停止
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SpaceDetail'
+        '404':
+          $ref: '#/components/responses/SpaceNotFound'
+        '409':
+          description: 状态转换非法
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SpaceError'
+
+  /spaces/{space_id}/access-url:
+    post:
+      tags:
+        - Spaces
+      summary: 签发免登录访问 URL
+      description: |
+        为运行中的空间签发免登录访问 URL，直达 IDE。约 5 分钟内有效，仅供即时跳转，
+        不应持久化。仅 `running` 状态可签发，否则返回 409。
+
+        - studio 后端: SageMaker presigned domain URL（*.sagemaker.aws）
+        - hyperpod 后端: 集群 IDE 域（admin 配置的自定义 DNS）
+      operationId: getSpaceAccessUrl
+      parameters:
+        - $ref: '#/components/parameters/SpaceId'
+      responses:
+        '200':
+          description: 成功签发
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SpaceAccessUrlResponse'
+        '404':
+          $ref: '#/components/responses/SpaceNotFound'
+        '409':
+          description: 空间非运行中
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SpaceError'
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    SpaceId:
+      name: space_id
+      in: path
+      required: true
+      description: 开发空间 ID（UUID）
+      schema:
+        type: string
+
+  responses:
+    Unauthorized:
+      description: 未认证
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/SpaceError'
+    SpaceNotFound:
+      description: 开发空间不存在
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/SpaceError'
+
+  schemas:
+    SpaceBackend:
+      type: string
+      description: |
+        开发环境后端类型。
+        - studio: SageMaker Studio Spaces（独立计费实例，不占集群）
+        - hyperpod: HyperPod 原生 Spaces（集群节点，纳入 Kueue 治理）
+      enum:
+        - studio
+        - hyperpod
+      default: studio
+
+    SpaceType:
+      type: string
+      description: IDE 类型
+      enum:
+        - jupyter
+        - vscode
+        - rstudio
+
+    SpaceInstanceType:
+      type: string
+      description: 实例类型
+      enum:
+        - ml.t3.medium
+        - ml.t3.large
+        - ml.g4dn.xlarge
+        - ml.g5.xlarge
+        - ml.g5.2xlarge
+
+    SpaceStatus:
+      type: string
+      description: 空间生命周期状态
+      enum:
+        - pending
+        - running
+        - stopped
+        - failed
+        - deleted
+
+    CreateSpaceRequest:
+      type: object
+      required:
+        - space_name
+      properties:
+        space_name:
+          type: string
+          minLength: 3
+          maxLength: 255
+          description: 空间名称
+        backend:
+          $ref: '#/components/schemas/SpaceBackend'
+        instance_type:
+          $ref: '#/components/schemas/SpaceInstanceType'
+        space_type:
+          $ref: '#/components/schemas/SpaceType'
+        storage_size_gb:
+          type: integer
+          minimum: 5
+          maximum: 500
+          default: 20
+          description: 存储大小（GB）
+
+    SpaceSummary:
+      type: object
+      required:
+        - id
+        - space_name
+        - owner_id
+        - instance_type
+        - space_type
+        - backend
+        - status
+        - created_at
+      properties:
+        id:
+          type: string
+          description: 空间 ID（UUID）
+        space_name:
+          type: string
+        owner_id:
+          type: integer
+        instance_type:
+          $ref: '#/components/schemas/SpaceInstanceType'
+        space_type:
+          $ref: '#/components/schemas/SpaceType'
+        backend:
+          $ref: '#/components/schemas/SpaceBackend'
+        status:
+          $ref: '#/components/schemas/SpaceStatus'
+        created_at:
+          type: string
+          format: date-time
+
+    SpaceDetail:
+      allOf:
+        - $ref: '#/components/schemas/SpaceSummary'
+        - type: object
+          properties:
+            storage_size_gb:
+              type: integer
+            lifecycle_config_arn:
+              type: string
+              nullable: true
+            sagemaker_space_arn:
+              type: string
+              nullable: true
+              description: 仅 studio 后端
+            namespace:
+              type: string
+              nullable: true
+              description: 仅 hyperpod 后端，CRD 所在 K8s namespace
+            queue_name:
+              type: string
+              nullable: true
+              description: 仅 hyperpod 后端，Kueue local queue
+            workspace_template:
+              type: string
+              nullable: true
+              description: 仅 hyperpod 后端，WorkspaceTemplate 引用
+            updated_at:
+              type: string
+              format: date-time
+            deleted_at:
+              type: string
+              format: date-time
+              nullable: true
+
+    SpaceListResponse:
+      type: object
+      required:
+        - items
+        - total
+        - page
+        - page_size
+        - total_pages
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/SpaceSummary'
+        total:
+          type: integer
+        page:
+          type: integer
+        page_size:
+          type: integer
+        total_pages:
+          type: integer
+
+    SpaceAccessUrlResponse:
+      type: object
+      required:
+        - url
+      properties:
+        url:
+          type: string
+          description: 免登录访问 URL（约 5 分钟内有效，仅供即时跳转）
+
+    SpaceError:
+      type: object
+      description: RFC 9457 Problem Details 错误响应
+      properties:
+        http_status:
+          type: integer
+        error_code:
+          type: string
+        message:
+          type: string
+        details:
+          type: object
+          nullable: true
