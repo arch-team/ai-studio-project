@@ -5,7 +5,10 @@ from datetime import datetime
 from functools import lru_cache
 from typing import Any
 
+import boto3
 import httpx
+from botocore.auth import SigV4Auth
+from botocore.awsrequest import AWSRequest
 
 from src.shared.domain.problem import Problem, problem
 from src.shared.infrastructure import get_settings
@@ -24,16 +27,42 @@ class PrometheusQueryError(Problem):
 class PrometheusClient(IPrometheusClient):
     """Prometheus HTTP API 客户端实现."""
 
-    def __init__(self, endpoint: str | None = None, timeout: float = 30.0):
+    def __init__(
+        self,
+        endpoint: str | None = None,
+        timeout: float = 30.0,
+        use_sigv4: bool | None = None,
+    ):
         """初始化 Prometheus 客户端.
 
         Args:
-            endpoint: Prometheus 端点 URL
+            endpoint: Prometheus 端点 URL。回退链: amp_query_endpoint → prometheus_endpoint → 本地默认
             timeout: 请求超时时间（秒）
+            use_sigv4: 是否对请求做 AWS SigV4 签名（查询 Amazon Managed Prometheus 必须）。
+                显式传入优先；否则按端点是否含 "aps-workspaces" 自动判定。
         """
         settings = get_settings()
-        self._endpoint = endpoint or getattr(settings, "prometheus_endpoint", "http://localhost:9090")
+        self._endpoint = (
+            endpoint
+            or getattr(settings, "amp_query_endpoint", None)
+            or getattr(settings, "prometheus_endpoint", None)
+            or "http://localhost:9090"
+        )
         self._timeout = timeout
+        self._region = getattr(settings, "amp_region", "us-east-1")
+        self._use_sigv4 = use_sigv4 if use_sigv4 is not None else ("aps-workspaces" in self._endpoint)
+
+    def _sign_headers(self, method: str, url: str) -> dict[str, str]:
+        """对发往 AMP 的请求做 SigV4 签名，返回需附加到 HTTP 请求的签名头.
+
+        Args:
+            method: HTTP 方法
+            url: 含 query string 的完整请求 URL（签名必须作用于最终 URL）
+        """
+        credentials = boto3.Session().get_credentials()
+        aws_request = AWSRequest(method=method, url=url)
+        SigV4Auth(credentials, "aps", self._region).add_auth(aws_request)
+        return dict(aws_request.headers)
 
     async def query_instant(self, query: str) -> list[dict[str, Any]]:
         """执行即时查询."""
@@ -41,7 +70,11 @@ class PrometheusClient(IPrometheusClient):
         params = {"query": query}
 
         async with httpx.AsyncClient(timeout=self._timeout) as client:
-            response = await client.get(url, params=params)
+            headers: dict[str, str] = {}
+            if self._use_sigv4:
+                signed_req = client.build_request("GET", url, params=params)
+                headers = self._sign_headers("GET", str(signed_req.url))
+            response = await client.get(url, params=params, headers=headers)
             response.raise_for_status()
             data = response.json()
 
@@ -68,7 +101,11 @@ class PrometheusClient(IPrometheusClient):
         }
 
         async with httpx.AsyncClient(timeout=self._timeout) as client:
-            response = await client.get(url, params=params)
+            headers: dict[str, str] = {}
+            if self._use_sigv4:
+                signed_req = client.build_request("GET", url, params=params)
+                headers = self._sign_headers("GET", str(signed_req.url))
+            response = await client.get(url, params=params, headers=headers)
             response.raise_for_status()
             data = response.json()
 
