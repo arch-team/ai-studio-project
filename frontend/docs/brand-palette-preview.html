@@ -1,0 +1,636 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>深空离子青 · 品牌配色方案</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+/* ============================================================
+   深空离子青 品牌配色预览
+   色值唯一真实源: frontend/src/shared/theme/brandTheme.ts
+   本预览页仅用于可视化，色值与代码逐一对应
+   ============================================================ */
+
+:root {
+  --font-display: "Chakra Petch", sans-serif;
+  --font-mono: "Space Mono", "SF Mono", ui-monospace, monospace;
+  /* 品牌正文字体栈（如实复刻 brandTheme.ts 的 FONT_FAMILY_BASE） */
+  --font-brand: "Open Sans", "PingFang SC", "Hiragino Sans GB", "Noto Sans SC", "Microsoft YaHei", "Helvetica Neue", Arial, sans-serif;
+}
+
+/* 暗黑模式：深空青黑背景 + 亮离子青强调（模拟平台暗黑界面） */
+:root[data-theme="dark"] {
+  --bg-0: #02110F;
+  --bg-1: #07211E;
+  --bg-grad: radial-gradient(ellipse 70% 80% at 85% -10%, rgba(66,224,204,0.10), transparent 55%), radial-gradient(ellipse 50% 60% at 10% 110%, rgba(80,137,198,0.06), transparent 50%), linear-gradient(168deg, #02110F 0%, #06201D 60%, #08322D 100%);
+  --surface: rgba(120, 230, 215, 0.035);
+  --surface-hi: rgba(120, 230, 215, 0.07);
+  --border: rgba(66, 224, 204, 0.16);
+  --border-hi: rgba(66, 224, 204, 0.42);
+  --text: #E6F5F1;
+  --text-dim: #6F938C;
+  --text-faint: #3F5A55;
+  --accent: #42E0CC;
+  --accent-soft: rgba(66, 224, 204, 0.14);
+  --glow: 0 0 40px rgba(66, 224, 204, 0.18);
+  --grid-line: rgba(66, 224, 204, 0.05);
+  --mode-pill-bg: rgba(66,224,204,0.12);
+}
+
+/* 明亮模式：浅青白背景 + 深离子青强调（模拟平台明亮界面） */
+:root[data-theme="light"] {
+  --bg-0: #F2F8F6;
+  --bg-1: #FFFFFF;
+  --bg-grad: radial-gradient(ellipse 70% 80% at 85% -10%, rgba(10,160,142,0.08), transparent 55%), radial-gradient(ellipse 50% 60% at 8% 108%, rgba(80,137,198,0.05), transparent 50%), linear-gradient(168deg, #EEF7F4 0%, #F4FAF8 55%, #E9F4F1 100%);
+  --surface: rgba(13, 101, 87, 0.035);
+  --surface-hi: rgba(13, 101, 87, 0.06);
+  --border: rgba(13, 101, 87, 0.14);
+  --border-hi: rgba(13, 101, 87, 0.40);
+  --text: #0A2A26;
+  --text-dim: #4A6B65;
+  --text-faint: #9DB8B2;
+  --accent: #0D6557;
+  --accent-soft: rgba(13, 101, 87, 0.10);
+  --glow: 0 0 36px rgba(13, 101, 87, 0.12);
+  --grid-line: rgba(13, 101, 87, 0.045);
+  --mode-pill-bg: rgba(13,101,87,0.10);
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+html { scroll-behavior: smooth; }
+
+body {
+  font-family: var(--font-brand);
+  background: var(--bg-0);
+  color: var(--text);
+  line-height: 1.6;
+  transition: background 0.6s ease, color 0.4s ease;
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* 背景氛围层：深空渐变 + 细网格 */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  background: var(--bg-grad);
+  z-index: -2;
+  transition: background 0.6s ease;
+}
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  background-image: linear-gradient(var(--grid-line) 1px, transparent 1px), linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
+  background-size: 56px 56px;
+  z-index: -1;
+  pointer-events: none;
+  mask-image: radial-gradient(ellipse 100% 80% at 50% 0%, black 30%, transparent 80%);
+  -webkit-mask-image: radial-gradient(ellipse 100% 80% at 50% 0%, black 30%, transparent 80%);
+}
+
+/* ===== 顶栏 ===== */
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px clamp(20px, 5vw, 64px);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  background: color-mix(in srgb, var(--bg-0) 72%, transparent);
+  border-bottom: 1px solid var(--border);
+}
+.brand-mark { display: flex; align-items: center; gap: 12px; }
+.brand-mark svg { width: 30px; height: 30px; filter: drop-shadow(0 0 8px rgba(66,224,204,0.4)); }
+.brand-mark .name {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 16px;
+  letter-spacing: 0.02em;
+  color: var(--text);
+}
+.brand-mark .name small {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.18em;
+  color: var(--text-dim);
+  font-weight: 400;
+}
+
+.theme-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  color: var(--text);
+  background: var(--surface-hi);
+  border: 1px solid var(--border);
+  border-radius: 100px;
+  padding: 8px 16px;
+  cursor: pointer;
+  transition: border-color 0.3s, box-shadow 0.3s, transform 0.2s;
+}
+.theme-toggle:hover { border-color: var(--border-hi); box-shadow: var(--glow); transform: translateY(-1px); }
+.theme-toggle .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 8px var(--accent); }
+
+/* ===== 容器 ===== */
+.wrap { max-width: 1180px; margin: 0 auto; padding: 0 clamp(20px, 5vw, 64px); }
+
+/* ===== Hero ===== */
+.hero {
+  position: relative;
+  padding: clamp(64px, 12vh, 140px) 0 clamp(48px, 8vh, 96px);
+  text-align: center;
+}
+.hero-logo { width: 76px; height: 76px; margin: 0 auto 28px; display: block; filter: drop-shadow(0 0 24px rgba(66,224,204,0.45)); animation: float 6s ease-in-out infinite; }
+@keyframes float { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-9px); } }
+.hero h1 {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: clamp(44px, 9vw, 104px);
+  line-height: 0.98;
+  letter-spacing: -0.01em;
+  color: var(--text);
+  margin-bottom: 18px;
+}
+.hero h1 .ion {
+  background: linear-gradient(120deg, var(--accent), #52E3D2 60%, #7FECDF);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  filter: drop-shadow(0 0 30px rgba(66,224,204,0.3));
+}
+.hero .en {
+  font-family: var(--font-mono);
+  font-size: clamp(11px, 2vw, 15px);
+  letter-spacing: 0.42em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  margin-bottom: 28px;
+}
+.hero .lede {
+  max-width: 540px;
+  margin: 0 auto;
+  font-size: clamp(14px, 2.4vw, 17px);
+  color: var(--text-dim);
+}
+.hero .lede code {
+  font-family: var(--font-mono);
+  font-size: 0.85em;
+  color: var(--accent);
+  background: var(--accent-soft);
+  padding: 2px 7px;
+  border-radius: 5px;
+}
+
+/* ===== 区块 ===== */
+section.block { padding: clamp(40px, 7vh, 80px) 0; }
+.block-head { display: flex; align-items: baseline; gap: 18px; margin-bottom: 38px; }
+.block-num {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: var(--accent);
+  letter-spacing: 0.1em;
+}
+.block-title {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: clamp(22px, 4vw, 34px);
+  color: var(--text);
+  letter-spacing: 0.01em;
+}
+.block-sub { font-size: 13.5px; color: var(--text-dim); margin-left: auto; max-width: 320px; text-align: right; }
+
+/* ===== 色卡网格 ===== */
+.swatches { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 18px; }
+.swatch {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  overflow: hidden;
+  cursor: pointer;
+  transition: transform 0.3s cubic-bezier(.2,.8,.2,1), border-color 0.3s, box-shadow 0.3s;
+  position: relative;
+}
+.swatch:hover { transform: translateY(-5px); border-color: var(--border-hi); box-shadow: var(--glow); }
+.chip { height: 96px; position: relative; transition: background 0.6s ease; }
+.chip .copied {
+  position: absolute; inset: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--font-mono); font-size: 12px; letter-spacing: 0.1em;
+  color: #fff; background: rgba(0,0,0,0.55); backdrop-filter: blur(3px);
+  opacity: 0; transition: opacity 0.25s; pointer-events: none;
+}
+.swatch.copied .chip .copied { opacity: 1; }
+.swatch-body { padding: 14px 16px 16px; }
+.swatch-name { font-size: 13.5px; font-weight: 600; color: var(--text); margin-bottom: 3px; }
+.swatch-use { font-size: 11.5px; color: var(--text-dim); margin-bottom: 12px; min-height: 30px; }
+.hexrow { display: flex; flex-direction: column; gap: 4px; font-family: var(--font-mono); font-size: 11.5px; }
+.hexrow .hx { display: flex; justify-content: space-between; align-items: center; transition: opacity 0.4s; }
+.hexrow .hx .lbl { color: var(--text-faint); font-size: 9.5px; letter-spacing: 0.12em; }
+.hexrow .hx .val { color: var(--text); letter-spacing: 0.02em; }
+[data-theme="light"] .hx.dark { opacity: 0.38; }
+[data-theme="dark"] .hx.light { opacity: 0.38; }
+.hexrow .hx.single .val { color: var(--accent); }
+
+/* ===== 真实场景 ===== */
+.scene { background: var(--surface); border: 1px solid var(--border); border-radius: 20px; padding: clamp(24px, 4vw, 40px); }
+.scene-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 36px; }
+@media (max-width: 760px) { .scene-grid { grid-template-columns: 1fr; } .block-sub { display: none; } }
+.scene h4 { font-family: var(--font-display); font-size: 13px; font-weight: 500; letter-spacing: 0.14em; text-transform: uppercase; color: var(--text-dim); margin-bottom: 16px; }
+.scene .row { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin-bottom: 14px; }
+
+/* 演示按钮（直接用品牌色，明暗随主题） */
+.btn { font-family: var(--font-brand); font-size: 14px; font-weight: 600; border: none; border-radius: 8px; padding: 9px 18px; cursor: pointer; transition: background 0.2s, box-shadow 0.2s, transform 0.15s; }
+.btn-primary { background: var(--accent); color: var(--on-primary); }
+:root[data-theme="dark"] { --on-primary: #04332C; }
+:root[data-theme="light"] { --on-primary: #FFFFFF; }
+.btn-primary:hover { transform: translateY(-1px); box-shadow: var(--glow); }
+.btn-normal { background: transparent; border: 1.5px solid var(--accent); color: var(--accent); }
+.btn-label { background: transparent; color: var(--accent); padding: 9px 10px; }
+
+/* 演示链接 */
+.demo-link { color: var(--accent); text-decoration: none; border-bottom: 1px solid transparent; transition: border-color 0.2s; font-size: 14px; }
+.demo-link:hover { border-bottom-color: var(--accent); }
+
+/* 演示输入框（焦点环） */
+.demo-input { font-family: var(--font-brand); font-size: 14px; background: var(--bg-1); color: var(--text); border: 1px solid var(--border); border-radius: 8px; padding: 9px 12px; width: 100%; outline: none; transition: box-shadow 0.2s, border-color 0.2s; }
+.demo-input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+
+/* 选中态列表项 */
+.demo-list { border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+.demo-list .item { padding: 10px 14px; font-size: 13.5px; color: var(--text); border-bottom: 1px solid var(--border); }
+.demo-list .item:last-child { border-bottom: none; }
+.demo-list .item.sel { background: var(--selected-bg); border-left: 3px solid var(--accent); padding-left: 11px; }
+:root[data-theme="dark"] { --selected-bg: #123A36; }
+:root[data-theme="light"] { --selected-bg: #E6F7F4; }
+
+/* 状态指示器 */
+.status { display: inline-flex; align-items: center; gap: 7px; font-size: 13px; color: var(--text); }
+.status .sd { width: 9px; height: 9px; border-radius: 50%; }
+
+/* 训练任务卡片 */
+.job-card { background: var(--bg-1); border: 1px solid var(--border); border-radius: 14px; padding: 18px; }
+.job-card .jc-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 14px; }
+.job-card .jc-name { font-weight: 600; font-size: 15px; color: var(--text); }
+.job-card .jc-meta { font-family: var(--font-mono); font-size: 11px; color: var(--text-dim); margin-top: 2px; }
+.job-card .jc-bar { height: 6px; background: var(--accent-soft); border-radius: 100px; overflow: hidden; margin-bottom: 8px; }
+.job-card .jc-fill { height: 100%; width: 62%; background: var(--accent); border-radius: 100px; }
+.job-card .jc-prog { font-family: var(--font-mono); font-size: 11px; color: var(--text-dim); }
+
+/* ===== Hero 渐变展示 ===== */
+.grads { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+@media (max-width: 640px) { .grads { grid-template-columns: 1fr; } }
+.grad-card { border-radius: 16px; overflow: hidden; border: 1px solid var(--border); }
+.grad-vis { height: 150px; position: relative; display: flex; align-items: flex-end; padding: 16px; }
+.grad-vis.light-hero { background: radial-gradient(ellipse 60% 90% at 82% -12%, rgba(82,227,210,0.26), transparent 60%), linear-gradient(132deg, #051F1C 0%, #0A3733 52%, #0E5147 100%); }
+.grad-vis.dark-hero { background: radial-gradient(ellipse 60% 90% at 82% -12%, rgba(66,224,204,0.18), transparent 60%), linear-gradient(132deg, #02110F 0%, #07211E 52%, #0B3B35 100%); }
+.grad-vis .gtag { font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.1em; color: #B8EEE6; }
+.grad-meta { padding: 12px 16px; background: var(--surface); font-family: var(--font-mono); font-size: 10.5px; color: var(--text-dim); line-height: 1.5; word-break: break-all; }
+
+/* ===== 字体展示 ===== */
+.font-demo { background: var(--surface); border: 1px solid var(--border); border-radius: 20px; padding: clamp(24px, 4vw, 40px); }
+.font-stack { font-family: var(--font-mono); font-size: 12px; color: var(--accent); background: var(--accent-soft); padding: 14px 18px; border-radius: 10px; margin-bottom: 28px; line-height: 1.8; word-break: break-word; }
+.font-samples { display: flex; flex-direction: column; gap: 18px; }
+.fs-row { display: flex; align-items: baseline; gap: 18px; flex-wrap: wrap; border-bottom: 1px dashed var(--border); padding-bottom: 16px; }
+.fs-row:last-child { border-bottom: none; }
+.fs-tag { font-family: var(--font-mono); font-size: 10px; color: var(--text-faint); letter-spacing: 0.1em; min-width: 70px; }
+.fs-text { color: var(--text); }
+
+/* ===== 图表 ===== */
+.chart-area { display: grid; grid-template-columns: 1.1fr 0.9fr; gap: 28px; align-items: center; }
+@media (max-width: 760px) { .chart-area { grid-template-columns: 1fr; } }
+.bars { display: flex; align-items: flex-end; gap: 14px; height: 180px; padding: 16px; background: var(--surface); border: 1px solid var(--border); border-radius: 16px; }
+.bar { flex: 1; border-radius: 6px 6px 0 0; position: relative; transition: opacity 0.3s; min-height: 8%; }
+.bar:hover { opacity: 0.82; }
+.bar .blab { position: absolute; bottom: -22px; left: 0; right: 0; text-align: center; font-family: var(--font-mono); font-size: 9px; color: var(--text-dim); }
+.legend { display: flex; flex-direction: column; gap: 11px; }
+.legend .lg { display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--text); }
+.legend .lg .sq { width: 13px; height: 13px; border-radius: 4px; flex-shrink: 0; }
+.legend .lg .lhex { font-family: var(--font-mono); font-size: 10.5px; color: var(--text-dim); margin-left: auto; }
+
+/* ===== footer ===== */
+footer { border-top: 1px solid var(--border); padding: 36px 0 60px; margin-top: 40px; }
+footer .ftxt { font-family: var(--font-mono); font-size: 11.5px; color: var(--text-dim); line-height: 1.9; }
+footer .ftxt code { color: var(--accent); }
+footer .rule { display: inline-block; margin-top: 12px; font-size: 11px; color: var(--text-faint); }
+
+/* reveal 动画 */
+.reveal { opacity: 0; transform: translateY(22px); transition: opacity 0.7s ease, transform 0.7s cubic-bezier(.2,.8,.2,1); }
+.reveal.in { opacity: 1; transform: none; }
+</style>
+</head>
+<body>
+
+<!-- 顶栏 -->
+<div class="topbar">
+  <div class="brand-mark">
+    <svg viewBox="0 0 32 32" role="img" aria-label="AI 训练平台标识">
+      <defs><linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#52E3D2"/><stop offset="1" stop-color="#0AA08E"/></linearGradient></defs>
+      <rect x="1" y="1" width="30" height="30" rx="9" fill="url(#bg)"/>
+      <g stroke="#04332C" stroke-width="2.2" stroke-linecap="round"><path d="M16 10.5 L10 21" fill="none"/><path d="M16 10.5 L22 21" fill="none"/><path d="M10 21 L22 21" fill="none"/></g>
+      <circle cx="16" cy="9.5" r="3.2" fill="#04332C"/><circle cx="9.5" cy="21.5" r="3.2" fill="#04332C"/><circle cx="22.5" cy="21.5" r="3.2" fill="#04332C"/>
+    </svg>
+    <div class="name">深空离子青<small>BRAND PALETTE</small></div>
+  </div>
+  <button class="theme-toggle" id="toggle">
+    <span class="dot"></span>
+    <span id="toggle-label">暗黑模式</span>
+  </button>
+</div>
+
+<!-- Hero -->
+<header class="hero wrap">
+  <svg class="hero-logo" viewBox="0 0 32 32" role="img" aria-label="平台标识">
+    <defs><linearGradient id="bg2" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#52E3D2"/><stop offset="1" stop-color="#0AA08E"/></linearGradient></defs>
+    <rect x="1" y="1" width="30" height="30" rx="9" fill="url(#bg2)"/>
+    <g stroke="#04332C" stroke-width="2.2" stroke-linecap="round"><path d="M16 10.5 L10 21" fill="none"/><path d="M16 10.5 L22 21" fill="none"/><path d="M10 21 L22 21" fill="none"/></g>
+    <circle cx="16" cy="9.5" r="3.2" fill="#04332C"/><circle cx="9.5" cy="21.5" r="3.2" fill="#04332C"/><circle cx="22.5" cy="21.5" r="3.2" fill="#04332C"/>
+  </svg>
+  <h1>深空<span class="ion">离子青</span></h1>
+  <div class="en">Deep-Space Ion Cyan</div>
+  <p class="lede">AI 训练平台品牌配色方案。摆脱默认 AWS 控制台蓝，以深空青黑与离子青建立平台自有识别。明暗双模式均经 WCAG AA 对比度调校，全部通过 Cloudscape 官方 <code>applyTheme</code> 实现，零自定义 CSS。</p>
+</header>
+
+<main>
+<!-- 01 品牌主色 -->
+<section class="block wrap reveal">
+  <div class="block-head">
+    <span class="block-num">01</span>
+    <span class="block-title">品牌主色</span>
+    <span class="block-sub">主操作按钮、强调元素。三态（默认/悬停/按下）+ 按钮文字色。</span>
+  </div>
+  <div class="swatches" id="primary-swatches"></div>
+</section>
+
+<!-- 02 链接·焦点·选中 -->
+<section class="block wrap reveal">
+  <div class="block-head">
+    <span class="block-num">02</span>
+    <span class="block-title">链接 · 焦点 · 选中</span>
+    <span class="block-sub">导航链接、键盘焦点环、列表/表格选中态。</span>
+  </div>
+  <div class="swatches" id="link-swatches"></div>
+</section>
+
+<!-- 03 状态语义色 -->
+<section class="block wrap reveal">
+  <div class="block-head">
+    <span class="block-num">03</span>
+    <span class="block-title">状态语义色</span>
+    <span class="block-sub">训练任务状态（JOB_STATUS_CHART_COLORS）。单值，明暗通用。</span>
+  </div>
+  <div class="swatches" id="status-swatches"></div>
+</section>
+
+<!-- 04 图表分类色 -->
+<section class="block wrap reveal">
+  <div class="block-head">
+    <span class="block-num">04</span>
+    <span class="block-title">图表分类色板</span>
+    <span class="block-sub">品牌青打头的 5 组分类色，保证类别间区分度。</span>
+  </div>
+  <div class="swatches" id="chart-swatches" style="margin-bottom:32px;"></div>
+  <div class="chart-area">
+    <div class="bars" id="demo-bars"></div>
+    <div class="legend" id="demo-legend"></div>
+  </div>
+</section>
+
+<!-- 05 字体 -->
+<section class="block wrap reveal">
+  <div class="block-head">
+    <span class="block-num">05</span>
+    <span class="block-title">字体与排版</span>
+    <span class="block-sub">中文优先字体栈，补足 Cloudscape 默认 Open Sans 缺失的中文字形。</span>
+  </div>
+  <div class="font-demo">
+    <div class="font-stack">"Open Sans", "PingFang SC", "Hiragino Sans GB", "Noto Sans SC", "Microsoft YaHei", "Helvetica Neue", Arial, sans-serif</div>
+    <div class="font-samples">
+      <div class="fs-row"><span class="fs-tag">显示</span><span class="fs-text" style="font-size:32px;font-weight:700;">分布式训练任务调度</span></div>
+      <div class="fs-row"><span class="fs-tag">标题</span><span class="fs-text" style="font-size:22px;font-weight:600;">HyperPod 集群资源监控</span></div>
+      <div class="fs-row"><span class="fs-tag">正文</span><span class="fs-text" style="font-size:15px;">基于 AWS SageMaker HyperPod 构建的企业级 AI 训练平台，支持 PyTorch DDP、FSDP、DeepSpeed 分布式训练。</span></div>
+      <div class="fs-row"><span class="fs-tag">数字</span><span class="fs-text" style="font-family:var(--font-mono);font-size:18px;">128 GPUs · 4 nodes · 99.2% 利用率</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- 06 真实场景 -->
+<section class="block wrap reveal">
+  <div class="block-head">
+    <span class="block-num">06</span>
+    <span class="block-title">真实使用场景</span>
+    <span class="block-sub">配色在实际组件中的表现，可切换明暗对照。</span>
+  </div>
+  <div class="scene">
+    <div class="scene-grid">
+      <div>
+        <h4>按钮</h4>
+        <div class="row">
+          <button class="btn btn-primary">创建训练任务</button>
+          <button class="btn btn-normal">取消</button>
+          <button class="btn btn-label">查看详情</button>
+        </div>
+        <h4 style="margin-top:26px;">链接 · 输入框（焦点环）</h4>
+        <div class="row"><a href="#" class="demo-link" onclick="return false;">llama2-finetune-001 →</a></div>
+        <div class="row"><input class="demo-input" placeholder="搜索训练任务…" value="resnet" aria-label="搜索"></div>
+        <h4 style="margin-top:26px;">列表选中态</h4>
+        <div class="demo-list">
+          <div class="item">bert-pretrain-002</div>
+          <div class="item sel">llama2-finetune-001</div>
+          <div class="item">gpt-train-003</div>
+        </div>
+      </div>
+      <div>
+        <h4>状态指示器</h4>
+        <div class="row" style="gap:20px;">
+          <span class="status"><span class="sd" style="background:#0AA08E;"></span>运行中</span>
+          <span class="status"><span class="sd" style="background:#67A353;"></span>已完成</span>
+        </div>
+        <div class="row" style="gap:20px;">
+          <span class="status"><span class="sd" style="background:#D63F38;"></span>已失败</span>
+          <span class="status"><span class="sd" style="background:#8C8C94;"></span>已暂停</span>
+        </div>
+        <h4 style="margin-top:26px;">训练任务卡片</h4>
+        <div class="job-card">
+          <div class="jc-top">
+            <div>
+              <div class="jc-name">llama2-finetune-001</div>
+              <div class="jc-meta">FSDP · 4 nodes · 32 GPUs</div>
+            </div>
+            <span class="status"><span class="sd" style="background:#0AA08E;"></span>运行中</span>
+          </div>
+          <div class="jc-bar"><div class="jc-fill"></div></div>
+          <div class="jc-prog">Epoch 3 / 10 · 62%</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 07 Hero 渐变 -->
+<section class="block wrap reveal">
+  <div class="block-head">
+    <span class="block-num">07</span>
+    <span class="block-title">Hero 页头渐变</span>
+    <span class="block-sub">首页/门户型页面专用。深空青黑线性渐变叠加右上离子青辉光。</span>
+  </div>
+  <div class="grads">
+    <div class="grad-card">
+      <div class="grad-vis light-hero"><span class="gtag">明亮模式 · light</span></div>
+      <div class="grad-meta">radial-gradient(… rgba(82,227,210,0.26) …)<br>linear-gradient(132deg, #051F1C → #0A3733 → #0E5147)</div>
+    </div>
+    <div class="grad-card">
+      <div class="grad-vis dark-hero"><span class="gtag">暗黑模式 · dark</span></div>
+      <div class="grad-meta">radial-gradient(… rgba(66,224,204,0.18) …)<br>linear-gradient(132deg, #02110F → #07211E → #0B3B35)</div>
+    </div>
+  </div>
+</section>
+</main>
+
+<footer class="wrap reveal">
+  <div class="ftxt">
+    色值唯一真实源 · <code>frontend/src/shared/theme/brandTheme.ts</code><br>
+    本预览页仅用于可视化，所有色值与代码逐一对应 · 点击任意色卡可复制 HEX<br>
+    <span class="rule">铁律：改色只改 design token，禁止自定义 CSS 与硬编码颜色</span>
+  </div>
+</footer>
+
+<script>
+/* ============ 色值数据（逐一对应 brandTheme.ts） ============ */
+const PRIMARY = [
+  { name: '主色 · 默认', use: 'colorBackgroundButtonPrimaryDefault', light: '#0D6557', dark: '#42E0CC' },
+  { name: '主色 · 悬停', use: 'colorBackgroundButtonPrimaryHover', light: '#0A5247', dark: '#5FE8D8' },
+  { name: '主色 · 按下', use: 'colorBackgroundButtonPrimaryActive', light: '#08433A', dark: '#2FCBB7' },
+  { name: '主按钮文字', use: 'colorTextButtonPrimaryDefault', light: '#FFFFFF', dark: '#04332C' },
+];
+const LINK = [
+  { name: '链接 · 默认', use: 'colorTextLinkDefault', light: '#0B5D50', dark: '#52E3D2' },
+  { name: '链接 · 悬停', use: 'colorTextLinkHover', light: '#08433A', dark: '#7FECDF' },
+  { name: '焦点环', use: 'colorBorderItemFocused', light: '#0AA08E', dark: '#52E3D2' },
+  { name: '选中态背景', use: 'colorBackgroundItemSelected', light: '#E6F7F4', dark: '#123A36' },
+];
+const STATUS = [
+  { name: '运行中', use: 'running · 品牌活跃青', hex: '#0AA08E' },
+  { name: '已完成', use: 'completed · 沉稳绿', hex: '#67A353' },
+  { name: '已失败', use: 'failed · 警示红', hex: '#D63F38' },
+  { name: '已暂停', use: 'paused · 中性灰', hex: '#8C8C94' },
+];
+const CHART = [
+  { name: '分类 1', use: 'Categorical 1', light: '#0AA08E', dark: '#42E0CC' },
+  { name: '分类 2', use: 'Categorical 2', light: '#5089C6', dark: '#7CA9DC' },
+  { name: '分类 3', use: 'Categorical 3', light: '#B0833D', dark: '#D9A95B' },
+  { name: '分类 4', use: 'Categorical 4', light: '#8D6C9F', dark: '#B095C4' },
+  { name: '分类 5', use: 'Categorical 5', light: '#566977', dark: '#90A4B0' },
+];
+
+/* ============ 渲染色卡 ============ */
+function dualSwatch(d) {
+  return `<div class="swatch" data-light="${d.light}" data-dark="${d.dark}">
+    <div class="chip" style="--cl:${d.light};--cd:${d.dark};background:var(--cd);"><span class="copied">✓ 已复制</span></div>
+    <div class="swatch-body">
+      <div class="swatch-name">${d.name}</div>
+      <div class="swatch-use">${d.use}</div>
+      <div class="hexrow">
+        <div class="hx light"><span class="lbl">LIGHT</span><span class="val">${d.light}</span></div>
+        <div class="hx dark"><span class="lbl">DARK</span><span class="val">${d.dark}</span></div>
+      </div>
+    </div></div>`;
+}
+function singleSwatch(d) {
+  return `<div class="swatch" data-single="${d.hex}">
+    <div class="chip" style="background:${d.hex};"><span class="copied">✓ 已复制</span></div>
+    <div class="swatch-body">
+      <div class="swatch-name">${d.name}</div>
+      <div class="swatch-use">${d.use}</div>
+      <div class="hexrow"><div class="hx single"><span class="lbl">HEX</span><span class="val">${d.hex}</span></div></div>
+    </div></div>`;
+}
+
+document.getElementById('primary-swatches').innerHTML = PRIMARY.map(dualSwatch).join('');
+document.getElementById('link-swatches').innerHTML = LINK.map(dualSwatch).join('');
+document.getElementById('status-swatches').innerHTML = STATUS.map(singleSwatch).join('');
+document.getElementById('chart-swatches').innerHTML = CHART.map(dualSwatch).join('');
+
+/* chip 背景随主题切换：用 CSS 变量 + data-theme 控制 */
+function applyChipBg() {
+  const dark = document.documentElement.getAttribute('data-theme') === 'dark';
+  document.querySelectorAll('.chip[style*="--cd"]').forEach(c => {
+    c.style.background = dark ? 'var(--cd)' : 'var(--cl)';
+  });
+}
+
+/* ============ 图表 ============ */
+const barData = [
+  { v: 88, light: '#0AA08E', dark: '#42E0CC', l: 'cat1' },
+  { v: 64, light: '#5089C6', dark: '#7CA9DC', l: 'cat2' },
+  { v: 72, light: '#B0833D', dark: '#D9A95B', l: 'cat3' },
+  { v: 45, light: '#8D6C9F', dark: '#B095C4', l: 'cat4' },
+  { v: 58, light: '#566977', dark: '#90A4B0', l: 'cat5' },
+];
+document.getElementById('demo-bars').innerHTML = barData.map(b =>
+  `<div class="bar" data-light="${b.light}" data-dark="${b.dark}" style="height:${b.v}%;"><span class="blab">${b.l}</span></div>`
+).join('');
+document.getElementById('demo-legend').innerHTML = CHART.map(c =>
+  `<div class="lg"><span class="sq" data-light="${c.light}" data-dark="${c.dark}"></span>${c.use}<span class="lhex">—</span></div>`
+).join('');
+function applyChartColors() {
+  const dark = document.documentElement.getAttribute('data-theme') === 'dark';
+  document.querySelectorAll('.bar[data-light]').forEach(b => b.style.background = dark ? b.dataset.dark : b.dataset.light);
+  document.querySelectorAll('.legend .sq').forEach((s, i) => {
+    const hex = dark ? s.dataset.dark : s.dataset.light;
+    s.style.background = hex;
+    s.parentElement.querySelector('.lhex').textContent = hex;
+  });
+}
+
+/* ============ 主题切换 ============ */
+const root = document.documentElement;
+const toggle = document.getElementById('toggle');
+const label = document.getElementById('toggle-label');
+function syncTheme() {
+  const dark = root.getAttribute('data-theme') === 'dark';
+  label.textContent = dark ? '暗黑模式' : '明亮模式';
+  applyChipBg();
+  applyChartColors();
+}
+toggle.addEventListener('click', () => {
+  root.setAttribute('data-theme', root.getAttribute('data-theme') === 'dark' ? 'light' : 'dark');
+  syncTheme();
+});
+
+/* ============ 点击复制 ============ */
+document.body.addEventListener('click', (e) => {
+  const sw = e.target.closest('.swatch');
+  if (!sw) return;
+  const dark = root.getAttribute('data-theme') === 'dark';
+  const hex = sw.dataset.single || (dark ? sw.dataset.dark : sw.dataset.light);
+  navigator.clipboard?.writeText(hex).catch(() => {});
+  sw.classList.add('copied');
+  const chip = sw.querySelector('.copied');
+  if (chip) chip.textContent = '✓ ' + hex;
+  setTimeout(() => sw.classList.remove('copied'), 900);
+});
+
+/* ============ 滚动 reveal ============ */
+const io = new IntersectionObserver((entries) => {
+  entries.forEach(en => { if (en.isIntersecting) { en.target.classList.add('in'); io.unobserve(en.target); } });
+}, { threshold: 0.12 });
+document.querySelectorAll('.reveal').forEach(el => io.observe(el));
+
+/* 初始化 */
+syncTheme();
+</script>
+</body>
+</html>
