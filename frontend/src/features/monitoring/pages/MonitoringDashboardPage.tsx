@@ -13,6 +13,7 @@
 
 import { useState, useMemo } from "react";
 import {
+  Alert,
   Box,
   ColumnLayout,
   Container,
@@ -49,7 +50,7 @@ import {
   DATE_RANGE_PICKER_I18N,
 } from "@shared/utils";
 import type {
-  Alert,
+  Alert as AlertData,
   ClusterSummary,
   ResourceUtilization,
   MetricFilters,
@@ -82,9 +83,8 @@ const REFRESH_INTERVAL_OPTIONS = [
   { id: "5m", text: "5分钟" },
 ];
 
-// Grafana 配置 (可从环境变量读取)
+// Grafana 静态配置 (baseUrl 在组件内动态读取环境变量，以支持运行时降级判断)
 const GRAFANA_CONFIG = {
-  baseUrl: import.meta.env.VITE_GRAFANA_URL || "/grafana",
   dashboardId: "cluster-overview",
   orgId: 1,
 };
@@ -290,8 +290,17 @@ function GrafanaDashboard({
   refreshInterval?: number;
   visible: boolean;
 }) {
+  // 动态读取环境变量，判断 Grafana 是否真正配置
+  // 注意: fallback "/grafana" 在 dev 环境是死链，不视为"已配置"
+  const grafanaBaseUrl = import.meta.env.VITE_GRAFANA_URL;
+  const isGrafanaConfigured = Boolean(grafanaBaseUrl);
+
   // 构建 Grafana URL (必须在条件返回之前调用 Hook)
   const grafanaUrl = useMemo(() => {
+    if (!grafanaBaseUrl) {
+      return "";
+    }
+
     const params = new URLSearchParams({
       orgId: String(GRAFANA_CONFIG.orgId),
       from: new Date(startTime).getTime().toString(),
@@ -304,11 +313,23 @@ function GrafanaDashboard({
       params.append("refresh", `${Math.floor(refreshInterval / 1000)}s`);
     }
 
-    return `${GRAFANA_CONFIG.baseUrl}/d/${GRAFANA_CONFIG.dashboardId}?${params.toString()}`;
-  }, [startTime, endTime, refreshInterval]);
+    return `${grafanaBaseUrl}/d/${GRAFANA_CONFIG.dashboardId}?${params.toString()}`;
+  }, [grafanaBaseUrl, startTime, endTime, refreshInterval]);
 
   if (!visible) {
     return null;
+  }
+
+  // 未配置 Grafana: 优雅降级，展示引导文案而非死链 iframe
+  if (!isGrafanaConfigured) {
+    return (
+      <Container header={<Header variant="h2">Grafana 仪表盘</Header>}>
+        <Alert type="info" header="Grafana 未配置">
+          Grafana 仪表盘尚未部署，请联系管理员配置 VITE_GRAFANA_URL
+          环境变量后查看实时监控大盘。当前可在「概览」「指标趋势」标签页查看核心指标。
+        </Alert>
+      </Container>
+    );
   }
 
   return (
@@ -345,12 +366,12 @@ function GrafanaDashboard({
 /**
  * 告警面板
  */
-function AlertsPanel({ alerts }: { alerts: Alert[] }) {
+function AlertsPanel({ alerts }: { alerts: AlertData[] }) {
   const columnDefinitions = [
     {
       id: "severity",
       header: "级别",
-      cell: (item: Alert) => (
+      cell: (item: AlertData) => (
         <StatusIndicator type={ALERT_SEVERITY_COLORS[item.severity]}>
           {ALERT_SEVERITY_LABELS[item.severity]}
         </StatusIndicator>
@@ -360,24 +381,24 @@ function AlertsPanel({ alerts }: { alerts: Alert[] }) {
     {
       id: "title",
       header: "告警",
-      cell: (item: Alert) => item.title,
+      cell: (item: AlertData) => item.title,
     },
     {
       id: "resource",
       header: "资源",
-      cell: (item: Alert) => item.resource_type,
+      cell: (item: AlertData) => item.resource_type,
       width: 100,
     },
     {
       id: "fired_at",
       header: "触发时间",
-      cell: (item: Alert) => formatDateTimeShort(item.fired_at),
+      cell: (item: AlertData) => formatDateTimeShort(item.fired_at),
       width: 150,
     },
     {
       id: "status",
       header: "状态",
-      cell: (item: Alert) => (
+      cell: (item: AlertData) => (
         <StatusIndicator
           type={item.status === "resolved" ? "success" : "warning"}
         >

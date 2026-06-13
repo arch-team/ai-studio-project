@@ -5,7 +5,7 @@
  * TDD Step 1: Red - 编写测试
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { renderWithProviders } from '@tests/__utils__/test-utils';
@@ -286,6 +286,48 @@ describe('MonitoringDashboardPage', () => {
 
       renderWithProviders(<MonitoringDashboardPage />);
       expect(screen.getByText(/暂无集群/i)).toBeInTheDocument();
+    });
+  });
+
+  describe('Grafana 未配置降级', () => {
+    afterEach(() => {
+      vi.unstubAllEnvs();
+    });
+
+    it('未配置 VITE_GRAFANA_URL 时应显示引导文案而非死链 iframe', async () => {
+      // 显式置空 VITE_GRAFANA_URL，模拟 dev 环境未部署 Grafana
+      vi.stubEnv('VITE_GRAFANA_URL', '');
+      const user = userEvent.setup();
+
+      renderWithProviders(<MonitoringDashboardPage />);
+
+      // 切换到 Grafana 标签页
+      await user.click(screen.getByRole('tab', { name: /Grafana/i }));
+
+      // 引导文案存在（标题提示未配置，正文提示联系管理员）
+      expect(screen.getByText('Grafana 未配置')).toBeInTheDocument();
+      expect(screen.getByText(/请联系管理员/)).toBeInTheDocument();
+
+      // 不渲染指向 /grafana 死链的 iframe
+      expect(screen.queryByTitle('Grafana 监控仪表盘')).not.toBeInTheDocument();
+    });
+
+    it('已配置 VITE_GRAFANA_URL 时应渲染 iframe 且 src 指向配置的 URL', async () => {
+      vi.stubEnv('VITE_GRAFANA_URL', 'https://grafana.example.com');
+      const user = userEvent.setup();
+
+      renderWithProviders(<MonitoringDashboardPage />);
+
+      // 切换到 Grafana 标签页
+      await user.click(screen.getByRole('tab', { name: /Grafana/i }));
+
+      // iframe 渲染，且 src 指向配置的 Grafana URL
+      const iframe = screen.getByTitle('Grafana 监控仪表盘');
+      expect(iframe).toBeInTheDocument();
+      expect(iframe).toHaveAttribute(
+        'src',
+        expect.stringContaining('https://grafana.example.com'),
+      );
     });
   });
 });
