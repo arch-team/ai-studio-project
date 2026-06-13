@@ -65,6 +65,21 @@
 
 ---
 
+## 设计规范
+
+- [ ] 四态完整：default/loading/empty/error 全处理（详见 [interaction-states.md](interaction-states.md)）
+- [ ] 错误态保留 PageLayout 骨架 + 重试，不裸容器塌缩、不静默降级为空
+- [ ] empty 态带引导主操作 CTA
+- [ ] 状态展示走 `{ENTITY}_STATUS_LABELS` 映射，不裸渲染英文枚举值（详见 [ux-writing.md](ux-writing.md)）
+- [ ] 页面遵循四大模式之一（列表/详情/表单/Dashboard，详见 [page-templates.md](page-templates.md)）
+- [ ] 颜色只用 design token，无硬编码 hex（详见 [design-tokens.md](design-tokens.md)）
+- [ ] 图表同图同量纲、聚合值与分项分离、类别配色用分类色序列
+- [ ] UI 术语与文案符合规范（动词/状态名词统一、中文排版）
+
+详见 [interaction-states.md](interaction-states.md) / [ux-writing.md](ux-writing.md) / [page-templates.md](page-templates.md) / [design-tokens.md](design-tokens.md)
+
+---
+
 ## 代码风格
 
 - [ ] 命名符合规范 (PascalCase 组件, camelCase 函数, UPPER_SNAKE 常量)

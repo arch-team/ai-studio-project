@@ -94,5 +94,8 @@ src/
 | `.claude/rules/security.md` | XSS 防护、敏感数据存储、输入验证、API 安全 |
 | `.claude/rules/performance.md` | 代码分割、Memoization、列表优化、Bundle 优化 |
 | `.claude/rules/accessibility.md` | WCAG 2.1 AA、ARIA 使用、键盘导航 |
-| `.claude/rules/checklist.md` | PR Review 检查清单 (架构、Cloudscape、安全、测试) |
-| `../specs/frontend-design-guide.md` | 完整视觉规范、页面模板、色彩系统、间距系统 |
+| `.claude/rules/checklist.md` | PR Review 检查清单 (架构、Cloudscape、安全、测试、设计规范) |
+| `.claude/rules/design-tokens.md` | 深空离子青品牌主题：色板、字体栈、图表色、Hero、Logo (色值单一真实源) |
+| `.claude/rules/page-templates.md` | 列表/详情/表单/Dashboard 四大页面模式骨架 + 图表严谨性 |
+| `.claude/rules/interaction-states.md` | 错误/加载/空/成功四态完整性 + error 态铁律 |
+| `.claude/rules/ux-writing.md` | 术语映射、状态标签、文案模式、中文排版 |

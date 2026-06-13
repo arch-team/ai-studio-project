@@ -168,6 +168,8 @@
 | 文本对比度 | >= 4.5:1 (正常文本), >= 3:1 (大文本) |
 | 不仅依赖颜色 | 颜色 + 图标 + 文字组合区分状态 |
 
+> 品牌色的明暗双值与对比度（如主色 `#0D6557` 对白字 ≈ 5.9:1）见 [design-tokens.md](design-tokens.md) §2；颜色一律走 design token，不硬编码。
+
 ```tsx
 // ✅ 正确 - 使用 Cloudscape StatusIndicator (颜色 + 图标 + 文字)
 <StatusIndicator type="success">已完成</StatusIndicator>
