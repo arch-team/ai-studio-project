@@ -68,8 +68,9 @@ class K8sWorkspaceClient:
         """
         url_path = f"/apis/{_WORKSPACE_API_GROUP}/{_WORKSPACE_API_VERSION}/namespaces/{namespace}/workspaces"
 
+        # 写操作：无集群→SpaceBackendUnavailableError，连接失败→HyperPodSpaceBackendError
         response = await self._request("POST", url_path, json=body)
-        assert response is not None  # 写操作 allow_unavailable_for_read=False，必有 Response
+        assert response is not None  # 写操作不降级，_request 必返回 Response
         try:
             response.raise_for_status()
         except httpx.HTTPStatusError as e:
@@ -99,7 +100,8 @@ class K8sWorkspaceClient:
         """
         url_path = f"/apis/{_WORKSPACE_API_GROUP}/{_WORKSPACE_API_VERSION}/namespaces/{namespace}/workspaces/{name}"
 
-        response = await self._request("GET", url_path, allow_unavailable_for_read=True)
+        # 读操作降级：无集群/连接失败→None
+        response = await self._request("GET", url_path, allow_unavailable=True, allow_connect_error=True)
         if response is None:
             return None
 
@@ -142,13 +144,14 @@ class K8sWorkspaceClient:
         url_path = f"/apis/{_WORKSPACE_API_GROUP}/{_WORKSPACE_API_VERSION}/namespaces/{namespace}/workspaces/{name}"
         body = {"spec": {"desiredStatus": desired_status}}
 
+        # 写操作：无集群→SpaceBackendUnavailableError，连接失败→HyperPodSpaceBackendError
         response = await self._request(
             "PATCH",
             url_path,
             json=body,
             extra_headers={"Content-Type": "application/merge-patch+json"},
         )
-        assert response is not None  # 写操作 allow_unavailable_for_read=False，必有 Response
+        assert response is not None  # 写操作不降级，_request 必返回 Response
         try:
             response.raise_for_status()
         except httpx.HTTPStatusError as e:
@@ -179,8 +182,8 @@ class K8sWorkspaceClient:
         """
         url_path = f"/apis/{_WORKSPACE_API_GROUP}/{_WORKSPACE_API_VERSION}/namespaces/{namespace}/workspaces/{name}"
 
-        # 无集群时视为无可删资源（幂等成功），故 allow_unavailable_for_read=True
-        response = await self._request("DELETE", url_path, allow_unavailable_for_read=True)
+        # 无集群→幂等返回（无可删资源）；连接失败→抛异常（allow_connect_error=False）
+        response = await self._request("DELETE", url_path, allow_unavailable=True)
         if response is None:
             logger.info("workspace_delete_skipped_no_cluster", namespace=namespace, name=name)
             return
@@ -219,11 +222,12 @@ class K8sWorkspaceClient:
             HyperPodSpaceBackendError: 创建失败
         """
         url_path = (
-            f"/apis/{_CONNECTION_API_GROUP}/{_CONNECTION_API_VERSION}" f"/namespaces/{namespace}/workspaceconnections"
+            f"/apis/{_CONNECTION_API_GROUP}/{_CONNECTION_API_VERSION}/namespaces/{namespace}/workspaceconnections"
         )
 
+        # 写操作：无集群→SpaceBackendUnavailableError，连接失败→HyperPodSpaceBackendError
         response = await self._request("POST", url_path, json=body)
-        assert response is not None  # 写操作 allow_unavailable_for_read=False，必有 Response
+        assert response is not None  # 写操作不降级，_request 必返回 Response
         try:
             response.raise_for_status()
         except httpx.HTTPStatusError as e:
@@ -250,12 +254,10 @@ class K8sWorkspaceClient:
         Returns:
             Connection 资源，不存在或不可用时返回 None
         """
-        url_path = (
-            f"/apis/{_CONNECTION_API_GROUP}/{_CONNECTION_API_VERSION}"
-            f"/namespaces/{namespace}/workspaceconnections/{name}"
-        )
+        url_path = f"/apis/{_CONNECTION_API_GROUP}/{_CONNECTION_API_VERSION}/namespaces/{namespace}/workspaceconnections/{name}"
 
-        response = await self._request("GET", url_path, allow_unavailable_for_read=True)
+        # 读操作降级：无集群/连接失败→None
+        response = await self._request("GET", url_path, allow_unavailable=True, allow_connect_error=True)
         if response is None:
             return None
 
@@ -279,7 +281,8 @@ class K8sWorkspaceClient:
         *,
         json: dict[str, Any] | None = None,
         extra_headers: dict[str, str] | None = None,
-        allow_unavailable_for_read: bool = False,
+        allow_unavailable: bool = False,
+        allow_connect_error: bool = False,
     ) -> httpx.Response | None:
         """统一发出 K8s API 请求，封装可用性检查、认证、CA 验证与连接错误处理。
 
@@ -290,20 +293,23 @@ class K8sWorkspaceClient:
             url_path: API 路径 (以 / 开头，不含 host)
             json: 请求体
             extra_headers: 附加请求头（如 merge-patch Content-Type）
-            allow_unavailable_for_read: 读操作降级开关。
-                True → 无集群/连接失败时返回 None；
-                False → 无集群抛 SpaceBackendUnavailableError，连接失败抛 HyperPodSpaceBackendError。
+            allow_unavailable: 无集群配置（无 api_url）时的降级开关。
+                True → 返回 None（读操作降级 / delete 无可删资源）；
+                False → 抛 SpaceBackendUnavailableError（写操作必须明确报错）。
+            allow_connect_error: 连接失败（httpx.ConnectError）时的降级开关。
+                True → 返回 None（读操作降级）；
+                False → 抛 HyperPodSpaceBackendError（写操作/delete 连接失败须报错）。
 
         Returns:
             httpx.Response；降级场景下返回 None
 
         Raises:
-            SpaceBackendUnavailableError: 写操作且 K8s API 不可达
-            HyperPodSpaceBackendError: 写操作连接失败或其它请求异常
+            SpaceBackendUnavailableError: 无 api_url 且 allow_unavailable=False
+            HyperPodSpaceBackendError: 连接失败且 allow_connect_error=False，或其它请求异常
         """
         api_url = self._resolve_api_url()
         if api_url is None:
-            if allow_unavailable_for_read:
+            if allow_unavailable:
                 logger.info("workspace_k8s_api_unavailable", url_path=url_path)
                 return None
             raise SpaceBackendUnavailableError(message="K8s API unavailable: cluster not configured")
@@ -327,12 +333,13 @@ class K8sWorkspaceClient:
                     return await client.delete(url, headers=headers)
                 return await client.get(url, headers=headers)
         except httpx.ConnectError:
-            if allow_unavailable_for_read:
+            if allow_connect_error:
                 logger.info("workspace_k8s_connection_failed", url_path=url_path)
                 return None
             raise HyperPodSpaceBackendError(message="K8s API connection failed") from None
         except Exception as e:
-            if allow_unavailable_for_read:
+            # 其它传输层异常（如超时）：读操作降级→None，写/删操作→HyperPodSpaceBackendError
+            if allow_connect_error:
                 logger.warning("workspace_api_error", url_path=url_path, error=str(e))
                 return None
             logger.error("workspace_api_error", url_path=url_path, error=str(e))
