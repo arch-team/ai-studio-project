@@ -117,6 +117,8 @@ workspace_template: str | None = None         # 仅 hyperpod：WorkspaceTemplate
 
 与方式一「以真实资源状态为事实源做 lazy sync」同构——事实源从 SageMaker App 换成 `Workspace` CRD。
 
+> **规划阶段需验证**：add-on 尚未安装（§2.4），上表的 CRD 状态字段名（`status.workspaceConnectionUrl`）与状态枚举值（`Creating/Running/Stopped/Failed/Degraded`）来自 AWS 文档，需在「基础设施就绪」阶段对照真实集群 CRD schema 核验后再固化映射表——§3.3 的状态映射依赖这些精确字符串。
+
 ### 3.4 数据库迁移
 
 `development_spaces` 表增量加列（Alembic）：`backend`（默认 `'studio'`，存量行自动归类）、`namespace`、`queue_name`、`workspace_template`。对存量方式一空间零影响。
@@ -135,13 +137,15 @@ workspace_template: str | None = None         # 仅 hyperpod：WorkspaceTemplate
 
 ```python
 class ISpaceBackendClient(ABC):
-    async def provision_space(self, space: Space) -> dict      # 创建底层资源
+    async def provision_space(self, space: Space) -> dict      # 创建底层资源，返回需持久化的标识
     async def delete_space(self, space: Space) -> None         # 幂等删除
     async def start_space(self, space: Space) -> None          # 拉起计算
     async def stop_space(self, space: Space) -> None           # 释放计算、保留存储
     async def describe_space(self, space: Space) -> dict | None # {status,...}，不存在返回 None
     async def create_access_url(self, space: Space, conn_type: str) -> str
 ```
+
+> `provision_space` 返回 `dict` 沿用现有 `ISageMakerSpacesClient` 风格（`dict[str, Any]`）。规划阶段明确各 backend 返回的 key：studio 返回 `{"arn": ...}`（写入 `sagemaker_space_arn`），hyperpod 返回 `{"namespace": ..., "workspace_name": ...}`（写入对应字段），让 service 知道该持久化什么。
 
 ### 4.2 两个实现，service 对称分发
 
@@ -193,7 +197,7 @@ class ISpaceBackendClient(ABC):
 create_space(backend=hyperpod):
   1. 去重检查（backend 无关）
   2. 分流 → HyperPodSpaceBackend.provision:
-     a. 通过 shared IQuotaChecker 校验团队 ClusterQueue 余量（复用 quotas 模块，与训练任务同源）
+     a. 通过 shared IQuotaChecker 校验配额（复用 quotas 模块，与训练任务同源）
      b. 配额不足 → SpaceQuotaExceededError(429)
      c. POST Workspace CRD，带:
         - kueue.x-k8s.io/queue-name label → 团队 local queue
@@ -201,6 +205,8 @@ create_space(backend=hyperpod):
         - resources requests/limits
   3. 计 SLA、存库
 ```
+
+> **规划阶段需解决的集成细节**：现有 `IQuotaChecker`（`shared/domain/interfaces/quota_checker.py`）是**按 `user_id` 设计**的（`check_quota(user_id, resource_type, amount) -> bool`），而 Kueue ClusterQueue 是**团队范围**的。规划时需决定二者映射方式：(a) 解析 user→team 后查团队配额，或 (b) 将 `IQuotaChecker` 校验作为前置软门，把 Kueue admission 作为真正的硬门（推荐——避免与 Kueue 重复造配额逻辑，前者给用户即时反馈，后者是事实裁决者）。实现者不应假设一个团队键的方法签名。
 
 ### 5.2 治理策略（AWS 文档推荐）
 
