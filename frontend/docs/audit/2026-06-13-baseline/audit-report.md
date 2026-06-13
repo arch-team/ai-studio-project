@@ -1,7 +1,7 @@
 # UI/UX 基线审计报告（阶段 1）
 
 > 审计日期：2026-06-13 | 场景：baseline
-> 范围：13 模块 29 页面（billing 无页面除外），截图 160 张（状态 × 双主题）
+> 范围：13 模块 29 个 PageSpec（billing 无页面除外），其中 28 个有效评分单元（checkpoints 四态无效不计，见 F-060），截图 160 张（状态 × 双主题）
 > 方法：截图流水线（Playwright，MockApi 注入状态）→ 13 路 design-reviewer 独立四维度评分 → 聚合
 > 配套文件：[score-matrix.md](score-matrix.md)（评分矩阵）、[findings.md](findings.md)（问题清单）
 

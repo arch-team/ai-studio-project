@@ -1,8 +1,13 @@
 /**
  * UI/UX 审计页面清单
  *
- * 数据源：frontend/src/app/router/routes.ts（29 个可审计页面）
- * 状态豁免规则见 spec §3.1/§5.4：
+ * 数据源：frontend/src/app/router/routes.ts
+ * 页面数口径（避免文档对账困惑）：
+ * - 29 个 PageSpec 条目（本数组 AUDIT_PAGES 长度）
+ * - 28 个有效评分单元：29 条减去 checkpoints（master-detail 二级数据态未被 mock 引擎驱动，
+ *   四态截图相同，IX 无法评估，见 findings F-060）。ide 页虽复用 space-list 组件，但已产出截图并参与评分（2.8）。
+ * - 评分矩阵与审计报告以「28 个有效评分页面」为统计口径
+ * 状态豁免规则见 spec §3.1/§5.4（spec 路径相对仓库根：docs/superpowers/specs/2026-06-12-ui-ux-quality-system-design.md）：
  * - 列表页: default/empty/loading/error 四态
  * - 详情页: default/loading/error 三态（error 用 404）
  * - 表单页: 仅 default（提交类错误属交互级，静态截图不适用）

@@ -1,7 +1,7 @@
 # UI/UX 基线审计评分矩阵
 
 > 审计日期：2026-06-13 | 场景：baseline（阶段 1 全量基线）
-> 评分框架：IA 30% / IX 30% / CONS 25% / VIS 15%，1-5 分，商用门槛 4.0
+> 评分框架：IA 30% / IX 30% / CONS 25% / VIS 15%，1-5 分，商用门槛 4.0（定义见仓库根 docs/superpowers/specs/2026-06-12-ui-ux-quality-system-design.md §3.2）
 > 评分由 13 路 design-reviewer 独立评审（截图：13 模块 × 状态 × 双主题，共 160 张）
 
 ## 评分矩阵
