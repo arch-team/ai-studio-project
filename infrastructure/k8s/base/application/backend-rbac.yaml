@@ -1,6 +1,8 @@
 # Backend 服务 K8s RBAC
 # 后端通过 in-cluster ServiceAccount 调用 HyperPod SDK 提交/管理训练任务，
 # 需要 HyperPodPyTorchJob CRD 及关联资源（Pod 日志、Kueue 工作负载）的权限。
+# 另需 HyperPod 原生 Spaces 的 Workspace CRD 权限（HyperPodSpaceBackend 通过
+# K8s API 操作 workspace.jupyter.org Workspace，Phase B Task 16 核验确认）。
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
@@ -23,6 +25,14 @@ rules:
   # Kueue 调度状态查询（任务排队/抢占调试）
   - apiGroups: ["kueue.x-k8s.io"]
     resources: ["workloads", "localqueues", "clusterqueues"]
+    verbs: ["get", "list", "watch"]
+  # HyperPod 原生 Spaces - Workspace CRD 全生命周期（create/get/list/patch/delete）
+  - apiGroups: ["workspace.jupyter.org"]
+    resources: ["workspaces"]
+    verbs: ["create", "delete", "get", "list", "patch", "update", "watch"]
+  # Spaces 模板与访问策略只读（创建 Workspace 时引用，add-on 预置于 jupyter-k8s-system）
+  - apiGroups: ["workspace.jupyter.org"]
+    resources: ["workspacetemplates", "workspaceaccessstrategies"]
     verbs: ["get", "list", "watch"]
   # 训练 Pod 状态与日志
   - apiGroups: [""]

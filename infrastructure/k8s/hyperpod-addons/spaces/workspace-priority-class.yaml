@@ -1,0 +1,24 @@
+# HyperPod 原生 Spaces - Kueue WorkloadPriorityClass
+#
+# Interactive Spaces 优先级类 (AWS 官方 Task Governance for Interactive Spaces
+# 文档推荐权重 100，高于训练 75/评估 50/批处理 25，确保开发 Pod 优先准入与抢占)。
+#
+# 后端 HyperPodSpaceBackend 给 Workspace CRD 打 label
+# kueue.x-k8s.io/priority-class=interactive-space-priority，
+# 该 label 经底层 Deployment 传播到 Pod，由 Kueue 的 pod integration 拦截治理
+# (Phase B Task 16 集群实测确认 label 传播与 Workload 准入链路成立)。
+#
+# 注意: ClusterQueue / LocalQueue / 团队配额由 SageMaker HyperPod Task Governance
+# API 托管创建 (compute-quota)，不在此 manifest 管理 (符合宪法 I HyperPod Native-First
+# 与 product-architecture.md "配额通过 Task Governance API 配置" 约束)。
+# 见 docs/superpowers/specs/2026-06-13-hyperpod-spaces-phase-b-infra.md。
+---
+apiVersion: kueue.x-k8s.io/v1beta1
+kind: WorkloadPriorityClass
+metadata:
+  name: interactive-space-priority
+  labels:
+    app.kubernetes.io/part-of: ai-training-platform
+    app.kubernetes.io/component: spaces
+value: 100
+description: "Interactive Spaces 优先级 (HyperPod 原生 Spaces, 文档推荐权重 100)"
