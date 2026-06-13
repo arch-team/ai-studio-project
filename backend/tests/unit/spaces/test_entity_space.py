@@ -382,3 +382,35 @@ class TestSpaceRestartTransitions:
         space.transition_to(SpaceStatus.RUNNING)
         with pytest.raises(InvalidStateTransitionError):
             space.mark_starting()
+
+
+class TestSpaceBackendField:
+    """Tests for Space backend field and HyperPod-specific fields."""
+
+    def test_default_backend_is_studio(self) -> None:
+        """默认 backend 为 STUDIO，HyperPod 专属字段为 None。"""
+        from src.modules.spaces.domain.value_objects import SpaceBackend
+
+        space = Space(id="uuid", space_name="s1", owner_id=1)
+        assert space.backend is SpaceBackend.STUDIO
+        assert space.namespace is None
+        assert space.queue_name is None
+        assert space.workspace_template is None
+
+    def test_hyperpod_backend_with_fields(self) -> None:
+        """显式传入 HyperPod backend 及专属字段。"""
+        from src.modules.spaces.domain.value_objects import SpaceBackend
+
+        space = Space(
+            id="uuid",
+            space_name="s2",
+            owner_id=1,
+            backend=SpaceBackend.HYPERPOD,
+            namespace="dev-spaces",
+            queue_name="team-alpha-localqueue",
+            workspace_template="sagemaker-jupyter-template",
+        )
+        assert space.backend is SpaceBackend.HYPERPOD
+        assert space.namespace == "dev-spaces"
+        assert space.queue_name == "team-alpha-localqueue"
+        assert space.workspace_template == "sagemaker-jupyter-template"

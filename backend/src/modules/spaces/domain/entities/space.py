@@ -11,6 +11,7 @@ from src.shared.utils import utc_now
 from ..value_objects import (
     INSTANCE_TYPE_RESOURCES,
     SPACE_STATE_TRANSITIONS,
+    SpaceBackend,
     SpaceInstanceType,
     SpaceStatus,
     SpaceType,
@@ -27,6 +28,13 @@ class Space(PydanticEntity):
     # Configuration
     instance_type: SpaceInstanceType = SpaceInstanceType.ML_G5_XLARGE
     space_type: SpaceType = SpaceType.JUPYTER
+    backend: SpaceBackend = SpaceBackend.STUDIO
+
+    # HyperPod backend 专属字段（仅 backend=HYPERPOD 使用）
+    namespace: str | None = None
+    queue_name: str | None = None
+    workspace_template: str | None = None
+
     storage_size_gb: int = 20
 
     # Status
