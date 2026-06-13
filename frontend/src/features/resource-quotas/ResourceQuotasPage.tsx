@@ -10,6 +10,7 @@ import {
   Box,
   Button,
   Header,
+  Modal,
   Pagination,
   SpaceBetween,
   StatusIndicator,
@@ -19,6 +20,7 @@ import {
   useResourceLimitConfigs,
   useCreateResourceLimitConfig,
   useUpdateResourceLimitConfig,
+  useDeleteResourceLimitConfig,
 } from './api';
 import { PageLayout } from '@shared/components';
 import { QuotaFormModal } from './components/QuotaFormModal';
@@ -43,15 +45,20 @@ export function ResourceQuotasPage() {
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [editingQuota, setEditingQuota] = useState<ResourceLimitConfig | null>(null);
 
+  // 删除确认弹窗状态
+  const [deleteModalVisible, setDeleteModalVisible] = useState(false);
+  const [configToDelete, setConfigToDelete] = useState<ResourceLimitConfig | null>(null);
+
   // 数据查询
   const { data, isLoading, error } = useResourceLimitConfigs({
     page: currentPage,
     page_size: pageSize,
   });
 
-  // 创建/更新 mutations
+  // 创建/更新/删除 mutations
   const createMutation = useCreateResourceLimitConfig();
   const updateMutation = useUpdateResourceLimitConfig();
+  const deleteMutation = useDeleteResourceLimitConfig();
 
   // 打开创建 Modal
   const handleCreate = () => {
@@ -88,6 +95,31 @@ export function ResourceQuotasPage() {
       createMutation.mutate(formData as CreateResourceLimitConfigRequest, {
         onSuccess: () => {
           handleModalDismiss();
+        },
+      });
+    }
+  };
+
+  // 打开删除确认弹窗
+  const handleDeleteClick = (config: ResourceLimitConfig) => {
+    setConfigToDelete(config);
+    setDeleteModalVisible(true);
+  };
+
+  // 取消删除
+  const handleCancelDelete = () => {
+    setDeleteModalVisible(false);
+    setConfigToDelete(null);
+  };
+
+  // 确认删除
+  const handleConfirmDelete = () => {
+    if (configToDelete) {
+      deleteMutation.mutate(configToDelete.id, {
+        onSuccess: () => {
+          // 删除成功：关闭弹窗（列表由 hook 自动 invalidate 刷新）
+          setDeleteModalVisible(false);
+          setConfigToDelete(null);
         },
       });
     }
@@ -138,9 +170,14 @@ export function ResourceQuotasPage() {
       id: 'actions',
       header: '操作',
       cell: (item: ResourceLimitConfig) => (
-        <Button variant="inline-link" onClick={() => handleEdit(item)}>
-          编辑
-        </Button>
+        <SpaceBetween direction="horizontal" size="xs">
+          <Button variant="inline-link" onClick={() => handleEdit(item)}>
+            编辑
+          </Button>
+          <Button variant="inline-link" onClick={() => handleDeleteClick(item)}>
+            删除
+          </Button>
+        </SpaceBetween>
       ),
     },
   ];
@@ -201,6 +238,38 @@ export function ResourceQuotasPage() {
         editingQuota={editingQuota}
         isLoading={createMutation.isPending || updateMutation.isPending}
       />
+
+      {/* 删除确认弹窗（仅在打开时挂载，避免与表单弹窗的 dialog 角色共存） */}
+      {deleteModalVisible && (
+        <Modal
+          visible={deleteModalVisible}
+          onDismiss={handleCancelDelete}
+          header="确认删除"
+          footer={
+            <Box float="right">
+              <SpaceBetween direction="horizontal" size="xs">
+                <Button variant="link" onClick={handleCancelDelete}>
+                  取消
+                </Button>
+                <Button
+                  variant="primary"
+                  onClick={handleConfirmDelete}
+                  loading={deleteMutation.isPending}
+                >
+                  确认删除
+                </Button>
+              </SpaceBetween>
+            </Box>
+          }
+        >
+          <SpaceBetween size="m">
+            <Alert type="warning">此操作不可撤销</Alert>
+            <Box>
+              确定删除配置「<b>{configToDelete?.config_name}</b>」吗？
+            </Box>
+          </SpaceBetween>
+        </Modal>
+      )}
     </SpaceBetween>
     </PageLayout>
   );

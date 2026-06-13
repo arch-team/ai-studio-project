@@ -91,6 +91,13 @@ async function setupResourceQuotaMocks(page: Page) {
         });
         return;
       }
+
+      // 删除：返回 204 No Content
+      if (request.method() === "DELETE") {
+        await route.fulfill({ status: 204, body: "" });
+        return;
+      }
+
       await route.fallback();
     },
   );
@@ -104,26 +111,59 @@ async function setupResourceQuotaMocks(page: Page) {
         id: 1,
         username: "admin",
         email: "admin@example.com",
+        display_name: null,
         role: "ADMIN",
         status: "ACTIVE",
+        auth_type: "local",
       }),
     });
   });
 
+  // Mock token 刷新（整页导航后 initializeAuth 用 sessionStorage 的
+  // refreshToken 静默续期，必须 Mock 否则会被登出重定向到 /login）
+  await page.route("**/api/v1/auth/token/refresh", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        access_token: "mock-access-token-refreshed",
+        refresh_token: "mock-refresh-token",
+        token_type: "bearer",
+        expires_in: 3600,
+      }),
+    });
+  });
+
+  // Mock 登出
+  await page.route("**/api/v1/auth/logout", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ message: "已登出" }),
+    });
+  });
+
+  // 登录响应需匹配前端 LoginResponse 契约：tokens 嵌套对象 + user
+  // （前端 authStore.login 解构 response.tokens.refresh_token）
   await page.route("**/api/v1/auth/login", async (route) => {
     await route.fulfill({
       status: 200,
       contentType: "application/json",
       body: JSON.stringify({
-        access_token: "mock-access-token",
-        refresh_token: "mock-refresh-token",
-        token_type: "bearer",
+        tokens: {
+          access_token: "mock-access-token",
+          refresh_token: "mock-refresh-token",
+          token_type: "bearer",
+          expires_in: 3600,
+        },
         user: {
           id: 1,
           username: "admin",
           email: "admin@example.com",
+          display_name: null,
           role: "ADMIN",
           status: "ACTIVE",
+          auth_type: "local",
         },
       }),
     });
@@ -335,8 +375,271 @@ test.describe("资源配额 CRUD - 编辑配额 (Mock 模式)", () => {
   });
 });
 
+test.describe("资源配额 CRUD - 删除配额 (Mock 模式)", () => {
+  test.skip(isRemote, "此组测试仅在 Mock 模式下运行");
+
+  let quotasPage: ResourceQuotasPage;
+
+  test.beforeEach(async ({ page }) => {
+    await setupResourceQuotaMocks(page);
+    quotasPage = new ResourceQuotasPage(page);
+    await navigateWithAuth(page, "/resource-quotas");
+    await quotasPage.waitForPageReady();
+  });
+
+  test("点击删除弹出二次确认 Modal", async () => {
+    await quotasPage.clickDeleteAtRow(0);
+
+    // 删除确认 Modal 可见，并显示配置名称与不可撤销警告
+    await expect(quotasPage.deleteModal).toBeVisible();
+    await expect(quotasPage.confirmDeleteButton).toBeVisible();
+    await expect(quotasPage.cancelDeleteButton).toBeVisible();
+
+    // 应包含被删除配置的名称（第一行为"管理员配额"）
+    await expect(quotasPage.deleteModal).toContainText("管理员配额");
+    await expect(quotasPage.deleteModal).toContainText("此操作不可撤销");
+  });
+
+  test("二次确认拦截 - 点删除不直接发请求，确认后才发 DELETE", async ({
+    page,
+  }) => {
+    let deleteCalled = false;
+    let deletedId: string | null = null;
+
+    // 拦截 DELETE 请求
+    await page.route(
+      /\/api\/v1\/resource-limit-configs\/(\d+)$/,
+      async (route) => {
+        const request = route.request();
+        if (request.method() === "DELETE") {
+          deleteCalled = true;
+          const match = new URL(request.url()).pathname.match(
+            /\/resource-limit-configs\/(\d+)$/,
+          );
+          deletedId = match ? match[1] : null;
+          await route.fulfill({ status: 204, body: "" });
+          return;
+        }
+        await route.fallback();
+      },
+    );
+
+    // 点击删除 -> 弹出确认 Modal
+    await quotasPage.clickDeleteAtRow(0);
+
+    // 关键断言：此时尚未发出 DELETE 请求
+    expect(deleteCalled).toBe(false);
+
+    // 点击"确认删除" -> 才真正发出 DELETE
+    await quotasPage.confirmDelete();
+    await quotasPage.waitForDeleteModalClose();
+
+    expect(deleteCalled).toBe(true);
+    // 第一行为 id=1 的"管理员配额"
+    expect(deletedId).toBe("1");
+  });
+
+  test("删除取消 - 点取消后 Modal 关闭且配置仍在", async ({ page }) => {
+    let deleteCalled = false;
+
+    await page.route(
+      /\/api\/v1\/resource-limit-configs\/(\d+)$/,
+      async (route) => {
+        const request = route.request();
+        if (request.method() === "DELETE") {
+          deleteCalled = true;
+          await route.fulfill({ status: 204, body: "" });
+          return;
+        }
+        await route.fallback();
+      },
+    );
+
+    await quotasPage.clickDeleteAtRow(0);
+    await expect(quotasPage.deleteModal).toBeVisible();
+
+    // 点击取消
+    await quotasPage.cancelDelete();
+    await quotasPage.waitForDeleteModalClose();
+
+    // 未发出删除请求，配置仍在列表中
+    expect(deleteCalled).toBe(false);
+    const hasConfig = await quotasPage.hasConfig("管理员配额");
+    expect(hasConfig).toBe(true);
+    const rowCount = await quotasPage.getRowCount();
+    expect(rowCount).toBe(mockResourceLimitConfigs.length);
+  });
+
+  test("表单边界 - 超长配置名原样进入请求体（前端不截断）", async ({
+    page,
+  }) => {
+    // 当前表单对名称无长度上限校验：验证超长名称能原样发送给后端，
+    // 由后端做最终长度约束（前端不静默截断）。
+    let createBody: Record<string, unknown> = {};
+
+    await page.route(
+      /\/api\/v1\/resource-limit-configs(\?.*)?$/,
+      async (route) => {
+        if (route.request().method() === "POST") {
+          createBody = route.request().postDataJSON();
+          await route.fulfill({
+            status: 201,
+            contentType: "application/json",
+            body: JSON.stringify({
+              id: 100,
+              ...createBody,
+              project_id: null,
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+            }),
+          });
+          return;
+        }
+        await route.fallback();
+      },
+    );
+
+    const longName = "超长配置名称".repeat(40); // 240 字符
+    await quotasPage.clickCreate();
+    await quotasPage.fillForm({
+      configName: longName,
+      role: "工程师",
+      priority: "中",
+    });
+    await quotasPage.submitForm();
+    await quotasPage.waitForModalClose();
+
+    expect(createBody.config_name).toBe(longName);
+  });
+
+  test("表单验证 - 数值下限（负数）", async () => {
+    await quotasPage.clickCreate();
+
+    await quotasPage.fillForm({
+      configName: "测试配额下限",
+      role: "工程师",
+      maxGpu: "-1",
+      priority: "中",
+    });
+
+    await quotasPage.submitForm();
+
+    // GPU 范围为 0-1000，负数应触发范围错误，Modal 保持打开
+    const hasError = await quotasPage.hasFormError("之间的整数");
+    expect(hasError).toBe(true);
+    await expect(quotasPage.configNameInput).toBeVisible();
+  });
+
+  test("表单验证 - 最大节点下限（节点最小为 1）", async () => {
+    await quotasPage.clickCreate();
+
+    await quotasPage.fillForm({
+      configName: "测试节点下限",
+      role: "工程师",
+      maxNodes: "0",
+      priority: "中",
+    });
+
+    await quotasPage.submitForm();
+
+    // 节点范围为 1-1000，0 应触发范围错误，Modal 保持打开
+    const hasError = await quotasPage.hasFormError("最大节点必须是 1-1000");
+    expect(hasError).toBe(true);
+    await expect(quotasPage.configNameInput).toBeVisible();
+  });
+});
+
+test.describe("资源配额 CRUD - 错误态 (Mock 模式)", () => {
+  test.skip(isRemote, "此组测试仅在 Mock 模式下运行");
+
+  test("列表 API 返回 500 时显示错误 Alert 而非白屏", async ({ page }) => {
+    // 先 Mock 认证（避免被重定向到登录页），再 Mock 列表 500
+    await page.route("**/api/v1/auth/me", async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          id: 1,
+          username: "admin",
+          email: "admin@example.com",
+          display_name: null,
+          role: "ADMIN",
+          status: "ACTIVE",
+          auth_type: "local",
+        }),
+      });
+    });
+    await page.route("**/api/v1/auth/token/refresh", async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          access_token: "mock-access-token-refreshed",
+          refresh_token: "mock-refresh-token",
+          token_type: "bearer",
+          expires_in: 3600,
+        }),
+      });
+    });
+    await page.route("**/api/v1/auth/login", async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          tokens: {
+            access_token: "mock-access-token",
+            refresh_token: "mock-refresh-token",
+            token_type: "bearer",
+            expires_in: 3600,
+          },
+          user: {
+            id: 1,
+            username: "admin",
+            email: "admin@example.com",
+            display_name: null,
+            role: "ADMIN",
+            status: "ACTIVE",
+            auth_type: "local",
+          },
+        }),
+      });
+    });
+
+    // 列表 API 返回 500
+    await page.route(
+      /\/api\/v1\/resource-limit-configs(\?.*)?$/,
+      async (route) => {
+        if (route.request().method() === "GET") {
+          await route.fulfill({
+            status: 500,
+            contentType: "application/json",
+            body: JSON.stringify({ detail: "服务器内部错误" }),
+          });
+          return;
+        }
+        await route.fallback();
+      },
+    );
+
+    const quotasPage = new ResourceQuotasPage(page);
+    await navigateWithAuth(page, "/resource-quotas");
+    await quotasPage.waitForPageReady();
+
+    // 页面标题应仍可见（未白屏崩溃）
+    await expect(quotasPage.pageTitle).toBeVisible();
+
+    // 错误 Alert 应显示（"加载失败" header）
+    await expect(quotasPage.errorState).toBeVisible({ timeout: 10000 });
+  });
+});
+
 test.describe("资源配额 CRUD - 真实 Dev 环境", () => {
   test.skip(!isRemote, "此组测试仅在真实 Dev 环境下运行");
+
+  // 串行执行：本组测试共享同一真实后端，存在创建/删除等有状态操作。
+  // 「计数严格 +1」「删除后计数 -1」依赖列表总数稳定，若与其他用例并行会
+  // 因总数波动导致计数断言抖动，故强制串行避免相互干扰。
+  test.describe.configure({ mode: "serial" });
 
   let quotasPage: ResourceQuotasPage;
   let testConfigName: string;
@@ -515,6 +818,150 @@ test.describe("资源配额 CRUD - 真实 Dev 环境", () => {
       expect(responseData).toHaveProperty("total");
       expect(responseData).toHaveProperty("page");
       expect(responseData).toHaveProperty("page_size");
+    }
+  });
+
+  test("创建后列表计数严格 +1 且新配置可见", async ({ page }) => {
+    // 读取创建前总数（Cloudscape Header counter: "资源限制配置 (N)"）
+    const subHeader = page.locator("h2").filter({ hasText: "资源限制配置" });
+    const beforeText = (await subHeader.textContent()) ?? "";
+    const beforeMatch = beforeText.match(/\((\d+)\)/);
+    expect(
+      beforeMatch,
+      "应能从 Header counter 读取创建前计数（形如「资源限制配置 (N)」）",
+    ).toBeTruthy();
+    const beforeCount = parseInt(beforeMatch![1]);
+
+    // 创建一条配置
+    // 角色使用「查看者」(viewer)：dev 环境该角色无全局配额，避免与已存在的
+    // engineer 全局配额冲突触发 409 DUPLICATE_CONFIG。
+    const responsePromise = page.waitForResponse(
+      (resp) =>
+        resp.url().includes("/resource-limit-configs") &&
+        resp.request().method() === "POST",
+      { timeout: 15000 },
+    );
+
+    await quotasPage.createQuota({
+      configName: testConfigName,
+      role: "查看者",
+      maxGpu: "4",
+      maxCpu: "16",
+      maxMemory: "64",
+      maxStorage: "200",
+      maxNodes: "2",
+      priority: "中",
+    });
+
+    // 创建必须成功（201）。若返回 409/其他错误说明角色冲突或后端问题，
+    // 此处直接失败暴露问题，而非 skip 掩盖。
+    const response = await responsePromise;
+    const respBody = await response.text().catch(() => "");
+    expect(
+      response.status(),
+      `创建配额应返回 201，实际 ${response.status()}，响应: ${respBody}`,
+    ).toBe(201);
+
+    await quotasPage.waitForModalClose();
+    await page.waitForTimeout(1000);
+    await quotasPage.waitForPageReady();
+
+    // 严格断言：新配置可见
+    const hasNewConfig = await quotasPage.hasConfig(testConfigName);
+    expect(hasNewConfig).toBe(true);
+
+    // 严格断言：总数 +1（toPass 自动重试，等待 invalidate 刷新计数）
+    await expect(async () => {
+      const afterText = (await subHeader.textContent()) ?? "";
+      const afterMatch = afterText.match(/\((\d+)\)/);
+      expect(afterMatch).toBeTruthy();
+      expect(parseInt(afterMatch![1])).toBe(beforeCount + 1);
+    }).toPass({ timeout: 10000 });
+
+    // 清理：删除刚创建的测试配置
+    await quotasPage.clickDeleteByName(testConfigName);
+    await quotasPage.confirmDelete();
+    await quotasPage.waitForDeleteModalClose();
+  });
+
+  test("删除流程 - 创建后删除，列表中消失且计数 -1", async ({ page }) => {
+    // 先创建一条可删除的测试配置
+    // 角色使用「项目经理」(project_manager)：dev 环境该角色无全局配额，
+    // 与「计数严格 +1」用例的 viewer 角色错开，避免串行/并行下相互占用同一
+    // 全局配额槽位触发 409 DUPLICATE_CONFIG。
+    const createResponsePromise = page.waitForResponse(
+      (resp) =>
+        resp.url().includes("/resource-limit-configs") &&
+        resp.request().method() === "POST",
+      { timeout: 15000 },
+    );
+
+    await quotasPage.createQuota({
+      configName: testConfigName,
+      role: "项目经理",
+      maxGpu: "4",
+      maxCpu: "16",
+      maxMemory: "64",
+      maxStorage: "200",
+      maxNodes: "2",
+      priority: "中",
+    });
+
+    // 创建必须成功（201），否则直接失败暴露问题（不再 skip 掩盖）。
+    const createResp = await createResponsePromise;
+    const createBody = await createResp.text().catch(() => "");
+    expect(
+      createResp.status(),
+      `创建配额应返回 201，实际 ${createResp.status()}，响应: ${createBody}`,
+    ).toBe(201);
+
+    await quotasPage.waitForModalClose();
+    await page.waitForTimeout(1000);
+    await quotasPage.waitForPageReady();
+
+    // 确认创建成功、配置在列表中
+    expect(await quotasPage.hasConfig(testConfigName)).toBe(true);
+
+    // 读取删除前计数
+    const subHeader = page.locator("h2").filter({ hasText: "资源限制配置" });
+    const beforeText = (await subHeader.textContent()) ?? "";
+    const beforeMatch = beforeText.match(/\((\d+)\)/);
+    const beforeCount = beforeMatch ? parseInt(beforeMatch[1]) : null;
+
+    // 执行删除：点删除 -> 确认 Modal -> 确认删除
+    const deleteResponsePromise = page.waitForResponse(
+      (resp) =>
+        resp.url().includes("/resource-limit-configs") &&
+        resp.request().method() === "DELETE",
+      { timeout: 15000 },
+    );
+
+    await quotasPage.clickDeleteByName(testConfigName);
+    await expect(quotasPage.deleteModal).toBeVisible();
+    await expect(quotasPage.deleteModal).toContainText(testConfigName);
+    await quotasPage.confirmDelete();
+
+    const deleteResp = await deleteResponsePromise.catch(() => null);
+    expect(deleteResp).toBeTruthy();
+    expect(deleteResp!.status()).toBe(204);
+
+    await quotasPage.waitForDeleteModalClose();
+    await page.waitForTimeout(1000);
+    await quotasPage.waitForPageReady();
+
+    // 严格断言：配置从列表消失
+    await expect(async () => {
+      expect(await quotasPage.hasConfig(testConfigName)).toBe(false);
+    }).toPass({ timeout: 10000 });
+
+    // 严格断言：计数 -1（若删除前能读取到计数）
+    if (beforeCount !== null) {
+      await expect(async () => {
+        const afterText = (await subHeader.textContent()) ?? "";
+        const afterMatch = afterText.match(/\((\d+)\)/);
+        expect(afterMatch).toBeTruthy();
+        expect(parseInt(afterMatch![1])).toBe(beforeCount - 1);
+      }).toPass({ timeout: 10000 });
     }
   });
 });
