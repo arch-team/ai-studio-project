@@ -52,9 +52,17 @@ def mock_sagemaker() -> AsyncMock:
 
 @pytest.fixture
 def service(mock_repo: AsyncMock, mock_sagemaker: AsyncMock) -> SpaceService:
+    """构造 SpaceService（使用 StudioSpaceBackend 包装 mock_sagemaker）。"""
+    from src.modules.spaces.domain.value_objects import SpaceBackend
+    from src.modules.spaces.infrastructure.external.studio_space_backend import StudioSpaceBackend
+
+    # 将 mock_sagemaker 包进真实的 StudioSpaceBackend
+    studio_backend = StudioSpaceBackend(sagemaker_client=mock_sagemaker)
+
     return SpaceService(
         space_repository=mock_repo,
-        sagemaker_client=mock_sagemaker,
+        backends={SpaceBackend.STUDIO: studio_backend},
+        quota_checker=None,  # 现有测试不涉及配额
     )
 
 
@@ -283,32 +291,6 @@ class TestStatusSyncFromApp:
         assert result.status == SpaceStatus.RUNNING
 
 
-class TestAppDeletingGuard:
-    """App 删除中（停止后窗口期）时启动/删除给出明确 409."""
-
-    async def test_start_while_app_deleting_raises_conflict(
-        self, service: SpaceService, mock_repo: AsyncMock, mock_sagemaker: AsyncMock
-    ) -> None:
-        space = _make_space("f1111111-1111-1111-1111-111111111111", SpaceStatus.STOPPED)
-        mock_repo.get_by_id.return_value = space
-        mock_sagemaker.describe_app.return_value = {"status": "Deleting"}
-
-        with pytest.raises(InvalidSpaceStateError):
-            await service.start_space(space.id)
-        mock_sagemaker.create_app.assert_not_awaited()
-
-    async def test_delete_while_app_deleting_raises_conflict(
-        self, service: SpaceService, mock_repo: AsyncMock, mock_sagemaker: AsyncMock
-    ) -> None:
-        space = _make_space("f2222222-2222-2222-2222-222222222222", SpaceStatus.STOPPED)
-        mock_repo.get_by_id.return_value = space
-        mock_sagemaker.describe_app.return_value = {"status": "Deleting"}
-
-        with pytest.raises(InvalidSpaceStateError):
-            await service.delete_space(space.id)
-        mock_sagemaker.delete_space.assert_not_awaited()
-
-
 class TestGetSpaceAccessUrl:
     """打开 IDE: 仅运行中的空间可签发 presigned 访问 URL."""
 
@@ -347,3 +329,148 @@ class TestGetSpaceAccessUrl:
 
         with pytest.raises(InvalidSpaceStateError):
             await service.get_space_access_url(space.id)
+
+
+class TestBackendDispatch:
+    """backend 策略分发和 HyperPod 配额校验."""
+
+    async def test_create_hyperpod_calls_quota_then_hyperpod_backend(
+        self, mock_repo: AsyncMock
+    ) -> None:
+        """HyperPod backend 创建时走配额检查，调用 hyperpod backend。"""
+        from src.modules.spaces.application.interfaces import ISpaceBackendClient
+        from src.modules.spaces.domain.value_objects import SpaceBackend
+        from src.shared.domain.interfaces import IQuotaChecker
+
+        # Mock backends
+        mock_studio = AsyncMock(spec=ISpaceBackendClient)
+        mock_hyperpod = AsyncMock(spec=ISpaceBackendClient)
+        mock_hyperpod.provision_space.return_value = {
+            "namespace": "team-a",
+            "workspace_name": "dev-hyperpod-1",
+        }
+
+        # Mock quota checker: 配额充足
+        mock_quota = AsyncMock(spec=IQuotaChecker)
+        mock_quota.check_quota.return_value = True
+
+        # 构造 service（新签名）
+        service = SpaceService(
+            space_repository=mock_repo,
+            backends={SpaceBackend.STUDIO: mock_studio, SpaceBackend.HYPERPOD: mock_hyperpod},
+            quota_checker=mock_quota,
+        )
+
+        mock_repo.get_by_name_and_owner.return_value = None
+
+        # 创建 HyperPod space
+        space = await service.create_space(
+            owner_id=1,
+            data={
+                "space_name": "dev-hyperpod-1",
+                "backend": "hyperpod",
+                "instance_type": "ml.g5.xlarge",
+                "namespace": "team-a",
+                "queue_name": "default",
+            },
+        )
+
+        # 验证配额检查被调用（resource_type="gpu", amount=1）
+        mock_quota.check_quota.assert_awaited_once()
+        _, kwargs = mock_quota.check_quota.await_args
+        assert kwargs["resource_type"] == "gpu"
+        assert kwargs["amount"] == 1
+
+        # 验证 hyperpod backend 被调用
+        mock_hyperpod.provision_space.assert_awaited_once()
+        # 验证 studio backend 未被调用
+        mock_studio.provision_space.assert_not_awaited()
+
+        # 验证实体字段回填
+        assert space.namespace == "team-a"
+        assert space.space_name == "dev-hyperpod-1"
+
+    async def test_create_hyperpod_quota_exceeded_raises_429(
+        self, mock_repo: AsyncMock
+    ) -> None:
+        """HyperPod 配额不足时抛 SpaceQuotaExceededError，不调用 backend。"""
+        from src.modules.spaces.application.interfaces import ISpaceBackendClient
+        from src.modules.spaces.domain.exceptions import SpaceQuotaExceededError
+        from src.modules.spaces.domain.value_objects import SpaceBackend
+        from src.shared.domain.interfaces import IQuotaChecker
+
+        mock_studio = AsyncMock(spec=ISpaceBackendClient)
+        mock_hyperpod = AsyncMock(spec=ISpaceBackendClient)
+
+        # Mock quota checker: 配额不足
+        mock_quota = AsyncMock(spec=IQuotaChecker)
+        mock_quota.check_quota.return_value = False
+        mock_quota.get_available_quota.return_value = 0
+
+        service = SpaceService(
+            space_repository=mock_repo,
+            backends={SpaceBackend.STUDIO: mock_studio, SpaceBackend.HYPERPOD: mock_hyperpod},
+            quota_checker=mock_quota,
+        )
+
+        mock_repo.get_by_name_and_owner.return_value = None
+
+        # 尝试创建 HyperPod space，期望抛 429
+        with pytest.raises(SpaceQuotaExceededError) as exc_info:
+            await service.create_space(
+                owner_id=1,
+                data={
+                    "space_name": "dev-hyperpod-2",
+                    "backend": "hyperpod",
+                    "instance_type": "ml.g5.xlarge",
+                },
+            )
+
+        # 验证异常细节
+        assert exc_info.value.resource == "gpu"
+        assert exc_info.value.required == 1
+        assert exc_info.value.available == 0
+
+        # 验证 provision_space 未被调用（配额不足时应提前中断）
+        mock_hyperpod.provision_space.assert_not_awaited()
+
+    async def test_create_studio_skips_quota(
+        self, mock_repo: AsyncMock
+    ) -> None:
+        """Studio backend 创建时跳过配额检查。"""
+        from src.modules.spaces.application.interfaces import ISpaceBackendClient
+        from src.modules.spaces.domain.value_objects import SpaceBackend
+        from src.shared.domain.interfaces import IQuotaChecker
+
+        mock_studio = AsyncMock(spec=ISpaceBackendClient)
+        mock_studio.provision_space.return_value = {"arn": "arn:aws:sagemaker:::space/dev-studio-1"}
+        mock_hyperpod = AsyncMock(spec=ISpaceBackendClient)
+
+        mock_quota = AsyncMock(spec=IQuotaChecker)
+
+        service = SpaceService(
+            space_repository=mock_repo,
+            backends={SpaceBackend.STUDIO: mock_studio, SpaceBackend.HYPERPOD: mock_hyperpod},
+            quota_checker=mock_quota,
+        )
+
+        mock_repo.get_by_name_and_owner.return_value = None
+
+        # 创建 Studio space
+        space = await service.create_space(
+            owner_id=1,
+            data={
+                "space_name": "dev-studio-1",
+                "backend": "studio",
+                "instance_type": "ml.g5.xlarge",
+            },
+        )
+
+        # 验证配额检查未被调用
+        mock_quota.check_quota.assert_not_awaited()
+
+        # 验证 studio backend 被调用
+        mock_studio.provision_space.assert_awaited_once()
+
+        # 验证实体 sagemaker_space_arn 被回填
+        assert space.sagemaker_space_arn == "arn:aws:sagemaker:::space/dev-studio-1"

@@ -9,19 +9,22 @@ from typing import TYPE_CHECKING
 
 import structlog
 
-from src.modules.spaces.application.interfaces import ISageMakerSpacesClient
+from src.modules.spaces.application.interfaces import ISpaceBackendClient
 from src.modules.spaces.domain.entities import Space
 from src.modules.spaces.domain.exceptions import (
     DuplicateSpaceNameError,
     InvalidSpaceStateError,
+    SpaceQuotaExceededError,
 )
 from src.modules.spaces.domain.repositories import ISpaceRepository
 from src.modules.spaces.domain.value_objects import (
+    SpaceBackend,
     SpaceInstanceType,
     SpaceStatus,
     SpaceType,
 )
 from src.shared.application import BaseApplicationService
+from src.shared.domain.interfaces import IQuotaChecker
 from src.shared.utils import utc_now
 
 if TYPE_CHECKING:
@@ -32,32 +35,27 @@ logger = structlog.get_logger(__name__)
 # Space 启动 SLA 阈值 (秒)
 STARTUP_SLA_SECONDS = 180  # 3 分钟
 
-# IDE 类型映射: SpaceType -> SageMaker IDE 类型
-_IDE_TYPE_MAP = {
-    SpaceType.JUPYTER: "jupyterlab",
-    SpaceType.VSCODE: "vscode",
-    SpaceType.RSTUDIO: "jupyterlab",  # RStudio 使用 JupyterLab 容器
-}
-
 
 class SpaceService(BaseApplicationService[Space, str]):
-    """开发空间管理服务."""
+    """开发空间管理服务 - backend 无关，策略分发。"""
 
     def __init__(
         self,
         space_repository: ISpaceRepository,
-        sagemaker_client: ISageMakerSpacesClient,
+        backends: dict[SpaceBackend, ISpaceBackendClient],
+        quota_checker: IQuotaChecker | None = None,
         metrics_service: SpaceMetricsService | None = None,
     ):
         super().__init__(space_repository, "Space")
         self._space_repository = space_repository
-        self._sagemaker_client = sagemaker_client
+        self._backends = backends
+        self._quota_checker = quota_checker
         self._metrics_service = metrics_service
         self._sync_task: asyncio.Task[None] | None = None
         self._sync_interval: float = 30.0
 
     async def create_space(self, owner_id: int, data: dict) -> Space:
-        """创建新的开发空间."""
+        """创建新的开发空间 - backend 无关，策略分发 + 配额校验。"""
         space_name = data["space_name"]
 
         # 检查同一所有者下的名称重复
@@ -68,6 +66,8 @@ class SpaceService(BaseApplicationService[Space, str]):
         space_type = SpaceType(data.get("space_type", "jupyter"))
         instance_type = SpaceInstanceType(data.get("instance_type", "ml.g5.xlarge"))
         storage_size_gb = data.get("storage_size_gb", 20)
+        backend_str = data.get("backend", "studio")
+        backend = SpaceBackend(backend_str)
 
         # 创建域实体
         space = Space(
@@ -76,49 +76,54 @@ class SpaceService(BaseApplicationService[Space, str]):
             owner_id=owner_id,
             instance_type=instance_type,
             space_type=space_type,
+            backend=backend,
             storage_size_gb=storage_size_gb,
             status=SpaceStatus.PENDING,
+            lifecycle_config_arn=data.get("lifecycle_config_arn"),
+            # HyperPod 专属字段
+            namespace=data.get("namespace"),
+            queue_name=data.get("queue_name"),
+            workspace_template=data.get("workspace_template"),
             created_at=utc_now(),
             updated_at=utc_now(),
         )
 
-        # 调用 SageMaker API 创建 Space（配置+存储），同时记录启动耗时
-        ide_type = _IDE_TYPE_MAP.get(space_type, "jupyterlab")
-        start_time = time.monotonic()
-        result = await self._sagemaker_client.create_space(
-            name=space_name,
-            instance_type=instance_type.value,
-            ide_type=ide_type,
-            lifecycle_config_arn=data.get("lifecycle_config_arn"),
-            storage_size_gb=storage_size_gb,
-        )
+        # HyperPod backend: 配额校验（仅校验 GPU，若 gpu_count=0 的实例类型可跳过）
+        if backend == SpaceBackend.HYPERPOD and self._quota_checker:
+            requirements = space.get_resource_requirements()
+            gpu_count = requirements["gpu_count"]
+            if gpu_count > 0:
+                has_quota = await self._quota_checker.check_quota(
+                    user_id=owner_id,
+                    resource_type="gpu",
+                    amount=gpu_count,
+                )
+                if not has_quota:
+                    available = await self._quota_checker.get_available_quota(owner_id, "gpu")
+                    raise SpaceQuotaExceededError(
+                        resource="gpu",
+                        required=gpu_count,
+                        available=available,
+                    )
 
-        # 拉起 App 计算实例——Space 只是配置，App 才是真实计费资源
-        try:
-            await self._sagemaker_client.create_app(
-                space_name=space_name,
-                ide_type=ide_type,
-                instance_type=instance_type.value,
-                lifecycle_config_arn=data.get("lifecycle_config_arn"),
-            )
-        except Exception:
-            # 防止孤儿 SageMaker Space：App 拉起失败时尽力清理已创建的 Space
-            try:
-                await self._sagemaker_client.delete_space(space_name)
-            except Exception:
-                logger.warning("space_orphan_cleanup_failed", space_name=space_name)
-            raise
+        # 取对应 backend 并调用 provision_space
+        backend_client = self._backends[backend]
+        start_time = time.monotonic()
+        result = await backend_client.provision_space(space)
         elapsed_seconds = time.monotonic() - start_time
 
-        # 记录 SageMaker ARN
-        space.sagemaker_space_arn = result.get("arn")
-        space.lifecycle_config_arn = data.get("lifecycle_config_arn")
+        # 回填 backend 返回的标识
+        if backend == SpaceBackend.STUDIO:
+            space.sagemaker_space_arn = result.get("arn")
+        elif backend == SpaceBackend.HYPERPOD:
+            space.namespace = result.get("namespace")
+            # workspace_name 已在 space_name 中
 
         logger.info(
             "space_created",
             space_id=space.id,
             space_name=space_name,
-            sagemaker_arn=space.sagemaker_space_arn,
+            backend=backend.value,
             elapsed_seconds=round(elapsed_seconds, 2),
         )
 
@@ -132,79 +137,65 @@ class SpaceService(BaseApplicationService[Space, str]):
             )
 
         # 上报启动耗时到 CloudWatch Metrics
-        await self._record_startup_metric(space.id, elapsed_seconds)
+        await self._record_startup_metric(space.id or space_name, elapsed_seconds)
 
         # 保存到数据库
         return await self._space_repository.create(space)
 
     async def get_space(self, space_id: str) -> Space:
-        """根据 ID 获取开发空间（读取前同步 SageMaker 实际状态）."""
+        """根据 ID 获取开发空间（读取前同步底层实际状态）."""
         space = await self._get_or_raise(space_id)
-        return await self._sync_status_from_sagemaker(space)
+        return await self._sync_status(space)
 
-    # SageMaker App 状态 → 平台状态映射。
-    # App（计算实例）是真实计费资源和状态事实源：无 App / Deleted = 已停止。
-    _APP_STATUS_MAP = {
-        "Pending": SpaceStatus.PENDING,
-        "InService": SpaceStatus.RUNNING,
-        "Deleting": SpaceStatus.STOPPED,
-        "Deleted": SpaceStatus.STOPPED,
-        "Failed": SpaceStatus.FAILED,
-    }
+    async def _sync_status(self, space: Space) -> Space:
+        """按需将底层实际状态对齐到本地实体（lazy sync - backend 无关）。
 
-    def _ide_type_of(self, space: Space) -> str:
-        return _IDE_TYPE_MAP.get(space.space_type, "jupyterlab")
-
-    async def _ensure_app_not_deleting(self, space: Space, operation: str) -> None:
-        """App 处于 Deleting 时拒绝操作（SageMaker 侧会 ResourceInUse）.
-
-        Raises:
-            InvalidSpaceStateError: App 删除中，需等待完成后重试
-        """
-        try:
-            info = await self._sagemaker_client.describe_app(
-                space_name=space.space_name,
-                ide_type=self._ide_type_of(space),
-            )
-        except Exception:
-            return
-        if isinstance(info, dict) and info.get("status") == "Deleting":
-            raise InvalidSpaceStateError(
-                space_id=space.id or "",
-                current_state="stopping",
-                operation=operation,
-            )
-
-    async def _sync_status_from_sagemaker(self, space: Space) -> Space:
-        """按需将 SageMaker App 实际状态对齐到本地实体（lazy sync）。
-
-        App 计算实例的状态独立演进（Pending→InService、外部停止等），平台无后台
-        轮询时本地状态会滞留。读写操作前调用本方法消除偏差。对齐外部事实直接赋值，
-        不走业务状态机。同步失败不阻塞主流程。
+        按 describe_space 三态契约消费:
+        - {"status": <SpaceStatus 值>} → 同步该状态
+        - {"status": "stopped"} (资源不存在) → 同步为 stopped
+        - None (无法映射) → 不变更状态
         """
         if space.status == SpaceStatus.DELETED:
             return space
+
+        backend = self._backends.get(space.backend)
+        if not backend:
+            logger.warning("space_backend_missing", space_id=space.id, backend=space.backend.value)
+            return space
+
         try:
-            info = await self._sagemaker_client.describe_app(
-                space_name=space.space_name,
-                ide_type=self._ide_type_of(space),
-            )
+            info = await backend.describe_space(space)
         except Exception as e:
             logger.warning("space_status_sync_failed", space_id=space.id, error=str(e))
             return space
 
-        # App 不存在 = 无运行实例 = 已停止
-        mapped = self._APP_STATUS_MAP.get(info.get("status", "")) if isinstance(info, dict) else SpaceStatus.STOPPED
-        if mapped is None or mapped == space.status:
+        # 消费三态契约
+        if info is None or not isinstance(info, dict):
+            # None 或非 dict → 无可用状态，不变更
+            return space
+
+        status_str = info.get("status")
+        if status_str is None:
+            # status 为 None → 不变更
+            return space
+
+        try:
+            mapped_status = SpaceStatus(status_str)
+        except ValueError:
+            logger.warning("unmapped_space_status", space_id=space.id, status=status_str)
+            return space
+
+        # 状态无变化 → 不变更
+        if mapped_status == space.status:
             return space
 
         logger.info(
             "space_status_synced",
             space_id=space.id,
             from_status=space.status.value,
-            to_status=mapped.value,
+            to_status=mapped_status.value,
         )
-        space.status = mapped
+        space.status = mapped_status
         space.touch()
         return await self._space_repository.update(space)
 
@@ -217,11 +208,7 @@ class SpaceService(BaseApplicationService[Space, str]):
         sort_by: str = "created_at",
         sort_order: str = "desc",
     ) -> tuple[list[Space], int]:
-        """列出开发空间 (支持过滤和分页)，返回前对齐 SageMaker 实际状态.
-
-        无后台轮询时列表页是用户主要观察入口，不同步会让状态滞留 pending。
-        逐空间并发同步，单个失败不影响整体返回。
-        """
+        """列出开发空间 (支持过滤和分页)，返回前对齐底层实际状态。"""
         spaces, total = await self._space_repository.list_spaces(
             owner_id=owner_id,
             status=status,
@@ -230,41 +217,30 @@ class SpaceService(BaseApplicationService[Space, str]):
             sort_by=sort_by,
             sort_order=sort_order,
         )
-        synced = await asyncio.gather(*(self._sync_status_from_sagemaker(space) for space in spaces))
+        synced = await asyncio.gather(*(self._sync_status(space) for space in spaces))
         return list(synced), total
 
     async def start_space(self, space_id: str) -> Space:
-        """启动开发空间——真实拉起 SageMaker App 计算实例.
-
-        同步后若 App 已在运行/启动中则幂等返回；否则 create_app 并置为
-        PENDING（启动中），后续读取经懒同步推进到 RUNNING。
-        """
+        """启动开发空间 - backend 无关分发。"""
         space = await self._get_or_raise(space_id)
-        space = await self._sync_status_from_sagemaker(space)
+        space = await self._sync_status(space)
 
-        # 同步后已在运行或启动中：幂等返回，避免重复 create_app
+        # 同步后已在运行或启动中：幂等返回
         if space.status in (SpaceStatus.RUNNING, SpaceStatus.PENDING):
             return space
 
-        # 上一个 App 仍在删除中（停止后约 1 分钟窗口），create_app 会被
-        # SageMaker 以 ResourceInUse 拒绝，提前给出明确的 409
-        await self._ensure_app_not_deleting(space, operation="start")
-
-        # 校验状态机（failed/stopped 可启动），再真实拉起实例
+        # 校验状态机（failed/stopped 可启动）
         space.mark_starting()
 
+        backend = self._backends[space.backend]
         start_time = time.monotonic()
-        await self._sagemaker_client.create_app(
-            space_name=space.space_name,
-            ide_type=self._ide_type_of(space),
-            instance_type=space.instance_type.value,
-            lifecycle_config_arn=space.lifecycle_config_arn,
-        )
+        await backend.start_space(space)
         elapsed_seconds = time.monotonic() - start_time
 
         logger.info(
             "space_starting",
             space_id=space_id,
+            backend=space.backend.value,
             elapsed_seconds=round(elapsed_seconds, 2),
         )
 
@@ -283,33 +259,35 @@ class SpaceService(BaseApplicationService[Space, str]):
         return await self._space_repository.update(space)
 
     async def stop_space(self, space_id: str) -> Space:
-        """停止开发空间——真实删除 SageMaker App 释放计算实例（EBS 文件保留）."""
+        """停止开发空间 - backend 无关分发。"""
         space = await self._get_or_raise(space_id)
-        space = await self._sync_status_from_sagemaker(space)
+        space = await self._sync_status(space)
 
-        # 同步后发现 App 已不在（外部停止）：幂等返回
+        # 同步后发现已停止：幂等返回
         if space.status == SpaceStatus.STOPPED:
             return space
 
         space.stop()
 
-        await self._sagemaker_client.delete_app(
-            space_name=space.space_name,
-            ide_type=self._ide_type_of(space),
-        )
+        backend = self._backends[space.backend]
+        await backend.stop_space(space)
 
         logger.info("space_stopping", space_id=space_id, space_name=space.space_name)
 
         return await self._space_repository.update(space)
 
-    async def get_space_access_url(self, space_id: str) -> str:
-        """签发空间 IDE 的免登录访问 URL（仅运行中可用）.
+    async def get_space_access_url(self, space_id: str, conn_type: str = "web-ui") -> str:
+        """签发空间 IDE 的免登录访问 URL（仅运行中可用）- backend 无关分发。
+
+        Args:
+            space_id: 空间 ID
+            conn_type: 连接类型 (web-ui | vscode-remote)
 
         Raises:
-            InvalidSpaceStateError: 空间非运行中（无可访问的计算实例）
+            InvalidSpaceStateError: 空间非运行中
         """
         space = await self._get_or_raise(space_id)
-        space = await self._sync_status_from_sagemaker(space)
+        space = await self._sync_status(space)
 
         if space.status != SpaceStatus.RUNNING:
             raise InvalidSpaceStateError(
@@ -318,27 +296,18 @@ class SpaceService(BaseApplicationService[Space, str]):
                 operation="open",
             )
 
-        return await self._sagemaker_client.create_presigned_url(
-            space_name=space.space_name,
-            ide_type=self._ide_type_of(space),
-        )
+        backend = self._backends[space.backend]
+        return await backend.create_access_url(space, conn_type)
 
     async def delete_space(self, space_id: str) -> None:
-        """删除开发空间——清理 App 后删除 SageMaker Space（含 EBS 数据）."""
+        """删除开发空间 - backend 无关分发。"""
         space = await self._get_or_raise(space_id)
-        space = await self._sync_status_from_sagemaker(space)
-
-        # App 删除中时 SageMaker DeleteSpace 会被 ResourceInUse 拒绝，提前 409
-        await self._ensure_app_not_deleting(space, operation="delete")
+        space = await self._sync_status(space)
 
         space.delete()
 
-        # 先确保 App 已清理（delete_app 对不存在的 App 幂等），再删 Space
-        await self._sagemaker_client.delete_app(
-            space_name=space.space_name,
-            ide_type=self._ide_type_of(space),
-        )
-        await self._sagemaker_client.delete_space(space.space_name)
+        backend = self._backends[space.backend]
+        await backend.delete_space(space)
 
         logger.info("space_deleted", space_id=space_id, space_name=space.space_name)
 
@@ -364,12 +333,12 @@ class SpaceService(BaseApplicationService[Space, str]):
             await asyncio.sleep(self._sync_interval)
 
     async def _sync_all_active_spaces(self) -> None:
-        """同步所有非终态 Space 的状态（以 App 计算实例为事实源）。"""
+        """同步所有非终态 Space 的状态（backend 无关）。"""
         active_statuses = [SpaceStatus.PENDING, SpaceStatus.RUNNING]
         spaces = await self._space_repository.list_by_statuses(active_statuses)
         for space in spaces:
             try:
-                await self._sync_status_from_sagemaker(space)
+                await self._sync_status(space)
             except Exception:
                 logger.warning("space_sync_single_failed", space_id=space.id)
 
