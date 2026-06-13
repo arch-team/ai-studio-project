@@ -20,6 +20,7 @@ _IDE_TYPE_MAP = {
 }
 
 # SageMaker App 状态 → 平台状态
+# Deleting/Deleted 均映射为 STOPPED：计算实例已释放（或释放中），不再对外提供服务。
 _APP_STATUS_MAP = {
     "Pending": SpaceStatus.PENDING,
     "InService": SpaceStatus.RUNNING,
@@ -68,8 +69,13 @@ class StudioSpaceBackend(ISpaceBackendClient):
             # 防止孤儿 Space：App 拉起失败时尽力清理已创建的 Space
             try:
                 await self._sm.delete_space(space.space_name)
-            except Exception:
-                logger.warning("space_orphan_cleanup_failed", space_name=space.space_name)
+            except Exception as cleanup_error:
+                logger.warning(
+                    "space_orphan_cleanup_failed",
+                    space_name=space.space_name,
+                    error=str(cleanup_error),
+                    exc_info=True,
+                )
             raise
 
         return {"arn": result.get("arn")}
@@ -96,7 +102,8 @@ class StudioSpaceBackend(ISpaceBackendClient):
         """查询 App 状态并映射为平台状态。
 
         Returns:
-            {"status": <SpaceStatus 值>}，App 不存在时返回 {"status": "stopped"}
+            {"status": <SpaceStatus 值>}；App 不存在时返回 {"status": "stopped"}（明确"已停止"）；
+            状态无法映射时返回 None（无可用状态信息，下游不变更状态）。
         """
         info = await self._sm.describe_app(space_name=space.space_name, ide_type=self._ide_type(space))
 
@@ -108,7 +115,10 @@ class StudioSpaceBackend(ISpaceBackendClient):
         mapped = _APP_STATUS_MAP.get(info.get("status", ""))
         if mapped:
             return {"status": mapped.value}
-        return {"status": None}
+
+        # 未知/无法映射的状态：返回 None，下游视为"不变更状态"
+        logger.warning("unmapped_app_status", status=info.get("status"), space_name=space.space_name)
+        return None
 
     async def create_access_url(self, space: Space, conn_type: str) -> str:
         """签发免登录访问 URL (5 分钟有效)。
