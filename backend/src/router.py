@@ -14,6 +14,7 @@ from src.modules.auth.api.endpoints.users import router as users_router
 from src.modules.billing.api.endpoints import router as billing_router
 from src.modules.datasets.api.endpoints import router as datasets_router
 from src.modules.models.api.endpoints import router as models_router
+from src.modules.monitoring.api.cluster_endpoints import router as clusters_router
 from src.modules.monitoring.api.endpoints import router as monitoring_router
 from src.modules.quotas.api.endpoints import router as quotas_router
 from src.modules.quotas.api.resource_quota_endpoints import router as resource_quotas_router
@@ -36,6 +37,8 @@ api_router.include_router(datasets_router, prefix="/datasets", tags=["数据集"
 api_router.include_router(spaces_router, prefix="/spaces", tags=["开发空间"])
 api_router.include_router(audit_router, prefix="/audit-logs", tags=["审计日志"])
 api_router.include_router(monitoring_router, prefix="/monitoring", tags=["监控"])
+# 集群监控走无 monitoring 前缀的 /clusters*（前端契约），路径自带 /clusters，不加 prefix。
+api_router.include_router(clusters_router, tags=["集群监控"])
 api_router.include_router(billing_router, tags=["计费报表"])
 
 __all__ = ["api_router"]

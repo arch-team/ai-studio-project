@@ -1,15 +1,25 @@
 """Monitoring API schemas."""
 
 from .responses import (
+    AlertListResponse,
+    AlertResponse,
+    ClusterDetailResponse,
     ClusterHealthResponse,
+    ClusterListResponse,
     ClusterMetricsResponse,
+    ClusterSummaryResponse,
     GPUUtilizationPointResponse,
     GPUUtilizationResponse,
     GrafanaDashboardInfo,
     GrafanaDashboardsResponse,
+    InstanceGroupResponse,
     MetricDataPointResponse,
     MetricResponse,
+    MetricSeriesResponse,
     NetworkMetricsResponse,
+    NodeListResponse,
+    NodeSummaryResponse,
+    ResourceUtilizationResponse,
     StorageMetricsResponse,
 )
 
@@ -24,4 +34,15 @@ __all__ = [
     "StorageMetricsResponse",
     "NetworkMetricsResponse",
     "ClusterHealthResponse",
+    # 监控页响应 Schema（2C.1）
+    "ClusterSummaryResponse",
+    "ClusterListResponse",
+    "InstanceGroupResponse",
+    "ClusterDetailResponse",
+    "NodeSummaryResponse",
+    "NodeListResponse",
+    "ResourceUtilizationResponse",
+    "MetricSeriesResponse",
+    "AlertResponse",
+    "AlertListResponse",
 ]

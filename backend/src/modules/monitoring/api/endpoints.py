@@ -14,6 +14,7 @@ from src.shared.utils import utc_now
 from ..application.services import ClusterHealthService, PrometheusService
 from .dependencies import get_cluster_health_service, get_prometheus_service
 from .schemas import (
+    AlertListResponse,
     ClusterHealthResponse,
     ClusterMetricsResponse,
     GPUUtilizationPointResponse,
@@ -22,7 +23,9 @@ from .schemas import (
     GrafanaDashboardsResponse,
     MetricDataPointResponse,
     MetricResponse,
+    MetricSeriesResponse,
     NetworkMetricsResponse,
+    ResourceUtilizationResponse,
     StorageMetricsResponse,
 )
 
@@ -256,3 +259,86 @@ async def get_cluster_health(
             storage_alert_count=0,
             network_alert_count=0,
         )
+
+
+@router.get("/utilization", response_model=list[ResourceUtilizationResponse])
+async def get_resource_utilization(
+    _: None = Depends(get_current_active_user),
+    prometheus_service: PrometheusService = Depends(get_prometheus_service),
+) -> list[ResourceUtilizationResponse]:
+    """获取集群整体资源利用率（CPU/内存/GPU）.
+
+    AMP 故障时降级返回空 list，不 5xx。
+    """
+    try:
+        points = await prometheus_service.get_resource_utilization()
+        return [
+            ResourceUtilizationResponse(
+                resource_type=p.resource_type,
+                total=p.total,
+                used=p.used,
+                available=p.available,
+                utilization_percentage=p.utilization_percentage,
+                unit=p.unit,
+            )
+            for p in points
+        ]
+    except Exception as e:
+        logger.warning("prometheus_unavailable", endpoint="utilization", error=str(e))
+        return []
+
+
+@router.get("/metrics", response_model=list[MetricSeriesResponse])
+async def get_metric_series(
+    metric_names: str | None = Query(None, description="逗号分隔的指标名称"),
+    start_time: datetime | None = Query(None, description="开始时间"),
+    end_time: datetime | None = Query(None, description="结束时间"),
+    step: str = Query("1m", description="时间步长"),
+    _: None = Depends(get_current_active_user),
+    prometheus_service: PrometheusService = Depends(get_prometheus_service),
+) -> list[MetricSeriesResponse]:
+    """获取指标序列（前端 MetricSeries 列表）.
+
+    AMP 故障时降级返回空 list，不 5xx。
+    """
+    if end_time is None:
+        end_time = utc_now()
+    if start_time is None:
+        start_time = end_time - timedelta(hours=1)
+
+    if metric_names:
+        names = [n.strip() for n in metric_names.split(",") if n.strip()]
+    else:
+        names = ["DCGM_FI_DEV_GPU_UTIL", "node_cpu_usage", "node_memory_usage"]
+
+    try:
+        result = await prometheus_service.query_metrics(
+            metric_names=names,
+            start_time=start_time,
+            end_time=end_time,
+            step=step,
+        )
+        return [
+            MetricSeriesResponse(
+                metric_name=name,
+                labels={},
+                data_points=[MetricDataPointResponse(timestamp=dp.timestamp, value=dp.value) for dp in data_points],
+            )
+            for name, data_points in result.items()
+        ]
+    except Exception as e:
+        logger.warning("prometheus_unavailable", endpoint="metrics", error=str(e))
+        return []
+
+
+@router.get("/alerts", response_model=AlertListResponse)
+async def list_alerts(
+    page: int = Query(1, ge=1, description="页码"),
+    page_size: int = Query(20, ge=1, le=100, description="每页数量"),
+    _: None = Depends(get_current_active_user),
+) -> AlertListResponse:
+    """获取告警分页列表.
+
+    告警子系统尚未实现（YAGNI），返回结构正确的空分页集，保证前端正常渲染。
+    """
+    return AlertListResponse(items=[], total=0, page=page, page_size=page_size, total_pages=0)
