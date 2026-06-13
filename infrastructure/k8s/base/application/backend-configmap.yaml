@@ -10,6 +10,8 @@ data:
   AWS_REGION: "us-east-1"
   S3_BUCKET_NAME: "ai-platform-dev-datasets"
   HYPERPOD_CLUSTER_NAME: "ai-platform-dev-hyperpod"
+  # Amazon Managed Prometheus 查询端点（监控页指标数据源，PrometheusClient 经 SigV4 查询）
+  AMP_QUERY_ENDPOINT: "https://aps-workspaces.us-east-1.amazonaws.com/workspaces/ws-577036b0-ac41-4e0b-81a5-4436385b0fdc"
   # Spaces 专用 Domain：显式指定，避免自动发现命中共享 Unified Studio 域
   SAGEMAKER_DOMAIN_ID: "d-i3e6cqfdqszw"
   SAGEMAKER_USER_PROFILE: "studio-user"
