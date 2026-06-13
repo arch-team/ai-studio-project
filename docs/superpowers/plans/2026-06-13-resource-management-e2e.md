@@ -604,17 +604,17 @@ class ClusterSyncService:
         self._lock = asyncio.Lock()
 
     async def get_clusters(self) -> list[HyperPodCluster]:
-        existing, _ = await self._repo.list_clusters()  # 现有方法返回 (items, total) 或 list，按实际签名取
+        # 注：list_clusters() 实测返回 list[HyperPodCluster]（非 (items, total) 元组），直接接收
+        existing = await self._repo.list_clusters()
         if existing and self._is_fresh(existing):
             return existing
         # 回源（单飞保护，避免并发首请求击穿）
         async with self._lock:
-            existing, _ = await self._repo.list_clusters()
+            existing = await self._repo.list_clusters()
             if existing and self._is_fresh(existing):
                 return existing
             await self._sync_from_sagemaker()
-            result, _ = await self._repo.list_clusters()
-            return result
+            return await self._repo.list_clusters()
 
     def _is_fresh(self, clusters) -> bool:
         return all(
@@ -633,8 +633,6 @@ class ClusterSyncService:
         else:
             await self._repo.create(entity)
 ```
-
-> 注：`list_clusters()` 实际签名见 impl（可能返回 list 或 (items, total)），实现时按真实签名调整解包。
 
 字段映射 `_map_to_entity`：`ClusterName`→cluster_name、`ClusterArn`→cluster_arn、`ClusterStatus` 经 `_STATUS_MAP`→status、`InstanceGroups`（list）→instance_groups(JSON) 且 `sum(CurrentCount)`→total_nodes、GPU 实例组累计→total_gpu_count、`utc_now()`→last_sync_at。
 
