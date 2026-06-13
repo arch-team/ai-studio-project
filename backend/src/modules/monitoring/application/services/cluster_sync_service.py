@@ -18,7 +18,7 @@ from typing import Any
 import structlog
 
 from src.shared.infrastructure import get_settings
-from src.shared.utils import utc_now
+from src.shared.utils import ensure_aware, utc_now
 
 from ...domain.entities import HyperPodCluster
 from ...domain.repositories import IHyperPodClusterRepository
@@ -88,12 +88,17 @@ class ClusterSyncService:
             return await self._repo.list_clusters()
 
     def _is_fresh(self, clusters: list[HyperPodCluster]) -> bool:
-        """所有集群均已同步且未超 TTL 视为新鲜."""
+        """所有集群均已同步且未超 TTL 视为新鲜.
+
+        MySQL DATETIME 列不存时区，SQLAlchemy 读回的 last_sync_at 是 naive datetime，
+        与 aware 的 utc_now() 直接相减会抛 TypeError。用 ensure_aware 将 naive 视为 UTC
+        统一为 aware 后再比较。
+        """
         now = utc_now()
         for cluster in clusters:
             if cluster.last_sync_at is None:
                 return False
-            if (now - cluster.last_sync_at).total_seconds() >= self._ttl_seconds:
+            if (now - ensure_aware(cluster.last_sync_at)).total_seconds() >= self._ttl_seconds:
                 return False
         return True
 

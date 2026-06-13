@@ -4,7 +4,7 @@
 仅 mock 边界依赖（仓库 + SageMaker 客户端），不 mock 被测服务。
 """
 
-from datetime import timedelta
+from datetime import datetime, timedelta
 from typing import Any
 from unittest.mock import AsyncMock
 
@@ -147,6 +147,40 @@ async def test_get_clusters_creates_when_arn_not_in_db(repo: AsyncMock, sagemake
 
     repo.create.assert_awaited()
     repo.update.assert_not_awaited()
+
+
+# === naive datetime 时区比较（MySQL DATETIME 读回）===
+
+
+async def test_is_fresh_handles_naive_fresh_last_sync_at(repo: AsyncMock, sagemaker: AsyncMock) -> None:
+    # MySQL DATETIME 列不存时区，SQLAlchemy 读回的 last_sync_at 是 naive datetime。
+    # _is_fresh 比较 aware utc_now() 与 naive last_sync_at 不应抛 TypeError；
+    # 刚刚同步的 naive 时间应判为新鲜 → 不回源。
+    naive_recent = datetime.utcnow()  # naive（无 tzinfo），模拟 MySQL 读回
+    cluster = _fresh_cluster()
+    cluster.last_sync_at = naive_recent
+    repo.list_clusters.return_value = [cluster]
+
+    svc = ClusterSyncService(repo, sagemaker, ttl_seconds=300)
+    result = await svc.get_clusters()  # 不应抛 TypeError
+
+    sagemaker.describe_cluster.assert_not_awaited()  # naive 且新鲜 → 不回源
+    assert len(result) == 1
+
+
+async def test_is_fresh_handles_naive_stale_last_sync_at(repo: AsyncMock, sagemaker: AsyncMock) -> None:
+    # naive 且超 TTL（10 分钟前）应正确判为过期 → 触发回源，验证修复保持原有新鲜度逻辑。
+    naive_stale = datetime.utcnow() - timedelta(minutes=10)  # naive，超 TTL
+    cluster = _stale_cluster()
+    cluster.last_sync_at = naive_stale
+    repo.list_clusters.return_value = [cluster]
+    repo.get_by_arn.return_value = cluster
+
+    svc = ClusterSyncService(repo, sagemaker, ttl_seconds=300, cluster_name=_CLUSTER_NAME)
+    await svc.get_clusters()  # 不应抛 TypeError
+
+    sagemaker.describe_cluster.assert_awaited()  # naive 且过期 → 回源刷新
+    repo.update.assert_awaited()
 
 
 # === 状态与字段映射 ===
