@@ -6,6 +6,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from starlette.applications import Starlette
+from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
 from starlette.routing import Route
@@ -407,8 +408,10 @@ class TestAuditMiddlewareUserExtraction:
             ]
         )
         app.state.audit_repository = mock_repo
+        # 注意中间件 LIFO 执行顺序：后添加的 set_user 在最外层先执行，
+        # 先设置 request.state.user_id，内层 AuditMiddleware 才能读到。
         app.add_middleware(middleware_class)
-        app.middleware("http")(set_user)
+        app.add_middleware(BaseHTTPMiddleware, dispatch=set_user)
         return app
 
 
