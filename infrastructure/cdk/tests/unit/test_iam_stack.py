@@ -104,26 +104,28 @@ class TestBackendServiceRole:
         template.has_resource_properties(
             "AWS::IAM::Policy",
             {
-                "PolicyDocument": {
-                    "Statement": Match.array_with(
-                        [
-                            Match.object_like(
-                                {
-                                    "Action": Match.array_with(
-                                        [
-                                            "aps:QueryMetrics",
-                                            "aps:GetSeries",
-                                            "aps:GetLabels",
-                                            "aps:GetMetricMetadata",
-                                        ]
-                                    ),
-                                    "Effect": "Allow",
-                                    "Sid": "AmpQueryAccess",
-                                }
-                            )
-                        ]
-                    )
-                }
+                "PolicyDocument": Match.object_like(
+                    {
+                        "Statement": Match.array_with(
+                            [
+                                Match.object_like(
+                                    {
+                                        "Action": Match.array_with(
+                                            [
+                                                "aps:QueryMetrics",
+                                                "aps:GetSeries",
+                                                "aps:GetLabels",
+                                                "aps:GetMetricMetadata",
+                                            ]
+                                        ),
+                                        "Effect": "Allow",
+                                        "Sid": "AmpQueryAccess",
+                                    }
+                                )
+                            ]
+                        )
+                    }
+                )
             },
         )
 

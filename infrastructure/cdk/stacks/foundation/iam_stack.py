@@ -366,6 +366,7 @@ class IamStack(cdk.Stack):
             )
         )
 
+        # workspace ARN 由 L4 ObservabilityStack 运行时生成，L1 IamStack 无法跨层引用，故用 workspace/* 通配
         role.add_to_policy(
             iam.PolicyStatement(
                 sid="AmpQueryAccess",
