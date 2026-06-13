@@ -144,7 +144,7 @@ class ModelService(BaseApplicationService[Model, int]):
 
             if v1 is not None and v2 is not None:
                 diff = v2 - v1
-                diff_percent = ((v2 - v1) / v1 * 100) if v1 != 0 else None
+                diff_percent = (diff / v1 * 100) if v1 != 0 else None
 
             metrics_diff[metric] = {
                 "v1": v1,

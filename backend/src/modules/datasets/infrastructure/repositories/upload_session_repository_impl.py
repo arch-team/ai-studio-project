@@ -16,6 +16,7 @@ from src.modules.datasets.infrastructure.models import (
     UploadSessionStatus,
 )
 from src.shared.infrastructure.pydantic_repository import PydanticRepository
+from src.shared.utils import calculate_offset
 
 
 class UploadSessionRepositoryImpl(
@@ -180,7 +181,7 @@ class UploadSessionRepositoryImpl(
         query = query.order_by(UploadSessionModel.created_at.desc())
 
         # 应用分页
-        offset = (page - 1) * page_size
+        offset = calculate_offset(page, page_size)
         query = query.offset(offset).limit(page_size)
 
         # 执行查询
