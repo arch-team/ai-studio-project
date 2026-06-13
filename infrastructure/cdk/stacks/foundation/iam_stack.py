@@ -366,6 +366,22 @@ class IamStack(cdk.Stack):
             )
         )
 
+        role.add_to_policy(
+            iam.PolicyStatement(
+                sid="AmpQueryAccess",
+                effect=iam.Effect.ALLOW,
+                actions=[
+                    "aps:QueryMetrics",
+                    "aps:GetSeries",
+                    "aps:GetLabels",
+                    "aps:GetMetricMetadata",
+                ],
+                resources=[
+                    f"arn:aws:aps:{self.env_config.region}:{self.env_config.account}:workspace/*",
+                ],
+            )
+        )
+
         cdk.Tags.of(role).add(
             "Name", f"{self.env_config.resource_prefix}-backend-service-role"
         )
