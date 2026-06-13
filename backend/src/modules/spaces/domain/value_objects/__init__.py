@@ -8,12 +8,14 @@ from .space_enums import (
     SpaceStatus,
     SpaceType,
 )
+from .workspace_status import map_workspace_status
 
 __all__ = [
+    "INSTANCE_TYPE_RESOURCES",
+    "SPACE_STATE_TRANSITIONS",
     "SpaceBackend",
     "SpaceInstanceType",
-    "SpaceType",
     "SpaceStatus",
-    "SPACE_STATE_TRANSITIONS",
-    "INSTANCE_TYPE_RESOURCES",
+    "SpaceType",
+    "map_workspace_status",
 ]
