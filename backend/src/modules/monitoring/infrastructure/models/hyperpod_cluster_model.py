@@ -1,6 +1,7 @@
 """HyperPodCluster ORM model."""
 
 from datetime import datetime
+from enum import Enum as PyEnum
 
 from sqlalchemy import BigInteger, DateTime, Enum, Integer, String, text
 from sqlalchemy.dialects.mysql import JSON
@@ -8,6 +9,16 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from src.modules.monitoring.domain.value_objects import ClusterStatus, HealthStatus
 from src.shared.infrastructure.database import Base
+
+
+def _enum_values(enum_cls: type[PyEnum]) -> list[str]:
+    """让 SQLAlchemy Enum 列以 .value 而非成员名持久化/读回。
+
+    数据库迁移 (a1b2c3d4e5f6) 创建的 ENUM 列使用小写 .value
+    (如 'creating')，而 SQLAlchemy Enum() 默认按成员名 (如 'CREATING')
+    读写。不指定 values_callable 会导致读回时 LookupError/KeyError。
+    """
+    return [member.value for member in enum_cls]
 
 
 class HyperPodClusterModel(Base):
@@ -88,14 +99,14 @@ class HyperPodClusterModel(Base):
 
     # Status fields
     status: Mapped[ClusterStatus] = mapped_column(
-        Enum(ClusterStatus),
+        Enum(ClusterStatus, values_callable=_enum_values),
         nullable=False,
         server_default="creating",
         index=True,
         comment="集群状态",
     )
     health_status: Mapped[HealthStatus | None] = mapped_column(
-        Enum(HealthStatus),
+        Enum(HealthStatus, values_callable=_enum_values),
         nullable=True,
         index=True,
         comment="健康状态",
