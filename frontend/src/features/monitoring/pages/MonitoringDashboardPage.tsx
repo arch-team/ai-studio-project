@@ -321,12 +321,19 @@ function GrafanaDashboard({
   }
 
   // 未配置 Grafana: 优雅降级，展示引导文案而非死链 iframe
+  // 文案分层: 对终端用户说"还能去哪看数据"，运维提示不暴露 env 变量名
   if (!isGrafanaConfigured) {
     return (
       <Container header={<Header variant="h2">Grafana 仪表盘</Header>}>
-        <Alert type="info" header="Grafana 未配置">
-          Grafana 仪表盘尚未部署，请联系管理员配置 VITE_GRAFANA_URL
-          环境变量后查看实时监控大盘。当前可在「概览」「指标趋势」标签页查看核心指标。
+        <Alert type="info" header="Grafana 监控大盘未启用">
+          <SpaceBetween size="xs">
+            <Box variant="p">
+              实时监控大盘尚未启用。您仍可在「概览」与「指标趋势」标签页查看集群状态、资源利用率和指标趋势。
+            </Box>
+            <Box variant="small" color="text-body-secondary">
+              管理员可配置监控大盘地址以启用此功能。
+            </Box>
+          </SpaceBetween>
         </Alert>
       </Container>
     );

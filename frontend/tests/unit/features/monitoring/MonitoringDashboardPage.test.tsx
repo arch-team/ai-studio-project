@@ -304,9 +304,14 @@ describe('MonitoringDashboardPage', () => {
       // 切换到 Grafana 标签页
       await user.click(screen.getByRole('tab', { name: /Grafana/i }));
 
-      // 引导文案存在（标题提示未配置，正文提示联系管理员）
-      expect(screen.getByText('Grafana 未配置')).toBeInTheDocument();
-      expect(screen.getByText(/请联系管理员/)).toBeInTheDocument();
+      // 引导文案对终端用户友好：标题提示未启用，正文告知仍可在概览/指标趋势查看数据
+      expect(screen.getByText('Grafana 监控大盘未启用')).toBeInTheDocument();
+      expect(
+        screen.getByText(/您仍可在「概览」与「指标趋势」标签页查看/),
+      ).toBeInTheDocument();
+
+      // 文案不暴露 env 变量名等运维信息
+      expect(screen.queryByText(/VITE_GRAFANA_URL/)).not.toBeInTheDocument();
 
       // 不渲染指向 /grafana 死链的 iframe
       expect(screen.queryByTitle('Grafana 监控仪表盘')).not.toBeInTheDocument();
