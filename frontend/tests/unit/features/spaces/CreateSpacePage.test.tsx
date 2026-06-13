@@ -6,6 +6,7 @@
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { screen, waitFor, fireEvent } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { renderWithProviders } from "@tests/__utils__/test-utils";
 import { useUIStore } from "@store/slices/uiSlice";
 import { CreateSpacePage } from "@features/spaces/pages";
@@ -204,6 +205,57 @@ describe("CreateSpacePage", () => {
       expect(
         screen.queryByText(/HyperPod 集群空间将占用团队的 ClusterQueue 配额/)
       ).not.toBeInTheDocument();
+    });
+
+    it("通过 Select 选中「HyperPod 集群」后显示配额提示且提交 backend:hyperpod", async () => {
+      const user = userEvent.setup();
+      renderWithProviders(<CreateSpacePage />);
+
+      // 初始（默认 studio）不应显示 HyperPod 配额提示
+      expect(
+        screen.queryByText(/HyperPod 集群空间将占用团队的 ClusterQueue 配额/)
+      ).not.toBeInTheDocument();
+
+      // 1. 找到「环境类型」Select 的 trigger（Cloudscape Select 渲染为
+      //    aria-haspopup="listbox" 的 button，trigger 上显示当前选中值 "SageMaker Studio"）
+      const backendTrigger = screen
+        .getAllByRole("button")
+        .find(
+          (btn) =>
+            btn.getAttribute("aria-haspopup") === "listbox" &&
+            btn.textContent?.includes("SageMaker Studio")
+        );
+      expect(backendTrigger).toBeDefined();
+
+      // 2. 点击展开 listbox，再点击「HyperPod 集群」选项（role="option"）
+      await user.click(backendTrigger!);
+      const hyperpodOption = await screen.findByRole("option", {
+        name: /HyperPod 集群/,
+      });
+      await user.click(hyperpodOption);
+
+      // 3. 选中 HyperPod 后，配额提示 Alert 应出现（文案含 "ClusterQueue 配额"）
+      await waitFor(() => {
+        expect(
+          screen.getByText(/HyperPod 集群空间将占用团队的 ClusterQueue 配额/)
+        ).toBeInTheDocument();
+      });
+
+      // 4. 填入合法名称并点击「创建空间」
+      const nameInput = screen.getByPlaceholderText("my-dev-space");
+      fireEvent.change(nameInput, { target: { value: "valid-name" } });
+      await user.click(screen.getByRole("button", { name: "创建空间" }));
+
+      // 5. 断言提交请求体携带 backend: 'hyperpod'
+      await waitFor(() => {
+        expect(mockMutateAsync).toHaveBeenCalledWith({
+          space_name: "valid-name",
+          backend: "hyperpod",
+          space_type: "jupyter",
+          instance_type: "ml.g5.xlarge",
+          storage_size_gb: 10,
+        });
+      });
     });
 
     it("提交失败时应该显示错误信息", async () => {
