@@ -15,14 +15,14 @@ from src.modules.spaces.domain.value_objects import map_workspace_status
 from src.modules.spaces.infrastructure.external.k8s_workspace_client import (
     K8sWorkspaceClient,
 )
+from src.modules.spaces.infrastructure.external.workspace_crd import (
+    CONNECTION_API_VERSION_FULL,
+    CONNECTION_KIND,
+    WORKSPACE_API_VERSION_FULL,
+    WORKSPACE_KIND,
+)
 
 logger = structlog.get_logger(__name__)
-
-# CRD API 版本常量 (Phase B 真实集群需核验)
-_WORKSPACE_API_VERSION = "workspace.jupyter.org/v1alpha1"
-_WORKSPACE_KIND = "Workspace"
-_CONNECTION_API_VERSION = "connection.workspace.jupyter.org/v1alpha1"
-_CONNECTION_KIND = "WorkspaceConnection"
 
 # 交互空间优先级类 (设计 §5.2: 优先级 100)
 INTERACTIVE_SPACE_PRIORITY_CLASS = "interactive-space-priority"
@@ -183,7 +183,10 @@ class HyperPodSpaceBackend(ISpaceBackendClient):
 
         # 超时
         raise HyperPodSpaceBackendError(
-            message=f"Timeout waiting for access URL (workspace={space.space_name}, type={conn_type})"
+            message=(
+                f"Timeout waiting for access URL after {_MAX_POLL_ATTEMPTS} attempts "
+                f"(workspace={space.space_name}, type={conn_type})"
+            )
         )
 
     def _build_workspace_body(self, space: Space) -> dict[str, Any]:
@@ -191,8 +194,8 @@ class HyperPodSpaceBackend(ISpaceBackendClient):
         resources = space.get_resource_requirements()
 
         return {
-            "apiVersion": _WORKSPACE_API_VERSION,
-            "kind": _WORKSPACE_KIND,
+            "apiVersion": WORKSPACE_API_VERSION_FULL,
+            "kind": WORKSPACE_KIND,
             "metadata": {
                 "name": space.space_name,
                 "labels": {
@@ -207,10 +210,13 @@ class HyperPodSpaceBackend(ISpaceBackendClient):
                 },
                 "resources": {
                     "requests": {
+                        # K8s CPU 单位: 核数 (整数字符串, 如 "4" = 4 核)
                         "cpu": str(resources["cpu_cores"]),
+                        # K8s 内存单位: Gi (1Gi = 2^30 字节)
                         "memory": f"{resources['memory_gb']}Gi",
                     },
                     "limits": {
+                        # GPU 通过 nvidia.com/gpu 扩展资源声明 (整数张数)
                         "nvidia.com/gpu": str(resources["gpu_count"]),
                     },
                 },
@@ -225,8 +231,8 @@ class HyperPodSpaceBackend(ISpaceBackendClient):
     ) -> dict[str, Any]:
         """构建 WorkspaceConnection CRD body。"""
         return {
-            "apiVersion": _CONNECTION_API_VERSION,
-            "kind": _CONNECTION_KIND,
+            "apiVersion": CONNECTION_API_VERSION_FULL,
+            "kind": CONNECTION_KIND,
             "metadata": {
                 "name": connection_name,
             },

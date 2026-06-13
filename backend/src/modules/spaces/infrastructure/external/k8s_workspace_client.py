@@ -19,6 +19,18 @@ from src.modules.spaces.domain.exceptions import (
     HyperPodSpaceBackendError,
     SpaceBackendUnavailableError,
 )
+from src.modules.spaces.infrastructure.external.workspace_crd import (
+    CONNECTION_API_GROUP as _CONNECTION_API_GROUP,
+)
+from src.modules.spaces.infrastructure.external.workspace_crd import (
+    CONNECTION_API_VERSION as _CONNECTION_API_VERSION,
+)
+from src.modules.spaces.infrastructure.external.workspace_crd import (
+    WORKSPACE_API_GROUP as _WORKSPACE_API_GROUP,
+)
+from src.modules.spaces.infrastructure.external.workspace_crd import (
+    WORKSPACE_API_VERSION as _WORKSPACE_API_VERSION,
+)
 
 logger = structlog.get_logger(__name__)
 
@@ -28,11 +40,8 @@ _SA_CA_PATH = Path("/var/run/secrets/kubernetes.io/serviceaccount/ca.crt")
 _K8S_HOST_ENV = "KUBERNETES_SERVICE_HOST"
 _K8S_PORT_ENV = "KUBERNETES_SERVICE_PORT"
 
-# Workspace CRD API 路径
-_WORKSPACE_API_GROUP = "workspace.jupyter.org"
-_WORKSPACE_API_VERSION = "v1alpha1"
-_CONNECTION_API_GROUP = "connection.workspace.jupyter.org"
-_CONNECTION_API_VERSION = "v1alpha1"
+# CRD API group/version 常量从 workspace_crd 模块导入 (见上方 import 别名)
+# URL path 构造逻辑保持不变 (_WORKSPACE_API_GROUP 等仍可用)
 
 
 class K8sWorkspaceClient:

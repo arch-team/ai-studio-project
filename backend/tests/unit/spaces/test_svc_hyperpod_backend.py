@@ -1,6 +1,6 @@
 """HyperPodSpaceBackend 测试 —— mock K8sWorkspaceClient 验证 CRD body 与状态映射。"""
 
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, patch
 
 import pytest
 
@@ -145,8 +145,11 @@ class TestDescribe:
 
 
 class TestAccessUrl:
-    async def test_create_access_url_creates_connection_and_polls(self, mock_k8s: AsyncMock) -> None:
-        """测试 create_access_url 创建 WorkspaceConnection 并轮询获取 URL。"""
+    @patch("asyncio.sleep", new_callable=AsyncMock)
+    async def test_create_access_url_creates_connection_and_polls(
+        self, mock_sleep: AsyncMock, mock_k8s: AsyncMock
+    ) -> None:
+        """测试 create_access_url 创建 WorkspaceConnection 并轮询获取 URL (mock sleep 瞬时完成)。"""
         # 第一次返回无 URL,第二次返回有 URL
         mock_k8s.get_workspace_connection.side_effect = [
             {"status": {}},
@@ -166,21 +169,25 @@ class TestAccessUrl:
         assert mock_k8s.get_workspace_connection.call_count == 2
         assert url == "https://ide.dev.example.com/lab"
 
-    async def test_create_access_url_times_out_after_max_retries(self, mock_k8s: AsyncMock) -> None:
-        """测试 create_access_url 在超过最大轮询次数后超时。"""
+    @patch("asyncio.sleep", new_callable=AsyncMock)
+    async def test_create_access_url_times_out_after_max_retries(
+        self, mock_sleep: AsyncMock, mock_k8s: AsyncMock
+    ) -> None:
+        """测试 create_access_url 在超过最大轮询次数后超时 (mock sleep 瞬时完成)。"""
         # 始终返回无 URL
         mock_k8s.get_workspace_connection.return_value = {"status": {}}
 
         backend = HyperPodSpaceBackend(mock_k8s)
 
-        with pytest.raises(HyperPodSpaceBackendError, match="Timeout waiting for access URL"):
+        with pytest.raises(HyperPodSpaceBackendError, match="Timeout waiting for access URL after 10 attempts"):
             await backend.create_access_url(_hp_space(), conn_type="web-ui")
 
-    async def test_create_access_url_handles_none_connection(self, mock_k8s: AsyncMock) -> None:
-        """测试 create_access_url 处理 get_workspace_connection 返回 None。"""
+    @patch("asyncio.sleep", new_callable=AsyncMock)
+    async def test_create_access_url_handles_none_connection(self, mock_sleep: AsyncMock, mock_k8s: AsyncMock) -> None:
+        """测试 create_access_url 处理 get_workspace_connection 返回 None (mock sleep 瞬时完成)。"""
         mock_k8s.get_workspace_connection.return_value = None
 
         backend = HyperPodSpaceBackend(mock_k8s)
 
-        with pytest.raises(HyperPodSpaceBackendError, match="Timeout waiting for access URL"):
+        with pytest.raises(HyperPodSpaceBackendError, match="Timeout waiting for access URL after 10 attempts"):
             await backend.create_access_url(_hp_space(), conn_type="web-ui")
