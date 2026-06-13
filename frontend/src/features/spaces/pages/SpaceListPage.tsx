@@ -6,6 +6,7 @@
 
 import {
   Alert,
+  Badge,
   Box,
   Button,
   Container,
@@ -28,7 +29,7 @@ import {
 import { PageLayout } from '@shared/components';
 import { SpaceStatusBadge } from '../components/SpaceStatusBadge';
 import type { SpaceStatus, SpaceFilters, SpaceSummary } from '../types';
-import { SPACE_STATUS_LABELS, SPACE_TYPE_LABELS } from '../types';
+import { SPACE_STATUS_LABELS, SPACE_TYPE_LABELS, SPACE_BACKEND_LABELS } from '../types';
 
 // 面包屑（模块级常量，避免每次渲染创建新引用）
 const BREADCRUMBS = [
@@ -173,6 +174,15 @@ export function SpaceListPage() {
           </Link>
         ),
         sortingField: 'space_name',
+      },
+      {
+        id: 'backend',
+        header: '环境类型',
+        cell: (item: SpaceSummary) => (
+          <Badge color={item.backend === 'hyperpod' ? 'blue' : undefined}>
+            {SPACE_BACKEND_LABELS[item.backend]}
+          </Badge>
+        ),
       },
       {
         id: 'space_type',

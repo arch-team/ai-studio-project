@@ -21,6 +21,8 @@ export type SpaceInstanceType =
   | 'ml.g5.xlarge'
   | 'ml.g5.2xlarge';
 
+export type SpaceBackend = 'studio' | 'hyperpod';
+
 // === Space Types ===
 
 export interface SpaceSummary {
@@ -30,6 +32,7 @@ export interface SpaceSummary {
   instance_type: SpaceInstanceType;
   space_type: SpaceType;
   status: SpaceStatus;
+  backend: SpaceBackend;
   created_at: string;
 }
 
@@ -37,6 +40,9 @@ export interface SpaceDetail extends SpaceSummary {
   storage_size_gb: number;
   lifecycle_config_arn: string | null;
   sagemaker_space_arn: string | null;
+  namespace: string | null;
+  queue_name: string | null;
+  workspace_template: string | null;
   updated_at: string;
   deleted_at: string | null;
 }
@@ -48,6 +54,7 @@ export interface CreateSpaceRequest {
   instance_type?: SpaceInstanceType;
   space_type?: SpaceType;
   storage_size_gb?: number;
+  backend?: SpaceBackend;
 }
 
 export interface UpdateSpaceRequest {
@@ -108,4 +115,9 @@ export const INSTANCE_TYPE_LABELS: Record<SpaceInstanceType, string> = {
   'ml.g4dn.xlarge': 'ml.g4dn.xlarge (4 vCPU, 16 GB, 1x NVIDIA T4)',
   'ml.g5.xlarge': 'ml.g5.xlarge (4 vCPU, 16 GB, 1x NVIDIA A10G)',
   'ml.g5.2xlarge': 'ml.g5.2xlarge (8 vCPU, 32 GB, 1x NVIDIA A10G)',
+};
+
+export const SPACE_BACKEND_LABELS: Record<SpaceBackend, string> = {
+  studio: 'SageMaker Studio',
+  hyperpod: 'HyperPod 集群',
 };

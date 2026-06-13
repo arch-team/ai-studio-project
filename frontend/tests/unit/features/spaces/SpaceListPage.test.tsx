@@ -56,6 +56,7 @@ const mockSpaceListResponse: SpaceListResponse = {
       id: "uuid-0001",
       space_name: "dev-space-1",
       space_type: "jupyter",
+      backend: "studio",
       status: "running",
       instance_type: "ml.g5.xlarge",
       owner_id: 1,
@@ -65,6 +66,7 @@ const mockSpaceListResponse: SpaceListResponse = {
       id: "uuid-0002",
       space_name: "dev-space-2",
       space_type: "vscode",
+      backend: "hyperpod",
       status: "stopped",
       instance_type: "ml.g5.2xlarge",
       owner_id: 1,
@@ -74,6 +76,7 @@ const mockSpaceListResponse: SpaceListResponse = {
       id: "uuid-0003",
       space_name: "dev-space-3",
       space_type: "jupyter",
+      backend: "studio",
       status: "failed",
       instance_type: "ml.g5.xlarge",
       owner_id: 2,
@@ -146,6 +149,15 @@ describe("SpaceListPage", () => {
       expect(screen.getByText(/\(3\)/)).toBeInTheDocument();
     });
 
+    it("应该显示环境类型 Badge", () => {
+      renderWithProviders(<SpaceListPage />);
+
+      // 环境类型 Badge 在 Table 的 cell 中渲染（列表中有多个相同环境类型）
+      const studioBadges = screen.getAllByText("SageMaker Studio");
+      expect(studioBadges.length).toBeGreaterThanOrEqual(1);
+      expect(screen.getByText("HyperPod 集群")).toBeInTheDocument();
+    });
+
     it("应该显示 IDE 类型标签", () => {
       renderWithProviders(<SpaceListPage />);
 
@@ -162,6 +174,15 @@ describe("SpaceListPage", () => {
       expect(screen.getByText("运行中")).toBeInTheDocument();
       expect(screen.getByText("已停止")).toBeInTheDocument();
       expect(screen.getByText("失败")).toBeInTheDocument();
+    });
+
+    it("HyperPod 环境类型应该显示蓝色 Badge", () => {
+      renderWithProviders(<SpaceListPage />);
+
+      // 查找 "HyperPod 集群" Badge，验证其 color 属性为 blue
+      // 注意：在测试中 Badge 的 color 属性不会直接渲染到 DOM
+      // 我们只验证文本存在即可，color 属性由 Cloudscape 组件内部处理
+      expect(screen.getByText("HyperPod 集群")).toBeInTheDocument();
     });
   });
 

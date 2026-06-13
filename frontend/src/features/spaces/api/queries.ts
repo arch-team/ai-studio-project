@@ -130,13 +130,11 @@ export function useOpenSpaceIDE() {
       win.opener = null;
       try {
         const { url } = await fetchSpaceAccessUrl(id);
-        // 仅允许跳转 SageMaker Studio 域，防止开放重定向
+        // 仅校验 HTTPS 协议和非空 hostname，HyperPod 使用自定义 DNS 域
         const parsed = new URL(url);
-        const isTrusted =
-          parsed.protocol === 'https:' &&
-          parsed.hostname.endsWith('.sagemaker.aws');
+        const isTrusted = parsed.protocol === 'https:' && parsed.hostname.length > 0;
         if (!isTrusted) {
-          throw new Error('访问地址不可信，已阻止跳转');
+          throw new Error('访问地址不可信（非 HTTPS 或无效域名），已阻止跳转');
         }
         win.location.href = url;
         return url;

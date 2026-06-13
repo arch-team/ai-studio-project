@@ -5,6 +5,7 @@
  */
 
 import {
+  Alert,
   Box,
   Button,
   Container,
@@ -26,8 +27,13 @@ const BREADCRUMBS = [
   { text: '开发空间', href: '/spaces' },
   { text: '创建开发空间', href: '#' },
 ];
-import type { SpaceType, SpaceInstanceType, CreateSpaceRequest } from '../types';
-import { SPACE_TYPE_LABELS, INSTANCE_TYPE_LABELS } from '../types';
+import type { SpaceType, SpaceInstanceType, SpaceBackend, CreateSpaceRequest } from '../types';
+import { SPACE_TYPE_LABELS, INSTANCE_TYPE_LABELS, SPACE_BACKEND_LABELS } from '../types';
+
+// 环境类型选项（SageMaker Studio / HyperPod 集群）
+const backendOptions = Object.entries(SPACE_BACKEND_LABELS).map(
+  ([value, label]) => ({ label, value })
+);
 
 // IDE 类型选项（与后端 SpaceTypeEnum 一致）
 const spaceTypeOptions = Object.entries(SPACE_TYPE_LABELS).map(
@@ -44,6 +50,7 @@ const instanceTypeOptions = Object.entries(INSTANCE_TYPE_LABELS).map(
  */
 function validateForm(values: {
   name: string;
+  backend: string;
   spaceType: string;
   instanceType: string;
   storageGb: string;
@@ -58,6 +65,10 @@ function validateForm(values: {
     errors.name = '空间名称不能超过 63 个字符';
   } else if (!/^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/.test(values.name)) {
     errors.name = '空间名称只能包含小写字母、数字和连字符，且必须以字母或数字开头和结尾';
+  }
+
+  if (!values.backend) {
+    errors.backend = '请选择环境类型';
   }
 
   if (!values.spaceType) {
@@ -85,6 +96,7 @@ export function CreateSpacePage() {
 
   // 表单状态
   const [name, setName] = useState('');
+  const [backend, setBackend] = useState<SpaceBackend>('studio');
   const [spaceType, setSpaceType] = useState<string>('jupyter');
   const [instanceType, setInstanceType] = useState<string>('ml.g5.xlarge');
   const [storageGb, setStorageGb] = useState('10');
@@ -99,6 +111,7 @@ export function CreateSpacePage() {
   const handleSubmit = useCallback(async () => {
     const validationErrors = validateForm({
       name,
+      backend,
       spaceType,
       instanceType,
       storageGb,
@@ -113,6 +126,7 @@ export function CreateSpacePage() {
 
     const request: CreateSpaceRequest = {
       space_name: name,
+      backend: backend,
       space_type: spaceType as SpaceType,
       instance_type: instanceType as SpaceInstanceType,
       storage_size_gb: parseInt(storageGb, 10),
@@ -125,7 +139,7 @@ export function CreateSpacePage() {
       // 错误处理由 mutation 的 onError 处理
       console.error('创建开发空间失败:', error);
     }
-  }, [name, spaceType, instanceType, storageGb, createMutation, navigate]);
+  }, [name, backend, spaceType, instanceType, storageGb, createMutation, navigate]);
 
   return (
     <PageLayout
@@ -157,6 +171,29 @@ export function CreateSpacePage() {
       >
         <Container header={<Header variant="h2">基础配置</Header>}>
           <SpaceBetween size="m">
+            <FormField
+              label="环境类型"
+              errorText={errors.backend}
+              constraintText="选择运行环境（SageMaker Studio 或 HyperPod 集群）"
+            >
+              <Select
+                selectedOption={
+                  backendOptions.find((opt) => opt.value === backend) ||
+                  backendOptions[0]
+                }
+                onChange={({ detail }) =>
+                  setBackend(detail.selectedOption.value as SpaceBackend || 'studio')
+                }
+                options={backendOptions}
+              />
+            </FormField>
+
+            {backend === 'hyperpod' && (
+              <Alert type="info">
+                HyperPod 集群空间将占用团队的 ClusterQueue 配额，空闲资源会被集群自动回收。
+              </Alert>
+            )}
+
             <FormField
               label="空间名称"
               errorText={errors.name}

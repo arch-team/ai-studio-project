@@ -64,6 +64,11 @@ describe("CreateSpacePage", () => {
       expect(breadcrumbs.some((b) => b.text === "创建开发空间")).toBe(true);
     });
 
+    it("应该渲染环境类型选择器", () => {
+      renderWithProviders(<CreateSpacePage />);
+      expect(screen.getByText("环境类型")).toBeInTheDocument();
+    });
+
     it("应该渲染空间名称输入框", () => {
       renderWithProviders(<CreateSpacePage />);
       expect(screen.getByText("空间名称")).toBeInTheDocument();
@@ -162,7 +167,7 @@ describe("CreateSpacePage", () => {
   });
 
   describe("表单提交", () => {
-    it("表单验证通过后应该提交并导航", async () => {
+    it("表单验证通过后应该提交并导航（默认 studio）", async () => {
       renderWithProviders(<CreateSpacePage />);
 
       // 使用 Cloudscape Input 组件的实际 change 事件
@@ -180,6 +185,7 @@ describe("CreateSpacePage", () => {
       await waitFor(() => {
         expect(mockMutateAsync).toHaveBeenCalledWith({
           space_name: "my-test-space",
+          backend: "studio",
           space_type: "jupyter",
           instance_type: "ml.g5.xlarge",
           storage_size_gb: 10,
@@ -189,6 +195,15 @@ describe("CreateSpacePage", () => {
       await waitFor(() => {
         expect(mockNavigate).toHaveBeenCalledWith("/spaces");
       });
+    });
+
+    it("默认应该不显示 HyperPod 配额提示（backend=studio）", () => {
+      renderWithProviders(<CreateSpacePage />);
+
+      // 默认 backend=studio，不显示 HyperPod 提示
+      expect(
+        screen.queryByText(/HyperPod 集群空间将占用团队的 ClusterQueue 配额/)
+      ).not.toBeInTheDocument();
     });
 
     it("提交失败时应该显示错误信息", async () => {

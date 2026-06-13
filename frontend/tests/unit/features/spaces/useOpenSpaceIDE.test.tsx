@@ -79,11 +79,11 @@ describe("useOpenSpaceIDE", () => {
     expect(apiClient.post).not.toHaveBeenCalled();
   });
 
-  it("不可信域名拒绝跳转并关闭已开的窗口", async () => {
+  it("不可信协议（非 HTTPS）拒绝跳转并关闭已开的窗口", async () => {
     const fakeWin = createFakeWindow();
     vi.spyOn(window, "open").mockReturnValue(fakeWin);
     vi.mocked(apiClient.post).mockResolvedValue({
-      url: "https://evil.example.com/auth",
+      url: "http://evil.example.com/auth",
     });
 
     const { result } = renderHook(() => useOpenSpaceIDE(), {
@@ -95,6 +95,39 @@ describe("useOpenSpaceIDE", () => {
     );
     expect(fakeWin.close).toHaveBeenCalled();
     expect(fakeWin.location.href).toBe("about:blank");
+  });
+
+  it("javascript: 协议拒绝跳转并关闭已开的窗口", async () => {
+    const fakeWin = createFakeWindow();
+    vi.spyOn(window, "open").mockReturnValue(fakeWin);
+    vi.mocked(apiClient.post).mockResolvedValue({
+      url: "javascript:alert(1)",
+    });
+
+    const { result } = renderHook(() => useOpenSpaceIDE(), {
+      wrapper: createWrapper(),
+    });
+
+    await expect(result.current.mutateAsync("space-1")).rejects.toThrow(
+      /不可信/,
+    );
+    expect(fakeWin.close).toHaveBeenCalled();
+  });
+
+  it("允许 HyperPod 自定义域名（HTTPS + 非 sagemaker.aws）", async () => {
+    const hyperpodUrl = "https://custom.hyperpod.example.com/jupyter";
+    const fakeWin = createFakeWindow();
+    vi.spyOn(window, "open").mockReturnValue(fakeWin);
+    vi.mocked(apiClient.post).mockResolvedValue({ url: hyperpodUrl });
+
+    const { result } = renderHook(() => useOpenSpaceIDE(), {
+      wrapper: createWrapper(),
+    });
+
+    await result.current.mutateAsync("space-2");
+
+    expect(fakeWin.location.href).toBe(hyperpodUrl);
+    expect(fakeWin.close).not.toHaveBeenCalled();
   });
 
   it("API 失败时关闭已开的窗口并抛出错误", async () => {
