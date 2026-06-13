@@ -14,12 +14,7 @@ import yaml
 from httpx import AsyncClient
 
 # contract YAML 文件所在目录
-CONTRACTS_DIR = (
-    Path(__file__).resolve().parents[4]
-    / "specs"
-    / "001-ai-training-platform"
-    / "contracts"
-)
+CONTRACTS_DIR = Path(__file__).resolve().parents[4] / "specs" / "001-ai-training-platform" / "contracts"
 
 
 @pytest.fixture
@@ -78,9 +73,7 @@ def _extract_paths_via_regex(content: str) -> dict[str, Any]:
             result[current_path] = {}
             continue
         # 匹配方法行: '    get/post/etc:'
-        method_match = re.match(
-            r"^    (get|post|put|patch|delete|head|options):", line
-        )
+        method_match = re.match(r"^    (get|post|put|patch|delete|head|options):", line)
         if method_match and current_path is not None:
             result[current_path][method_match.group(1)] = {}
 

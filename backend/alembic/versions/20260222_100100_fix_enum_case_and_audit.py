@@ -11,15 +11,15 @@ but the Python Enum classes use lowercase values (e.g. "active").
 Also adds missing audit operation types: pause, resume, cancel.
 """
 
-from typing import Sequence, Union
+from collections.abc import Sequence
 
 from alembic import op
 
 # revision identifiers, used by Alembic.
 revision: str = "d4e5f6a7b8c9"
-down_revision: Union[str, None] = "c3d4e5f6a7b8"
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+down_revision: str | None = "c3d4e5f6a7b8"
+branch_labels: str | Sequence[str] | None = None
+depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
@@ -29,8 +29,7 @@ def upgrade() -> None:
     op.execute("ALTER TABLE users MODIFY COLUMN status VARCHAR(20) NOT NULL")
     op.execute("UPDATE users SET status = LOWER(status)")
     op.execute(
-        "ALTER TABLE users MODIFY COLUMN status "
-        "ENUM('active','inactive','suspended') NOT NULL COMMENT '用户状态'"
+        "ALTER TABLE users MODIFY COLUMN status " "ENUM('active','inactive','suspended') NOT NULL COMMENT '用户状态'"
     )
 
     # ============================================================
@@ -110,10 +109,7 @@ def upgrade() -> None:
     # ============================================================
     op.execute("ALTER TABLE audit_logs MODIFY COLUMN status VARCHAR(20) NOT NULL")
     op.execute("UPDATE audit_logs SET status = LOWER(status)")
-    op.execute(
-        "ALTER TABLE audit_logs MODIFY COLUMN status "
-        "ENUM('success','failed') NOT NULL COMMENT '操作状态'"
-    )
+    op.execute("ALTER TABLE audit_logs MODIFY COLUMN status " "ENUM('success','failed') NOT NULL COMMENT '操作状态'")
 
 
 def downgrade() -> None:
@@ -122,10 +118,7 @@ def downgrade() -> None:
     # 9. audit_logs.status
     op.execute("ALTER TABLE audit_logs MODIFY COLUMN status VARCHAR(20) NOT NULL")
     op.execute("UPDATE audit_logs SET status = UPPER(status)")
-    op.execute(
-        "ALTER TABLE audit_logs MODIFY COLUMN status "
-        "ENUM('SUCCESS','FAILED') NOT NULL COMMENT '操作状态'"
-    )
+    op.execute("ALTER TABLE audit_logs MODIFY COLUMN status " "ENUM('SUCCESS','FAILED') NOT NULL COMMENT '操作状态'")
 
     # 8. audit_logs.resource_type
     op.execute("ALTER TABLE audit_logs MODIFY COLUMN resource_type VARCHAR(30) NOT NULL")
@@ -189,6 +182,5 @@ def downgrade() -> None:
     op.execute("ALTER TABLE users MODIFY COLUMN status VARCHAR(20) NOT NULL")
     op.execute("UPDATE users SET status = UPPER(status)")
     op.execute(
-        "ALTER TABLE users MODIFY COLUMN status "
-        "ENUM('ACTIVE','INACTIVE','SUSPENDED') NOT NULL COMMENT '用户状态'"
+        "ALTER TABLE users MODIFY COLUMN status " "ENUM('ACTIVE','INACTIVE','SUSPENDED') NOT NULL COMMENT '用户状态'"
     )

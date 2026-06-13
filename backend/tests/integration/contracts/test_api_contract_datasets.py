@@ -27,20 +27,14 @@ class TestDatasetsContractPaths:
     """验证 datasets API 路径存在性。"""
 
     @pytest.mark.asyncio
-    async def test_openapi_schema_contains_datasets_list_path(
-        self, openapi_paths: dict[str, Any]
-    ) -> None:
+    async def test_openapi_schema_contains_datasets_list_path(self, openapi_paths: dict[str, Any]) -> None:
         """验证 OpenAPI schema 包含 /api/v1/datasets 列表路径。"""
         expected = f"{API_PREFIX}/datasets"
         matching = [p for p in openapi_paths if p == expected]
-        assert len(matching) == 1, (
-            f"期望路径 {expected} 在 OpenAPI schema 中存在"
-        )
+        assert len(matching) == 1, f"期望路径 {expected} 在 OpenAPI schema 中存在"
 
     @pytest.mark.asyncio
-    async def test_openapi_schema_contains_datasets_detail_path(
-        self, openapi_paths: dict[str, Any]
-    ) -> None:
+    async def test_openapi_schema_contains_datasets_detail_path(self, openapi_paths: dict[str, Any]) -> None:
         """验证 OpenAPI schema 包含 /api/v1/datasets/{{dataset_id}} 详情路径。"""
         matching = [
             p
@@ -52,18 +46,14 @@ class TestDatasetsContractPaths:
             and "upload" not in p
             and "health" not in p
         ]
-        assert len(matching) >= 1, (
-            "期望至少有一个 datasets/{id} 路径"
-        )
+        assert len(matching) >= 1, "期望至少有一个 datasets/{id} 路径"
 
 
 class TestDatasetsContractMethods:
     """验证 datasets API 端点支持的 HTTP 方法。"""
 
     @pytest.mark.asyncio
-    async def test_datasets_list_supports_get(
-        self, openapi_paths: dict[str, Any]
-    ) -> None:
+    async def test_datasets_list_supports_get(self, openapi_paths: dict[str, Any]) -> None:
         """验证 GET /datasets 方法存在。"""
         path = f"{API_PREFIX}/datasets"
         assert path in openapi_paths, f"路径 {path} 不存在"
@@ -71,9 +61,7 @@ class TestDatasetsContractMethods:
         assert "get" in methods, "GET /datasets 方法缺失"
 
     @pytest.mark.asyncio
-    async def test_datasets_list_supports_post(
-        self, openapi_paths: dict[str, Any]
-    ) -> None:
+    async def test_datasets_list_supports_post(self, openapi_paths: dict[str, Any]) -> None:
         """验证 POST /datasets 方法存在。"""
         path = f"{API_PREFIX}/datasets"
         assert path in openapi_paths, f"路径 {path} 不存在"
@@ -81,9 +69,7 @@ class TestDatasetsContractMethods:
         assert "post" in methods, "POST /datasets 方法缺失"
 
     @pytest.mark.asyncio
-    async def test_datasets_detail_supports_get(
-        self, openapi_paths: dict[str, Any]
-    ) -> None:
+    async def test_datasets_detail_supports_get(self, openapi_paths: dict[str, Any]) -> None:
         """验证 GET /datasets/{{dataset_id}} 方法存在。"""
         detail_path = next(
             (
@@ -103,9 +89,7 @@ class TestDatasetsContractMethods:
         assert "get" in methods, "GET /datasets/{id} 方法缺失"
 
     @pytest.mark.asyncio
-    async def test_datasets_detail_supports_patch(
-        self, openapi_paths: dict[str, Any]
-    ) -> None:
+    async def test_datasets_detail_supports_patch(self, openapi_paths: dict[str, Any]) -> None:
         """验证 PATCH /datasets/{{dataset_id}} 方法存在。"""
         detail_path = next(
             (
@@ -125,9 +109,7 @@ class TestDatasetsContractMethods:
         assert "patch" in methods, "PATCH /datasets/{id} 方法缺失"
 
     @pytest.mark.asyncio
-    async def test_datasets_detail_supports_delete(
-        self, openapi_paths: dict[str, Any]
-    ) -> None:
+    async def test_datasets_detail_supports_delete(self, openapi_paths: dict[str, Any]) -> None:
         """验证 DELETE /datasets/{{dataset_id}} 方法存在。"""
         detail_path = next(
             (
@@ -162,16 +144,11 @@ class TestDatasetsContractConsistency:
 
         for contract_path in contract_paths:
             full_path = f"{API_PREFIX}{contract_path}"
-            found = any(
-                self._paths_match(full_path, openapi_path)
-                for openapi_path in openapi_paths
-            )
+            found = any(self._paths_match(full_path, openapi_path) for openapi_path in openapi_paths)
             if not found:
                 missing_paths.append(contract_path)
 
-        assert not missing_paths, (
-            f"以下 contract 路径在 OpenAPI schema 中不存在: {missing_paths}"
-        )
+        assert not missing_paths, f"以下 contract 路径在 OpenAPI schema 中不存在: {missing_paths}"
 
     @pytest.mark.asyncio
     async def test_all_contract_methods_exist_in_openapi(
@@ -186,11 +163,7 @@ class TestDatasetsContractConsistency:
         for contract_path, methods in contract_paths.items():
             full_path = f"{API_PREFIX}{contract_path}"
             openapi_path = next(
-                (
-                    p
-                    for p in openapi_paths
-                    if self._paths_match(full_path, p)
-                ),
+                (p for p in openapi_paths if self._paths_match(full_path, p)),
                 None,
             )
             if openapi_path is None:
@@ -199,13 +172,9 @@ class TestDatasetsContractConsistency:
             openapi_methods = set(openapi_paths[openapi_path].keys())
             for method in methods:
                 if method.lower() not in openapi_methods:
-                    missing_methods.append(
-                        f"{method.upper()} {contract_path}"
-                    )
+                    missing_methods.append(f"{method.upper()} {contract_path}")
 
-        assert not missing_methods, (
-            f"以下 contract 方法在 OpenAPI schema 中不存在: {missing_methods}"
-        )
+        assert not missing_methods, f"以下 contract 方法在 OpenAPI schema 中不存在: {missing_methods}"
 
     @staticmethod
     def _paths_match(path_a: str, path_b: str) -> bool:

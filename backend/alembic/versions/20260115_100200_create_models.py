@@ -8,17 +8,18 @@ Creates the models table for storing trained model metadata.
 Supports model versioning and SageMaker Model Registry integration.
 """
 
-from typing import Sequence, Union
+from collections.abc import Sequence
 
 import sqlalchemy as sa
-from alembic import op
 from sqlalchemy.dialects import mysql
+
+from alembic import op
 
 # revision identifiers, used by Alembic.
 revision: str = "6d0e1f4a3b5c"
-down_revision: Union[str, None] = "5c9d0e3f2a4b"
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+down_revision: str | None = "5c9d0e3f2a4b"
+branch_labels: str | Sequence[str] | None = None
+depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
@@ -292,9 +293,7 @@ def upgrade() -> None:
         )
     )
     if result.scalar() == 0:
-        op.execute(
-            "ALTER TABLE models ADD FULLTEXT INDEX ft_models_search (model_name, description)"
-        )
+        op.execute("ALTER TABLE models ADD FULLTEXT INDEX ft_models_search (model_name, description)")
 
 
 def downgrade() -> None:

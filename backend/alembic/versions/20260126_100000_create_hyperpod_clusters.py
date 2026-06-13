@@ -8,17 +8,18 @@ Creates the hyperpod_clusters table for caching HyperPod cluster metadata.
 This table is a local cache; the source of truth is the HyperPod/K8s API.
 """
 
-from typing import Sequence, Union
+from collections.abc import Sequence
 
 import sqlalchemy as sa
-from alembic import op
 from sqlalchemy.dialects import mysql
+
+from alembic import op
 
 # revision identifiers, used by Alembic.
 revision: str = "a1b2c3d4e5f6"
-down_revision: Union[str, None] = "9a1b2c3d4e5f"
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+down_revision: str | None = "9a1b2c3d4e5f"
+branch_labels: str | Sequence[str] | None = None
+depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
@@ -101,7 +102,11 @@ def upgrade() -> None:
         sa.Column(
             "status",
             sa.Enum(
-                "creating", "active", "updating", "deleting", "failed",
+                "creating",
+                "active",
+                "updating",
+                "deleting",
+                "failed",
                 name="clusterstatus",
             ),
             nullable=False,
@@ -111,7 +116,9 @@ def upgrade() -> None:
         sa.Column(
             "health_status",
             sa.Enum(
-                "healthy", "degraded", "unhealthy",
+                "healthy",
+                "degraded",
+                "unhealthy",
                 name="healthstatus",
             ),
             nullable=True,

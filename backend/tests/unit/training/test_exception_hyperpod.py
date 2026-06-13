@@ -69,6 +69,7 @@ class TestHyperPodPodNotFoundError:
     def test_inherits_from_problem(self) -> None:
         """Test that exception inherits from Problem."""
         from src.shared.domain.problem import Problem
+
         error = HyperPodPodNotFoundError(job_name="job", pod_name="pod")
         assert isinstance(error, Problem)
 
@@ -126,6 +127,7 @@ class TestHyperPodOperationError:
     def test_inherits_from_problem(self) -> None:
         """Test that exception inherits from Problem."""
         from src.shared.domain.problem import Problem
+
         error = HyperPodOperationError(operation="test", reason="test")
         assert isinstance(error, Problem)
 

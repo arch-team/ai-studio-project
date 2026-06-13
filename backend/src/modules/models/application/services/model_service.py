@@ -204,7 +204,9 @@ class ModelService(BaseApplicationService[Model, int]):
 
         # Use base class method for state transition validation
         self._validate_state_transition(
-            model, ModelStatus.ARCHIVED, [ModelStatus.REGISTERED, ModelStatus.TRAINING]  # Allowed from states
+            model,
+            ModelStatus.ARCHIVED,
+            [ModelStatus.REGISTERED, ModelStatus.TRAINING],  # Allowed from states
         )
 
         model.archive()

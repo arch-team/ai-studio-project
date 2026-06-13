@@ -177,10 +177,9 @@ class TestDomainLayerIndependence:
                 if "api." in imp or imp.startswith("src.api"):
                     violations.append(f"{file_path.relative_to(file_path.parent.parent.parent)}: " f"imports '{imp}'")
 
-        assert (
-            not violations
-        ), f"Domain layer should not import API modules.\n" f"Found {len(violations)} violation(s):\n" + "\n".join(
-            f"  - {v}" for v in violations
+        assert not violations, (
+            f"Domain layer should not import API modules.\n"
+            f"Found {len(violations)} violation(s):\n" + "\n".join(f"  - {v}" for v in violations)
         )
 
 

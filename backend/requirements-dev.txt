@@ -10,4 +10,6 @@ pytest-cov>=4.1.0
 black>=24.0.0
 isort>=5.13.0
 mypy>=1.13.0
-ruff>=0.8.0
+# ruff 必须钉到 0.6.2：sagemaker-hyperpod (运行时依赖) 硬钉 ruff==0.6.2，
+# 放宽下限会触发 pip ResolutionImpossible，导致 CI 后端 job 安装失败。
+ruff==0.6.2

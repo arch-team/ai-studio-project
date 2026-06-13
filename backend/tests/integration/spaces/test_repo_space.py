@@ -37,9 +37,7 @@ async def session() -> AsyncSession:
             await conn.execute(__import__("sqlalchemy").text("SELECT 1"))
 
         # 创建 session
-        async_session_maker = sessionmaker(
-            engine, class_=AsyncSession, expire_on_commit=False
-        )
+        async_session_maker = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
         async with async_session_maker() as session:
             yield session
             await session.rollback()
