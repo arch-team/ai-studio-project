@@ -45,3 +45,10 @@ export async function updateResourceLimitConfig(
 ): Promise<ResourceLimitConfig> {
   return apiClient.put<ResourceLimitConfig>(`/resource-limit-configs/${id}`, data);
 }
+
+/**
+ * 删除资源限制配置（软删除，后端返回 204）
+ */
+export async function deleteResourceLimitConfig(id: number): Promise<void> {
+  return apiClient.delete(`/resource-limit-configs/${id}`);
+}
