@@ -206,11 +206,34 @@ describe('AuditLogsPage', () => {
       mockUseAuditLogs.mockReturnValue({
         data: undefined,
         isLoading: false,
-        error: new Error('Network error'),
+        error: new Error('服务器内部错误'),
+        refetch: vi.fn(),
       });
 
       renderWithProviders(<AuditLogsPage />);
       expect(screen.getByText(/加载失败/i)).toBeInTheDocument();
+      // 错误态保留页面骨架（标题/面包屑）
+      expect(screen.getByRole('heading', { name: /审计日志/i })).toBeInTheDocument();
+    });
+
+    it('should render retry button and invoke refetch on click', async () => {
+      const mockRefetch = vi.fn();
+      mockUseAuditLogs.mockReturnValue({
+        data: undefined,
+        isLoading: false,
+        error: new Error('服务器内部错误'),
+        refetch: mockRefetch,
+      });
+
+      renderWithProviders(<AuditLogsPage />);
+
+      const retryButton = await screen.findByRole('button', { name: /重试/i });
+      expect(retryButton).toBeInTheDocument();
+
+      fireEvent.click(retryButton);
+      await waitFor(() => {
+        expect(mockRefetch).toHaveBeenCalled();
+      });
     });
   });
 
