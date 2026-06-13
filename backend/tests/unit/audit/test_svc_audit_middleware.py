@@ -1,6 +1,5 @@
 """Unit tests for audit logging middleware - TDD Red Phase."""
 
-import asyncio
 import json
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock

@@ -17,9 +17,9 @@ import pytest
 
 from src.modules.billing.application.services.pricing_model import (
     InstancePricing,
+    NetworkPricing,
     PricingModelService,
     StoragePricing,
-    NetworkPricing,
 )
 
 

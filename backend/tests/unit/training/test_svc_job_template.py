@@ -242,7 +242,7 @@ class TestUpdateTemplate:
         mock_template_repository.get_by_id.return_value = sample_template
         mock_template_repository.update.return_value = sample_template
 
-        result = await service.update_template(
+        await service.update_template(
             template_id=1,
             user_id=10,
             data={"name": "updated-name"},

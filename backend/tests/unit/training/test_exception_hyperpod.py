@@ -6,7 +6,6 @@ from src.modules.training.domain.exceptions import (
     HyperPodOperationError,
     HyperPodPodNotFoundError,
     HyperPodSDKUnavailableError,
-    TrainingError,
 )
 
 
