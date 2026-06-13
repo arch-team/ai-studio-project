@@ -1,50 +1,15 @@
 """审计日志 ORM 模型."""
 
-import enum
 from datetime import datetime, timedelta
 from typing import Any
 
-from sqlalchemy import BigInteger, DateTime, Enum, ForeignKey, String, Text, event, func
+from sqlalchemy import BigInteger, DateTime, ForeignKey, String, Text, event, func
 from sqlalchemy.dialects.mysql import JSON
 from sqlalchemy.orm import Mapped, mapped_column
 
-from src.shared.infrastructure import Base
+from src.modules.audit.domain.value_objects import AuditStatus, OperationType, ResourceType
+from src.shared.infrastructure import Base, lowercase_enum
 from src.shared.utils import utc_now
-
-
-class OperationType(enum.Enum):
-    """操作类型枚举.
-
-    SQLAlchemy 2.0+ 默认使用 .name (大写) 存储到数据库，
-    因此 .value 必须与 DB ENUM 定义的值一致（大写）。
-    """
-
-    CREATE = "CREATE"
-    UPDATE = "UPDATE"
-    DELETE = "DELETE"
-    LOGIN = "LOGIN"
-    LOGOUT = "LOGOUT"
-    PAUSE = "PAUSE"
-    RESUME = "RESUME"
-    CANCEL = "CANCEL"
-
-
-class ResourceType(enum.Enum):
-    """资源类型枚举."""
-
-    TRAINING_JOB = "TRAINING_JOB"
-    DATASET = "DATASET"
-    MODEL = "MODEL"
-    USER = "USER"
-    QUOTA = "QUOTA"
-    SPACE = "SPACE"
-
-
-class AuditStatus(enum.Enum):
-    """审计状态枚举."""
-
-    SUCCESS = "SUCCESS"
-    FAILED = "FAILED"
 
 
 class AuditLogModel(Base):
@@ -70,13 +35,13 @@ class AuditLogModel(Base):
 
     # 操作详情
     operation_type: Mapped[OperationType] = mapped_column(
-        Enum(OperationType),
+        lowercase_enum(OperationType),
         nullable=False,
         index=True,
         comment="操作类型",
     )
     resource_type: Mapped[ResourceType] = mapped_column(
-        Enum(ResourceType),
+        lowercase_enum(ResourceType),
         nullable=False,
         index=True,
         comment="资源类型",
@@ -114,7 +79,7 @@ class AuditLogModel(Base):
 
     # 操作状态
     status: Mapped[AuditStatus] = mapped_column(
-        Enum(AuditStatus),
+        lowercase_enum(AuditStatus),
         nullable=False,
         default=AuditStatus.SUCCESS,
         index=True,

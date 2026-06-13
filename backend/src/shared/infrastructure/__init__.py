@@ -2,6 +2,7 @@
 
 from .config import Settings, get_settings
 from .database import AsyncSessionLocal, Base, engine, get_db
+from .db_enum import lowercase_enum
 from .external import CloudWatchLogsClient, ICloudWatchLogsClient, get_cloudwatch_logs_client
 from .logging_config import (
     bind_context,
@@ -39,6 +40,8 @@ __all__ = [
     "SoftDeleteMixin",
     # Query
     "QueryBuilder",
+    # Enum helper
+    "lowercase_enum",
     # Repository
     "PydanticRepository",
     # Storage

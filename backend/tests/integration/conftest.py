@@ -1,15 +1,56 @@
 """Integration Test Configuration - Shared fixtures for integration tests."""
 
+from collections.abc import AsyncGenerator
 from datetime import timedelta
 from typing import Any
 
 import pytest
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy.pool import NullPool
 
+from src.shared.infrastructure.config import get_settings
+from src.shared.infrastructure.database import import_all_models
 from src.shared.infrastructure.security.constants import PASSWORD_BCRYPT_COST
 from src.shared.infrastructure.security.jwt import JWTManager
 from src.shared.infrastructure.security.password import PasswordHasher
 
+# 确保所有 ORM 模型在建立映射前已加载（跨模块 relationship 需要）
+import_all_models()
+
 # Note: client fixture is inherited from tests/conftest.py
+
+
+# =============================================================================
+# Real Database Session Fixture
+# =============================================================================
+
+
+@pytest.fixture
+async def db_session() -> AsyncGenerator[AsyncSession, None]:
+    """提供真实 MySQL 会话，测试结束自动回滚。
+
+    使用独立 engine + NullPool，避免与全局连接池/事件循环冲突
+    （全局 engine 在导入时建池，pytest-asyncio 为每个测试创建独立事件循环，
+    复用池中连接会触发 "Event loop is closed"）。
+
+    前置条件: 可连接的 MySQL 且已 alembic upgrade head
+      (docker compose up -d mysql && alembic upgrade head)。
+    """
+    settings = get_settings()
+    engine = create_async_engine(
+        settings.database_url.get_secret_value(),
+        poolclass=NullPool,
+    )
+    session_maker = async_sessionmaker(bind=engine, class_=AsyncSession, expire_on_commit=False)
+
+    async with session_maker() as session:
+        try:
+            yield session
+        finally:
+            await session.rollback()
+
+    await engine.dispose()
+
 
 # =============================================================================
 # Authentication Fixtures

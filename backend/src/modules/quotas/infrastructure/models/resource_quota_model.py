@@ -6,7 +6,6 @@ from typing import TYPE_CHECKING
 from sqlalchemy import (
     BigInteger,
     DateTime,
-    Enum,
     ForeignKey,
     Integer,
     String,
@@ -17,6 +16,7 @@ from sqlalchemy.dialects.mysql import JSON
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from src.modules.quotas.domain.value_objects import QuotaStatus, QuotaType
+from src.shared.infrastructure import lowercase_enum
 from src.shared.infrastructure.database import Base
 from src.shared.infrastructure.models import TimestampMixin
 
@@ -52,7 +52,7 @@ class ResourceQuotaModel(Base, TimestampMixin):
 
     # Quota type
     quota_type: Mapped[QuotaType] = mapped_column(
-        Enum(QuotaType),
+        lowercase_enum(QuotaType),
         nullable=False,
         default=QuotaType.USER,
         index=True,
@@ -133,7 +133,7 @@ class ResourceQuotaModel(Base, TimestampMixin):
 
     # Quota status
     status: Mapped[QuotaStatus] = mapped_column(
-        Enum(QuotaStatus),
+        lowercase_enum(QuotaStatus),
         nullable=False,
         default=QuotaStatus.ACTIVE,
         index=True,
