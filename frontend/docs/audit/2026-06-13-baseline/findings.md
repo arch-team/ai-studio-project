@@ -16,11 +16,11 @@
 | F-006 | models/model-versions | IX | error 态与 empty 态渲染完全一致（均"暂无版本历史"空表格），加载失败被错误降级为"无数据"，无 Alert/重试，掩盖故障并误导用户 | model-versions--error--light/dark.png |
 | F-007 | audit/audit-logs | IX | error 态整页塌缩为裸容器，丢失标题/面包屑/筛选区，仅一行红色裸文本，无图标/Alert/重试，破坏审计页可信度 | audit-logs--error--light/dark.png |
 | F-008 | audit/audit-logs | CONS | error 态与本模块 loading/empty 态（均保留页面 chrome）实现完全不一致，亦与 resource-quotas 的 Alert 式 error 态不一致，缺乏统一错误呈现组件 | audit-logs--error--dark.png |
-| F-009 | monitoring/monitoring | VIS | 「资源使用对比」堆叠柱状图量纲混用：百分比指标（CPU/内存/GPU，个位数）与存储绝对值（50 万级）共用 0–600000 单一 Y 轴，前三组柱被压成贴地不可见细线，整图退化为"单根存储柱"，无法对比 | monitoring--default--light/dark.png |
-| F-010 | monitoring/monitoring | VIS | 「资源分布」环形图量纲混用：CPU 62%/内存 48%/GPU 87% 三个百分比与"存储"50 万级绝对值放入同一维度求占比，致三项退化为环顶极细色块、引导线交叠，"存储"独占整环 95%+ 面积，占比含义失真 | monitoring--default--light/dark.png |
+| F-009 | monitoring/monitoring | VIS | ✅ **已修复（2026-06-14）**。原：「资源使用对比」堆叠柱状图量纲混用，百分比指标与存储绝对值（50 万级）共用单一 Y 轴，前三组柱贴地不可见。修复：柱状图改为各资源利用率对比（CPU/内存/GPU/存储 统一 0–100% 量纲，`formatUtilizationBarData`），四柱可读可比。回归确认 VIS 4.5。 | monitoring--default--light/dark.png |
+| F-010 | monitoring/monitoring | VIS | ✅ **已修复（2026-06-14）**。原：「资源分布」环形图把三个百分比与存储绝对值放入同一维度求占比，存储独占整环 95%+。修复：异量纲不可求占比，移除该饼图（`formatUtilizationCompareData` 改为同量纲利用率对比柱状图），消除冗余与失真。回归确认。 | monitoring--default--light/dark.png |
 | F-011 | reports/resource-usage、cost-analysis | CONS | error 态丢失整个页面骨架（顶栏/面包屑/Header/操作按钮消失），仅剩孤立错误容器，与 default/loading 态外壳不一致（两页一致地错，走了独立渲染分支未复用骨架） | resource-usage--error--light.png, cost-analysis--error--light.png |
-| F-012 | reports/cost-analysis | VIS | 成本趋势折线图将"总计"聚合值与计算/存储/网络/其他分项画在同一量纲折线图：总计与计算两条蓝线高度重叠不可区分，存储/网络/其他被压缩贴底不可读 | cost-analysis--default--light.png |
-| F-013 | reports/cost-analysis | CONS | 同页折线图与环形图颜色语义冲突：蓝色在折线图=总计、在环形图=计算（同色不同义）；"其他"折线图为灰、环形图为橙红（同义不同色），跨图阅读被误导 | cost-analysis--default--light/dark.png |
+| F-012 | reports/cost-analysis | VIS | ✅ **已修复（2026-06-14）**。原：成本趋势折线图把"总计"聚合值与各分项同图，总计与计算重叠、小项贴底。修复：移除"总计"折线（`buildCostTrendSeries` 仅画分项），总成本由顶部 KPI 卡单独承载。回归确认。 | cost-analysis--default--light.png |
+| F-013 | reports/cost-analysis | CONS | ✅ **已修复（2026-06-14）**。原：折线图与环形图同色不同义（蓝=总计/蓝=计算）、同义不同色。修复：两图均删除硬编码 hex，走 Cloudscape 分类色板 token（`colorChartsPaletteCategorical*`，品牌青打头），分项顺序一致，同类别跨图自动同色。回归确认 CONS 4.5。 | cost-analysis--default--light/dark.png |
 | F-014 | admin/user-management | IX | error 态整页框架塌缩：加载失败时 Header/面包屑/标题/筛选器全部消失，仅剩孤立红字错误框，无重试按钮、无导航出口，用户陷入死胡同 | user-management--error--light/dark.png |
 
 ## P1 — 明显不专业（跨模块高频）
@@ -29,7 +29,7 @@
 
 | 编号 | 模块/页面 | 维度 | 问题描述 | 截图 |
 |------|----------|------|---------|------|
-| F-020 | 全局（datasets/spaces/templates/monitoring/reports/admin 等所有页面） | VIS | 右下角悬浮"沙滩/棕榈树"彩色 emoji 圆形图标出现在几乎所有页面所有状态，疑似遗留的占位/调试 widget，部分页面遮挡内容，是整个应用最显著的专业感杀手 | dataset-list--default--light.png 及全站多数截图 |
+| ~~F-020~~ | ~~全局~~ | VIS | ❌ **误报（2026-06-14 排查关闭）**。右下角悬浮彩色 emoji 圆形图标经全量排查（`src/` + `index.html` + `main.tsx` + 布局 + 审计脚本 `auditSetup.ts` + `playwright.config.ts`）**确认非应用代码**——源码中不存在任何沙滩 emoji、`position:fixed` 悬浮元素或第三方挂件脚本；`auditSetup` 仅注入 sessionStorage/localStorage，不操作 DOM。该图标系**截图机器的浏览器扩展**（如划词翻译/客服挂件）注入，且在 2026-06-14 修复后截图中位置纹丝不动（与代码改动无关）。结论：非平台缺陷，不修代码，建议截图环境用纯净 profile 复跑以消除。 | （误报，无需修复） |
 
 ### error 态退化（除已列 P0 外）
 
@@ -81,4 +81,8 @@
 
 ## 移交后端
 
-（本次审计未发现需移交后端的 API 缺口；F-040 的异常 mock 数据属审计 fixture 范畴，在前端 audit/fixtures 修正。）
+| 编号 | 模块/页面 | 说明 |
+|------|----------|------|
+| F-070 | reports/cost-analysis | **数据契约不一致（2026-06-14 修 F-012/013 时发现）**：`DailyCost`（每日成本时间序列）缺 `data_transfer_cost_usd` 字段，而 `CostSummary` / `CostBreakdown` 均有"数据传输"分项。致成本趋势折线图只能画 4 类（计算/存储/网络/其他），饼图与明细表为 5 类（多"数据传输"），同页两图类别集合不一致（design-reviewer 标记 P2 CONS）。**前端不伪造日维度数据传输数据**；需后端在 daily_costs 时间序列补 `data_transfer_cost_usd` 字段后，前端 `DailyCost` 类型与 `buildCostTrendSeries` 同步加入该分项，使两图类别对齐。 |
+
+> 注：F-040 的异常 mock 数据属审计 fixture 范畴，在前端 audit/fixtures 修正，非后端缺口。

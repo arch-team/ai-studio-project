@@ -13,10 +13,13 @@ import {
   Header,
   LineChart,
   BarChart,
-  PieChart,
   StatusIndicator,
 } from '@cloudscape-design/components';
 import type { MetricSeries, ResourceUtilization } from '../types';
+import {
+  formatUtilizationBarData,
+  formatUtilizationCompareData,
+} from './chartData';
 
 // 指标名称映射
 const METRIC_LABELS: Record<string, string> = {
@@ -29,22 +32,10 @@ const METRIC_LABELS: Record<string, string> = {
   disk_write_bytes: '磁盘写入',
 };
 
-// 资源类型映射
-const RESOURCE_LABELS: Record<string, string> = {
-  cpu: 'CPU',
-  memory: '内存',
-  gpu: 'GPU',
-  storage: '存储',
-};
-
-// 图表颜色
-const CHART_COLORS = [
-  '#0972d3', // aws-blue
-  '#067f68', // green
-  '#c33d69', // red
-  '#7d8998', // grey
-  '#9469d6', // purple
-];
+// 注意：图表不再硬编码 hex 颜色数组。Cloudscape 图表组件在省略 series.color 时
+// 默认采用品牌分类色板 token（colorChartsPaletteCategorical*，见 brandTheme.ts /
+// design-tokens.md §3），自动适配明暗模式。F-013 同源修复：删除 CHART_COLORS。
+// 资源利用率数据转换（formatUtilization*）已拆至 ./chartData，本文件只导出组件。
 
 interface MetricsChartsProps {
   /** 图表类型 */
@@ -69,61 +60,14 @@ function formatLineChartData(data: MetricSeries[]): Array<{
   type: 'line';
   data: { x: Date; y: number }[];
 }> {
-  return data.map((series, index) => ({
+  // 不传 color：交由 Cloudscape 分类色板 token 自动着色（F-013 同源）
+  return data.map((series) => ({
     title: METRIC_LABELS[series.metric_name] || series.metric_name,
     type: 'line' as const,
     data: series.data_points.map((point) => ({
       x: new Date(point.timestamp),
       y: point.value,
     })),
-    color: CHART_COLORS[index % CHART_COLORS.length],
-  }));
-}
-
-/**
- * 将 ResourceUtilization 转换为 BarChart 数据格式
- */
-function formatBarChartData(
-  data: ResourceUtilization[]
-): Array<{
-  title: string;
-  type: 'bar';
-  data: { x: string; y: number }[];
-}> {
-  return [
-    {
-      title: '已使用',
-      type: 'bar' as const,
-      data: data.map((item) => ({
-        x: RESOURCE_LABELS[item.resource_type] || item.resource_type,
-        y: item.used,
-      })),
-    },
-    {
-      title: '可用',
-      type: 'bar' as const,
-      data: data.map((item) => ({
-        x: RESOURCE_LABELS[item.resource_type] || item.resource_type,
-        y: item.available,
-      })),
-    },
-  ];
-}
-
-/**
- * 将 ResourceUtilization 转换为 PieChart 数据格式
- */
-function formatPieChartData(
-  data: ResourceUtilization[]
-): Array<{
-  title: string;
-  value: number;
-  color?: string;
-}> {
-  return data.map((item, index) => ({
-    title: `${RESOURCE_LABELS[item.resource_type] || item.resource_type} (${item.utilization_percentage}%)`,
-    value: item.used,
-    color: CHART_COLORS[index % CHART_COLORS.length],
   }));
 }
 
@@ -138,10 +82,10 @@ export function MetricsCharts({
   height = 300,
   loading = false,
 }: MetricsChartsProps) {
-  // 准备图表数据
+  // 准备图表数据（柱状/对比均走 0-100% 利用率量纲，F-009/F-010）
   const lineSeries = useMemo(() => formatLineChartData(data), [data]);
-  const barSeries = useMemo(() => formatBarChartData(utilizationData), [utilizationData]);
-  const pieSeries = useMemo(() => formatPieChartData(utilizationData), [utilizationData]);
+  const barSeries = useMemo(() => formatUtilizationBarData(utilizationData), [utilizationData]);
+  const compareSeries = useMemo(() => formatUtilizationCompareData(utilizationData), [utilizationData]);
 
   // 计算 X 轴范围 (折线图)
   const xDomain = useMemo(() => {
@@ -205,35 +149,38 @@ export function MetricsCharts({
     );
   }
 
-  // 渲染柱状图
+  // 渲染柱状图（资源利用率对比，0-100% 量纲，F-009）
   if (type === 'bar') {
     return (
       <Container header={<Header variant="h2">{title}</Header>} data-testid="metrics-chart">
         <BarChart
           series={barSeries}
           xScaleType="categorical"
+          yDomain={[0, 100]}
           i18nStrings={{
-            yTickFormatter: (y) => String(y),
+            yTickFormatter: (y) => `${y}%`,
           }}
           height={height}
           hideFilter
-          stackedBars
           empty={<Box textAlign="center">暂无数据</Box>}
         />
       </Container>
     );
   }
 
-  // 渲染饼图
+  // 渲染资源利用率对比（原"资源分布"饼图，F-010：异量纲不可求占比，改为同量纲柱状对比）
   if (type === 'pie') {
     return (
       <Container header={<Header variant="h2">{title}</Header>} data-testid="metrics-chart">
-        <PieChart
-          data={pieSeries}
-          size="medium"
-          variant="donut"
+        <BarChart
+          series={compareSeries}
+          xScaleType="categorical"
+          yDomain={[0, 100]}
+          i18nStrings={{
+            yTickFormatter: (y) => `${y}%`,
+          }}
+          height={height}
           hideFilter
-          hideLegend={false}
           empty={<Box textAlign="center">暂无数据</Box>}
         />
       </Container>

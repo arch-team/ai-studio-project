@@ -642,24 +642,27 @@ export function CreateTrainingJobPage() {
 
 > Cloudscape 图表组件自带 loading / empty / error 状态槽（`statusType`、`empty`、`errorText`），四态接入见 [interaction-states.md](interaction-states.md)；图表配色 token 见 [design-tokens.md](design-tokens.md) §3。**禁止引入 recharts 等第三方图表库**（[tech-stack.md](tech-stack.md) 禁用清单）。
 
-### 5.5 待改项（量纲混用）
+### 5.5 历史量纲缺陷（已修复，留作范例）
 
-| 编号 | 页面 | 问题 | 修复方向 |
+> 以下四条 baseline 缺陷已于 **2026-06-14** 按本章 §5.1/§5.2/§5.3 修复并通过回归（monitoring 3.85→4.4、cost-analysis 3.8→4.5），保留作为"反面案例 → 正确改法"的范例。
+
+| 编号 | 页面 | 原问题 | 修复（已落地） |
 |------|------|------|---------|
-| **F-009** | monitoring/monitoring | 「资源使用对比」堆叠柱：百分比指标与存储绝对值共用 0–600000 单轴，前三组柱贴地不可见 | 百分比与字节拆为两张图（§5.1） |
-| **F-010** | monitoring/monitoring | 「资源分布」环形图：CPU/内存/GPU 百分比与存储绝对值同维求占比，存储独占 95%+ 面积 | 占比图只放同量纲项；异量纲不进同一环（§5.1） |
-| **F-012** | reports/cost-analysis | 成本趋势折线：「总计」与计算/存储/网络/其他分项同图，总计与计算重叠、小项贴底 | 总计转 KPI / 独立图，分项另开堆叠图（§5.2） |
-| **F-013** | reports/cost-analysis | 折线图与环形图配色语义冲突（蓝色同色不同义、"其他"同义不同色） | 跨图同语义同色，走分类色 token（§5.3） |
+| ✅ **F-009** | monitoring/monitoring | 「资源使用对比」堆叠柱：百分比指标与存储绝对值共用单轴，前三组柱贴地不可见 | 改为各资源利用率对比柱状图，统一 0–100% 量纲（§5.1）；`monitoring/components/chartData.ts` `formatUtilizationBarData` |
+| ✅ **F-010** | monitoring/monitoring | 「资源分布」环形图：百分比与存储绝对值同维求占比，存储独占 95%+ 面积 | 异量纲不可求占比，移除该饼图改为同量纲利用率对比（§5.1）；`formatUtilizationCompareData` |
+| ✅ **F-012** | reports/cost-analysis | 成本趋势折线：「总计」与分项同图，总计与计算重叠、小项贴底 | 移除「总计」折线，总成本由 KPI 卡承载，折线仅画分项（§5.2）；`reports/components/chartData.ts` `buildCostTrendSeries` |
+| ✅ **F-013** | reports/cost-analysis | 折线图与环形图配色语义冲突（同色不同义） | 两图均删硬编码 hex，走分类色板 token，分项顺序一致使跨图同类同色（§5.3） |
+
+> ⏳ 残留（移交后端，见 baseline findings F-070）：`DailyCost` 缺 `data_transfer_cost_usd`，致成本趋势折线图 4 类与饼图/明细表 5 类不对齐；待后端补字段后前端同步加入该分项。
 
 ---
 
 ## 已知差距清单
 
-> 本规范定义目标范式；以下为存量页面与目标的差距，由阶段 4 修复任务按编号消化。
+> 本规范定义目标范式。图表量纲四条缺陷（F-009/010/012/013）已于 2026-06-14 修复（详见 §5.5），下表仅留尚未闭合的差距。
 
 | 编号 | 维度 | 差距 | 涉及页面 |
 |------|------|------|---------|
-| F-009 | 图表量纲 | 「资源使用对比」堆叠柱量纲混用：百分比指标与存储绝对值共用单一 Y 轴，前三组柱贴地不可见 → 按量纲拆图（§5.1） | monitoring/monitoring |
-| F-010 | 图表量纲 | 「资源分布」环形图量纲混用：三个百分比与存储绝对值同维求占比，存储独占整环 95%+，占比失真 → 异量纲不进同一环（§5.1） | monitoring/monitoring |
-| F-012 | 图表聚合 | 成本趋势折线把「总计」聚合值与各分项画同图，总计与计算重叠、小项贴底不可读 → 总计转 KPI/独立图（§5.2） | reports/cost-analysis |
-| F-013 | 图表配色 | 折线图与环形图颜色语义冲突（同色不同义 / 同义不同色），跨图阅读误导 → 跨图同语义同色，走分类色 token（§5.3） | reports/cost-analysis |
+| F-070 | 图表类别对齐（移交后端） | `DailyCost` 缺 `data_transfer_cost_usd`，成本趋势折线图 4 类与饼图/明细表 5 类不对齐；待后端补字段后前端同步加入分项 | reports/cost-analysis |
+
+> ✅ 已修复：F-009/F-010（monitoring 图表量纲）、F-012/F-013（cost-analysis 聚合值与配色）——见 §5.5 范例。

@@ -45,11 +45,7 @@ import {
   DATE_RANGE_PICKER_I18N,
 } from "@shared/utils";
 import type { CostBreakdown, GroupBy, CostAnalysisFilters } from "../types";
-import {
-  GROUP_BY_LABELS,
-  COST_CATEGORY_LABELS,
-  COST_CATEGORY_COLORS,
-} from "../types";
+import { GROUP_BY_LABELS, COST_CATEGORY_LABELS } from "../types";
 
 // === 常量配置 ===
 
@@ -137,11 +133,12 @@ function CostDistributionPie({
   breakdown: CostBreakdown[];
   loading: boolean;
 }) {
+  // 不传 color：交由 Cloudscape 分类色板 token 自动着色（F-013）。
+  // 折线图与本饼图均走默认分类色板且分项顺序一致，同一成本类别跨图自动同色。
   const pieData = useMemo(() => {
     return breakdown.map((item) => ({
       title: COST_CATEGORY_LABELS[item.category] || item.name,
       value: item.cost_usd,
-      color: COST_CATEGORY_COLORS[item.category] || "#879596",
     }));
   }, [breakdown]);
 

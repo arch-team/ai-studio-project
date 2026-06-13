@@ -18,7 +18,6 @@ import {
   ColumnLayout,
   Container,
   DateRangePicker,
-  Grid,
   Header,
   Link,
   ProgressBar,
@@ -578,22 +577,15 @@ export function MonitoringDashboardPage() {
                   {/* 资源利用率 */}
                   <ResourceUtilizationCards utilization={utilization} />
 
-                  {/* 利用率图表 */}
+                  {/* 利用率图表（统一 0-100% 量纲，F-009/F-010）。
+                      两图同源数据，避免冗余：概览仅保留一张资源利用率对比柱状图。 */}
                   {utilization.length > 0 && (
-                    <Grid gridDefinition={[{ colspan: 6 }, { colspan: 6 }]}>
-                      <MetricsCharts
-                        type="bar"
-                        title="资源使用对比"
-                        utilizationData={utilization}
-                        height={250}
-                      />
-                      <MetricsCharts
-                        type="pie"
-                        title="资源分布"
-                        utilizationData={utilization}
-                        height={250}
-                      />
-                    </Grid>
+                    <MetricsCharts
+                      type="bar"
+                      title="资源利用率对比"
+                      utilizationData={utilization}
+                      height={280}
+                    />
                   )}
 
                   {/* 告警面板 */}
@@ -615,21 +607,15 @@ export function MonitoringDashboardPage() {
                     loading={metricsLoading}
                   />
 
-                  {/* 更多指标图表可以在这里添加 */}
-                  <Grid gridDefinition={[{ colspan: 6 }, { colspan: 6 }]}>
+                  {/* 当前资源利用率快照（0-100% 量纲，与趋势图互补） */}
+                  {utilization.length > 0 && (
                     <MetricsCharts
                       type="bar"
-                      title="当前资源使用"
+                      title="当前资源利用率"
                       utilizationData={utilization}
                       height={280}
                     />
-                    <MetricsCharts
-                      type="pie"
-                      title="资源分布占比"
-                      utilizationData={utilization}
-                      height={280}
-                    />
-                  </Grid>
+                  )}
                 </SpaceBetween>
               ),
             },
