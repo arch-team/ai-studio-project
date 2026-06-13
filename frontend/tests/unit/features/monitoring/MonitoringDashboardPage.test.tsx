@@ -7,6 +7,7 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { renderWithProviders } from '@tests/__utils__/test-utils';
 import { MonitoringDashboardPage } from '@features/monitoring';
 import type {
@@ -240,10 +241,38 @@ describe('MonitoringDashboardPage', () => {
         data: undefined,
         isLoading: false,
         error: new Error('Failed to load clusters'),
+        refetch: vi.fn(),
       });
 
       renderWithProviders(<MonitoringDashboardPage />);
       expect(screen.getByText(/加载失败/i)).toBeInTheDocument();
+    });
+
+    it('应在错误态保留页面骨架并展示 InlineErrorState 与重试按钮（F-008）', async () => {
+      const refetch = vi.fn();
+      mockUseClusters.mockReturnValue({
+        data: undefined,
+        isLoading: false,
+        error: { message: '服务器内部错误' },
+        refetch,
+      });
+
+      renderWithProviders(<MonitoringDashboardPage />);
+
+      // InlineErrorState：标题"加载失败" + 错误消息
+      expect(await screen.findByText('加载失败')).toBeInTheDocument();
+      expect(screen.getByText('服务器内部错误')).toBeInTheDocument();
+
+      // 重试按钮存在且点击触发 refetch
+      const retryButton = screen.getByRole('button', { name: '重试' });
+      expect(retryButton).toBeInTheDocument();
+      await userEvent.click(retryButton);
+      expect(refetch).toHaveBeenCalledTimes(1);
+
+      // 骨架保留：PageLayout Header 渲染"集群监控"标题
+      expect(
+        screen.getByRole('heading', { name: /集群监控/i }),
+      ).toBeInTheDocument();
     });
   });
 

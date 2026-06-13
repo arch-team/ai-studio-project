@@ -35,7 +35,7 @@ import {
   useAlerts,
   useMetricSeries,
 } from "../api";
-import { PageLayout } from "@shared/components";
+import { PageLayout, InlineErrorState } from "@shared/components";
 import { MetricsCharts } from "../components";
 
 // 面包屑（模块级常量，避免每次渲染创建新引用）
@@ -461,6 +461,7 @@ export function MonitoringDashboardPage() {
     data: clustersData,
     isLoading: clustersLoading,
     error: clustersError,
+    refetch,
   } = useClusters();
 
   // 资源利用率
@@ -494,13 +495,16 @@ export function MonitoringDashboardPage() {
   const alerts = alertsData?.items || [];
 
   // === 错误处理 ===
+  // 错误态保留 PageLayout 骨架（标题/面包屑），在内部渲染 InlineErrorState + 重试，
+  // 不再塌缩为裸 Container（F-008）。
   if (clustersError) {
     return (
-      <Container>
-        <Box textAlign="center" color="text-status-error" padding="xl">
-          加载失败: {clustersError.message}
-        </Box>
-      </Container>
+      <PageLayout title="集群监控" breadcrumbs={BREADCRUMBS}>
+        <InlineErrorState
+          message={clustersError.message}
+          onRetry={() => refetch()}
+        />
+      </PageLayout>
     );
   }
 
