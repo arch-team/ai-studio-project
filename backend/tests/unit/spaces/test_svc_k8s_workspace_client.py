@@ -101,36 +101,6 @@ class TestDeleteWorkspace:
         await c.delete_workspace("dev", "w1")
 
 
-class TestCreateWorkspaceConnection:
-    async def test_posts_to_connections_endpoint(self, client: K8sWorkspaceClient) -> None:
-        with patch("httpx.AsyncClient") as mock_cls:
-            inst = mock_cls.return_value.__aenter__.return_value
-            inst.post = AsyncMock(return_value=MagicMock(status_code=201, json=lambda: {"metadata": {"name": "conn1"}}))
-            inst.post.return_value.raise_for_status = MagicMock()
-            await client.create_workspace_connection("dev-spaces", {})
-            url = inst.post.call_args[0][0]
-            assert "/apis/connection.workspace.jupyter.org/v1alpha1/namespaces/dev-spaces/workspaceconnections" in url
-
-    async def test_no_api_url_raises_unavailable_error(self) -> None:
-        c = K8sWorkspaceClient(k8s_api_url=None, token=None)
-        with pytest.raises(SpaceBackendUnavailableError):
-            await c.create_workspace_connection("dev", {})
-
-
-class TestGetWorkspaceConnection:
-    async def test_404_returns_none(self, client: K8sWorkspaceClient) -> None:
-        with patch("httpx.AsyncClient") as mock_cls:
-            inst = mock_cls.return_value.__aenter__.return_value
-            inst.get = AsyncMock(return_value=MagicMock(status_code=404))
-            result = await client.get_workspace_connection("dev-spaces", "missing")
-            assert result is None
-
-    async def test_no_api_url_returns_none(self) -> None:
-        c = K8sWorkspaceClient(k8s_api_url=None, token=None)
-        result = await c.get_workspace_connection("dev-spaces", "conn1")
-        assert result is None
-
-
 class TestUnavailable:
     async def test_no_api_url_returns_none_for_reads(self) -> None:
         c = K8sWorkspaceClient(k8s_api_url=None, token=None)

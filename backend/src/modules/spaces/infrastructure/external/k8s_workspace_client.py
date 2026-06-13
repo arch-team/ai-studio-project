@@ -1,11 +1,13 @@
 """Kubernetes Workspace CRD 客户端。
 
-通过 K8s API 操作 workspace.jupyter.org/v1alpha1 Workspace 和
-connection.workspace.jupyter.org/v1alpha1 WorkspaceConnection CRD。
+通过 K8s API 操作 workspace.jupyter.org/v1alpha1 Workspace CRD。
 使用 httpx 调用 Kubernetes API Server。
 
 部署环境从 Pod 挂载的 ServiceAccount token 读取认证信息。
 开发环境（无 K8s 集群）读操作 gracefully 降级返回 None，写操作抛 SpaceBackendUnavailableError。
+
+注意 (Phase B Task 15 核验): 真实 add-on 无独立 WorkspaceConnection CRD,
+访问 URL 在 Workspace 自身 status.accessURL,故本客户端仅操作 Workspace 资源。
 """
 
 import os
@@ -18,12 +20,6 @@ import structlog
 from src.modules.spaces.domain.exceptions import (
     HyperPodSpaceBackendError,
     SpaceBackendUnavailableError,
-)
-from src.modules.spaces.infrastructure.external.workspace_crd import (
-    CONNECTION_API_GROUP as _CONNECTION_API_GROUP,
-)
-from src.modules.spaces.infrastructure.external.workspace_crd import (
-    CONNECTION_API_VERSION as _CONNECTION_API_VERSION,
 )
 from src.modules.spaces.infrastructure.external.workspace_crd import (
     WORKSPACE_API_GROUP as _WORKSPACE_API_GROUP,
@@ -211,77 +207,6 @@ class K8sWorkspaceClient:
                 status_code=e.response.status_code,
             )
             raise HyperPodSpaceBackendError(message=f"Failed to delete workspace: {e.response.status_code}") from e
-
-    async def create_workspace_connection(
-        self,
-        namespace: str,
-        body: dict[str, Any],
-    ) -> dict[str, Any] | None:
-        """创建 WorkspaceConnection。
-
-        Args:
-            namespace: K8s namespace
-            body: WorkspaceConnection 资源定义
-
-        Returns:
-            创建后的 WorkspaceConnection 资源
-
-        Raises:
-            SpaceBackendUnavailableError: K8s API 不可达
-            HyperPodSpaceBackendError: 创建失败
-        """
-        url_path = (
-            f"/apis/{_CONNECTION_API_GROUP}/{_CONNECTION_API_VERSION}/namespaces/{namespace}/workspaceconnections"
-        )
-
-        # 写操作：无集群→SpaceBackendUnavailableError，连接失败→HyperPodSpaceBackendError
-        response = await self._request("POST", url_path, json=body)
-        assert response is not None  # 写操作不降级，_request 必返回 Response
-        try:
-            response.raise_for_status()
-        except httpx.HTTPStatusError as e:
-            logger.warning(
-                "workspace_connection_create_failed",
-                namespace=namespace,
-                status_code=e.response.status_code,
-            )
-            raise HyperPodSpaceBackendError(message=f"Failed to create connection: {e.response.status_code}") from e
-        data: dict[str, Any] = response.json()
-        return data
-
-    async def get_workspace_connection(
-        self,
-        namespace: str,
-        name: str,
-    ) -> dict[str, Any] | None:
-        """获取 WorkspaceConnection。
-
-        Args:
-            namespace: K8s namespace
-            name: Connection 名称
-
-        Returns:
-            Connection 资源，不存在或不可用时返回 None
-        """
-        url_path = f"/apis/{_CONNECTION_API_GROUP}/{_CONNECTION_API_VERSION}/namespaces/{namespace}/workspaceconnections/{name}"
-
-        # 读操作降级：无集群/连接失败→None
-        response = await self._request("GET", url_path, allow_unavailable=True, allow_connect_error=True)
-        if response is None:
-            return None
-
-        if response.status_code == 404:
-            logger.info("workspace_connection_not_found", namespace=namespace, name=name)
-            return None
-
-        try:
-            response.raise_for_status()
-        except Exception as e:
-            # 读操作降级：其它错误也返回 None
-            logger.warning("workspace_connection_api_error", namespace=namespace, name=name, error=str(e))
-            return None
-        data: dict[str, Any] = response.json()
-        return data
 
     async def _request(
         self,

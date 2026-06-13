@@ -334,9 +334,7 @@ class TestGetSpaceAccessUrl:
 class TestBackendDispatch:
     """backend 策略分发和 HyperPod 配额校验."""
 
-    async def test_create_hyperpod_calls_quota_then_hyperpod_backend(
-        self, mock_repo: AsyncMock
-    ) -> None:
+    async def test_create_hyperpod_calls_quota_then_hyperpod_backend(self, mock_repo: AsyncMock) -> None:
         """HyperPod backend 创建时走配额检查，调用 hyperpod backend。"""
         from src.modules.spaces.application.interfaces import ISpaceBackendClient
         from src.modules.spaces.domain.value_objects import SpaceBackend
@@ -390,9 +388,7 @@ class TestBackendDispatch:
         assert space.namespace == "team-a"
         assert space.space_name == "dev-hyperpod-1"
 
-    async def test_create_hyperpod_quota_exceeded_raises_429(
-        self, mock_repo: AsyncMock
-    ) -> None:
+    async def test_create_hyperpod_quota_exceeded_raises_429(self, mock_repo: AsyncMock) -> None:
         """HyperPod 配额不足时抛 SpaceQuotaExceededError，不调用 backend。"""
         from src.modules.spaces.application.interfaces import ISpaceBackendClient
         from src.modules.spaces.domain.exceptions import SpaceQuotaExceededError
@@ -434,9 +430,7 @@ class TestBackendDispatch:
         # 验证 provision_space 未被调用（配额不足时应提前中断）
         mock_hyperpod.provision_space.assert_not_awaited()
 
-    async def test_create_studio_skips_quota(
-        self, mock_repo: AsyncMock
-    ) -> None:
+    async def test_create_studio_skips_quota(self, mock_repo: AsyncMock) -> None:
         """Studio backend 创建时跳过配额检查。"""
         from src.modules.spaces.application.interfaces import ISpaceBackendClient
         from src.modules.spaces.domain.value_objects import SpaceBackend

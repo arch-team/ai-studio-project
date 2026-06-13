@@ -1,6 +1,13 @@
 """HyperPod Spaces 后端适配器 —— 将 K8sWorkspaceClient 适配为 ISpaceBackendClient。
 
 通过 Kubernetes CRD 操作 HyperPod 原生 Spaces (workspace.jupyter.org/v1alpha1 Workspace)。
+
+CRD schema 对齐真实集群 (Phase B Task 15 核验):
+- status 用 K8s 标准 conditions (Available/Progressing/Degraded/Stopped),非 phase 字段
+- 访问 URL 在 Workspace 自身 status.accessURL (由 WorkspaceAccessStrategy 生成),
+  无独立 WorkspaceConnection CRD
+- spec.displayName 为必填字段
+- spec.templateRef 含 name + namespace (模板预置在 jupyter-k8s-system)
 """
 
 import asyncio
@@ -16,15 +23,14 @@ from src.modules.spaces.infrastructure.external.k8s_workspace_client import (
     K8sWorkspaceClient,
 )
 from src.modules.spaces.infrastructure.external.workspace_crd import (
-    CONNECTION_API_VERSION_FULL,
-    CONNECTION_KIND,
     WORKSPACE_API_VERSION_FULL,
     WORKSPACE_KIND,
+    WORKSPACE_TEMPLATE_NAMESPACE,
 )
 
 logger = structlog.get_logger(__name__)
 
-# 交互空间优先级类 (设计 §5.2: 优先级 100)
+# 交互空间优先级类 (设计 §5.2: 优先级 100; Task 16 创建对应 WorkloadPriorityClass)
 INTERACTIVE_SPACE_PRIORITY_CLASS = "interactive-space-priority"
 
 # Access URL 轮询配置
@@ -110,8 +116,8 @@ class HyperPodSpaceBackend(ISpaceBackendClient):
 
         三态返回契约 (与 StudioSpaceBackend 对称):
         - CRD 不存在 → {"status": "stopped"} (明确"已停止")
-        - phase 可映射 → {"status": <SpaceStatus 值>}
-        - phase 无法映射 → None (无可用状态信息,下游不变更状态)
+        - conditions 可映射 → {"status": <SpaceStatus 值>}
+        - conditions 无法映射 → None (无可用状态信息,下游不变更状态)
         """
         workspace = await self._k8s.get_workspace(
             namespace=space.namespace or "default",
@@ -122,28 +128,31 @@ class HyperPodSpaceBackend(ISpaceBackendClient):
         if workspace is None:
             return {"status": "stopped"}
 
-        # 映射 Workspace phase 到平台状态
-        phase = workspace.get("status", {}).get("phase")
-        mapped = map_workspace_status(phase)
+        # 映射 Workspace conditions 到平台状态
+        conditions = workspace.get("status", {}).get("conditions")
+        mapped = map_workspace_status(conditions)
 
         if mapped:
             return {"status": mapped.value}
 
         # 未知/无法映射的状态: 返回 None,下游视为"不变更状态"
         logger.warning(
-            "unmapped_workspace_phase",
-            phase=phase,
+            "unmapped_workspace_conditions",
+            conditions=conditions,
             workspace_name=space.space_name,
             namespace=space.namespace,
         )
         return None
 
     async def create_access_url(self, space: Space, conn_type: str) -> str:
-        """签发免登录访问 URL (创建 WorkspaceConnection 并轮询获取 URL)。
+        """签发免登录访问 URL (轮询 Workspace status.accessURL)。
+
+        真实 CRD 中访问 URL 由 WorkspaceAccessStrategy 生成并写入 Workspace 自身
+        status.accessURL (无独立 WorkspaceConnection CRD)。Workspace 就绪后该字段填充。
 
         Args:
             space: 空间实体
-            conn_type: 连接类型 (web-ui | vscode-remote)
+            conn_type: 连接类型 (web-ui | vscode-remote),保留用于日志/未来分支
 
         Returns:
             免登录访问 URL
@@ -151,27 +160,17 @@ class HyperPodSpaceBackend(ISpaceBackendClient):
         Raises:
             HyperPodSpaceBackendError: 超时或无法获取 URL
         """
-        connection_name = f"{space.space_name}-{conn_type}"
-        body = self._build_workspace_connection_body(space, conn_type, connection_name)
-
-        # 创建 WorkspaceConnection CRD
-        await self._k8s.create_workspace_connection(
-            namespace=space.namespace or "default",
-            body=body,
-        )
-
-        # 轮询获取 workspaceConnectionUrl
         for attempt in range(_MAX_POLL_ATTEMPTS):
-            connection = await self._k8s.get_workspace_connection(
+            workspace = await self._k8s.get_workspace(
                 namespace=space.namespace or "default",
-                name=connection_name,
+                name=space.space_name,
             )
 
-            if connection:
-                url: str | None = connection.get("status", {}).get("workspaceConnectionUrl")
+            if workspace:
+                url: str | None = workspace.get("status", {}).get("accessURL")
                 if url:
                     logger.info(
-                        "workspace_connection_url_ready",
+                        "workspace_access_url_ready",
                         workspace_name=space.space_name,
                         conn_type=conn_type,
                         attempts=attempt + 1,
@@ -204,9 +203,13 @@ class HyperPodSpaceBackend(ISpaceBackendClient):
                 },
             },
             "spec": {
+                # displayName 是真实 CRD 必填字段
+                "displayName": space.space_name,
                 "desiredStatus": "Running",
                 "templateRef": {
                     "name": space.workspace_template or "default-template",
+                    # 模板预置在 jupyter-k8s-system (add-on 安装的系统命名空间)
+                    "namespace": WORKSPACE_TEMPLATE_NAMESPACE,
                 },
                 "resources": {
                     "requests": {
@@ -220,24 +223,5 @@ class HyperPodSpaceBackend(ISpaceBackendClient):
                         "nvidia.com/gpu": str(resources["gpu_count"]),
                     },
                 },
-            },
-        }
-
-    def _build_workspace_connection_body(
-        self,
-        space: Space,
-        conn_type: str,
-        connection_name: str,
-    ) -> dict[str, Any]:
-        """构建 WorkspaceConnection CRD body。"""
-        return {
-            "apiVersion": CONNECTION_API_VERSION_FULL,
-            "kind": CONNECTION_KIND,
-            "metadata": {
-                "name": connection_name,
-            },
-            "spec": {
-                "workspaceName": space.space_name,
-                "workspaceConnectionType": conn_type,
             },
         }

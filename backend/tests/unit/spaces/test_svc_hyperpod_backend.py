@@ -1,4 +1,9 @@
-"""HyperPodSpaceBackend 测试 —— mock K8sWorkspaceClient 验证 CRD body 与状态映射。"""
+"""HyperPodSpaceBackend 测试 —— mock K8sWorkspaceClient 验证 CRD body 与状态映射。
+
+CRD schema 对齐真实集群 (Phase B Task 15 核验):
+- status 用 conditions 列表 (非 phase 字段)
+- 访问 URL 在 Workspace 自身 status.accessURL (无独立 WorkspaceConnection CRD)
+"""
 
 from unittest.mock import AsyncMock, patch
 
@@ -33,15 +38,15 @@ def _hp_space() -> Space:
     )
 
 
+def _conditions(**types: str) -> list[dict[str, str]]:
+    return [{"type": t, "status": s} for t, s in types.items()]
+
+
 @pytest.fixture
 def mock_k8s() -> AsyncMock:
     k8s = AsyncMock()
     k8s.create_workspace.return_value = {"metadata": {"name": "dev-hp"}}
-    k8s.get_workspace.return_value = {"status": {"phase": "Running"}}
-    k8s.create_workspace_connection.return_value = None
-    k8s.get_workspace_connection.return_value = {
-        "status": {"workspaceConnectionUrl": "https://ide.dev.example.com/lab"}
-    }
+    k8s.get_workspace.return_value = {"status": {"conditions": _conditions(Available="True", Progressing="False")}}
     return k8s
 
 
@@ -57,7 +62,13 @@ class TestProvision:
         assert labels["kueue.x-k8s.io/queue-name"] == "team-alpha-localqueue"
         assert labels["kueue.x-k8s.io/priority-class"] == INTERACTIVE_SPACE_PRIORITY_CLASS
         assert body["spec"]["desiredStatus"] == "Running"
+
+        # displayName 是真实 CRD 必填字段
+        assert body["spec"]["displayName"] == "dev-hp"
+
+        # templateRef 含 name + namespace (真实 CRD 模板在 jupyter-k8s-system)
         assert body["spec"]["templateRef"]["name"] == "sagemaker-jupyter-template"
+        assert body["spec"]["templateRef"]["namespace"] == "jupyter-k8s-system"
 
         # 验证 resource requirements
         resources = body["spec"]["resources"]
@@ -111,17 +122,21 @@ class TestLifecycle:
 
 
 class TestDescribe:
-    async def test_describe_maps_running_phase(self, mock_k8s: AsyncMock) -> None:
-        """测试 describe_space 映射 Running phase 到 RUNNING 状态。"""
-        mock_k8s.get_workspace.return_value = {"status": {"phase": "Running"}}
+    async def test_describe_maps_available_to_running(self, mock_k8s: AsyncMock) -> None:
+        """测试 describe_space 映射 Available=True 到 RUNNING 状态。"""
+        mock_k8s.get_workspace.return_value = {
+            "status": {"conditions": _conditions(Available="True", Progressing="False")}
+        }
         backend = HyperPodSpaceBackend(mock_k8s)
 
         result = await backend.describe_space(_hp_space())
         assert result == {"status": SpaceStatus.RUNNING.value}
 
-    async def test_describe_maps_pending_phase(self, mock_k8s: AsyncMock) -> None:
-        """测试 describe_space 映射 Pending phase 到 PENDING 状态。"""
-        mock_k8s.get_workspace.return_value = {"status": {"phase": "Pending"}}
+    async def test_describe_maps_progressing_to_pending(self, mock_k8s: AsyncMock) -> None:
+        """测试 describe_space 映射 Progressing=True 到 PENDING 状态。"""
+        mock_k8s.get_workspace.return_value = {
+            "status": {"conditions": _conditions(Available="False", Progressing="True")}
+        }
         backend = HyperPodSpaceBackend(mock_k8s)
 
         result = await backend.describe_space(_hp_space())
@@ -135,9 +150,11 @@ class TestDescribe:
         result = await backend.describe_space(_hp_space())
         assert result == {"status": SpaceStatus.STOPPED.value}
 
-    async def test_describe_returns_none_when_phase_unmappable(self, mock_k8s: AsyncMock) -> None:
-        """测试 describe_space 在无法映射 phase 时返回 None (三态契约)。"""
-        mock_k8s.get_workspace.return_value = {"status": {"phase": "UnknownPhase"}}
+    async def test_describe_returns_none_when_conditions_unmappable(self, mock_k8s: AsyncMock) -> None:
+        """测试 describe_space 在 conditions 全 Unknown 时返回 None (三态契约)。"""
+        mock_k8s.get_workspace.return_value = {
+            "status": {"conditions": _conditions(Available="Unknown", Progressing="Unknown")}
+        }
         backend = HyperPodSpaceBackend(mock_k8s)
 
         result = await backend.describe_space(_hp_space())
@@ -146,27 +163,26 @@ class TestDescribe:
 
 class TestAccessUrl:
     @patch("asyncio.sleep", new_callable=AsyncMock)
-    async def test_create_access_url_creates_connection_and_polls(
+    async def test_create_access_url_polls_workspace_access_url(
         self, mock_sleep: AsyncMock, mock_k8s: AsyncMock
     ) -> None:
-        """测试 create_access_url 创建 WorkspaceConnection 并轮询获取 URL (mock sleep 瞬时完成)。"""
-        # 第一次返回无 URL,第二次返回有 URL
-        mock_k8s.get_workspace_connection.side_effect = [
-            {"status": {}},
-            {"status": {"workspaceConnectionUrl": "https://ide.dev.example.com/lab"}},
+        """测试 create_access_url 轮询 Workspace status.accessURL (mock sleep 瞬时完成)。"""
+        # 第一次无 accessURL,第二次有
+        mock_k8s.get_workspace.side_effect = [
+            {"status": {"conditions": _conditions(Available="False", Progressing="True")}},
+            {
+                "status": {
+                    "conditions": _conditions(Available="True"),
+                    "accessURL": "https://ide.dev.example.com/lab",
+                }
+            },
         ]
 
         backend = HyperPodSpaceBackend(mock_k8s)
         url = await backend.create_access_url(_hp_space(), conn_type="web-ui")
 
-        # 验证创建 connection
-        create_call = mock_k8s.create_workspace_connection.call_args
-        body = create_call.kwargs["body"]
-        assert body["spec"]["workspaceName"] == "dev-hp"
-        assert body["spec"]["workspaceConnectionType"] == "web-ui"
-
-        # 验证轮询
-        assert mock_k8s.get_workspace_connection.call_count == 2
+        # 轮询 Workspace 自身 (非独立 connection CRD)
+        assert mock_k8s.get_workspace.call_count == 2
         assert url == "https://ide.dev.example.com/lab"
 
     @patch("asyncio.sleep", new_callable=AsyncMock)
@@ -174,8 +190,10 @@ class TestAccessUrl:
         self, mock_sleep: AsyncMock, mock_k8s: AsyncMock
     ) -> None:
         """测试 create_access_url 在超过最大轮询次数后超时 (mock sleep 瞬时完成)。"""
-        # 始终返回无 URL
-        mock_k8s.get_workspace_connection.return_value = {"status": {}}
+        # 始终无 accessURL
+        mock_k8s.get_workspace.return_value = {
+            "status": {"conditions": _conditions(Available="False", Progressing="True")}
+        }
 
         backend = HyperPodSpaceBackend(mock_k8s)
 
@@ -183,9 +201,9 @@ class TestAccessUrl:
             await backend.create_access_url(_hp_space(), conn_type="web-ui")
 
     @patch("asyncio.sleep", new_callable=AsyncMock)
-    async def test_create_access_url_handles_none_connection(self, mock_sleep: AsyncMock, mock_k8s: AsyncMock) -> None:
-        """测试 create_access_url 处理 get_workspace_connection 返回 None (mock sleep 瞬时完成)。"""
-        mock_k8s.get_workspace_connection.return_value = None
+    async def test_create_access_url_handles_none_workspace(self, mock_sleep: AsyncMock, mock_k8s: AsyncMock) -> None:
+        """测试 create_access_url 处理 get_workspace 返回 None (mock sleep 瞬时完成)。"""
+        mock_k8s.get_workspace.return_value = None
 
         backend = HyperPodSpaceBackend(mock_k8s)
 
