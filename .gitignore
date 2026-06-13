@@ -162,3 +162,7 @@ frontend/e2e/artifacts/
 
 # 误命名/临时产物
 login-result
+/image.png
+
+# Claude Code 工作树（另一分支的检出，不入库）
+.claude/worktrees/
