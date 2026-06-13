@@ -20,12 +20,12 @@ _ZERO = Decimal("0")
 _GB_DIVISOR = 1024 * 1024 * 1024
 
 
-def _period_column(date_format: str):
+def _period_column(date_format: str) -> Any:
     """构建按时间周期分组的列表达式。"""
     return func.date_format(TrainingJobModel.completed_at, date_format).label("period")
 
 
-def _period_range_columns():
+def _period_range_columns() -> tuple[Any, Any]:
     """构建周期起止时间的列表达式。"""
     return (
         func.min(TrainingJobModel.completed_at).label("period_start"),

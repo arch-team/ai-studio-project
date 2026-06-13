@@ -102,17 +102,22 @@ class CheckpointRepository(PydanticRepository[Checkpoint, CheckpointModel, int],
 
     async def get_oldest_checkpoints(
         self,
-        training_job_id: int,
+        training_job_id: int | None = None,
         hours_threshold: int = 72,
     ) -> list[Checkpoint]:
-        """Get checkpoints older than threshold for archival."""
+        """Get checkpoints older than threshold for archival.
+
+        training_job_id 为 None 时跨所有任务归档（用于定时迁移周期）。
+        """
         threshold_time = utc_now() - timedelta(hours=hours_threshold)
-        result = await self._session.execute(
+        stmt = (
             select(CheckpointModel)
-            .where(CheckpointModel.training_job_id == training_job_id)
             .where(CheckpointModel.status == CheckpointStatus.AVAILABLE)
             .where(CheckpointModel.created_at < threshold_time)
             .order_by(CheckpointModel.created_at.asc())
         )
+        if training_job_id is not None:
+            stmt = stmt.where(CheckpointModel.training_job_id == training_job_id)
+        result = await self._session.execute(stmt)
         models = result.scalars().all()
         return [self._to_entity(m) for m in models]

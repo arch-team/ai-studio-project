@@ -1,6 +1,9 @@
 """Model Repository Implementation - SQLAlchemy data access."""
 
-from sqlalchemy import func, select
+from collections.abc import Sequence
+from typing import Any
+
+from sqlalchemy import Select, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -107,13 +110,13 @@ class ModelRepository(PydanticRepository[Model, ModelModel, int], IModelReposito
 
     def _apply_model_filters(
         self,
-        query,
-        count_query,
+        query: Select[Any],
+        count_query: Select[Any],
         owner_id: int | None,
         training_job_id: int | None,
         status: str | ModelStatus | None,
         framework: str | ModelFramework | None,
-    ):
+    ) -> tuple[Select[Any], Select[Any]]:
         """应用过滤条件到查询."""
         if owner_id is not None:
             query = query.where(ModelModel.owner_id == owner_id)
@@ -135,22 +138,22 @@ class ModelRepository(PydanticRepository[Model, ModelModel, int], IModelReposito
 
         return query, count_query
 
-    async def _get_total_count(self, count_query) -> int:
+    async def _get_total_count(self, count_query: Select[Any]) -> int:
         """获取总记录数."""
         result = await self._session.execute(count_query)
         return result.scalar() or 0
 
-    def _apply_sorting(self, query, sort_by: str, sort_order: str):
+    def _apply_sorting(self, query: Select[Any], sort_by: str, sort_order: str) -> Select[Any]:
         """应用排序."""
         sort_column = getattr(ModelModel, sort_by, ModelModel.created_at)
         return query.order_by(sort_column.desc() if sort_order.lower() == "desc" else sort_column.asc())
 
-    def _apply_pagination(self, query, page: int, page_size: int):
+    def _apply_pagination(self, query: Select[Any], page: int, page_size: int) -> Select[Any]:
         """应用分页."""
         offset = (page - 1) * page_size
         return query.offset(offset).limit(page_size)
 
-    async def _execute_model_query(self, query):
+    async def _execute_model_query(self, query: Select[Any]) -> Sequence[Any]:
         """执行查询并返回模型列表."""
         result = await self._session.execute(query)
         return result.scalars().all()

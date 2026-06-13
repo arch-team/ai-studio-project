@@ -1,6 +1,8 @@
 """JobTemplate Repository Implementation - SQLAlchemy data access."""
 
-from sqlalchemy import and_, func, or_, select, update
+from typing import Any
+
+from sqlalchemy import Select, and_, func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.shared.infrastructure import PydanticRepository
@@ -104,13 +106,13 @@ class JobTemplateRepository(
 
     def _apply_template_filters(
         self,
-        query,
-        count_query,
+        query: Select[Any],
+        count_query: Select[Any],
         owner_id: int | None,
         visibility: TemplateVisibility | None,
         search_name: str | None,
         include_deleted: bool,
-    ):
+    ) -> tuple[Select[Any], Select[Any]]:
         """应用模板过滤条件."""
         # 排除软删除
         if not include_deleted:
@@ -133,7 +135,9 @@ class JobTemplateRepository(
 
         return query, count_query
 
-    def _apply_search_filter(self, query, count_query, search_name: str):
+    def _apply_search_filter(
+        self, query: Select[Any], count_query: Select[Any], search_name: str
+    ) -> tuple[Select[Any], Select[Any]]:
         """应用名称搜索过滤."""
         search_pattern = f"%{search_name}%"
         query = query.where(JobTemplateModel.name.ilike(search_pattern))
@@ -141,7 +145,13 @@ class JobTemplateRepository(
         return query, count_query
 
     async def _execute_paginated_query(
-        self, query, count_query, page: int, page_size: int, sort_by: str, sort_order: str
+        self,
+        query: Select[Any],
+        count_query: Select[Any],
+        page: int,
+        page_size: int,
+        sort_by: str,
+        sort_order: str,
     ) -> tuple[list[JobTemplate], int]:
         """执行分页查询."""
         # 获取总数

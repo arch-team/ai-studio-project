@@ -1,6 +1,6 @@
 """ResourceLimitConfig Repository Implementation - SQLAlchemy data access."""
 
-from sqlalchemy import and_, func, or_, select
+from sqlalchemy import ColumnElement, and_, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.shared.infrastructure import PydanticRepository
@@ -11,7 +11,7 @@ from ...domain.value_objects import LimitRole
 from ..models import ResourceLimitConfigModel
 
 
-def _not_deleted() -> and_:
+def _not_deleted() -> ColumnElement[bool]:
     """软删除过滤条件: deleted_at IS NULL."""
     return ResourceLimitConfigModel.deleted_at.is_(None)
 

@@ -83,6 +83,8 @@ class CheckpointClient:
 
         def _resume() -> dict[str, Any]:
             self._validate_resume_prerequisites(job_config, job_name)
+            # _validate_resume_prerequisites 已保证 job_config 非 None，此处收窄类型
+            assert job_config is not None
             self._cluster.ensure_cluster_context(cluster_name)
 
             # 准备恢复配置
@@ -116,7 +118,7 @@ class CheckpointClient:
             env_dict["RESUME_FROM_CHECKPOINT"] = "true"
         return env_dict
 
-    def _create_resume_job(self, job_name: str, job_config: dict[str, Any], env_dict: dict):
+    def _create_resume_job(self, job_name: str, job_config: dict[str, Any], env_dict: dict) -> Any:
         """创建恢复任务."""
         from sagemaker.hyperpod.common.config import Metadata
         from sagemaker.hyperpod.training.config.hyperpod_pytorch_job_unified_config import RunPolicy
@@ -174,7 +176,7 @@ class CheckpointClient:
         if target_job.status != "Running":
             raise HyperPodOperationError("trigger_preemption", "Target job is not running", target_job_name)
 
-    def _create_preemption_job(self, job_name: str, job_config: dict[str, Any]):
+    def _create_preemption_job(self, job_name: str, job_config: dict[str, Any]) -> Any:
         """创建高优先级抢占任务."""
         from sagemaker.hyperpod.common.config import Metadata
         from sagemaker.hyperpod.training.config.hyperpod_pytorch_job_unified_config import RunPolicy

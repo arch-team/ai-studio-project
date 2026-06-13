@@ -112,7 +112,7 @@ class CheckpointMigrationService:
             return result
 
         # 迁移所有检查点 (保留最新 3 个)
-        hot_retention = CHECKPOINT_MIGRATION_CONFIG["hot_retention_count"]
+        hot_retention = int(CHECKPOINT_MIGRATION_CONFIG["hot_retention_count"])
         for checkpoint in checkpoints[hot_retention:]:
             await self._migrate_and_count(checkpoint, target_tier, result)
 
@@ -153,12 +153,14 @@ class CheckpointMigrationService:
         target_tier: StorageTier,
     ) -> SingleMigrationResult:
         """执行单次迁移尝试。"""
-        # 执行迁移
-        new_path = await self._storage.migrate_checkpoint(
-            source_path=checkpoint.storage_path,
-            target_tier=target_tier.value,
+        # 执行迁移（IStorageService.migrate_checkpoint 返回 StorageInfo）
+        storage_info = await self._storage.migrate_checkpoint(
             job_id=checkpoint.training_job_id,
+            checkpoint_name=checkpoint.checkpoint_name,
+            from_tier=checkpoint.storage_tier.value,
+            to_tier=target_tier.value,
         )
+        new_path = storage_info.path
 
         # 验证完整性
         await self._verify_migration_integrity(checkpoint, new_path, target_tier)
@@ -289,7 +291,7 @@ class CheckpointMigrationService:
 
     async def _migrate_fsx_to_s3(self, result: MigrationResult) -> None:
         """从 FSx 迁移到 S3 (归档)"""
-        cold_threshold_hours = CHECKPOINT_MIGRATION_CONFIG["cold_age_threshold_hours"]
+        cold_threshold_hours = int(CHECKPOINT_MIGRATION_CONFIG["cold_age_threshold_hours"])
         old_checkpoints = await self._checkpoint_repo.get_oldest_checkpoints(
             training_job_id=None,
             hours_threshold=cold_threshold_hours,

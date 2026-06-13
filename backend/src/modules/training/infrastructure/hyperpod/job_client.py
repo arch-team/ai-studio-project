@@ -134,7 +134,7 @@ class JobClient:
             "tasks_per_node": job_config.get("tasks_per_node", 1),
         }
 
-    def _create_hyperpod_job(self, job_name: str, config: dict[str, Any]):
+    def _create_hyperpod_job(self, job_name: str, config: dict[str, Any]) -> Any:
         """创建 HyperPod 任务对象."""
         from sagemaker.hyperpod.common.config import Metadata
         from sagemaker.hyperpod.training.config.hyperpod_pytorch_job_unified_config import RunPolicy

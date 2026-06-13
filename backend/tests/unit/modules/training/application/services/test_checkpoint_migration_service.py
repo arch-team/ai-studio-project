@@ -14,6 +14,7 @@ from unittest.mock import AsyncMock
 
 import pytest
 
+from src.modules.training.application.interfaces import StorageInfo
 from src.modules.training.domain.entities import Checkpoint
 from src.modules.training.domain.value_objects import (
     CheckpointStatus,
@@ -21,6 +22,12 @@ from src.modules.training.domain.value_objects import (
     CheckpointType,
     StorageTier,
 )
+
+
+def _storage_info(path: str = "/new/path/checkpoint") -> StorageInfo:
+    """构建迁移返回的 StorageInfo（匹配 IStorageService.migrate_checkpoint 契约）。"""
+    return StorageInfo(path=path, size_bytes=1024 * 1024 * 100, checksum="abc123")
+
 
 # =============================================================================
 # 测试 Fixtures
@@ -45,7 +52,7 @@ def mock_storage_service():
     """Mock IStorageService"""
     service = AsyncMock()
     service.get_storage_usage = AsyncMock(return_value=0.5)  # 50% 使用率
-    service.migrate_checkpoint = AsyncMock(return_value="/new/path/checkpoint")
+    service.migrate_checkpoint = AsyncMock(return_value=_storage_info())
     service.verify_integrity = AsyncMock(return_value=True)
     service.delete_checkpoint = AsyncMock()
     return service
@@ -261,7 +268,7 @@ class TestErrorHandling:
         mock_storage_service.migrate_checkpoint.side_effect = [
             Exception("Error 1"),
             Exception("Error 2"),
-            "/new/path",  # 第 3 次成功
+            _storage_info("/new/path"),  # 第 3 次成功
         ]
         checkpoint = _create_checkpoint(1, storage_tier=StorageTier.NVME)
 

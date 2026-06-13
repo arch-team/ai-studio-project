@@ -14,7 +14,7 @@ from .kueue_client import IKueueClient, KueueWorkloadData, PreemptionEventData
 from .log_client import ITrainingLogClient, LogEntryData
 from .metrics_service import IMetricsService, MetricData, MetricPoint
 from .notification_service import Alert, INotificationService, NotificationChannel
-from .storage_service import IStorageService
+from .storage_service import IStorageService, StorageInfo
 
 __all__ = [
     "IHyperPodClient",
@@ -30,4 +30,5 @@ __all__ = [
     "INotificationService",
     "NotificationChannel",
     "IStorageService",
+    "StorageInfo",
 ]

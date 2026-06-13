@@ -1,6 +1,7 @@
 """ResourceQuota Endpoints - CRUD operations for resource quotas (T058-T060)."""
 
 from datetime import datetime
+from typing import Any
 
 from fastapi import APIRouter, Depends, Query, status
 
@@ -77,7 +78,7 @@ async def create_resource_quota(
     Admin-only endpoint for creating new resource quotas.
     The name must be unique.
     """
-    quota_data = {
+    quota_data: dict[str, Any] = {
         "name": data.name,
         "description": data.description,
         "quota_type": data.quota_type.value,
