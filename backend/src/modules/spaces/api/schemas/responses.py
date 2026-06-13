@@ -30,6 +30,13 @@ class SpaceTypeEnum(str, Enum):
     RSTUDIO = "rstudio"
 
 
+class SpaceBackendEnum(str, Enum):
+    """Space backend type enum for API."""
+
+    STUDIO = "studio"
+    HYPERPOD = "hyperpod"
+
+
 class SpaceStatusEnum(str, Enum):
     """Space status enum for API."""
 
@@ -51,6 +58,7 @@ class SpaceSummary(EntitySchema["Space"]):
     owner_id: int
     instance_type: SpaceInstanceTypeEnum
     space_type: SpaceTypeEnum
+    backend: SpaceBackendEnum
     status: SpaceStatusEnum
     created_at: datetime
 
@@ -61,6 +69,10 @@ class SpaceDetail(SpaceSummary):
     storage_size_gb: int
     lifecycle_config_arn: str | None = None
     sagemaker_space_arn: str | None = None
+    # HyperPod backend 专属字段（仅 backend=hyperpod 时有值）
+    namespace: str | None = None
+    queue_name: str | None = None
+    workspace_template: str | None = None
     updated_at: datetime
     deleted_at: datetime | None = None
 

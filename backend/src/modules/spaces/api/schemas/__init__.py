@@ -2,6 +2,7 @@
 
 from .requests import (
     CreateSpaceRequest,
+    SpaceBackendEnum,
     SpaceInstanceTypeEnum,
     SpaceTypeEnum,
     UpdateSpaceRequest,
@@ -28,5 +29,6 @@ __all__ = [
     # Enums
     "SpaceInstanceTypeEnum",
     "SpaceTypeEnum",
+    "SpaceBackendEnum",
     "SpaceStatusEnum",
 ]

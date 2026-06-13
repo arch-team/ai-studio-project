@@ -23,6 +23,13 @@ class SpaceTypeEnum(str, Enum):
     RSTUDIO = "rstudio"
 
 
+class SpaceBackendEnum(str, Enum):
+    """Space backend type enum for API."""
+
+    STUDIO = "studio"
+    HYPERPOD = "hyperpod"
+
+
 class CreateSpaceRequest(BaseModel):
     """Request body for creating a development space."""
 
@@ -39,6 +46,10 @@ class CreateSpaceRequest(BaseModel):
     space_type: SpaceTypeEnum = Field(
         default=SpaceTypeEnum.JUPYTER,
         description="IDE type (jupyter, vscode, rstudio)",
+    )
+    backend: SpaceBackendEnum = Field(
+        default=SpaceBackendEnum.STUDIO,
+        description="Backend type (studio: SageMaker Studio, hyperpod: HyperPod native)",
     )
     storage_size_gb: int = Field(
         default=20,
