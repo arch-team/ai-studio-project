@@ -228,19 +228,28 @@ describe("ModelDetailPage", () => {
   });
 
   describe("错误处理", () => {
-    it("应该显示错误消息", () => {
+    it("加载失败时应该在骨架内显示 InlineErrorState 并提供重试", async () => {
       mockUseModel.mockReturnValue({
         data: undefined,
         isLoading: false,
-        error: new Error("Not found"),
+        error: new Error("服务器内部错误"),
         refetch: vi.fn(),
       });
 
       renderWithProviders(<ModelDetailPage />);
-      expect(screen.getByText("Not found")).toBeInTheDocument();
+
+      // InlineErrorState 标题
+      expect(await screen.findByText("加载失败")).toBeInTheDocument();
+      // error.message 作为错误描述仍渲染
+      expect(screen.getByText("服务器内部错误")).toBeInTheDocument();
+      // 重试按钮（onRetry → refetch）
+      expect(screen.getByRole("button", { name: "重试" })).toBeInTheDocument();
+      // 错误态仍保留页面骨架（面包屑同步到全局 UI Store）
+      const breadcrumbs = useUIStore.getState().breadcrumbs;
+      expect(breadcrumbs.some((b) => b.text === "模型管理")).toBe(true);
     });
 
-    it("模型为空时应该显示不存在提示", () => {
+    it("模型为空时应该显示不存在提示且不提供重试", () => {
       mockUseModel.mockReturnValue({
         data: undefined,
         isLoading: false,
@@ -249,7 +258,12 @@ describe("ModelDetailPage", () => {
       });
 
       renderWithProviders(<ModelDetailPage />);
+      // 标题为"模型不存在"
       expect(screen.getByText("模型不存在")).toBeInTheDocument();
+      // 非错误（资源缺失）不提供重试按钮
+      expect(
+        screen.queryByRole("button", { name: "重试" }),
+      ).not.toBeInTheDocument();
     });
   });
 });

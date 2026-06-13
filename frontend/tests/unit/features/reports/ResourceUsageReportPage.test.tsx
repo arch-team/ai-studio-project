@@ -220,16 +220,23 @@ describe('ResourceUsageReportPage', () => {
   });
 
   describe('错误处理', () => {
-    it('should display error message on failure', () => {
+    it('should render InlineErrorState with retry inside page skeleton on failure', async () => {
+      const mockRefetch = vi.fn();
       mockUseResourceUsage.mockReturnValue({
         data: undefined,
         isLoading: false,
-        error: new Error('Network error'),
-        refetch: vi.fn(),
+        error: new Error('服务器内部错误'),
+        refetch: mockRefetch,
       });
 
       renderWithProviders(<ResourceUsageReportPage />);
-      expect(screen.getByText(/加载失败/i)).toBeInTheDocument();
+
+      // InlineErrorState 标题
+      expect(await screen.findByText('加载失败')).toBeInTheDocument();
+      // error.message 作为错误描述渲染
+      expect(screen.getByText('服务器内部错误')).toBeInTheDocument();
+      // 重试按钮（onRetry → refetch）
+      expect(screen.getByRole('button', { name: '重试' })).toBeInTheDocument();
     });
   });
 
