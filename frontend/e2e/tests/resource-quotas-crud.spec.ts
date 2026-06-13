@@ -636,6 +636,11 @@ test.describe("资源配额 CRUD - 错误态 (Mock 模式)", () => {
 test.describe("资源配额 CRUD - 真实 Dev 环境", () => {
   test.skip(!isRemote, "此组测试仅在真实 Dev 环境下运行");
 
+  // 串行执行：本组测试共享同一真实后端，存在创建/删除等有状态操作。
+  // 「计数严格 +1」「删除后计数 -1」依赖列表总数稳定，若与其他用例并行会
+  // 因总数波动导致计数断言抖动，故强制串行避免相互干扰。
+  test.describe.configure({ mode: "serial" });
+
   let quotasPage: ResourceQuotasPage;
   let testConfigName: string;
 
@@ -821,10 +826,15 @@ test.describe("资源配额 CRUD - 真实 Dev 环境", () => {
     const subHeader = page.locator("h2").filter({ hasText: "资源限制配置" });
     const beforeText = (await subHeader.textContent()) ?? "";
     const beforeMatch = beforeText.match(/\((\d+)\)/);
-    test.skip(!beforeMatch, "无法读取创建前计数，跳过严格计数校验");
+    expect(
+      beforeMatch,
+      "应能从 Header counter 读取创建前计数（形如「资源限制配置 (N)」）",
+    ).toBeTruthy();
     const beforeCount = parseInt(beforeMatch![1]);
 
     // 创建一条配置
+    // 角色使用「查看者」(viewer)：dev 环境该角色无全局配额，避免与已存在的
+    // engineer 全局配额冲突触发 409 DUPLICATE_CONFIG。
     const responsePromise = page.waitForResponse(
       (resp) =>
         resp.url().includes("/resource-limit-configs") &&
@@ -834,7 +844,7 @@ test.describe("资源配额 CRUD - 真实 Dev 环境", () => {
 
     await quotasPage.createQuota({
       configName: testConfigName,
-      role: "工程师",
+      role: "查看者",
       maxGpu: "4",
       maxCpu: "16",
       maxMemory: "64",
@@ -843,11 +853,14 @@ test.describe("资源配额 CRUD - 真实 Dev 环境", () => {
       priority: "中",
     });
 
-    const response = await responsePromise.catch(() => null);
-    test.skip(
-      !response || response.status() !== 201,
-      `创建未成功 (${response ? response.status() : "no response"})，跳过严格计数校验`,
-    );
+    // 创建必须成功（201）。若返回 409/其他错误说明角色冲突或后端问题，
+    // 此处直接失败暴露问题，而非 skip 掩盖。
+    const response = await responsePromise;
+    const respBody = await response.text().catch(() => "");
+    expect(
+      response.status(),
+      `创建配额应返回 201，实际 ${response.status()}，响应: ${respBody}`,
+    ).toBe(201);
 
     await quotasPage.waitForModalClose();
     await page.waitForTimeout(1000);
@@ -873,6 +886,9 @@ test.describe("资源配额 CRUD - 真实 Dev 环境", () => {
 
   test("删除流程 - 创建后删除，列表中消失且计数 -1", async ({ page }) => {
     // 先创建一条可删除的测试配置
+    // 角色使用「项目经理」(project_manager)：dev 环境该角色无全局配额，
+    // 与「计数严格 +1」用例的 viewer 角色错开，避免串行/并行下相互占用同一
+    // 全局配额槽位触发 409 DUPLICATE_CONFIG。
     const createResponsePromise = page.waitForResponse(
       (resp) =>
         resp.url().includes("/resource-limit-configs") &&
@@ -882,7 +898,7 @@ test.describe("资源配额 CRUD - 真实 Dev 环境", () => {
 
     await quotasPage.createQuota({
       configName: testConfigName,
-      role: "工程师",
+      role: "项目经理",
       maxGpu: "4",
       maxCpu: "16",
       maxMemory: "64",
@@ -891,11 +907,13 @@ test.describe("资源配额 CRUD - 真实 Dev 环境", () => {
       priority: "中",
     });
 
-    const createResp = await createResponsePromise.catch(() => null);
-    test.skip(
-      !createResp || createResp.status() !== 201,
-      `创建未成功 (${createResp ? createResp.status() : "no response"})，无法验证删除流程`,
-    );
+    // 创建必须成功（201），否则直接失败暴露问题（不再 skip 掩盖）。
+    const createResp = await createResponsePromise;
+    const createBody = await createResp.text().catch(() => "");
+    expect(
+      createResp.status(),
+      `创建配额应返回 201，实际 ${createResp.status()}，响应: ${createBody}`,
+    ).toBe(201);
 
     await quotasPage.waitForModalClose();
     await page.waitForTimeout(1000);
