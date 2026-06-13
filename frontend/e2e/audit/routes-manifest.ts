@@ -37,7 +37,12 @@ import {
 import { auditLogListResponse } from './fixtures/auditLogs';
 import { userListResponse } from './fixtures/users';
 import { checkpointListResponse } from './fixtures/checkpoints';
-import { mockSpaces, createSpaceListResponse } from '../fixtures/spaces';
+import {
+  mockSpaces,
+  createSpaceListResponse,
+  getMockSpaceDetail,
+  AUDIT_SPACE_DETAIL_ID,
+} from '../fixtures/spaces';
 import { createResourceLimitConfigResponse } from '../fixtures/resourceQuotas';
 import {
   dashboardJobStats,
@@ -299,7 +304,8 @@ export const AUDIT_PAGES: PageSpec[] = [
   },
 
   // === spaces ===
-  // 注意：空间 ID 为 UUID 字符串，detail 路由用真实 mock 的首个 UUID。
+  // 注意：空间 ID 为 UUID 字符串，detail 路由用命名常量 AUDIT_SPACE_DETAIL_ID
+  // （消除对数组顺序的依赖，见 e2e/fixtures/spaces.ts）。
   {
     module: 'spaces',
     pageName: 'space-list',
@@ -315,12 +321,12 @@ export const AUDIT_PAGES: PageSpec[] = [
   {
     module: 'spaces',
     pageName: 'space-detail',
-    route: `/spaces/${mockSpaces[0].id}`,
+    route: `/spaces/${AUDIT_SPACE_DETAIL_ID}`,
     pageType: 'detail',
     states: DETAIL_STATES,
     primary: {
       pattern: /\/api\/v1\/spaces\/[0-9a-f-]+$/,
-      defaultBody: mockSpaces[0],
+      defaultBody: getMockSpaceDetail(AUDIT_SPACE_DETAIL_ID),
     },
   },
   // IDE 页直接复用 SpaceListPage 组件，数据依赖与 space-list 相同（仅 default 态）
