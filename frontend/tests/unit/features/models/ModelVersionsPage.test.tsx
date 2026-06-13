@@ -185,14 +185,45 @@ describe("ModelVersionsPage", () => {
   });
 
   describe("错误处理", () => {
-    it("模型不存在时应该显示错误提示", () => {
+    it("模型不存在时应该在骨架内显示 InlineErrorState（非裸塌缩）", () => {
       mockUseModel.mockReturnValue({
         data: undefined,
         isLoading: false,
       });
 
       renderWithProviders(<ModelVersionsPage />);
+
+      // InlineErrorState 标题"模型不存在"
       expect(screen.getByText("模型不存在")).toBeInTheDocument();
+      // 错误态仍保留页面骨架：PageLayout 渲染固定标题"模型版本历史"
+      expect(
+        screen.getByRole("heading", { name: "模型版本历史" }),
+      ).toBeInTheDocument();
+      // 面包屑骨架仍同步到全局 UI Store（至少含"模型管理"），证明不是裸 Container 塌缩
+      const { breadcrumbs } = useUIStore.getState();
+      expect(breadcrumbs.some((b) => b.text === "模型管理")).toBe(true);
+    });
+
+    it("版本列表加载失败时应该显式报错并提供重试（不静默降级为空表）", () => {
+      const refetch = vi.fn();
+      mockUseModelVersions.mockReturnValue({
+        data: undefined,
+        isLoading: false,
+        isError: true,
+        refetch,
+      });
+
+      renderWithProviders(<ModelVersionsPage />);
+
+      // F-006 核心：版本区出现"加载失败"而非空表静默
+      expect(
+        screen.getByText(/版本列表加载失败/),
+      ).toBeInTheDocument();
+      // 提供重试按钮，点击触发 refetch
+      const retryButton = screen.getByRole("button", { name: "重试" });
+      expect(retryButton).toBeInTheDocument();
+      fireEvent.click(retryButton);
+      expect(refetch).toHaveBeenCalled();
     });
   });
 
