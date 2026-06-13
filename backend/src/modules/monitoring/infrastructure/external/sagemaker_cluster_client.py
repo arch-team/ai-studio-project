@@ -13,10 +13,12 @@ import structlog
 
 from src.shared.infrastructure import get_settings
 
+from ...application.interfaces.sagemaker_cluster_client import ISageMakerClusterClient
+
 logger = structlog.get_logger(__name__)
 
 
-class SageMakerClusterClient:
+class SageMakerClusterClient(ISageMakerClusterClient):
     """SageMaker HyperPod 集群只读客户端.
 
     薄封装 aioboto3 describe_cluster，暴露原生响应 dict。
@@ -28,7 +30,14 @@ class SageMakerClusterClient:
         self._region = region or settings.aws_region
 
     async def describe_cluster(self, cluster_name: str) -> dict[str, Any]:
-        """获取集群详细信息（原生 SageMaker 响应）."""
+        """获取集群详细信息（原生 SageMaker 响应）.
+
+        不捕获 botocore SDK 异常，裸抛由调用方（读穿透服务 → API 层）按降级策略处理。
+
+        Raises:
+            botocore.exceptions.ClientError: SageMaker API 调用失败（集群不存在、权限不足等）
+            botocore.exceptions.EndpointConnectionError: 无法连接到 SageMaker 端点
+        """
         async with self._session.client("sagemaker", region_name=self._region) as sm:
             response: dict[str, Any] = await sm.describe_cluster(ClusterName=cluster_name)
             return response

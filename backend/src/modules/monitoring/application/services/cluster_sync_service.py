@@ -23,6 +23,7 @@ from src.shared.utils import utc_now
 from ...domain.entities import HyperPodCluster
 from ...domain.repositories import IHyperPodClusterRepository
 from ...domain.value_objects import ClusterStatus
+from ..interfaces import ISageMakerClusterClient
 
 logger = structlog.get_logger(__name__)
 
@@ -41,7 +42,8 @@ _SAGEMAKER_STATUS_MAP: dict[str, ClusterStatus] = {
 # 未知 SageMaker 状态的兜底领域状态
 _DEFAULT_STATUS = ClusterStatus.CREATING
 
-# GPU 实例类型前缀（用于粗略累计 GPU 数）
+# GPU 实例类型前缀（用于粗略累计 GPU 数）。
+# 仅覆盖 ml.g/ml.p 系列，trn/inf 等加速器不计入。
 _GPU_INSTANCE_PREFIXES = ("ml.g", "ml.p")
 
 
@@ -50,12 +52,14 @@ class ClusterSyncService:
 
     DB 为主缓存，缺失/过期时回源 SageMaker describe-cluster 写库再返回。
     使用单飞锁（asyncio.Lock）+ 双重检查避免并发回源风暴。
+
+    当前按单集群部署：回源仅刷新 settings 配置的集群（hyperpod_cluster_name）。
     """
 
     def __init__(
         self,
         cluster_repo: IHyperPodClusterRepository,
-        sagemaker_client: Any,
+        sagemaker_client: ISageMakerClusterClient,
         ttl_seconds: int = 300,
         cluster_name: str | None = None,
     ):
@@ -102,6 +106,7 @@ class ClusterSyncService:
             logger.warning("cluster_sync_skipped_no_cluster_name")
             return
 
+        # describe_cluster 异常有意透传，由 API 层（2C.4）降级处理，此处不捕获。
         raw = await self._sagemaker.describe_cluster(self._cluster_name)
         entity = self._map_to_entity(raw)
 
@@ -135,6 +140,7 @@ class ClusterSyncService:
             instance_groups=instance_groups,
             total_nodes=total_nodes,
             available_nodes=total_nodes,
+            # 仅覆盖 ml.g/ml.p 系列，trn/inf 等加速器不计入；无 GPU 实例组时记 None。
             total_gpu_count=gpu_count or None,
             status=self._map_status(raw.get("ClusterStatus", "")),
             last_sync_at=utc_now(),
@@ -153,16 +159,13 @@ class ClusterSyncService:
         """提取 vpc_id（必填字段安全兜底）.
 
         describe-cluster 的 VpcConfig 仅含 SecurityGroupIds/Subnets，不直接给 vpc_id。
-        务实处理：取响应中的显式 vpc_id（若有），否则配置占位，最终兜底 "unknown"，
+        务实处理：取响应中的显式 vpc_id（若有），否则兜底 "unknown"，
         避免必填字段缺失导致实体构造失败。
+        Settings 暂无 vpc_id 配置，无法从响应取到时用 unknown 占位。
         """
         vpc_config = raw.get("VpcConfig") or {}
         vpc_id = vpc_config.get("VpcId")
         if vpc_id:
             return str(vpc_id)
-
-        settings_vpc = getattr(get_settings(), "vpc_id", None)
-        if settings_vpc:
-            return str(settings_vpc)
 
         return "unknown"

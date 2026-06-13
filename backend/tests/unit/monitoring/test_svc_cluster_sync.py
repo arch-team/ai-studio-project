@@ -247,3 +247,22 @@ async def test_concurrent_get_clusters_single_flight(repo: AsyncMock, sagemaker:
 
     # 单飞锁保证 describe_cluster 只被调用一次
     assert sagemaker.describe_cluster.await_count == 1
+
+
+# === 异常透传契约 ===
+
+
+async def test_get_clusters_propagates_describe_cluster_error(repo: AsyncMock, sagemaker: AsyncMock) -> None:
+    # DB 空触发回源，describe_cluster 失败（如 AMP/SageMaker 不可达）时异常须向上抛出，
+    # 由 API 层（2C.4）降级处理，服务层不吞异常；隐含验证单飞锁正常释放（不死锁）。
+    repo.list_clusters.return_value = []
+    sagemaker.describe_cluster.side_effect = Exception("AMP down")
+
+    svc = ClusterSyncService(repo, sagemaker, ttl_seconds=300, cluster_name=_CLUSTER_NAME)
+
+    with pytest.raises(Exception, match="AMP down"):
+        await svc.get_clusters()
+
+    # 锁已释放：再次调用仍能进入回源逻辑（若死锁此处会超时挂起）
+    with pytest.raises(Exception, match="AMP down"):
+        await svc.get_clusters()
