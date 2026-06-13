@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from functools import lru_cache
 from typing import Any
+from urllib.parse import quote, urlencode
 
 import boto3
 import httpx
@@ -66,13 +67,28 @@ class PrometheusClient(IPrometheusClient):
         SigV4Auth(credentials, "aps", self._region).add_auth(aws_request)
         return dict(aws_request.headers)
 
+    @staticmethod
+    def _build_url(url: str, params: dict[str, Any]) -> str:
+        """将 params 编码进 query string 拼成完整 URL，空格编码为 %20（AWS SigV4 兼容）。
+
+        SigV4 要求"签名计算用的 canonical query string"与"服务端从实际请求重建的 canonical"
+        完全一致。httpx 默认按 form-urlencoded 把空格编码为 `+`，而 AWS 规范要求 `%20`，
+        二者会导致含空格/特殊字符的 query（如即时查询表达式）签名不匹配而返回 403。
+        故在此用 quote（默认空格→%20）统一编码，供签名与发送共用同一 URL。
+        """
+        return f"{url}?{urlencode(params, quote_via=quote)}"
+
     async def _signed_get(self, client: httpx.AsyncClient, url: str, params: dict[str, Any]) -> httpx.Response:
-        """对 AMP 启用 SigV4 签名的 GET 请求；本地端点不签名。"""
+        """对 AMP 启用 SigV4 签名的 GET 请求；本地端点不签名。
+
+        签名与发送使用完全相同的完整 URL（含已编码 query string），避免 httpx 二次编码
+        导致签名 URL 与实际发送 URL 不一致。
+        """
+        full_url = self._build_url(url, params)
         headers: dict[str, str] = {}
         if self._use_sigv4:
-            signed_req = client.build_request("GET", url, params=params)
-            headers = self._sign_headers("GET", str(signed_req.url))
-        return await client.get(url, params=params, headers=headers)
+            headers = self._sign_headers("GET", full_url)
+        return await client.get(full_url, headers=headers)
 
     async def query_instant(self, query: str) -> list[dict[str, Any]]:
         """执行即时查询."""

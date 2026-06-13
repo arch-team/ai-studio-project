@@ -94,3 +94,71 @@ async def test_local_endpoint_not_signed(captured_request):
     await client.query_instant("up")
 
     assert "Authorization" not in (captured_request["headers"] or {})
+
+
+@pytest.fixture
+def captured_signed_url(monkeypatch):
+    """捕获传入 _sign_headers 的 URL（即 SigV4 签名实际作用的 URL）。"""
+    from src.modules.monitoring.infrastructure.external.prometheus_client import PrometheusClient
+
+    captured: dict = {}
+    original = PrometheusClient._sign_headers
+
+    def spy_sign_headers(self, method, url):
+        captured["signed_url"] = url
+        return original(self, method, url)
+
+    monkeypatch.setattr(PrometheusClient, "_sign_headers", spy_sign_headers)
+    return captured
+
+
+# 含空格、括号、引号、花括号——即时查询表达式的典型特殊字符
+SPECIAL_INSTANT_QUERY = '100 - (avg(rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100)'
+
+
+@pytest.mark.asyncio
+async def test_instant_query_signed_url_matches_sent_url(captured_request, captured_signed_url, fake_credentials):
+    """含特殊字符的即时查询：SigV4 签名作用的 URL 必须与 httpx 实际发送的 URL 完全一致。
+
+    这是 403 根因的回归保护：httpx 默认把空格 form-encode 为 `+`，而 AWS SigV4
+    canonical 要求 `%20`。若签名 URL 与发送 URL 编码不一致（如签名用 `%20`、发送用 `+`，
+    或反之），AMP 服务端重建的 canonical 与签名 canonical 不匹配 → 403 Forbidden。
+    """
+    from src.modules.monitoring.infrastructure.external.prometheus_client import PrometheusClient
+
+    client = PrometheusClient(
+        endpoint="https://aps-workspaces.us-east-1.amazonaws.com/workspaces/ws-x",
+        use_sigv4=True,
+    )
+    await client.query_instant(SPECIAL_INSTANT_QUERY)
+
+    signed_url = captured_signed_url["signed_url"]
+    sent_url = captured_request["url"]
+
+    # 1) 签名 URL 与发送 URL 字节级一致（核心断言）
+    assert signed_url == sent_url, (
+        f"签名 URL 与发送 URL 不一致，将导致 SigV4 签名 mismatch:\n" f"  signed={signed_url}\n  sent  ={sent_url}"
+    )
+    # 2) 空格编码为 %20（AWS 兼容），且未出现 httpx 风格的 `+` 编码
+    assert "%20" in sent_url
+    assert "+" not in sent_url.split("?", 1)[1], "query string 不应出现 httpx form-encode 的 `+`（空格）"
+    # 3) 发送 URL 不再附带额外 params（已全部编码进 URL，避免 httpx 二次编码）
+    assert captured_request["params"] == {}
+
+
+@pytest.mark.asyncio
+async def test_range_query_signed_url_matches_sent_url(captured_request, captured_signed_url, fake_credentials):
+    """范围查询（多参数）：签名 URL 同样必须与发送 URL 完全一致。"""
+    from src.modules.monitoring.infrastructure.external.prometheus_client import PrometheusClient
+
+    client = PrometheusClient(
+        endpoint="https://aps-workspaces.us-east-1.amazonaws.com/workspaces/ws-x",
+        use_sigv4=True,
+    )
+    await client.query_range(
+        "DCGM_FI_DEV_GPU_UTIL",
+        datetime(2026, 1, 1, tzinfo=UTC),
+        datetime(2026, 1, 2, tzinfo=UTC),
+    )
+
+    assert captured_signed_url["signed_url"] == captured_request["url"]
