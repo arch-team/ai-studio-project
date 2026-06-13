@@ -355,7 +355,7 @@ class SageMakerSpacesClient(ISageMakerSpacesClient):
         settings = get_settings()
         domain_id = getattr(settings, "sagemaker_domain_id", None)
         if domain_id:
-            return domain_id
+            return str(domain_id)
 
         # 自动发现 Domain
         response = await sm_client.list_domains(MaxResults=1)
@@ -363,7 +363,7 @@ class SageMakerSpacesClient(ISageMakerSpacesClient):
         if not domains:
             raise SpaceError(message="未找到可用的 SageMaker Studio Domain")
 
-        return domains[0]["DomainId"]
+        return str(domains[0]["DomainId"])
 
     async def _get_owner_user_profile(self, sm_client: Any, domain_id: str) -> str:
         """获取 Space 所属的 User Profile 名称.
@@ -394,12 +394,12 @@ class SageMakerSpacesClient(ISageMakerSpacesClient):
         resource_spec = jupyter_settings.get("DefaultResourceSpec", {})
         instance_type = resource_spec.get("InstanceType", "")
         if instance_type:
-            return instance_type
+            return str(instance_type)
 
         # 尝试 CodeEditor 设置
         code_editor_settings = space_settings.get("CodeEditorAppSettings", {})
         resource_spec = code_editor_settings.get("DefaultResourceSpec", {})
-        return resource_spec.get("InstanceType", "Unknown")
+        return str(resource_spec.get("InstanceType", "Unknown"))
 
 
 @lru_cache(maxsize=1)

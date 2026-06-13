@@ -42,18 +42,22 @@ class CRUDOperationsMixin:
             raise self._create_not_found_error(str(entity_id))
         return entity  # type: ignore
 
-    async def _get_by_field_or_none(self, field_name: str, field_value: Any) -> T | None:
-        """根据任意字段获取实体."""
+    async def _get_by_field_or_none(self, field_name: str, field_value: Any) -> Any:
+        """根据任意字段获取实体.
+
+        返回类型为 Any: 仓库的 get_by_{field} 方法通过 getattr 动态解析，
+        实体类型由具体子类决定，无法在 Mixin 层静态约束。
+        """
         method_name = f"get_by_{field_name}"
         if hasattr(self._repository, method_name):
             method = getattr(self._repository, method_name)
-            result: T | None = await method(field_value)
+            result = await method(field_value)
             return result
         return None
 
     async def _get_by_field_or_raise(self, field_name: str, field_value: Any) -> T:
         """根据任意字段获取实体或抛出未找到错误."""
-        entity = await self._get_by_field_or_none(field_name, field_value)
+        entity: T | None = await self._get_by_field_or_none(field_name, field_value)
         if entity is None:
             raise self._create_not_found_error(f"{field_name}={field_value}")
         return entity

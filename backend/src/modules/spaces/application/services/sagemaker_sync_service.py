@@ -126,12 +126,16 @@ class SpaceSyncService:
 
             for space in spaces:
                 stats["total"] += 1
+                if space.id is None:
+                    stats["skipped"] += 1
+                    continue
+                space_id = space.id
                 try:
                     old_status = space.status
-                    await self.sync_space_status(space.id)
+                    await self.sync_space_status(space_id)
 
                     # 重新读取判断是否更新
-                    updated_space = await self._space_repository.get_by_id(space.id)
+                    updated_space = await self._space_repository.get_by_id(space_id)
                     if updated_space and updated_space.status != old_status:
                         stats["updated"] += 1
                     else:

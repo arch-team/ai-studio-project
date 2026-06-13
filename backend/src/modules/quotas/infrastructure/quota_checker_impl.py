@@ -4,6 +4,7 @@ This implementation provides resource quota validation for the training module
 without creating a direct dependency on the quotas module.
 """
 
+from src.modules.quotas.domain.entities import ResourceQuota
 from src.modules.quotas.domain.repositories import IResourceQuotaRepository
 from src.shared.domain.exceptions import ResourceQuotaExceededError
 from src.shared.domain.interfaces import IQuotaChecker
@@ -48,7 +49,7 @@ class QuotaCheckerImpl(IQuotaChecker):
         # In-memory tracking of consumed quotas (should be replaced with persistent storage)
         self._consumed_quotas: dict[int, dict[str, int]] = {}
 
-    async def _resolve_quota(self, user_id: int):
+    async def _resolve_quota(self, user_id: int) -> ResourceQuota | None:
         """按优先级查找用户配额: 用户分配 → 命名约定 → 系统默认。"""
         # 优先: 用户通过 resource_quota_id 分配的配额
         quota = await self._repository.get_assigned_to_user(user_id)

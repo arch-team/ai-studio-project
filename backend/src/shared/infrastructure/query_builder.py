@@ -1,7 +1,7 @@
 """Query builder utility for common repository operations."""
 
 from enum import Enum
-from typing import Any, Generic, TypeVar
+from typing import Any, Generic, TypeVar, cast
 
 import structlog
 from sqlalchemy import Select, asc, desc, func, inspect, select
@@ -53,7 +53,7 @@ class QueryBuilder(Generic[ModelT]):
             # Check if column type has enum_class (SQLAlchemy Enum type)
             column_type = column.type
             if hasattr(column_type, "enum_class") and column_type.enum_class:
-                return column_type.enum_class
+                return cast("type[Enum]", column_type.enum_class)
         except (AttributeError, KeyError) as e:
             logger.debug("enum_class_not_found", column_name=column_name, error=str(e))
 

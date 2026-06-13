@@ -32,7 +32,7 @@ class UserResourceUsage:
 class TimeSeriesUsage:
     """时间序列资源使用数据。"""
 
-    period_start: datetime
+    period_start: datetime | None
     period_end: datetime | None
     total_gpu_hours: Decimal
     total_cost_usd: Decimal

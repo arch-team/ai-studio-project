@@ -3,7 +3,7 @@
 import json
 import re
 from collections.abc import Callable
-from typing import Any
+from typing import Any, cast
 
 import structlog
 from starlette.background import BackgroundTask
@@ -173,7 +173,7 @@ class AuditMiddleware(BaseHTTPMiddleware):
             content_type = request.headers.get("content-type", "")
             if "application/json" in content_type:
                 data = json.loads(body.decode("utf-8"))
-                return self._sanitize_data(data)
+                return cast("dict[str, Any]", self._sanitize_data(data))
 
             return None
         except (json.JSONDecodeError, UnicodeDecodeError):

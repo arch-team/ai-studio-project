@@ -2,6 +2,7 @@
 
 from datetime import datetime, timedelta
 from decimal import Decimal
+from typing import cast
 
 from src.modules.billing.application.interfaces.resource_usage_query import IResourceUsageQuery
 from src.modules.billing.application.services.usage_aggregator import _DATE_FORMAT_MAP
@@ -187,8 +188,8 @@ class ReportService:
     def _calculate_row_total(self, row: dict, cost_type: str | None) -> Decimal:
         """计算单行总成本。"""
         if not cost_type:
-            return row["total_cost"]
-        return row["compute_cost"] + row["storage_cost"] + row["network_cost"]
+            return cast("Decimal", row["total_cost"])
+        return cast("Decimal", row["compute_cost"] + row["storage_cost"] + row["network_cost"])
 
     def _calculate_cost_summary(self, data_points: list[dict]) -> dict:
         """计算成本汇总统计。"""
@@ -203,7 +204,7 @@ class ReportService:
             "grand_total_cost": total_compute + total_storage + total_network,
         }
 
-    def _calculate_forecast_if_needed(self, data_points: list[dict], include_forecast: bool) -> dict | None:
+    def _calculate_forecast_if_needed(self, data_points: list[dict], include_forecast: bool) -> list[dict] | None:
         """根据条件计算成本预测。"""
         if include_forecast and len(data_points) >= 7:
             return self._calculate_cost_forecast(data_points)

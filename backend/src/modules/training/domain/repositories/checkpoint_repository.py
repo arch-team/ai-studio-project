@@ -55,7 +55,10 @@ class ICheckpointRepository(ABC):
     @abstractmethod
     async def get_oldest_checkpoints(
         self,
-        training_job_id: int,
+        training_job_id: int | None = None,
         hours_threshold: int = 72,
     ) -> list[Checkpoint]:
-        """Get checkpoints older than threshold for archival."""
+        """Get checkpoints older than threshold for archival.
+
+        training_job_id 为 None 时跨所有任务归档（用于定时迁移周期）。
+        """

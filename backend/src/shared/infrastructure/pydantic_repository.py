@@ -1,11 +1,12 @@
 """统一仓库基类 - 支持自动和手动 Entity ↔ Model 转换。"""
 
-from typing import Any, Generic, TypeVar
+from typing import Any, Generic, TypeVar, cast
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.shared.domain.exceptions import EntityNotFoundError
+from src.shared.domain.pydantic_entity import PydanticEntity
 from src.shared.infrastructure.query_builder import QueryBuilder
 from src.shared.utils import utc_now
 
@@ -55,8 +56,8 @@ class PydanticRepository(Generic[EntityT, ModelT, IdT]):
 
     def _to_entity(self, model: ModelT) -> EntityT:
         """ORM 模型 → 领域实体。子类可覆盖。"""
-        if self._entity_class is not None and hasattr(self._entity_class, "from_orm"):
-            return self._entity_class.from_orm(model)
+        if self._entity_class is not None and issubclass(self._entity_class, PydanticEntity):
+            return cast("EntityT", self._entity_class.from_orm(model))
         raise NotImplementedError("子类必须实现 _to_entity() 或设置 _entity_class")
 
     def _to_model(self, entity: EntityT) -> ModelT:
@@ -88,6 +89,8 @@ class PydanticRepository(Generic[EntityT, ModelT, IdT]):
         """获取可更新的字段列表。"""
         if self._updatable_fields:
             return self._updatable_fields
+        if self._entity_class is None or not issubclass(self._entity_class, PydanticEntity):
+            raise NotImplementedError("需设置 _updatable_fields 或 _entity_class")
         return [f for f in self._entity_class.model_fields.keys() if f not in self._default_exclude_fields]
 
     def _get_id_column(self) -> Any:

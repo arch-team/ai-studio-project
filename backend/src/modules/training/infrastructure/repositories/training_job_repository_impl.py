@@ -1,8 +1,10 @@
 """TrainingJob Repository Implementation - SQLAlchemy data access."""
 
+from collections.abc import Sequence
 from datetime import datetime
+from typing import Any
 
-from sqlalchemy import func, select
+from sqlalchemy import Select, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.shared.infrastructure import PydanticRepository
@@ -95,14 +97,14 @@ class TrainingJobRepository(PydanticRepository[TrainingJob, TrainingJobModel, in
 
     def _apply_job_filters(
         self,
-        query,
-        count_query,
+        query: Select[Any],
+        count_query: Select[Any],
         owner_id: int | None,
         status: JobStatus | None,
         priority: JobPriority | None,
         submitted_after: datetime | None,
         submitted_before: datetime | None,
-    ):
+    ) -> tuple[Select[Any], Select[Any]]:
         """应用任务过滤条件."""
         if owner_id is not None:
             query = query.where(TrainingJobModel.owner_id == owner_id)
@@ -126,22 +128,22 @@ class TrainingJobRepository(PydanticRepository[TrainingJob, TrainingJobModel, in
 
         return query, count_query
 
-    async def _get_job_count(self, count_query) -> int:
+    async def _get_job_count(self, count_query: Select[Any]) -> int:
         """获取任务总数."""
         result = await self._session.execute(count_query)
         return result.scalar() or 0
 
-    def _apply_job_sorting(self, query, sort_by: str, sort_order: str):
+    def _apply_job_sorting(self, query: Select[Any], sort_by: str, sort_order: str) -> Select[Any]:
         """应用排序."""
         sort_column = getattr(TrainingJobModel, sort_by, TrainingJobModel.created_at)
         return query.order_by(sort_column.desc() if sort_order.lower() == "desc" else sort_column.asc())
 
-    def _apply_job_pagination(self, query, page: int, page_size: int):
+    def _apply_job_pagination(self, query: Select[Any], page: int, page_size: int) -> Select[Any]:
         """应用分页."""
         offset = (page - 1) * page_size
         return query.offset(offset).limit(page_size)
 
-    async def _execute_job_query(self, query):
+    async def _execute_job_query(self, query: Select[Any]) -> Sequence[Any]:
         """执行查询."""
         result = await self._session.execute(query)
         return result.scalars().all()
