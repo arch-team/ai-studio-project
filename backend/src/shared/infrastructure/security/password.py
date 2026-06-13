@@ -14,13 +14,21 @@ from src.shared.infrastructure.security.constants import (
 class PasswordHasher:
     """Password hashing using bcrypt."""
 
+    # bcrypt 只处理密码的前 72 字节，bcrypt>=4.1 起超长密码会直接抛 ValueError，
+    # 故在 hash/verify 两端都先截断，避免线上超长密码请求 500。
+    _BCRYPT_MAX_BYTES = 72
+
     def __init__(self, cost_factor: int = PASSWORD_BCRYPT_COST):
         self._cost_factor = cost_factor
+
+    def _encode(self, password: str) -> bytes:
+        """将密码编码并截断到 bcrypt 的 72 字节上限（按字节边界安全截断）。"""
+        return password.encode("utf-8")[: self._BCRYPT_MAX_BYTES]
 
     def hash_password(self, password: str) -> str:
         """Hash a password using bcrypt."""
         return bcrypt.hashpw(
-            password.encode("utf-8"),
+            self._encode(password),
             bcrypt.gensalt(rounds=self._cost_factor),
         ).decode("utf-8")
 
@@ -28,7 +36,7 @@ class PasswordHasher:
         """Verify a password against a hash."""
         try:
             return bcrypt.checkpw(
-                plain_password.encode("utf-8"),
+                self._encode(plain_password),
                 hashed_password.encode("utf-8"),
             )
         except (ValueError, TypeError):
