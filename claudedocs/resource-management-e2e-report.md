@@ -60,15 +60,16 @@
 
 ## 4. 发现并修复的 Bug
 
-### 4.1 本轮引入修复的真实 Bug（3 个）
+### 4.1 本轮引入修复的真实 Bug（4 个）
 
 | # | Bug | 根因 | 修复 | 发现方式 |
 |---|-----|------|------|---------|
 | B1 | HyperPodCluster Enum 持久化崩溃 | ORM `Enum()` 默认按成员名（大写）读写，迁移列是小写值，DB 读回 LookupError | model 加 `values_callable` 按 .value 映射 | Task 2C.2a 真实 DB 集成测试 |
 | B2 | AMP instant query 403 Forbidden | httpx 默认把空格编码为 `+`，AWS SigV4 要求 `%20`，含特殊字符的 PromQL 签名不匹配（而纯字母的 range query 恰好通过） | `urlencode(quote_via=quote)` 统一编码，签名与发送共用同一 URL | Task 2D.1 真实环境联调（utilization 返空，日志见 403） |
 | B3 | 集群列表读穿透降级返空 | `_is_fresh()` 比较 aware `utc_now()` 与 MySQL 读回的 naive `last_sync_at`，TypeError 被降级掩盖 | 用项目既有 `ensure_aware()` helper 统一时区 | Task 2D.1 真实环境联调（集群列表返空，日志见 TypeError） |
+| B4 | 指标趋势折线图生产环境恒为空 | 前端"指标趋势"Tab 传业务语义名（cpu_utilization 等），后端把它当字面 PromQL 查 AMP（无此指标）→ 返空 data_points → 折线图"暂无数据"。两层 E2E 都绕开了此 seam | 后端 `/monitoring/metrics` 加语义名→PromQL 映射（复用 `_UTILIZATION_QUERIES`），未知名仍透传；补 remote E2E 真实数据点断言 | 最终整体集成审查（实测三指标 data_points 全空） |
 
-**关键观察**：B2、B3 都被"故障降级返 200"机制掩盖——端点不崩但返回空数据。这印证了真实环境联调的价值：单测全绿 ≠ 真实可用，必须真打端点看真实数据。
+**关键观察**：B2、B3 都被"故障降级返 200"机制掩盖——端点不崩但返回空数据；B4 则被"两层 E2E 各自的盲区"掩盖（mock 组按发送名回数据、remote 组只断言图表区域渲染不断言数据点）。三者共同印证：单测/局部 E2E 全绿 ≠ 真实可用，必须真打端点看真实数据、整体集成视角复核跨前后端的语义契约。
 
 ### 4.2 发现但未在本轮修复的问题（记录待办）
 
@@ -85,10 +86,12 @@
 ```
 [200] /api/v1/clusters            → ai-platform-dev-hyperpod, status=active, 3 节点, gpu=1
 [200] /api/v1/monitoring/utilization → cpu 5.1% / memory 6.7% / gpu 0%
-[200] /api/v1/monitoring/metrics  → DCGM_FI_DEV_GPU_UTIL 真实时间序列
+[200] /api/v1/monitoring/metrics  → 真实时间序列（语义名 cpu/memory/gpu_utilization 各 61 数据点，见 B4）
 [200] /api/v1/monitoring/alerts   → 空集（告警子系统未实现，YAGNI）
 ```
 PromQL 数值交叉验证（直查 AMP vs 端点）：memory 6.76% vs 6.7%、gpu 0 vs 0、cpu 同量级 → PromQL 语义正确。
+
+> 修正说明：初版报告此处仅写"DCGM_FI_DEV_GPU_UTIL 真实时间序列"，仅反映默认调用（不带 metric_names）。最终整体审查发现前端"指标趋势"Tab 实际传业务语义名（cpu_utilization 等），后端把它当字面 PromQL 查 AMP 而返空 → 趋势折线图生产环境恒为空。已修复（见 B4），现三条语义指标各返 61 个真实数据点。
 
 ### 5.2 自动化测试
 | 范围 | 结果 |
