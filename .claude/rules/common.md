@@ -92,7 +92,8 @@ ai-studio-project/                 # Monorepo 根目录
 ├── .claude/                       # 根级：通用规范
 │   ├── CLAUDE.md                  # 全局入口（导航、项目概述）
 │   ├── rules/
-│   │   └── common.md              # 跨项目通用规则（本文件）
+│   │   ├── common.md              # 跨项目通用规则（本文件）
+│   │   └── product-architecture.md # 产品架构规范（业务视角 SSOT）
 │   ├── commands/                  # Claude Code 自定义命令
 │   ├── skills/                    # Claude Code 技能
 │   └── evals/                     # Claude Code 评估

@@ -14,4 +14,5 @@
 
 | 规则 | 文档 |
 |------|------|
+| 产品架构（平台定位、五层业务架构、LLMOps、多租户） | [rules/product-architecture.md](rules/product-architecture.md) |
 | Git 提交规范、代码审查、文档命名 | [rules/common.md](rules/common.md) |
