@@ -9,6 +9,7 @@ from src.modules.spaces.application.interfaces import (
     ISpaceBackendClient,
 )
 from src.modules.spaces.domain.entities import Space
+from src.modules.spaces.domain.exceptions import InvalidSpaceStateError
 from src.modules.spaces.domain.value_objects import SpaceStatus, SpaceType
 
 logger = structlog.get_logger(__name__)
@@ -39,6 +40,23 @@ class StudioSpaceBackend(ISpaceBackendClient):
     def _ide_type(self, space: Space) -> str:
         """获取 IDE 类型映射。"""
         return _IDE_TYPE_MAP.get(space.space_type, "jupyterlab")
+
+    async def _ensure_app_not_deleting(self, space: Space, operation: str) -> None:
+        """App 处于 Deleting 时拒绝操作（SageMaker 侧会 ResourceInUse），提前给明确 409。
+
+        停止 App 后约 1 分钟窗口期内 App 状态为 Deleting，此时 create_app / delete_space
+        会被 SageMaker 以 ResourceInUse 拒绝。提前拦截并返回 InvalidSpaceStateError，
+        避免用户收到底层 SageMaker 原始错误。
+
+        Raises:
+            InvalidSpaceStateError: App 删除中，需等待完成后重试
+        """
+        try:
+            info = await self._sm.describe_app(space_name=space.space_name, ide_type=self._ide_type(space))
+        except Exception:
+            return
+        if isinstance(info, dict) and info.get("status") == "Deleting":
+            raise InvalidSpaceStateError(space_id=space.id or "", current_state="stopping", operation=operation)
 
     async def provision_space(self, space: Space) -> dict[str, Any]:
         """创建 Studio Space + App，失败时清理孤儿资源。
@@ -82,11 +100,15 @@ class StudioSpaceBackend(ISpaceBackendClient):
 
     async def delete_space(self, space: Space) -> None:
         """删除 App 后删除 Space (幂等)。"""
+        # App 删除中时 SageMaker DeleteSpace 会被 ResourceInUse 拒绝，提前 409
+        await self._ensure_app_not_deleting(space, "delete")
         await self._sm.delete_app(space_name=space.space_name, ide_type=self._ide_type(space))
         await self._sm.delete_space(space.space_name)
 
     async def start_space(self, space: Space) -> None:
         """拉起 App 计算实例。"""
+        # 上一个 App 仍在删除中（停止后约 1 分钟窗口），create_app 会被 ResourceInUse 拒绝，提前 409
+        await self._ensure_app_not_deleting(space, "start")
         await self._sm.create_app(
             space_name=space.space_name,
             ide_type=self._ide_type(space),

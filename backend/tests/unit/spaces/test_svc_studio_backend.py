@@ -5,6 +5,7 @@ from unittest.mock import AsyncMock, call
 import pytest
 
 from src.modules.spaces.domain.entities import Space
+from src.modules.spaces.domain.exceptions import InvalidSpaceStateError
 from src.modules.spaces.domain.value_objects import (
     SpaceBackend,
     SpaceInstanceType,
@@ -103,6 +104,14 @@ class TestStart:
             lifecycle_config_arn=None,
         )
 
+    async def test_start_space_while_app_deleting_raises_conflict(self, mock_sagemaker: AsyncMock) -> None:
+        # App 处于 Deleting 窗口期，start 提前给 409 而非让 SageMaker 抛 ResourceInUse
+        mock_sagemaker.describe_app.return_value = {"status": "Deleting"}
+        backend = StudioSpaceBackend(mock_sagemaker)
+        with pytest.raises(InvalidSpaceStateError):
+            await backend.start_space(_studio_space())
+        mock_sagemaker.create_app.assert_not_awaited()
+
 
 class TestStop:
     async def test_stop_calls_delete_app_with_args(self, mock_sagemaker: AsyncMock) -> None:
@@ -118,11 +127,20 @@ class TestDelete:
     async def test_delete_calls_delete_app_then_delete_space(self, mock_sagemaker: AsyncMock) -> None:
         backend = StudioSpaceBackend(mock_sagemaker)
         await backend.delete_space(_studio_space())
-        # 先清理 App 再删除 Space，验证调用顺序
+        # 先清理 App 再删除 Space，验证调用顺序（describe_app 用于 deleting 预检）
         assert mock_sagemaker.mock_calls == [
+            call.describe_app(space_name="dev-1", ide_type="jupyterlab"),
             call.delete_app(space_name="dev-1", ide_type="jupyterlab"),
             call.delete_space("dev-1"),
         ]
+
+    async def test_delete_space_while_app_deleting_raises_conflict(self, mock_sagemaker: AsyncMock) -> None:
+        # App 处于 Deleting 窗口期，delete 提前给 409 而非让 SageMaker 抛 ResourceInUse
+        mock_sagemaker.describe_app.return_value = {"status": "Deleting"}
+        backend = StudioSpaceBackend(mock_sagemaker)
+        with pytest.raises(InvalidSpaceStateError):
+            await backend.delete_space(_studio_space())
+        mock_sagemaker.delete_space.assert_not_awaited()
 
 
 class TestAccessUrl:
