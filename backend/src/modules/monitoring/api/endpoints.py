@@ -239,6 +239,9 @@ async def get_cluster_health(
             network_alert_count=0,
         )
 
+    # 从仓库取出的集群必有持久化 id，收窄 int | None 类型
+    assert cluster.id is not None
+
     try:
         result = await health_service.check_health(cluster.id)
         return ClusterHealthResponse(
