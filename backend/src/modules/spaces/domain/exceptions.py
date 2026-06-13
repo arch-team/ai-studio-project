@@ -67,4 +67,20 @@ class SpaceQuotaExceededError(Problem):
     available: int
 
 
+@problem(400, "HYPERPOD_SPACE_BACKEND_ERROR")
+@dataclass
+class HyperPodSpaceBackendError(Problem):
+    """HyperPod Space K8s API 操作失败。"""
+
+    message: str
+
+
+@problem(503, "SPACE_BACKEND_UNAVAILABLE")
+@dataclass
+class SpaceBackendUnavailableError(Problem):
+    """Space 后端不可达（add-on 未装 / 集群不可达）。"""
+
+    message: str
+
+
 # =============================================================================

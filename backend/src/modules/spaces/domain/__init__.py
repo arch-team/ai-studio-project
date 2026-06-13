@@ -3,7 +3,9 @@
 from .entities import Space
 from .exceptions import (
     DuplicateSpaceNameError,
+    HyperPodSpaceBackendError,
     InvalidSpaceStateError,
+    SpaceBackendUnavailableError,
     SpaceError,
     SpaceNotFoundError,
     SpaceQuotaExceededError,
@@ -34,4 +36,6 @@ __all__ = [
     "DuplicateSpaceNameError",
     "InvalidSpaceStateError",
     "SpaceQuotaExceededError",
+    "HyperPodSpaceBackendError",
+    "SpaceBackendUnavailableError",
 ]
