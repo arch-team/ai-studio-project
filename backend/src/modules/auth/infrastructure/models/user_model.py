@@ -3,11 +3,11 @@
 from datetime import datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import BigInteger, DateTime, Enum, ForeignKey, Integer, String
+from sqlalchemy import BigInteger, DateTime, ForeignKey, Integer, String
 from sqlalchemy.dialects.mysql import JSON
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from src.shared.infrastructure import Base
+from src.shared.infrastructure import Base, lowercase_enum
 from src.shared.utils import utc_now
 
 from ...domain.value_objects import AuthType, UserRole, UserStatus
@@ -89,14 +89,14 @@ class UserModel(Base, TimestampMixin):
 
     # User status and role
     status: Mapped[UserStatus] = mapped_column(
-        Enum(UserStatus),
+        lowercase_enum(UserStatus),
         nullable=False,
         default=UserStatus.ACTIVE,
         index=True,
         comment="用户状态",
     )
     role: Mapped[UserRole] = mapped_column(
-        Enum(UserRole),
+        lowercase_enum(UserRole),
         nullable=False,
         default=UserRole.ENGINEER,
         comment="用户角色",
@@ -120,7 +120,7 @@ class UserModel(Base, TimestampMixin):
 
     # Authentication fields (for local accounts)
     auth_type: Mapped[AuthType] = mapped_column(
-        Enum(AuthType),
+        lowercase_enum(AuthType),
         nullable=False,
         default=AuthType.SSO,
         server_default="sso",

@@ -1,9 +1,10 @@
 """ResourceLimitConfig ORM model - Per-job resource limits by role."""
 
-from sqlalchemy import BigInteger, Enum, Integer, String, UniqueConstraint
+from sqlalchemy import BigInteger, Integer, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from src.modules.quotas.domain.value_objects import LimitRole, PriorityDefault
+from src.shared.infrastructure import lowercase_enum
 from src.shared.infrastructure.database import Base
 from src.shared.infrastructure.models import SoftDeleteMixin, TimestampMixin
 
@@ -30,7 +31,7 @@ class ResourceLimitConfigModel(Base, TimestampMixin, SoftDeleteMixin):
 
     # Role association
     role: Mapped[LimitRole] = mapped_column(
-        Enum(LimitRole),
+        lowercase_enum(LimitRole),
         nullable=False,
         index=True,
         comment="适用角色",
@@ -78,7 +79,7 @@ class ResourceLimitConfigModel(Base, TimestampMixin, SoftDeleteMixin):
 
     # Default priority
     priority_default: Mapped[PriorityDefault] = mapped_column(
-        Enum(PriorityDefault),
+        lowercase_enum(PriorityDefault),
         nullable=False,
         default=PriorityDefault.MEDIUM,
         comment="默认优先级",
