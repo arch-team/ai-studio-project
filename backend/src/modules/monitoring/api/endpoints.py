@@ -12,6 +12,7 @@ from src.modules.auth.api.dependencies import get_current_active_user
 from src.shared.utils import utc_now
 
 from ..application.services import ClusterHealthService, PrometheusService
+from ..application.services.prometheus_service import _UTILIZATION_QUERIES
 from .dependencies import get_cluster_health_service, get_prometheus_service
 from .schemas import (
     AlertListResponse,
@@ -31,6 +32,22 @@ from .schemas import (
 
 router = APIRouter()
 logger = structlog.get_logger(__name__)
+
+
+# 业务语义指标名 → 真实 PromQL 映射。
+# 前端「指标趋势」Tab 用业务语义名（cpu/memory/gpu_utilization），
+# 这些不是 AMP 真实指标名；须映射为真实 PromQL 再查询，否则字面量查不到数据。
+# 复用 PrometheusService 的 _UTILIZATION_QUERIES，与 /utilization 端点保持一致。
+_SEMANTIC_METRIC_QUERIES = {
+    "cpu_utilization": _UTILIZATION_QUERIES["cpu"],
+    "memory_utilization": _UTILIZATION_QUERIES["memory"],
+    "gpu_utilization": _UTILIZATION_QUERIES["gpu"],
+}
+
+
+def _resolve_metric_query(name: str) -> str:
+    """把业务语义指标名解析为真实 PromQL；未知名原样返回（向后兼容）。"""
+    return _SEMANTIC_METRIC_QUERIES.get(name, name)
 
 
 @router.get("/clusters/{cluster_name}/metrics", response_model=ClusterMetricsResponse)
@@ -314,20 +331,27 @@ async def get_metric_series(
     else:
         names = ["DCGM_FI_DEV_GPU_UTIL", "node_cpu_usage", "node_memory_usage"]
 
+    # 把业务语义名映射为真实 PromQL 再查询，同时保留原始名用于响应 label。
+    # 用 (PromQL, 原始名) 列表保序，避免去重丢失同 PromQL 不同语义名的场景。
+    resolved = [(_resolve_metric_query(name), name) for name in names]
+
     try:
         result = await prometheus_service.query_metrics(
-            metric_names=names,
+            metric_names=[query for query, _ in resolved],
             start_time=start_time,
             end_time=end_time,
             step=step,
         )
+        # 按原始传入名返回（图表 label 正确），数据点取自映射后 PromQL 的查询结果。
         return [
             MetricSeriesResponse(
-                metric_name=name,
+                metric_name=original_name,
                 labels={},
-                data_points=[MetricDataPointResponse(timestamp=dp.timestamp, value=dp.value) for dp in data_points],
+                data_points=[
+                    MetricDataPointResponse(timestamp=dp.timestamp, value=dp.value) for dp in result.get(query, [])
+                ],
             )
-            for name, data_points in result.items()
+            for query, original_name in resolved
         ]
     except Exception as e:
         logger.warning("prometheus_unavailable", endpoint="metrics", error=str(e))
