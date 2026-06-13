@@ -65,12 +65,15 @@ def _to_summary(cluster: HyperPodCluster) -> ClusterSummaryResponse:
 def _to_instance_groups(cluster: HyperPodCluster) -> list[InstanceGroupResponse]:
     """将实体的 instance_groups（SageMaker 原生 dict）映射为响应模型.
 
-    SageMaker InstanceGroups 字段为 PascalCase；available_count 无独立来源，
-    取 CurrentCount 兜底。容量类型映射 OnDemand→on_demand / Spot→spot。
+    SageMaker InstanceGroups 字段为 PascalCase；CurrentCount 可能缺失或为 null
+    （key 在但值为 None），用 `or 0` 同时兜底两种情况，避免 int(None) 抛 TypeError
+    逃逸成 5xx，违反"数据端点不 5xx"契约。available_count 暂等于总数（CurrentCount），
+    无节点级独立来源；待 2D.1 接入节点级数据（list_cluster_nodes）后修正为真实可用数。
+    容量类型映射 OnDemand→on_demand / Spot→spot。
     """
     groups: list[InstanceGroupResponse] = []
     for g in cluster.instance_groups:
-        current = int(g.get("CurrentCount", 0))
+        current = int(g.get("CurrentCount") or 0)
         capacity_raw = str(g.get("CapacityType", "OnDemand"))
         capacity_type = "spot" if capacity_raw.lower().startswith("spot") else "on_demand"
         groups.append(
@@ -78,6 +81,7 @@ def _to_instance_groups(cluster: HyperPodCluster) -> list[InstanceGroupResponse]
                 instance_group_name=str(g.get("InstanceGroupName", "")),
                 instance_type=str(g.get("InstanceType", "")),
                 instance_count=current,
+                # available_count 暂等于总数 CurrentCount（语义近似），待 2D.1 修正。
                 available_count=current,
                 capacity_type=capacity_type,
                 spot_interruption_behavior=None,
@@ -146,6 +150,7 @@ async def get_cluster_detail(
     """获取集群详情.
 
     集群不存在返回 404；查询异常时同样按 404 处理（前端可优雅降级到列表页）。
+    映射异常（如 instance_groups 含脏数据）同样按 404 降级，绝不逃逸成 5xx。
     """
     try:
         cluster = await cluster_repo.get_by_id(cluster_id)
@@ -159,7 +164,18 @@ async def get_cluster_detail(
             detail=f"Cluster '{cluster_id}' not found",
         )
 
-    return _to_detail(cluster)
+    # 双保险：_to_instance_groups 已加固不抛，此处再包一层；
+    # 映射意外失败时按 docstring 承诺降级为 404，而非 500。
+    try:
+        return _to_detail(cluster)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.warning("cluster_detail_mapping_failed", cluster_id=cluster_id, error=str(e))
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Cluster '{cluster_id}' not found",
+        ) from e
 
 
 @router.get("/clusters/{cluster_id}/nodes", response_model=NodeListResponse)

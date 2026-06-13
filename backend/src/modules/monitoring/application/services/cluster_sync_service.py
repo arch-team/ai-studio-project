@@ -125,9 +125,11 @@ class ClusterSyncService:
         覆盖式刷新：直接传 status（经映射），不走 transition_to 状态机。
         """
         instance_groups: list[dict[str, Any]] = raw.get("InstanceGroups", [])
-        total_nodes = sum(int(g.get("CurrentCount", 0)) for g in instance_groups)
+        # CurrentCount 可能缺失或为 null（key 在但值为 None），用 `or 0` 同时兜底，
+        # 避免 SageMaker 返回 null count 时 int(None) 在写库阶段抛 TypeError。
+        total_nodes = sum(int(g.get("CurrentCount") or 0) for g in instance_groups)
         gpu_count = sum(
-            int(g.get("CurrentCount", 0))
+            int(g.get("CurrentCount") or 0)
             for g in instance_groups
             if str(g.get("InstanceType", "")).startswith(_GPU_INSTANCE_PREFIXES)
         )

@@ -216,6 +216,29 @@ async def test_map_to_entity_field_mapping(repo: AsyncMock, sagemaker: AsyncMock
     assert entity.last_sync_at is not None
 
 
+async def test_map_to_entity_handles_null_current_count(repo: AsyncMock, sagemaker: AsyncMock) -> None:
+    # 健壮性回归：SageMaker 返回 CurrentCount=null（key 在但值为 None）时，
+    # int(None) 会抛 TypeError 导致写库阶段崩溃。加固后应兜底为 0，写库不抛。
+    raw = _fake_describe_cluster()
+    raw["InstanceGroups"] = [
+        {"InstanceGroupName": "g", "InstanceType": "ml.g5.2xlarge", "CurrentCount": None},
+        {"InstanceGroupName": "cpu", "InstanceType": "ml.m5.2xlarge", "CurrentCount": 1},
+    ]
+    sagemaker.describe_cluster.return_value = raw
+    repo.list_clusters.return_value = []
+    repo.get_by_arn.return_value = None
+
+    svc = ClusterSyncService(repo, sagemaker, ttl_seconds=300, cluster_name=_CLUSTER_NAME)
+    # 不抛 TypeError 即说明加固生效
+    await svc.get_clusters()
+
+    entity = repo.create.call_args.args[0]
+    # None 兜底为 0：total_nodes = 0 + 1
+    assert entity.total_nodes == 1
+    # GPU 组 CurrentCount=None 兜底为 0 → 无 GPU 计入 → total_gpu_count 记 None
+    assert entity.total_gpu_count is None
+
+
 async def test_map_to_entity_vpc_id_fallback_when_missing(repo: AsyncMock, sagemaker: AsyncMock) -> None:
     # VpcConfig 不提供 vpc_id，必填字段必须安全兜底，不能让实体构造失败
     raw = _fake_describe_cluster()

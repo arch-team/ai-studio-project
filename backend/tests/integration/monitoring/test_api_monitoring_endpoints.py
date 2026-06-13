@@ -70,6 +70,53 @@ class TestGetAlertsEndpoint:
         assert body["total_pages"] == 0
 
 
+class TestGetClusterDetailEndpoint:
+    """Tests for GET /api/v1/clusters/{id} endpoint."""
+
+    @pytest.mark.asyncio
+    async def test_get_cluster_detail_handles_null_current_count(
+        self, client: AsyncClient, engineer_auth_headers: dict[str, str]
+    ) -> None:
+        """instance_groups 含 CurrentCount=None 时返回 200，不逃逸成 5xx。
+
+        健壮性回归：脏数据（key 在但值为 null）经映射时 int(None) 会抛 TypeError。
+        加固后 available_count/instance_count 兜底为 0，详情端点正常返回。
+        """
+        from unittest.mock import AsyncMock
+
+        from src.main import app
+        from src.modules.monitoring.api.dependencies import get_cluster_repository
+        from src.modules.monitoring.domain.entities import HyperPodCluster
+        from src.modules.monitoring.domain.value_objects import ClusterStatus
+
+        cluster = HyperPodCluster(
+            id=42,
+            cluster_name="dirty-cluster",
+            cluster_arn="arn:aws:sagemaker:us-east-1:123:cluster/dirty",
+            region="us-east-1",
+            vpc_id="vpc-1",
+            instance_groups=[
+                {"InstanceGroupName": "g", "InstanceType": "ml.g5.2xlarge", "CurrentCount": None},
+            ],
+            total_nodes=0,
+            status=ClusterStatus.ACTIVE,
+        )
+        repo = AsyncMock()
+        repo.get_by_id = AsyncMock(return_value=cluster)
+        app.dependency_overrides[get_cluster_repository] = lambda: repo
+        try:
+            resp = await client.get("/api/v1/clusters/42", headers=engineer_auth_headers)
+            assert resp.status_code == 200
+            body = resp.json()
+            groups = body["instance_groups"]
+            assert len(groups) == 1
+            # None 兜底为 0，不抛 TypeError
+            assert groups[0]["instance_count"] == 0
+            assert groups[0]["available_count"] == 0
+        finally:
+            app.dependency_overrides.pop(get_cluster_repository, None)
+
+
 class TestEndpointDegradation:
     """故障降级：依赖异常时返回 200 + 空数据，不 5xx。"""
 
