@@ -3,12 +3,14 @@
 from .space_enums import (
     INSTANCE_TYPE_RESOURCES,
     SPACE_STATE_TRANSITIONS,
+    SpaceBackend,
     SpaceInstanceType,
     SpaceStatus,
     SpaceType,
 )
 
 __all__ = [
+    "SpaceBackend",
     "SpaceInstanceType",
     "SpaceType",
     "SpaceStatus",

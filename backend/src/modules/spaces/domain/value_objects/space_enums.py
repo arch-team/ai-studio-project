@@ -3,6 +3,17 @@
 from enum import Enum
 
 
+class SpaceBackend(Enum):
+    """开发环境后端类型。
+
+    studio: SageMaker Studio Spaces（独立计费实例，不占集群）
+    hyperpod: HyperPod 原生 Spaces（集群节点，纳入 Kueue 治理）
+    """
+
+    STUDIO = "studio"
+    HYPERPOD = "hyperpod"
+
+
 class SpaceInstanceType(Enum):
     """Space instance type options."""
 
