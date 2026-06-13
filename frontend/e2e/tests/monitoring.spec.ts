@@ -210,6 +210,17 @@ test.describe("集群监控 - 页面结构与 Tab 交互 (Mock 模式)", () => {
     expect(chartCount).toBeGreaterThan(0);
   });
 
+  test("指标趋势 Tab - 折线图有真实数据点 (非空态)", async () => {
+    // Mock /monitoring/metrics 返回非空 data_points → 折线图应渲染数据而非「暂无数据」
+    await monitoringPage.switchToTab("指标趋势");
+    await expect(monitoringPage.metricsTrendChart).toBeVisible();
+    // 折线图容器不应出现「暂无数据」空态文案
+    await expect(
+      monitoringPage.metricsTrendChart.getByText("暂无数据"),
+    ).toHaveCount(0);
+    expect(await monitoringPage.trendChartHasData()).toBe(true);
+  });
+
   test("Grafana Tab - 未配置时显示降级引导文案", async () => {
     // 依赖本轮前端「Grafana 死链降级」改动 (v1.0.19)
     await monitoringPage.switchToTab("Grafana");
@@ -293,6 +304,17 @@ test.describe("集群监控 - 真实数据 (Remote 模式)", () => {
     await monitoringPage.switchToTab("指标趋势");
     const chartCount = await monitoringPage.getMetricsChartCount();
     expect(chartCount).toBeGreaterThan(0);
+  });
+
+  test("指标趋势 Tab - 折线图有真实数据点 (语义指标名映射回归)", async () => {
+    // 真实环境回归：后端须把 cpu/memory/gpu_utilization 映射为真实 PromQL 查 AMP，
+    // 否则字面量查不到数据 → 折线图恒为「暂无数据」。此断言堵住该端到端裂缝。
+    await monitoringPage.switchToTab("指标趋势");
+    await expect(monitoringPage.metricsTrendChart).toBeVisible();
+    await expect(
+      monitoringPage.metricsTrendChart.getByText("暂无数据"),
+    ).toHaveCount(0);
+    expect(await monitoringPage.trendChartHasData()).toBe(true);
   });
 
   test("告警 Tab - 显示暂无告警空态 (告警子系统返空)", async () => {

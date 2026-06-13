@@ -8,13 +8,24 @@ import type {
   ClusterDetail,
   ClusterFilters,
   NodeListResponse,
-  ClusterMetrics,
   MetricSeries,
   MetricFilters,
   ResourceUtilization,
   AlertListResponse,
   AlertFilters,
 } from '../types';
+
+/**
+ * 后端 GET /clusters/{id}/metrics 实际响应形状。
+ *
+ * 后端返回 ClusterMetricsResponse（单对象，含 cluster_name + metrics 列表），
+ * 每个 metric 形如 MetricSeries（{ metric_name, data_points }）。
+ * 此前误声明为 ClusterMetrics[]（形状完全不同），现按真实契约修正。
+ */
+interface ClusterMetricsResponse {
+  cluster_name: string;
+  metrics: MetricSeries[];
+}
 
 // === Cluster APIs ===
 
@@ -51,18 +62,22 @@ export async function fetchClusterNodes(clusterId: number): Promise<NodeListResp
 
 /**
  * Fetch cluster metrics (CPU, memory, GPU utilization).
+ *
+ * 后端返回 ClusterMetricsResponse（含 metrics 列表），此处解出 metrics 返回
+ * MetricSeries[]，与调用方对「指标序列列表」的预期一致。
  */
 export async function fetchClusterMetrics(
   clusterId: number,
   filters: MetricFilters = {}
-): Promise<ClusterMetrics[]> {
-  return apiClient.get<ClusterMetrics[]>(`/clusters/${clusterId}/metrics`, {
+): Promise<MetricSeries[]> {
+  const response = await apiClient.get<ClusterMetricsResponse>(`/clusters/${clusterId}/metrics`, {
     params: {
       start_time: filters.start_time,
       end_time: filters.end_time,
       step: filters.step,
     },
   });
+  return response.metrics ?? [];
 }
 
 /**

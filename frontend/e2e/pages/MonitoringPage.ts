@@ -34,6 +34,7 @@ export class MonitoringPage extends BasePage {
 
   // === 指标趋势 Tab 内容 ===
   readonly metricsCharts: Locator;
+  readonly metricsTrendChart: Locator;
 
   // === Grafana Tab 内容 ===
   readonly grafanaToggle: Locator;
@@ -77,6 +78,10 @@ export class MonitoringPage extends BasePage {
 
     // 指标趋势 Tab — MetricsCharts 容器统一带 data-testid="metrics-chart"
     this.metricsCharts = page.locator('[data-testid="metrics-chart"]');
+    // 折线图容器（标题「资源利用率趋势」），用于断言趋势图有真实数据点
+    this.metricsTrendChart = page
+      .locator('[data-testid="metrics-chart"]')
+      .filter({ has: page.getByRole("heading", { name: "资源利用率趋势" }) });
 
     // Grafana Tab
     this.grafanaToggle = page.getByText("显示 Grafana 仪表盘");
@@ -153,6 +158,25 @@ export class MonitoringPage extends BasePage {
    */
   async getMetricsChartCount(): Promise<number> {
     return this.metricsCharts.count();
+  }
+
+  /**
+   * 指标趋势 Tab — 折线图是否有真实数据点（而非「暂无数据」空态）。
+   *
+   * 判据：折线图容器内无「暂无数据」文案，且渲染了 SVG 图表。覆盖语义指标名
+   * 映射裂缝——后端若把 cpu/memory/gpu_utilization 字面量当 PromQL 查询将返空，
+   * MetricsCharts 折线图据此显示「暂无数据」（data_points 全空时）。
+   */
+  async trendChartHasData(): Promise<boolean> {
+    const emptyCount = await this.metricsTrendChart
+      .getByText("暂无数据")
+      .count();
+    if (emptyCount > 0) {
+      return false;
+    }
+    // 有数据时 Cloudscape LineChart 渲染 SVG（空态则只有文案、无图表 SVG）
+    const svgCount = await this.metricsTrendChart.locator("svg").count();
+    return svgCount > 0;
   }
 
   /**
