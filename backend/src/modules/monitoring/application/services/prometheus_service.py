@@ -69,6 +69,33 @@ class GPUUtilizationPoint:
     utilization_percent: float
 
 
+@dataclass
+class ResourceUtilizationPoint:
+    """集群整体资源利用率快照（CPU/内存/GPU 单值）.
+
+    util 为百分比语义，用 total=100 / used=pct / available=100-pct 表达，
+    与前端 ResourceUtilization / 后端 ResourceUtilizationResponse 字段对齐。
+    """
+
+    resource_type: str  # cpu, memory, gpu
+    total: float
+    used: float
+    available: float
+    utilization_percentage: float
+    unit: str
+
+
+# 资源利用率聚合 PromQL（基于 AMP 真实在线指标，需在 2D.1 用 awscurl 对 AMP 校准）
+# - cpu: 用 idle 模式反推整体使用率（node-exporter）
+# - memory: 用 available/total 反推使用率（node-exporter）
+# - gpu: DCGM 整体平均利用率
+_UTILIZATION_QUERIES = {
+    "cpu": '100 - (avg(rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100)',
+    "memory": "(1 - sum(node_memory_MemAvailable_bytes) / sum(node_memory_MemTotal_bytes)) * 100",
+    "gpu": "avg(DCGM_FI_DEV_GPU_UTIL)",
+}
+
+
 # 告警阈值配置
 STORAGE_THRESHOLDS = {
     "warning": 80.0,
@@ -275,6 +302,27 @@ class PrometheusService:
                 )
 
         return data_points
+
+    async def get_resource_utilization(self) -> list[ResourceUtilizationPoint]:
+        """查询 CPU/内存/GPU 整体利用率（AMP 即时查询）.
+
+        某指标无数据时该项利用率为 0（优雅降级），不抛错。
+        """
+        points: list[ResourceUtilizationPoint] = []
+        for rtype, query in _UTILIZATION_QUERIES.items():
+            pct = await self._query_instant_value(query, default=0.0)
+            pct = round(pct, 1)
+            points.append(
+                ResourceUtilizationPoint(
+                    resource_type=rtype,
+                    total=100.0,
+                    used=pct,
+                    available=round(100.0 - pct, 1),
+                    utilization_percentage=pct,
+                    unit="%",
+                )
+            )
+        return points
 
     async def _query_instant_value(self, query: str, default: float = 0.0) -> float:
         """执行即时查询并提取第一个结果值."""

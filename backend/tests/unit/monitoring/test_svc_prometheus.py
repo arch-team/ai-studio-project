@@ -255,3 +255,44 @@ class TestGPUMetrics:
         # Assert
         assert result is not None
         assert len(result) > 0
+
+
+class TestResourceUtilization:
+    """Tests for cluster resource utilization aggregation (CPU/memory/GPU)."""
+
+    @pytest.mark.asyncio
+    async def test_get_resource_utilization_returns_cpu_mem_gpu(self) -> None:
+        """Test get_resource_utilization 返回 CPU/内存/GPU 三项利用率."""
+        # Arrange - 三次即时查询分别返回 cpu/memory/gpu
+        mock_client = AsyncMock()
+        mock_client.query_instant.side_effect = [
+            [{"value": [0, "45.0"]}],  # cpu
+            [{"value": [0, "60.0"]}],  # memory
+            [{"value": [0, "30.0"]}],  # gpu
+        ]
+        svc = PrometheusService(mock_client)
+
+        # Act
+        result = await svc.get_resource_utilization()
+
+        # Assert
+        types = {r.resource_type for r in result}
+        assert {"cpu", "memory", "gpu"}.issubset(types)
+        cpu = next(r for r in result if r.resource_type == "cpu")
+        assert cpu.utilization_percentage == 45.0
+        assert cpu.unit == "%"
+
+    @pytest.mark.asyncio
+    async def test_get_resource_utilization_handles_empty_result(self) -> None:
+        """某指标查询返回空时，该项利用率应为 0 而非崩溃."""
+        # Arrange - 全空
+        mock_client = AsyncMock()
+        mock_client.query_instant.side_effect = [[], [], []]
+        svc = PrometheusService(mock_client)
+
+        # Act
+        result = await svc.get_resource_utilization()
+
+        # Assert
+        assert len(result) == 3
+        assert all(r.utilization_percentage == 0.0 for r in result)
