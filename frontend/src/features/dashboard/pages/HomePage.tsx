@@ -30,7 +30,7 @@ import { useAuthStore } from '@features/auth';
 import { useTrainingJobs } from '@features/training/api';
 import { useDatasets } from '@features/datasets/api';
 import { useModels } from '@features/models/api';
-import { PageLayout } from '@shared/components';
+import { PageLayout, InlineErrorState } from '@shared/components';
 import { JOB_STATUS_CHART_COLORS } from '@shared/theme';
 
 /**
@@ -110,7 +110,7 @@ export function HomePage() {
   const userName = useAuthStore((s) => s.user?.name);
 
   // 各类统计（仅取 total，page_size=1 降低负载）
-  const { data: allJobs, isLoading: loadingAll } = useTrainingJobs({ page: 1, page_size: 1 });
+  const { data: allJobs, isLoading: loadingAll, isError: jobsError, refetch: refetchJobs } = useTrainingJobs({ page: 1, page_size: 1 });
   const { data: runningJobs, isLoading: loadingRunning } = useTrainingJobs({ status: 'running', page: 1, page_size: 1 });
   const { data: completedJobs, isLoading: loadingCompleted } = useTrainingJobs({ status: 'completed', page: 1, page_size: 1 });
   const { data: failedJobs } = useTrainingJobs({ status: 'failed', page: 1, page_size: 1 });
@@ -132,6 +132,9 @@ export function HomePage() {
   const totalJobs = allJobs?.total ?? 0;
   const chartLoading = loadingRunning || loadingCompleted;
 
+  // 错误态：核心数据源 allJobs 加载失败时显式报错，不再静默伪装健康（F-001/F-030）
+  const hasError = jobsError;
+
   const greeting = greetingByHour(new Date().getHours());
   const heroTitle = userName ? `${greeting}，${userName}` : '平台概览';
 
@@ -147,7 +150,9 @@ export function HomePage() {
       }
       heroExtra={
         <SpaceBetween size="l" direction="horizontal">
-          <StatusIndicator type="success">平台服务运行正常</StatusIndicator>
+          <StatusIndicator type={hasError ? 'warning' : 'success'}>
+            {hasError ? '平台状态无法获取' : '平台服务运行正常'}
+          </StatusIndicator>
           <StatusIndicator type={(runningJobs?.total ?? 0) > 0 ? 'in-progress' : 'stopped'}>
             {(runningJobs?.total ?? 0) > 0
               ? `${runningJobs?.total} 个任务训练中`
@@ -157,6 +162,13 @@ export function HomePage() {
       }
     >
       <SpaceBetween size="l">
+        {hasError && (
+          <InlineErrorState
+            message="部分平台数据加载失败，显示的指标可能不完整。"
+            onRetry={() => refetchJobs()}
+          />
+        )}
+
         {/* 关键指标 */}
         <ColumnLayout columns={4} minColumnWidth={170}>
           <MetricCard
@@ -236,7 +248,9 @@ export function HomePage() {
               <ColumnLayout columns={2} variant="text-grid">
                 <SpaceBetween size="xxs">
                   <Box variant="awsui-key-label">平台服务</Box>
-                  <StatusIndicator type="success">运行正常</StatusIndicator>
+                  <StatusIndicator type={hasError ? 'warning' : 'success'}>
+                    {hasError ? '无法获取' : '运行正常'}
+                  </StatusIndicator>
                 </SpaceBetween>
                 <SpaceBetween size="xxs">
                   <Box variant="awsui-key-label">调度器</Box>

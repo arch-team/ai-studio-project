@@ -17,7 +17,7 @@ spec:
     spec:
       containers:
         - name: frontend
-          image: 897473508751.dkr.ecr.us-east-1.amazonaws.com/ai-platform-dev-frontend:v1.0.15
+          image: 897473508751.dkr.ecr.us-east-1.amazonaws.com/ai-platform-dev-frontend:v1.0.19
           ports:
             - containerPort: 3000
               protocol: TCP

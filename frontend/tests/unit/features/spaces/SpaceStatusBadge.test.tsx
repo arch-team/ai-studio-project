@@ -21,7 +21,7 @@ describe('SpaceStatusBadge', () => {
 
   describe('状态映射', () => {
     const statusCases: { status: SpaceStatus; label: string }[] = [
-      { status: 'pending', label: '创建中' },
+      { status: 'pending', label: '启动中' },
       { status: 'running', label: '运行中' },
       { status: 'stopped', label: '已停止' },
       { status: 'failed', label: '失败' },

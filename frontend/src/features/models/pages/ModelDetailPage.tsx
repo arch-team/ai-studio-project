@@ -18,7 +18,7 @@ import {
 } from '@cloudscape-design/components';
 import { useCallback, useMemo } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { PageLayout } from '@shared/components';
+import { PageLayout, InlineErrorState } from '@shared/components';
 import { useModel, useArchiveModel, useRestoreModel } from '../api';
 import { ModelStatusBadge, RegistrySyncStatus } from '../components';
 import { MODEL_FRAMEWORK_LABELS } from '../types';
@@ -101,14 +101,16 @@ export function ModelDetailPage() {
     );
   }
 
-  // 错误状态
+  // 错误状态：保留页面骨架（标题/面包屑），提供重试
   if (error || !model) {
     return (
-      <Container>
-        <Box textAlign="center" color="text-status-error" padding="xl">
-          {error?.message || '模型不存在'}
-        </Box>
-      </Container>
+      <PageLayout title="模型详情" breadcrumbs={breadcrumbs}>
+        <InlineErrorState
+          title={error ? '加载失败' : '模型不存在'}
+          message={error?.message ?? '未找到该模型，它可能已被删除。'}
+          onRetry={error ? () => refetch() : undefined}
+        />
+      </PageLayout>
     );
   }
 

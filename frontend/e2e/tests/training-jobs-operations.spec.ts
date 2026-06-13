@@ -311,6 +311,15 @@ test.describe('训练任务操作', () => {
       { status: 'submitted', pause: false, resume: false, deleteDisabled: false },
     ] as const;
 
+    const STATUS_LABELS: Record<string, string> = {
+      submitted: '已提交',
+      running: '运行中',
+      paused: '已暂停',
+      preempted: '被抢占',
+      completed: '已完成',
+      failed: '已失败',
+    };
+
     for (const { status, pause, resume, deleteDisabled } of statusButtonMatrix) {
       test(`状态 "${status}" - 暂停:${pause}, 恢复:${resume}, 删除禁用:${deleteDisabled}`, async ({
         page,
@@ -323,6 +332,12 @@ test.describe('训练任务操作', () => {
         const detailPage = new TrainingJobDetailPage(page);
         await detailPage.goto(1);
         await detailPage.waitForContentLoad();
+
+        // 加固：等待状态标签渲染，确保详情数据已加载完成再断言按钮
+        // （共享环境慢响应时 h1 可见不代表详情查询已完成，曾导致 failed 用例偶发抖动）
+        await expect(page.getByText(STATUS_LABELS[status]).first()).toBeVisible({
+          timeout: 10000,
+        });
 
         // 检查暂停按钮
         if (pause) {

@@ -8,6 +8,7 @@ import {
   fetchResourceLimitConfigs,
   createResourceLimitConfig,
   updateResourceLimitConfig,
+  deleteResourceLimitConfig,
 } from './resourceQuotasApi';
 import type {
   ResourceLimitConfigFilters,
@@ -54,6 +55,23 @@ export function useUpdateResourceLimitConfig() {
       updateResourceLimitConfig(id, data),
     onSuccess: () => {
       // 更新成功后刷新列表
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.resourceQuotas.lists(),
+      });
+    },
+  });
+}
+
+/**
+ * 删除资源限制配置
+ */
+export function useDeleteResourceLimitConfig() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (id: number) => deleteResourceLimitConfig(id),
+    onSuccess: () => {
+      // 删除成功后刷新列表
       queryClient.invalidateQueries({
         queryKey: queryKeys.resourceQuotas.lists(),
       });

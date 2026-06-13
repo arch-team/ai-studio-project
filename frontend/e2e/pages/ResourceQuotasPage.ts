@@ -42,6 +42,11 @@ export class ResourceQuotasPage extends BasePage {
   readonly submitButton: Locator;
   readonly cancelButton: Locator;
 
+  // 删除确认 Modal 元素
+  readonly deleteModal: Locator;
+  readonly confirmDeleteButton: Locator;
+  readonly cancelDeleteButton: Locator;
+
   constructor(page: Page) {
     super(page);
 
@@ -86,6 +91,21 @@ export class ResourceQuotasPage extends BasePage {
     this.prioritySelect = page.getByText("选择优先级");
     this.submitButton = page.getByRole("button", { name: /创建|保存/ });
     this.cancelButton = page.getByRole("button", { name: "取消" });
+
+    // 删除确认 Modal
+    // 删除弹窗仅在打开时挂载，通过 role="dialog" + 标题/警告文本定位，
+    // 与表单 Modal 区分（删除弹窗含"此操作不可撤销"警告）
+    this.deleteModal = page
+      .getByRole("dialog")
+      .filter({ hasText: "此操作不可撤销" });
+    // 确认按钮文本"确认删除"，精确匹配避免与表单"创建/保存"混淆
+    this.confirmDeleteButton = this.deleteModal.getByRole("button", {
+      name: "确认删除",
+    });
+    // 取消按钮限定在删除弹窗内，避免与表单 Modal 的"取消"按钮冲突
+    this.cancelDeleteButton = this.deleteModal.getByRole("button", {
+      name: "取消",
+    });
   }
 
   /**
@@ -167,6 +187,50 @@ export class ResourceQuotasPage extends BasePage {
     const row = this.tableRows.filter({ hasText: configName });
     await row.getByRole("button", { name: "编辑" }).click();
     await this.configNameInput.waitFor({ state: "visible", timeout: 5000 });
+  }
+
+  /**
+   * 点击指定行的删除按钮，并等待删除确认 Modal 出现
+   *
+   * 操作列中"编辑""删除"两个按钮并存，按钮名精确定位避免误点编辑。
+   */
+  async clickDeleteAtRow(rowIndex: number) {
+    const deleteButton = this.tableRows
+      .nth(rowIndex)
+      .getByRole("button", { name: "删除" });
+    await deleteButton.click();
+    // 等待删除确认 Modal 出现
+    await this.deleteModal.waitFor({ state: "visible", timeout: 5000 });
+  }
+
+  /**
+   * 通过配置名称点击删除，并等待删除确认 Modal 出现
+   */
+  async clickDeleteByName(configName: string) {
+    const row = this.tableRows.filter({ hasText: configName });
+    await row.getByRole("button", { name: "删除" }).click();
+    await this.deleteModal.waitFor({ state: "visible", timeout: 5000 });
+  }
+
+  /**
+   * 在删除确认 Modal 中点击"确认删除"
+   */
+  async confirmDelete() {
+    await this.confirmDeleteButton.click();
+  }
+
+  /**
+   * 在删除确认 Modal 中点击"取消"
+   */
+  async cancelDelete() {
+    await this.cancelDeleteButton.click();
+  }
+
+  /**
+   * 等待删除确认 Modal 关闭
+   */
+  async waitForDeleteModalClose() {
+    await this.deleteModal.waitFor({ state: "hidden", timeout: 10000 });
   }
 
   /**

@@ -11,7 +11,10 @@ import structlog
 
 from src.modules.spaces.application.interfaces import ISageMakerSpacesClient
 from src.modules.spaces.domain.entities import Space
-from src.modules.spaces.domain.exceptions import DuplicateSpaceNameError
+from src.modules.spaces.domain.exceptions import (
+    DuplicateSpaceNameError,
+    InvalidSpaceStateError,
+)
 from src.modules.spaces.domain.repositories import ISpaceRepository
 from src.modules.spaces.domain.value_objects import (
     SpaceInstanceType,
@@ -79,7 +82,7 @@ class SpaceService(BaseApplicationService[Space, str]):
             updated_at=utc_now(),
         )
 
-        # 调用 SageMaker API 创建 Space，同时记录启动耗时
+        # 调用 SageMaker API 创建 Space（配置+存储），同时记录启动耗时
         ide_type = _IDE_TYPE_MAP.get(space_type, "jupyterlab")
         start_time = time.monotonic()
         result = await self._sagemaker_client.create_space(
@@ -89,6 +92,22 @@ class SpaceService(BaseApplicationService[Space, str]):
             lifecycle_config_arn=data.get("lifecycle_config_arn"),
             storage_size_gb=storage_size_gb,
         )
+
+        # 拉起 App 计算实例——Space 只是配置，App 才是真实计费资源
+        try:
+            await self._sagemaker_client.create_app(
+                space_name=space_name,
+                ide_type=ide_type,
+                instance_type=instance_type.value,
+                lifecycle_config_arn=data.get("lifecycle_config_arn"),
+            )
+        except Exception:
+            # 防止孤儿 SageMaker Space：App 拉起失败时尽力清理已创建的 Space
+            try:
+                await self._sagemaker_client.delete_space(space_name)
+            except Exception:
+                logger.warning("space_orphan_cleanup_failed", space_name=space_name)
+            raise
         elapsed_seconds = time.monotonic() - start_time
 
         # 记录 SageMaker ARN
@@ -123,42 +142,60 @@ class SpaceService(BaseApplicationService[Space, str]):
         space = await self._get_or_raise(space_id)
         return await self._sync_status_from_sagemaker(space)
 
-    # SageMaker Space 状态 → 平台状态映射（与 SpaceSyncService 保持一致）
-    _SDK_STATUS_MAP = {
+    # SageMaker App 状态 → 平台状态映射。
+    # App（计算实例）是真实计费资源和状态事实源：无 App / Deleted = 已停止。
+    _APP_STATUS_MAP = {
         "Pending": SpaceStatus.PENDING,
         "InService": SpaceStatus.RUNNING,
-        "Stopping": SpaceStatus.STOPPED,
-        "Stopped": SpaceStatus.STOPPED,
+        "Deleting": SpaceStatus.STOPPED,
+        "Deleted": SpaceStatus.STOPPED,
         "Failed": SpaceStatus.FAILED,
-        "Deleting": SpaceStatus.DELETED,
-        "Update_Failed": SpaceStatus.FAILED,
     }
 
-    async def _sync_status_from_sagemaker(self, space: Space) -> Space:
-        """按需将 SageMaker 实际状态对齐到本地实体（lazy sync）。
+    def _ide_type_of(self, space: Space) -> str:
+        return _IDE_TYPE_MAP.get(space.space_type, "jupyterlab")
 
-        创建后 SageMaker 侧状态独立演进（Pending→InService 等），平台无后台轮询时
-        本地状态会滞留在 pending，导致 stop/delete 被状态机拒绝。读写操作前调用本
-        方法消除偏差。对齐外部事实直接赋值，不走业务状态机。同步失败不阻塞主流程。
+    async def _ensure_app_not_deleting(self, space: Space, operation: str) -> None:
+        """App 处于 Deleting 时拒绝操作（SageMaker 侧会 ResourceInUse）.
+
+        Raises:
+            InvalidSpaceStateError: App 删除中，需等待完成后重试
+        """
+        try:
+            info = await self._sagemaker_client.describe_app(
+                space_name=space.space_name,
+                ide_type=self._ide_type_of(space),
+            )
+        except Exception:
+            return
+        if isinstance(info, dict) and info.get("status") == "Deleting":
+            raise InvalidSpaceStateError(
+                space_id=space.id or "",
+                current_state="stopping",
+                operation=operation,
+            )
+
+    async def _sync_status_from_sagemaker(self, space: Space) -> Space:
+        """按需将 SageMaker App 实际状态对齐到本地实体（lazy sync）。
+
+        App 计算实例的状态独立演进（Pending→InService、外部停止等），平台无后台
+        轮询时本地状态会滞留。读写操作前调用本方法消除偏差。对齐外部事实直接赋值，
+        不走业务状态机。同步失败不阻塞主流程。
         """
         if space.status == SpaceStatus.DELETED:
             return space
         try:
-            info = await self._sagemaker_client.describe_space(space.space_name)
+            info = await self._sagemaker_client.describe_app(
+                space_name=space.space_name,
+                ide_type=self._ide_type_of(space),
+            )
         except Exception as e:
             logger.warning("space_status_sync_failed", space_id=space.id, error=str(e))
             return space
 
-        if not isinstance(info, dict):
-            return space
-
-        mapped = self._SDK_STATUS_MAP.get(info.get("status", ""))
+        # App 不存在 = 无运行实例 = 已停止
+        mapped = self._APP_STATUS_MAP.get(info.get("status", "")) if isinstance(info, dict) else SpaceStatus.STOPPED
         if mapped is None or mapped == space.status:
-            return space
-
-        # "stopped" 是平台层语义（用户停用，SageMaker Space 本身始终 InService），
-        # 不能被 InService→running 回拉，否则 stop 后无法 delete
-        if space.status == SpaceStatus.STOPPED and mapped == SpaceStatus.RUNNING:
             return space
 
         logger.info(
@@ -197,23 +234,39 @@ class SpaceService(BaseApplicationService[Space, str]):
         return list(synced), total
 
     async def start_space(self, space_id: str) -> Space:
-        """启动开发空间."""
+        """启动开发空间——真实拉起 SageMaker App 计算实例.
+
+        同步后若 App 已在运行/启动中则幂等返回；否则 create_app 并置为
+        PENDING（启动中），后续读取经懒同步推进到 RUNNING。
+        """
         space = await self._get_or_raise(space_id)
         space = await self._sync_status_from_sagemaker(space)
-        space.start()
 
-        # 调用 SageMaker API 查询并确认 Space 存在，记录启动耗时
+        # 同步后已在运行或启动中：幂等返回，避免重复 create_app
+        if space.status in (SpaceStatus.RUNNING, SpaceStatus.PENDING):
+            return space
+
+        # 上一个 App 仍在删除中（停止后约 1 分钟窗口），create_app 会被
+        # SageMaker 以 ResourceInUse 拒绝，提前给出明确的 409
+        await self._ensure_app_not_deleting(space, operation="start")
+
+        # 校验状态机（failed/stopped 可启动），再真实拉起实例
+        space.mark_starting()
+
         start_time = time.monotonic()
-        sagemaker_info = await self._sagemaker_client.describe_space(space.space_name)
+        await self._sagemaker_client.create_app(
+            space_name=space.space_name,
+            ide_type=self._ide_type_of(space),
+            instance_type=space.instance_type.value,
+            lifecycle_config_arn=space.lifecycle_config_arn,
+        )
         elapsed_seconds = time.monotonic() - start_time
 
-        if sagemaker_info:
-            logger.info(
-                "space_starting",
-                space_id=space_id,
-                sagemaker_status=sagemaker_info.get("status"),
-                elapsed_seconds=round(elapsed_seconds, 2),
-            )
+        logger.info(
+            "space_starting",
+            space_id=space_id,
+            elapsed_seconds=round(elapsed_seconds, 2),
+        )
 
         # 检查是否超过启动 SLA
         if elapsed_seconds > STARTUP_SLA_SECONDS:
@@ -230,29 +283,61 @@ class SpaceService(BaseApplicationService[Space, str]):
         return await self._space_repository.update(space)
 
     async def stop_space(self, space_id: str) -> Space:
-        """停止开发空间."""
+        """停止开发空间——真实删除 SageMaker App 释放计算实例（EBS 文件保留）."""
         space = await self._get_or_raise(space_id)
         space = await self._sync_status_from_sagemaker(space)
+
+        # 同步后发现 App 已不在（外部停止）：幂等返回
+        if space.status == SpaceStatus.STOPPED:
+            return space
+
         space.stop()
 
-        # 查询 SageMaker Space 当前状态
-        sagemaker_info = await self._sagemaker_client.describe_space(space.space_name)
-        if sagemaker_info:
-            logger.info(
-                "space_stopping",
-                space_id=space_id,
-                sagemaker_status=sagemaker_info.get("status"),
-            )
+        await self._sagemaker_client.delete_app(
+            space_name=space.space_name,
+            ide_type=self._ide_type_of(space),
+        )
+
+        logger.info("space_stopping", space_id=space_id, space_name=space.space_name)
 
         return await self._space_repository.update(space)
 
-    async def delete_space(self, space_id: str) -> None:
-        """删除开发空间 (软删除)."""
+    async def get_space_access_url(self, space_id: str) -> str:
+        """签发空间 IDE 的免登录访问 URL（仅运行中可用）.
+
+        Raises:
+            InvalidSpaceStateError: 空间非运行中（无可访问的计算实例）
+        """
         space = await self._get_or_raise(space_id)
         space = await self._sync_status_from_sagemaker(space)
+
+        if space.status != SpaceStatus.RUNNING:
+            raise InvalidSpaceStateError(
+                space_id=space.id or "",
+                current_state=space.status.value,
+                operation="open",
+            )
+
+        return await self._sagemaker_client.create_presigned_url(
+            space_name=space.space_name,
+            ide_type=self._ide_type_of(space),
+        )
+
+    async def delete_space(self, space_id: str) -> None:
+        """删除开发空间——清理 App 后删除 SageMaker Space（含 EBS 数据）."""
+        space = await self._get_or_raise(space_id)
+        space = await self._sync_status_from_sagemaker(space)
+
+        # App 删除中时 SageMaker DeleteSpace 会被 ResourceInUse 拒绝，提前 409
+        await self._ensure_app_not_deleting(space, operation="delete")
+
         space.delete()
 
-        # 调用 SageMaker API 删除 Space
+        # 先确保 App 已清理（delete_app 对不存在的 App 幂等），再删 Space
+        await self._sagemaker_client.delete_app(
+            space_name=space.space_name,
+            ide_type=self._ide_type_of(space),
+        )
         await self._sagemaker_client.delete_space(space.space_name)
 
         logger.info("space_deleted", space_id=space_id, space_name=space.space_name)
@@ -279,21 +364,12 @@ class SpaceService(BaseApplicationService[Space, str]):
             await asyncio.sleep(self._sync_interval)
 
     async def _sync_all_active_spaces(self) -> None:
-        """同步所有非终态 Space 的状态。"""
+        """同步所有非终态 Space 的状态（以 App 计算实例为事实源）。"""
         active_statuses = [SpaceStatus.PENDING, SpaceStatus.RUNNING]
         spaces = await self._space_repository.list_by_statuses(active_statuses)
         for space in spaces:
             try:
-                info = await self._sagemaker_client.describe_space(space.space_name)
-                if info and info.get("status"):
-                    sagemaker_status = info["status"].lower()
-                    # 映射 SageMaker 状态到平台状态
-                    if sagemaker_status == "inservice" and space.status == SpaceStatus.PENDING:
-                        space.start()
-                        await self._space_repository.update(space)
-                    elif sagemaker_status == "failed":
-                        space.mark_failed(error_message=info.get("failure_reason", "Unknown"))
-                        await self._space_repository.update(space)
+                await self._sync_status_from_sagemaker(space)
             except Exception:
                 logger.warning("space_sync_single_failed", space_id=space.id)
 

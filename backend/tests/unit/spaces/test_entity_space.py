@@ -347,3 +347,38 @@ class TestStateTransitionMatrix:
         valid = SPACE_STATE_TRANSITIONS[SpaceStatus.PENDING]
         assert SpaceStatus.RUNNING in valid
         assert SpaceStatus.FAILED in valid
+
+
+class TestSpaceRestartTransitions:
+    """重启语义: 真实 App 启动需要时间，STOPPED 先进入 PENDING（启动中）."""
+
+    @pytest.fixture
+    def stopped_space(self) -> Space:
+        space = Space(id="uuid", space_name="test", owner_id=1)
+        space.transition_to(SpaceStatus.RUNNING)
+        space.transition_to(SpaceStatus.STOPPED)
+        return space
+
+    def test_stopped_to_pending_valid(self, stopped_space: Space) -> None:
+        """STOPPED -> PENDING 是合法转换（重启拉起 App）."""
+        assert stopped_space.can_transition_to(SpaceStatus.PENDING)
+        stopped_space.transition_to(SpaceStatus.PENDING)
+        assert stopped_space.status == SpaceStatus.PENDING
+
+    def test_mark_starting_from_stopped(self, stopped_space: Space) -> None:
+        """mark_starting 将 STOPPED 置为 PENDING."""
+        stopped_space.mark_starting()
+        assert stopped_space.status == SpaceStatus.PENDING
+
+    def test_mark_starting_when_pending_is_noop(self) -> None:
+        """已处于 PENDING（App 启动中）时 mark_starting 幂等."""
+        space = Space(id="uuid", space_name="test", owner_id=1)
+        space.mark_starting()
+        assert space.status == SpaceStatus.PENDING
+
+    def test_mark_starting_when_running_raises(self) -> None:
+        """RUNNING 状态不能再次启动."""
+        space = Space(id="uuid", space_name="test", owner_id=1)
+        space.transition_to(SpaceStatus.RUNNING)
+        with pytest.raises(InvalidStateTransitionError):
+            space.mark_starting()

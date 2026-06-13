@@ -26,7 +26,7 @@ import type {
   DateRangePickerProps,
   SelectProps,
 } from "@cloudscape-design/components";
-import { PageLayout } from "@shared/components";
+import { PageLayout, InlineErrorState } from "@shared/components";
 import { useResourceUsage, useExportReport } from "../api";
 
 // 面包屑（模块级常量，避免每次渲染创建新引用）
@@ -272,14 +272,12 @@ export function ResourceUsageReportPage() {
     [groupBy],
   );
 
-  // === 错误处理 ===
+  // === 错误处理：保留页面骨架（标题/面包屑），提供重试 ===
   if (error) {
     return (
-      <Container>
-        <Box textAlign="center" color="text-status-error" padding="xl">
-          加载失败: {error.message}
-        </Box>
-      </Container>
+      <PageLayout title="资源使用报表" breadcrumbs={BREADCRUMBS}>
+        <InlineErrorState message={error.message} onRetry={() => refetch()} />
+      </PageLayout>
     );
   }
 

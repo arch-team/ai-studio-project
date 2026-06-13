@@ -62,7 +62,7 @@ STACK_SPECIFIC_SUPPRESSIONS: dict[str, list[NagSuppression]] = {
         ),
         NagSuppression(
             id="AwsSolutions-IAM5",
-            reason="Wildcard permissions required for Lambda log retention custom resource",
+            reason="Wildcard permissions required for Lambda log retention custom resource and AMP query wildcards (workspace/*)",
         ),
     ],
     "storage": [

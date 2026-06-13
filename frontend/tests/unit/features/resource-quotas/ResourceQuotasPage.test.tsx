@@ -55,11 +55,13 @@ const mockListResponse: ResourceLimitConfigListResponse = {
 const mockUseResourceLimitConfigs = vi.fn();
 const mockUseCreateResourceLimitConfig = vi.fn();
 const mockUseUpdateResourceLimitConfig = vi.fn();
+const mockUseDeleteResourceLimitConfig = vi.fn();
 
 vi.mock('@features/resource-quotas/api', () => ({
   useResourceLimitConfigs: () => mockUseResourceLimitConfigs(),
   useCreateResourceLimitConfig: () => mockUseCreateResourceLimitConfig(),
   useUpdateResourceLimitConfig: () => mockUseUpdateResourceLimitConfig(),
+  useDeleteResourceLimitConfig: () => mockUseDeleteResourceLimitConfig(),
 }));
 
 describe('ResourceQuotasPage', () => {
@@ -79,6 +81,11 @@ describe('ResourceQuotasPage', () => {
     });
 
     mockUseUpdateResourceLimitConfig.mockReturnValue({
+      mutate: vi.fn(),
+      isPending: false,
+    });
+
+    mockUseDeleteResourceLimitConfig.mockReturnValue({
       mutate: vi.fn(),
       isPending: false,
     });
@@ -262,6 +269,69 @@ describe('ResourceQuotasPage', () => {
         expect(screen.getByRole('dialog')).toBeInTheDocument();
       });
       expect(screen.getByText(/编辑资源配额/i)).toBeInTheDocument();
+    });
+  });
+
+  describe('删除配额 Modal', () => {
+    it('should display delete action button for each row', () => {
+      renderWithProviders(<ResourceQuotasPage />);
+
+      const deleteButtons = screen.getAllByRole('button', { name: /删除/i });
+      expect(deleteButtons.length).toBe(2); // 每行一个
+    });
+
+    it('should open confirm modal with config name when clicking delete', async () => {
+      renderWithProviders(<ResourceQuotasPage />);
+
+      const deleteButtons = screen.getAllByRole('button', { name: /删除/i });
+      fireEvent.click(deleteButtons[0]);
+
+      // 二次确认弹窗出现：不可撤销警告 + 待删配置名 + 确认删除按钮
+      await waitFor(() => {
+        expect(screen.getByText(/此操作不可撤销/i)).toBeInTheDocument();
+      });
+      expect(
+        screen.getByRole('button', { name: /确认删除/i })
+      ).toBeInTheDocument();
+      // 显示待删配置名（表格内已有一处，弹窗内再出现，因此 >= 2）
+      expect(screen.getAllByText('高级工程师配额').length).toBeGreaterThanOrEqual(2);
+    });
+
+    it('should call delete mutation with config id on confirm', async () => {
+      const mockMutate = vi.fn();
+      mockUseDeleteResourceLimitConfig.mockReturnValue({
+        mutate: mockMutate,
+        isPending: false,
+      });
+
+      renderWithProviders(<ResourceQuotasPage />);
+
+      const deleteButtons = screen.getAllByRole('button', { name: /删除/i });
+      fireEvent.click(deleteButtons[0]);
+
+      // 等待弹窗内"确认删除"按钮出现后点击
+      const confirmButton = await screen.findByRole('button', {
+        name: /确认删除/i,
+      });
+      fireEvent.click(confirmButton);
+
+      expect(mockMutate).toHaveBeenCalledTimes(1);
+      // 第一个参数为配置 id (number)
+      expect(mockMutate.mock.calls[0][0]).toBe(mockQuotas[0].id);
+    });
+
+    it('should have cancel button in delete modal', async () => {
+      renderWithProviders(<ResourceQuotasPage />);
+
+      const deleteButtons = screen.getAllByRole('button', { name: /删除/i });
+      fireEvent.click(deleteButtons[0]);
+
+      await waitFor(() => {
+        expect(screen.getByText(/此操作不可撤销/i)).toBeInTheDocument();
+      });
+
+      // 弹窗内含"取消"按钮（表单弹窗 footer 也含同名按钮常驻 DOM，故 >= 1）
+      expect(screen.getAllByRole('button', { name: /取消/i }).length).toBeGreaterThanOrEqual(1);
     });
   });
 

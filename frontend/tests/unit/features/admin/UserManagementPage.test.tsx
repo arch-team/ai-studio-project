@@ -164,11 +164,34 @@ describe('UserManagementPage', () => {
       mockUseUsers.mockReturnValue({
         data: undefined,
         isLoading: false,
-        error: new Error('Network error'),
+        error: new Error('服务器内部错误'),
+        refetch: vi.fn(),
       });
 
       renderWithProviders(<UserManagementPage />);
       expect(screen.getByText(/加载失败/i)).toBeInTheDocument();
+      // 错误态保留页面骨架（标题/面包屑）
+      expect(screen.getByRole('heading', { name: /用户管理/i })).toBeInTheDocument();
+    });
+
+    it('should render retry button and invoke refetch on click', async () => {
+      const mockRefetch = vi.fn();
+      mockUseUsers.mockReturnValue({
+        data: undefined,
+        isLoading: false,
+        error: new Error('服务器内部错误'),
+        refetch: mockRefetch,
+      });
+
+      renderWithProviders(<UserManagementPage />);
+
+      const retryButton = await screen.findByRole('button', { name: /重试/i });
+      expect(retryButton).toBeInTheDocument();
+
+      fireEvent.click(retryButton);
+      await waitFor(() => {
+        expect(mockRefetch).toHaveBeenCalled();
+      });
     });
   });
 

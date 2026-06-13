@@ -4,8 +4,12 @@ from dataclasses import dataclass
 from datetime import datetime
 from functools import lru_cache
 from typing import Any
+from urllib.parse import quote, urlencode
 
+import boto3
 import httpx
+from botocore.auth import SigV4Auth
+from botocore.awsrequest import AWSRequest
 
 from src.shared.domain.problem import Problem, problem
 from src.shared.infrastructure import get_settings
@@ -24,24 +28,75 @@ class PrometheusQueryError(Problem):
 class PrometheusClient(IPrometheusClient):
     """Prometheus HTTP API 客户端实现."""
 
-    def __init__(self, endpoint: str | None = None, timeout: float = 30.0):
+    def __init__(
+        self,
+        endpoint: str | None = None,
+        timeout: float = 30.0,
+        use_sigv4: bool | None = None,
+    ):
         """初始化 Prometheus 客户端.
 
         Args:
-            endpoint: Prometheus 端点 URL
+            endpoint: Prometheus 端点 URL。回退链: amp_query_endpoint → prometheus_endpoint → 本地默认
             timeout: 请求超时时间（秒）
+            use_sigv4: 是否对请求做 AWS SigV4 签名（查询 Amazon Managed Prometheus 必须）。
+                显式传入优先；否则按端点是否含 "aps-workspaces" 自动判定。
         """
         settings = get_settings()
-        self._endpoint = endpoint or getattr(settings, "prometheus_endpoint", "http://localhost:9090")
+        self._endpoint = (
+            endpoint
+            or getattr(settings, "amp_query_endpoint", None)
+            or getattr(settings, "prometheus_endpoint", None)
+            or "http://localhost:9090"
+        )
         self._timeout = timeout
+        self._region = getattr(settings, "amp_region", "us-east-1")
+        self._use_sigv4 = use_sigv4 if use_sigv4 is not None else ("aps-workspaces" in self._endpoint)
+        # 复用 session；凭证由 botocore 自身缓存。无凭证环境延迟到签名时才获取，避免构造时崩溃。
+        self._session = boto3.Session()
+
+    def _sign_headers(self, method: str, url: str) -> dict[str, str]:
+        """对发往 AMP 的请求做 SigV4 签名，返回需附加到 HTTP 请求的签名头.
+
+        Args:
+            method: HTTP 方法
+            url: 含 query string 的完整请求 URL（签名必须作用于最终 URL）
+        """
+        credentials = self._session.get_credentials()
+        aws_request = AWSRequest(method=method, url=url)
+        SigV4Auth(credentials, "aps", self._region).add_auth(aws_request)
+        return dict(aws_request.headers)
+
+    @staticmethod
+    def _build_url(url: str, params: dict[str, Any]) -> str:
+        """将 params 编码进 query string 拼成完整 URL，空格编码为 %20（AWS SigV4 兼容）。
+
+        SigV4 要求"签名计算用的 canonical query string"与"服务端从实际请求重建的 canonical"
+        完全一致。httpx 默认按 form-urlencoded 把空格编码为 `+`，而 AWS 规范要求 `%20`，
+        二者会导致含空格/特殊字符的 query（如即时查询表达式）签名不匹配而返回 403。
+        故在此用 quote（默认空格→%20）统一编码，供签名与发送共用同一 URL。
+        """
+        return f"{url}?{urlencode(params, quote_via=quote)}"
+
+    async def _signed_get(self, client: httpx.AsyncClient, url: str, params: dict[str, Any]) -> httpx.Response:
+        """对 AMP 启用 SigV4 签名的 GET 请求；本地端点不签名。
+
+        签名与发送使用完全相同的完整 URL（含已编码 query string），避免 httpx 二次编码
+        导致签名 URL 与实际发送 URL 不一致。
+        """
+        full_url = self._build_url(url, params)
+        headers: dict[str, str] = {}
+        if self._use_sigv4:
+            headers = self._sign_headers("GET", full_url)
+        return await client.get(full_url, headers=headers)
 
     async def query_instant(self, query: str) -> list[dict[str, Any]]:
         """执行即时查询."""
         url = f"{self._endpoint}/api/v1/query"
-        params = {"query": query}
+        params: dict[str, Any] = {"query": query}
 
         async with httpx.AsyncClient(timeout=self._timeout) as client:
-            response = await client.get(url, params=params)
+            response = await self._signed_get(client, url, params)
             response.raise_for_status()
             data = response.json()
 
@@ -60,7 +115,7 @@ class PrometheusClient(IPrometheusClient):
     ) -> list[dict[str, Any]]:
         """执行范围查询."""
         url = f"{self._endpoint}/api/v1/query_range"
-        params: dict[str, str | float] = {
+        params: dict[str, Any] = {
             "query": query,
             "start": start.timestamp(),
             "end": end.timestamp(),
@@ -68,7 +123,7 @@ class PrometheusClient(IPrometheusClient):
         }
 
         async with httpx.AsyncClient(timeout=self._timeout) as client:
-            response = await client.get(url, params=params)
+            response = await self._signed_get(client, url, params)
             response.raise_for_status()
             data = response.json()
 

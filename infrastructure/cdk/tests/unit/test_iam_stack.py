@@ -99,6 +99,36 @@ class TestBackendServiceRole:
         """验证后端服务角色可访问."""
         assert iam_stack.backend_service_role is not None
 
+    def test_backend_role_amp_query_access(self, template: Template) -> None:
+        """验证后端服务角色具备 AMP (Amazon Managed Prometheus) 查询权限."""
+        template.has_resource_properties(
+            "AWS::IAM::Policy",
+            {
+                "PolicyDocument": Match.object_like(
+                    {
+                        "Statement": Match.array_with(
+                            [
+                                Match.object_like(
+                                    {
+                                        "Action": Match.array_with(
+                                            [
+                                                "aps:QueryMetrics",
+                                                "aps:GetSeries",
+                                                "aps:GetLabels",
+                                                "aps:GetMetricMetadata",
+                                            ]
+                                        ),
+                                        "Effect": "Allow",
+                                        "Sid": "AmpQueryAccess",
+                                    }
+                                )
+                            ]
+                        )
+                    }
+                )
+            },
+        )
+
 
 class TestIamPolicies:
     """IAM 策略测试."""

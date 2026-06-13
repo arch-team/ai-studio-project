@@ -135,3 +135,9 @@ export function generateTestSpaceName(prefix = 'e2e'): string {
   const rand = Math.random().toString(36).slice(2, 6);
   return `${prefix}-${ts}-${rand}`;
 }
+
+/**
+ * 审计 space-detail 页固定使用的空间 ID
+ * （改用命名常量消除对 mockSpaces 数组顺序的依赖；指向 running-jupyter-space）
+ */
+export const AUDIT_SPACE_DETAIL_ID = '11111111-1111-1111-1111-111111111111';

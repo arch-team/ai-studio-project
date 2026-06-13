@@ -14,6 +14,7 @@ import type {
 import {
   fetchSpaces,
   fetchSpace,
+  fetchSpaceAccessUrl,
   createSpace,
   updateSpace,
   deleteSpace,
@@ -30,6 +31,11 @@ export function useSpaces(filters: SpaceFilters = {}) {
   return useQuery({
     queryKey: queryKeys.spaces.list(filters as Record<string, unknown>),
     queryFn: () => fetchSpaces(filters),
+    // 启动/创建后 App 拉起需 1-3 分钟，存在启动中条目时轮询推进状态
+    refetchInterval: (query) => {
+      const items = query.state.data?.items ?? [];
+      return items.some((s) => s.status === 'pending') ? 10_000 : false;
+    },
   });
 }
 
@@ -102,6 +108,42 @@ export function useStartSpace() {
     onSuccess: (result) => {
       queryClient.setQueryData(queryKeys.spaces.detail(result.id), result);
       queryClient.invalidateQueries({ queryKey: queryKeys.spaces.lists() });
+    },
+  });
+}
+
+/**
+ * 打开空间 IDE：签发 presigned URL 并在新标签页打开。
+ *
+ * window.open 必须在用户手势同步触发后调用，否则被浏览器拦截；
+ * 先同步开空白窗口占位，URL 返回后再写入地址。
+ * 注意不能传 'noopener' 特性——按规范会使 window.open 返回 null，
+ * 拿不到引用就无法写入 URL（新页停留空白）；改为手动置空 opener。
+ */
+export function useOpenSpaceIDE() {
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const win = window.open('about:blank', '_blank');
+      if (!win) {
+        throw new Error('浏览器拦截了弹出窗口，请允许本站点打开新窗口后重试');
+      }
+      win.opener = null;
+      try {
+        const { url } = await fetchSpaceAccessUrl(id);
+        // 仅允许跳转 SageMaker Studio 域，防止开放重定向
+        const parsed = new URL(url);
+        const isTrusted =
+          parsed.protocol === 'https:' &&
+          parsed.hostname.endsWith('.sagemaker.aws');
+        if (!isTrusted) {
+          throw new Error('访问地址不可信，已阻止跳转');
+        }
+        win.location.href = url;
+        return url;
+      } catch (error) {
+        win.close();
+        throw error;
+      }
     },
   });
 }

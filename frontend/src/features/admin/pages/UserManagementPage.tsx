@@ -16,7 +16,7 @@ import {
   StatusIndicator,
   Table,
 } from "@cloudscape-design/components";
-import { PageLayout } from "@shared/components";
+import { PageLayout, InlineErrorState } from "@shared/components";
 import { useUsers, useCreateUser, useUpdateUser } from "../hooks";
 
 // 面包屑（模块级常量，避免每次渲染创建新引用）
@@ -108,7 +108,7 @@ export function UserManagementPage({ embedded = false }: UserManagementPageProps
   }, [currentPage, roleFilter, statusFilter]);
 
   // 数据查询
-  const { data, isLoading, error } = useUsers(filters);
+  const { data, isLoading, error, refetch } = useUsers(filters);
 
   // 创建/更新 mutations
   const createMutation = useCreateUser();
@@ -207,11 +207,9 @@ export function UserManagementPage({ embedded = false }: UserManagementPageProps
 
   if (error) {
     return (
-      <Container>
-        <Box textAlign="center" color="text-status-error" padding="xl">
-          加载失败: {error.message}
-        </Box>
-      </Container>
+      <PageLayout title="用户管理" breadcrumbs={BREADCRUMBS}>
+        <InlineErrorState message={error.message} onRetry={() => refetch()} />
+      </PageLayout>
     );
   }
 

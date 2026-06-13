@@ -15,12 +15,41 @@
  * 注意: 测试串行执行（生命周期有顺序依赖），共享一个测试空间以减少 AWS 资源开销
  */
 
+import { execFileSync } from 'node:child_process';
 import { test, expect, APIRequestContext } from '@playwright/test';
 import { SpacesPage } from '../pages/SpacesPage';
 import { loginViaUI, TEST_CREDENTIALS } from '../utils/auth';
 import { generateTestSpaceName } from '../fixtures/spaces';
 
 const isRemote = !!process.env.E2E_BASE_URL;
+
+/**
+ * AWS 侧事实断言: 直接查 SageMaker DescribeApp 验证计算实例真实状态。
+ * 平台契约要求停止 = 真实释放实例，启动 = 真实拉起实例，
+ * 仅靠平台 API 无法证明，必须对照 AWS 原生 API。
+ */
+function describeSageMakerAppStatus(spaceName: string): string | null {
+  try {
+    const out = execFileSync(
+      'aws',
+      [
+        'sagemaker', 'describe-app',
+        '--domain-id', 'd-i3e6cqfdqszw',
+        '--space-name', spaceName,
+        '--app-type', 'JupyterLab',
+        '--app-name', 'default',
+        '--region', 'us-east-1',
+        '--query', 'Status',
+        '--output', 'text',
+      ],
+      { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] },
+    );
+    return out.trim();
+  } catch {
+    // ResourceNotFound = App 不存在 = 无运行实例
+    return null;
+  }
+}
 
 // 整个文件串行执行
 test.describe.configure({ mode: 'serial' });
@@ -124,7 +153,8 @@ test.describe('开发空间 - 远程环境完整生命周期', () => {
 
     await spacesPage.fillCreateForm({
       name: spaceName,
-      // 默认 jupyter + ml.g5.xlarge，存储用最小 5GB 控制成本
+      // CPU 小实例: 启动快（GPU 冷启动 >5min 会超时）且控制成本
+      instanceTypeLabel: 'ml.t3.medium (2 vCPU, 4 GB)',
       storageGb: '5',
     });
     await spacesPage.submitCreateForm();
@@ -188,7 +218,47 @@ test.describe('开发空间 - 远程环境完整生命周期', () => {
     await expect(page.getByText('SageMaker ARN')).toBeVisible();
   });
 
-  test('5. UI 停止空间 → 状态变为已停止', async ({ page }) => {
+  test('4c. 打开 IDE: access-url 返回真实可达的 Studio 地址', async ({
+    page,
+    request,
+  }) => {
+    // API 契约: 签发 presigned URL
+    const res = await request.post(`/api/v1/spaces/${spaceId}/access-url`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    expect(res.ok(), `access-url 失败: ${res.status()}`).toBe(true);
+    const { url } = await res.json();
+    expect(url).toMatch(/^https:\/\/.+\.sagemaker\.aws\/auth\?token=/);
+
+    // URL 真实可达（跳转后落在 Studio 域，而非 AWS 登录页）
+    const resp = await page.goto(url, { waitUntil: 'domcontentloaded' });
+    expect(resp?.status(), 'presigned URL 应可访问').toBeLessThan(400);
+    await page.waitForLoadState('networkidle').catch(() => {});
+    expect(page.url()).toContain('sagemaker.aws');
+    expect(page.url()).not.toContain('signin.aws.amazon.com');
+
+    // UI 真实点击: 「打开」必须实际弹出新页并导航到 Studio 域。
+    // 回归缺陷: window.open 带 noopener 返回 null 导致新页停留 about:blank
+    const spacesPage = new SpacesPage(page);
+    await loginViaUI(page);
+    await spacesPage.goto();
+    await spacesPage.waitForPageReady();
+    expect(await spacesPage.hasRowAction(spaceName, '打开')).toBe(true);
+
+    const popupPromise = page.waitForEvent('popup', { timeout: 30_000 });
+    await spacesPage.clickRowAction(spaceName, '打开');
+    const popup = await popupPromise;
+    await popup.waitForURL(/sagemaker\.aws/, { timeout: 30_000 });
+    expect(popup.url()).toContain('sagemaker.aws');
+    await popup.close();
+  });
+
+  test('5. UI 停止空间 → 状态变为已停止且 AWS 侧实例真实释放', async ({
+    page,
+  }) => {
+    // 前置: AWS 侧 App 应为 InService
+    expect(describeSageMakerAppStatus(spaceName)).toBe('InService');
+
     const spacesPage = new SpacesPage(page);
     await loginViaUI(page);
     await spacesPage.goto();
@@ -208,9 +278,25 @@ test.describe('开发空间 - 远程环境完整生命周期', () => {
 
     expect(await spacesPage.hasRowAction(spaceName, '启动')).toBe(true);
     expect(await spacesPage.hasRowAction(spaceName, '删除')).toBe(true);
+
+    // AWS 侧事实: App 必须已进入删除流程（实例释放），不能仍 InService
+    await expect
+      .poll(() => describeSageMakerAppStatus(spaceName), { timeout: 60_000 })
+      .toMatch(/Deleting|Deleted|^$|null/);
   });
 
-  test('6. UI 重新启动空间 → 状态恢复运行中', async ({ page }) => {
+  test('6. UI 重新启动空间 → AWS 侧实例真实拉起并恢复运行中', async ({
+    page,
+    request,
+  }) => {
+    // 等待上一步 delete_app 完成（Deleting → Deleted），才能重新 create_app
+    await expect
+      .poll(() => describeSageMakerAppStatus(spaceName), {
+        timeout: 120_000,
+        intervals: [5000],
+      })
+      .not.toBe('Deleting');
+
     const spacesPage = new SpacesPage(page);
     await loginViaUI(page);
     await spacesPage.goto();
@@ -218,13 +304,26 @@ test.describe('开发空间 - 远程环境完整生命周期', () => {
 
     await spacesPage.clickRowAction(spaceName, '启动');
 
+    // 启动是异步拉起：先进入启动中，经懒同步推进到运行中（App 冷启动约 1-3 分钟）
+    const detail = await waitForSpaceStatus(
+      request,
+      token,
+      spaceId,
+      'running',
+      300_000,
+    );
+    expect(detail.status).toBe('running');
+
+    // AWS 侧事实: App 重新 InService（真实计算实例已拉起）
+    expect(describeSageMakerAppStatus(spaceName)).toBe('InService');
+
+    // UI 同步显示运行中
+    await spacesPage.goto();
+    await spacesPage.waitForPageReady();
     await expect
-      .poll(
-        async () => {
-          return spacesPage.getStatusOfSpace(spaceName);
-        },
-        { timeout: 60_000 },
-      )
+      .poll(async () => spacesPage.getStatusOfSpace(spaceName), {
+        timeout: 30_000,
+      })
       .toContain('运行中');
   });
 
@@ -248,6 +347,14 @@ test.describe('开发空间 - 远程环境完整生命周期', () => {
         timeout: 30_000,
       })
       .toContain('已停止');
+
+    // 等待 AWS 侧 App 删除完成（Deleting 期间 DeleteSpace 会被拒绝）
+    await expect
+      .poll(() => describeSageMakerAppStatus(spaceName), {
+        timeout: 120_000,
+        intervals: [5000],
+      })
+      .not.toBe('Deleting');
 
     // 删除（带确认弹窗）
     await spacesPage.deleteSpace(spaceName);

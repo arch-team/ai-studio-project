@@ -13,6 +13,7 @@
 
 import { useState, useMemo } from "react";
 import {
+  Alert,
   Box,
   ColumnLayout,
   Container,
@@ -35,7 +36,7 @@ import {
   useAlerts,
   useMetricSeries,
 } from "../api";
-import { PageLayout } from "@shared/components";
+import { PageLayout, InlineErrorState } from "@shared/components";
 import { MetricsCharts } from "../components";
 
 // 面包屑（模块级常量，避免每次渲染创建新引用）
@@ -49,7 +50,7 @@ import {
   DATE_RANGE_PICKER_I18N,
 } from "@shared/utils";
 import type {
-  Alert,
+  Alert as AlertData,
   ClusterSummary,
   ResourceUtilization,
   MetricFilters,
@@ -82,9 +83,8 @@ const REFRESH_INTERVAL_OPTIONS = [
   { id: "5m", text: "5分钟" },
 ];
 
-// Grafana 配置 (可从环境变量读取)
+// Grafana 静态配置 (baseUrl 在组件内动态读取环境变量，以支持运行时降级判断)
 const GRAFANA_CONFIG = {
-  baseUrl: import.meta.env.VITE_GRAFANA_URL || "/grafana",
   dashboardId: "cluster-overview",
   orgId: 1,
 };
@@ -290,8 +290,17 @@ function GrafanaDashboard({
   refreshInterval?: number;
   visible: boolean;
 }) {
+  // 动态读取环境变量，判断 Grafana 是否真正配置
+  // 注意: fallback "/grafana" 在 dev 环境是死链，不视为"已配置"
+  const grafanaBaseUrl = import.meta.env.VITE_GRAFANA_URL;
+  const isGrafanaConfigured = Boolean(grafanaBaseUrl);
+
   // 构建 Grafana URL (必须在条件返回之前调用 Hook)
   const grafanaUrl = useMemo(() => {
+    if (!grafanaBaseUrl) {
+      return "";
+    }
+
     const params = new URLSearchParams({
       orgId: String(GRAFANA_CONFIG.orgId),
       from: new Date(startTime).getTime().toString(),
@@ -304,11 +313,30 @@ function GrafanaDashboard({
       params.append("refresh", `${Math.floor(refreshInterval / 1000)}s`);
     }
 
-    return `${GRAFANA_CONFIG.baseUrl}/d/${GRAFANA_CONFIG.dashboardId}?${params.toString()}`;
-  }, [startTime, endTime, refreshInterval]);
+    return `${grafanaBaseUrl}/d/${GRAFANA_CONFIG.dashboardId}?${params.toString()}`;
+  }, [grafanaBaseUrl, startTime, endTime, refreshInterval]);
 
   if (!visible) {
     return null;
+  }
+
+  // 未配置 Grafana: 优雅降级，展示引导文案而非死链 iframe
+  // 文案分层: 对终端用户说"还能去哪看数据"，运维提示不暴露 env 变量名
+  if (!isGrafanaConfigured) {
+    return (
+      <Container header={<Header variant="h2">Grafana 仪表盘</Header>}>
+        <Alert type="info" header="Grafana 监控大盘未启用">
+          <SpaceBetween size="xs">
+            <Box variant="p">
+              实时监控大盘尚未启用。您仍可在「概览」与「指标趋势」标签页查看集群状态、资源利用率和指标趋势。
+            </Box>
+            <Box variant="small" color="text-body-secondary">
+              管理员可配置监控大盘地址以启用此功能。
+            </Box>
+          </SpaceBetween>
+        </Alert>
+      </Container>
+    );
   }
 
   return (
@@ -345,12 +373,12 @@ function GrafanaDashboard({
 /**
  * 告警面板
  */
-function AlertsPanel({ alerts }: { alerts: Alert[] }) {
+function AlertsPanel({ alerts }: { alerts: AlertData[] }) {
   const columnDefinitions = [
     {
       id: "severity",
       header: "级别",
-      cell: (item: Alert) => (
+      cell: (item: AlertData) => (
         <StatusIndicator type={ALERT_SEVERITY_COLORS[item.severity]}>
           {ALERT_SEVERITY_LABELS[item.severity]}
         </StatusIndicator>
@@ -360,24 +388,24 @@ function AlertsPanel({ alerts }: { alerts: Alert[] }) {
     {
       id: "title",
       header: "告警",
-      cell: (item: Alert) => item.title,
+      cell: (item: AlertData) => item.title,
     },
     {
       id: "resource",
       header: "资源",
-      cell: (item: Alert) => item.resource_type,
+      cell: (item: AlertData) => item.resource_type,
       width: 100,
     },
     {
       id: "fired_at",
       header: "触发时间",
-      cell: (item: Alert) => formatDateTimeShort(item.fired_at),
+      cell: (item: AlertData) => formatDateTimeShort(item.fired_at),
       width: 150,
     },
     {
       id: "status",
       header: "状态",
-      cell: (item: Alert) => (
+      cell: (item: AlertData) => (
         <StatusIndicator
           type={item.status === "resolved" ? "success" : "warning"}
         >
@@ -461,6 +489,7 @@ export function MonitoringDashboardPage() {
     data: clustersData,
     isLoading: clustersLoading,
     error: clustersError,
+    refetch,
   } = useClusters();
 
   // 资源利用率
@@ -494,13 +523,16 @@ export function MonitoringDashboardPage() {
   const alerts = alertsData?.items || [];
 
   // === 错误处理 ===
+  // 错误态保留 PageLayout 骨架（标题/面包屑），在内部渲染 InlineErrorState + 重试，
+  // 不再塌缩为裸 Container（F-008）。
   if (clustersError) {
     return (
-      <Container>
-        <Box textAlign="center" color="text-status-error" padding="xl">
-          加载失败: {clustersError.message}
-        </Box>
-      </Container>
+      <PageLayout title="集群监控" breadcrumbs={BREADCRUMBS}>
+        <InlineErrorState
+          message={clustersError.message}
+          onRetry={() => refetch()}
+        />
+      </PageLayout>
     );
   }
 

@@ -18,7 +18,7 @@ import {
   Table,
 } from "@cloudscape-design/components";
 import type { DateRangePickerProps } from "@cloudscape-design/components";
-import { PageLayout } from "@shared/components";
+import { PageLayout, InlineErrorState } from "@shared/components";
 import { useAuditLogs, useExportAuditLogs } from "../api";
 
 // 面包屑（模块级常量，避免每次渲染创建新引用）
@@ -129,7 +129,7 @@ export function AuditLogsPage() {
   }, [currentPage, actionFilter, resourceTypeFilter, resultFilter, dateRange]);
 
   // 数据查询
-  const { data, isLoading, error } = useAuditLogs(filters);
+  const { data, isLoading, error, refetch } = useAuditLogs(filters);
 
   // 导出功能
   const exportMutation = useExportAuditLogs();
@@ -193,11 +193,9 @@ export function AuditLogsPage() {
 
   if (error) {
     return (
-      <Container>
-        <Box textAlign="center" color="text-status-error" padding="xl">
-          加载失败: {error.message}
-        </Box>
-      </Container>
+      <PageLayout title="审计日志" breadcrumbs={BREADCRUMBS}>
+        <InlineErrorState message={error.message} onRetry={() => refetch()} />
+      </PageLayout>
     );
   }
 

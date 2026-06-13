@@ -4,6 +4,7 @@
 若 SDK 不支持特定配置 (如自定义存储大小、生命周期脚本) 则使用 aioboto3 调用 SageMaker API。
 """
 
+import asyncio
 from functools import lru_cache
 from typing import Any
 
@@ -95,6 +96,10 @@ class SageMakerSpacesClient(ISageMakerSpacesClient):
                     space_arn=response.get("SpaceArn"),
                 )
 
+                # CreateSpace 异步生效，Space 短暂处于 Creating；
+                # 后续 CreateApp 要求 InService，此处等待就绪（通常数秒）
+                await self._wait_space_in_service(sm, domain_id, name)
+
                 return {
                     "name": name,
                     "arn": response.get("SpaceArn", ""),
@@ -104,6 +109,31 @@ class SageMakerSpacesClient(ISageMakerSpacesClient):
         except Exception as e:
             logger.error("sagemaker_space_create_failed", space_name=name, error=str(e))
             raise SpaceError(message=f"创建 SageMaker Space 失败: {e}") from e
+
+    async def _wait_space_in_service(
+        self,
+        sm_client: Any,
+        domain_id: str,
+        name: str,
+        timeout_seconds: float = 120.0,
+        interval_seconds: float = 3.0,
+    ) -> None:
+        """轮询等待 Space 进入 InService.
+
+        Raises:
+            SpaceError: 等待超时或 Space 进入失败状态
+        """
+        deadline = asyncio.get_event_loop().time() + timeout_seconds
+        while True:
+            response = await sm_client.describe_space(DomainId=domain_id, SpaceName=name)
+            status = response.get("Status", "Unknown")
+            if status == "InService":
+                return
+            if status in ("Delete_Failed", "Update_Failed", "Failed"):
+                raise SpaceError(message=f"Space {name} 创建失败: {status}")
+            if asyncio.get_event_loop().time() >= deadline:
+                raise SpaceError(message=f"等待 Space {name} 就绪超时 (当前状态 {status})")
+            await asyncio.sleep(interval_seconds)
 
     async def get_space(self, name: str) -> dict[str, Any] | None:
         """查询 SageMaker Studio Space."""
@@ -182,6 +212,137 @@ class SageMakerSpacesClient(ISageMakerSpacesClient):
                 return None
             logger.error("sagemaker_space_describe_failed", space_name=name, error=str(e))
             raise SpaceError(message=f"查询 SageMaker Space 状态失败: {e}") from e
+
+    # Space 内 App 统一命名（SageMaker Studio 约定每个 Space 单 App）
+    _APP_NAME = "default"
+
+    # SageMaker Distribution 公共镜像所属账户（us-east-1）。
+    # CreateApp 对 JupyterLab/CodeEditor 必须显式提供 SageMakerImageArn。
+    _DISTRIBUTION_IMAGE_ACCOUNT = "885854791233"
+
+    @staticmethod
+    def _to_app_type(ide_type: str) -> str:
+        return "JupyterLab" if ide_type == "jupyterlab" else "CodeEditor"
+
+    def _default_image_arn(self, instance_type: str) -> str:
+        """按实例类型选择 SageMaker Distribution CPU/GPU 镜像."""
+        is_gpu = instance_type.startswith(("ml.g", "ml.p"))
+        variant = "gpu" if is_gpu else "cpu"
+        return f"arn:aws:sagemaker:{self._region}:{self._DISTRIBUTION_IMAGE_ACCOUNT}:image/sagemaker-distribution-{variant}"
+
+    async def create_app(
+        self,
+        space_name: str,
+        ide_type: str,
+        instance_type: str,
+        lifecycle_config_arn: str | None = None,
+    ) -> dict[str, Any]:
+        """在 Space 内创建 App（真实拉起计算实例）."""
+        app_type = self._to_app_type(ide_type)
+        resource_spec: dict[str, Any] = {
+            "InstanceType": instance_type,
+            "SageMakerImageArn": self._default_image_arn(instance_type),
+        }
+        if lifecycle_config_arn:
+            resource_spec["LifecycleConfigArn"] = lifecycle_config_arn
+
+        logger.info(
+            "sagemaker_app_creating",
+            space_name=space_name,
+            app_type=app_type,
+            instance_type=instance_type,
+        )
+
+        try:
+            async with self._session.client("sagemaker", region_name=self._region) as sm:
+                domain_id = await self._get_domain_id(sm)
+                response: dict[str, Any] = await sm.create_app(
+                    DomainId=domain_id,
+                    SpaceName=space_name,
+                    AppType=app_type,
+                    AppName=self._APP_NAME,
+                    ResourceSpec=resource_spec,
+                )
+                logger.info("sagemaker_app_created", space_name=space_name, app_arn=response.get("AppArn"))
+                return {"arn": response.get("AppArn", ""), "status": "Pending"}
+        except Exception as e:
+            logger.error("sagemaker_app_create_failed", space_name=space_name, error=str(e))
+            raise SpaceError(message=f"启动 SageMaker App 失败: {e}") from e
+
+    async def delete_app(self, space_name: str, ide_type: str) -> None:
+        """删除 Space 内的 App（停止并释放计算实例，EBS 文件保留）."""
+        app_type = self._to_app_type(ide_type)
+        logger.info("sagemaker_app_deleting", space_name=space_name, app_type=app_type)
+
+        try:
+            async with self._session.client("sagemaker", region_name=self._region) as sm:
+                domain_id = await self._get_domain_id(sm)
+                await sm.delete_app(
+                    DomainId=domain_id,
+                    SpaceName=space_name,
+                    AppType=app_type,
+                    AppName=self._APP_NAME,
+                )
+                logger.info("sagemaker_app_deleted", space_name=space_name)
+        except Exception as e:
+            error_code = getattr(e, "response", {}).get("Error", {}).get("Code", "")
+            # Deleted 状态的 App 元数据保留 24h，重复删除返回
+            # ValidationException "has already been deleted"，同样视为幂等成功
+            already_deleted = "already been deleted" in str(e)
+            if error_code in ("ResourceNotFound", "ResourceNotFoundException") or already_deleted:
+                logger.warning("sagemaker_app_already_deleted", space_name=space_name)
+                return
+            logger.error("sagemaker_app_delete_failed", space_name=space_name, error=str(e))
+            raise SpaceError(message=f"停止 SageMaker App 失败: {e}") from e
+
+    async def describe_app(self, space_name: str, ide_type: str) -> dict[str, Any] | None:
+        """查询 Space 内 App（计算实例）的状态."""
+        app_type = self._to_app_type(ide_type)
+
+        try:
+            async with self._session.client("sagemaker", region_name=self._region) as sm:
+                domain_id = await self._get_domain_id(sm)
+                response: dict[str, Any] = await sm.describe_app(
+                    DomainId=domain_id,
+                    SpaceName=space_name,
+                    AppType=app_type,
+                    AppName=self._APP_NAME,
+                )
+                return {
+                    "arn": response.get("AppArn", ""),
+                    "status": response.get("Status", "Unknown"),
+                    "failure_reason": response.get("FailureReason"),
+                }
+        except Exception as e:
+            error_code = getattr(e, "response", {}).get("Error", {}).get("Code", "")
+            if error_code in ("ResourceNotFound", "ResourceNotFoundException"):
+                return None
+            logger.error("sagemaker_app_describe_failed", space_name=space_name, error=str(e))
+            raise SpaceError(message=f"查询 SageMaker App 状态失败: {e}") from e
+
+    async def create_presigned_url(self, space_name: str, ide_type: str) -> str:
+        """为 Space 签发免登录访问 URL（直达 IDE）."""
+        # LandingUri 直达对应 IDE 应用，免去 Studio 首页二次点击
+        landing_app = "JupyterLab" if ide_type == "jupyterlab" else "CodeEditor"
+
+        try:
+            async with self._session.client("sagemaker", region_name=self._region) as sm:
+                domain_id = await self._get_domain_id(sm)
+                owner_profile = await self._get_owner_user_profile(sm, domain_id)
+
+                response: dict[str, Any] = await sm.create_presigned_domain_url(
+                    DomainId=domain_id,
+                    UserProfileName=owner_profile,
+                    SpaceName=space_name,
+                    LandingUri=f"app:{landing_app}:",
+                )
+
+                logger.info("sagemaker_presigned_url_created", space_name=space_name)
+                return str(response.get("AuthorizedUrl", ""))
+
+        except Exception as e:
+            logger.error("sagemaker_presigned_url_failed", space_name=space_name, error=str(e))
+            raise SpaceError(message=f"签发 Space 访问 URL 失败: {e}") from e
 
     async def _get_domain_id(self, sm_client: Any) -> str:
         """获取 SageMaker Studio Domain ID.

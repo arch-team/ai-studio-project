@@ -41,6 +41,11 @@ class Settings(BaseSettings):
     # HyperPod
     hyperpod_cluster_name: str | None = None
 
+    # Amazon Managed Prometheus (AMP) — 监控页指标数据源
+    # 未配置时 PrometheusClient 回退本地 prometheus（本地开发），dev/prod 须显式设置
+    amp_query_endpoint: str | None = None
+    amp_region: str = "us-east-1"
+
     # SageMaker Studio Spaces（开发空间）
     # 未配置时 spaces 模块会自动发现账号下第一个 Domain——多 Domain 账号（如共享
     # Unified Studio 域）下行为不确定，部署环境应显式指定专用 Domain

@@ -19,7 +19,13 @@ import { useCallback, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { PageLayout } from '@shared/components';
 import { formatDateTime } from '@shared/utils';
-import { useSpace, useStartSpace, useStopSpace, useDeleteSpace } from '../api';
+import {
+  useSpace,
+  useStartSpace,
+  useStopSpace,
+  useDeleteSpace,
+  useOpenSpaceIDE,
+} from '../api';
 import { SpaceStatusBadge } from '../components/SpaceStatusBadge';
 import { SPACE_TYPE_LABELS, INSTANCE_TYPE_LABELS } from '../types';
 
@@ -35,6 +41,7 @@ export function SpaceDetailPage() {
   const startMutation = useStartSpace();
   const stopMutation = useStopSpace();
   const deleteMutation = useDeleteSpace();
+  const openIDEMutation = useOpenSpaceIDE();
 
   const [deleteModalVisible, setDeleteModalVisible] = useState(false);
 
@@ -52,6 +59,10 @@ export function SpaceDetailPage() {
     if (id) startMutation.mutate(id);
   }, [id, startMutation]);
 
+  const handleOpenIDE = useCallback(() => {
+    if (id) openIDEMutation.mutate(id);
+  }, [id, openIDEMutation]);
+
   const handleStop = useCallback(() => {
     if (id) stopMutation.mutate(id);
   }, [id, stopMutation]);
@@ -67,8 +78,11 @@ export function SpaceDetailPage() {
   }, [id, deleteMutation, navigate]);
 
   const canStart = space?.status === 'stopped';
+  const canOpen = space?.status === 'running';
   const canStop = space?.status === 'running';
   const canDelete = space?.status === 'stopped' || space?.status === 'failed';
+  // 按 IDE 类型显示入口文案（JupyterLab / Code Editor）
+  const ideLabel = space ? SPACE_TYPE_LABELS[space.space_type] : 'IDE';
 
   return (
     <PageLayout
@@ -87,6 +101,17 @@ export function SpaceDetailPage() {
               loading={startMutation.isPending}
             >
               启动
+            </Button>
+          )}
+          {canOpen && (
+            <Button
+              variant="primary"
+              iconName="external"
+              iconAlign="right"
+              onClick={handleOpenIDE}
+              loading={openIDEMutation.isPending}
+            >
+              打开 {ideLabel}
             </Button>
           )}
           {canStop && (
@@ -109,6 +134,13 @@ export function SpaceDetailPage() {
             action={<Button onClick={() => refetch()}>重试</Button>}
           >
             {error.message}
+          </Alert>
+        )}
+
+        {/* 打开 IDE 失败提示 */}
+        {openIDEMutation.isError && (
+          <Alert type="error" header="打开开发环境失败" dismissible>
+            {openIDEMutation.error?.message || '请稍后重试'}
           </Alert>
         )}
 

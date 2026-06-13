@@ -16,7 +16,7 @@ import {
 } from '@cloudscape-design/components';
 import { useMemo, useState, useCallback } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { PageLayout } from '@shared/components';
+import { PageLayout, InlineErrorState } from '@shared/components';
 import { useModel, useModelVersions, useRollbackModelVersion } from '../api';
 import { ModelVersionTable, ModelMetricsCompare } from '../components';
 
@@ -52,7 +52,12 @@ export function ModelVersionsPage() {
   const rollbackMutation = useRollbackModelVersion();
 
   // 获取版本列表（包括对比数据）
-  const { data: versionsData, isLoading: versionsLoading, refetch } = useModelVersions(
+  const {
+    data: versionsData,
+    isLoading: versionsLoading,
+    isError: versionsError,
+    refetch,
+  } = useModelVersions(
     modelId,
     showComparison && selectedVersions.length === 2
       ? { compare_v1: selectedVersions[0], compare_v2: selectedVersions[1] }
@@ -104,14 +109,15 @@ export function ModelVersionsPage() {
     );
   }
 
-  // 错误状态
+  // 错误状态：保留页面骨架（固定标题/面包屑），不裸 Container 塌缩
   if (!model) {
     return (
-      <Container>
-        <Box textAlign="center" color="text-status-error" padding="xl">
-          模型不存在
-        </Box>
-      </Container>
+      <PageLayout title="模型版本历史" breadcrumbs={breadcrumbs}>
+        <InlineErrorState
+          title="模型不存在"
+          message="未找到该模型，无法查看版本历史。"
+        />
+      </PageLayout>
     );
   }
 
@@ -144,6 +150,14 @@ export function ModelVersionsPage() {
             version2={selectedVersions[1]}
           />
         </SpaceBetween>
+      )}
+
+      {/* 版本列表加载失败：显式报错，不静默降级为空表（F-006） */}
+      {versionsError && (
+        <InlineErrorState
+          message="版本列表加载失败。"
+          onRetry={() => refetch()}
+        />
       )}
 
       {/* 版本列表 */}

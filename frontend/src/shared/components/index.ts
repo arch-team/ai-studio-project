@@ -16,3 +16,7 @@ export type { PageLayoutProps } from './PageLayout';
 
 // Notification
 export { NotificationCenter } from './NotificationCenter';
+
+// Feedback
+export { InlineErrorState } from './feedback';
+export type { InlineErrorStateProps } from './feedback';
