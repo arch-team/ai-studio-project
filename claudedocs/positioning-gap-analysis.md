@@ -167,3 +167,44 @@ spec 与 constitution 措辞不统一        ~25%   历史遗留
 ---
 
 > **本报告为诊断 + 决策记录。** §9 决策已确认；规范层修正（Gap 1/2/3/4）将同步落实到 `.claude/rules/product-architecture.md`。Gap 4 立项与 Gap 5 重构本次不执行，仅登记。
+
+---
+
+## 10. speckit-analyze 复检结果（2026-06-13）
+
+> 在 product-architecture.md 修正后运行 `/speckit-analyze`，复检 spec/plan/tasks/constitution 四件套与新定位的一致性。本节记录发现与决策。
+
+### 10.1 核心发现
+
+| ID | 类别 | 严重度 | 位置 | 结论 |
+|----|------|:-----:|------|------|
+| **I1** | 不一致 | 🔴 CRITICAL | constitution L60/64/169/220 vs spec 全文 | 宪法定位"开发+训练+**部署**"且定义了 HyperPod Inference Operator / `sagemaker.hyperpod.inference` 推理部署组件；spec.md 26 个 FR **无任何模型推理/部署服务需求** |
+| **C1** | 覆盖缺口 | 🔴 CRITICAL | constitution L169/813 vs tasks 全文 | 宪法的"推理部署"能力在 tasks.md **零任务覆盖**（所有"部署"均为 CDK/基础设施部署） |
+| **N1** | 不一致 | 🟠 HIGH | spec L1 标题 vs constitution L60 | spec 标题"AI **训练**平台" vs 宪法"AI 平台（含部署）"；product-architecture.md 已对齐宪法，spec 成 outlier |
+| **N2** | 不一致 | 🟡 已消解 | 全文 | "LLMOps" 已从 product-architecture.md 去除，spec/plan/宪法本就无此词，无残留冲突 ✅ |
+| **M1** | 术语 | 🟡 MEDIUM | product-architecture §4.4 | `TenantSpace` 仅在"演进方向"，已标 🚧 待立项，spec/data-model/代码均无 — 自洽 |
+
+### 10.2 对 §1 诊断的修正（诚实记录）
+
+§1 曾将 Gap 1 描述为"三方措辞分歧"，**低估了证据强度**：宪法不仅愿景含"部署"，更具体定义了 **HyperPod Inference Operator（L169）、`sagemaker.hyperpod.inference` 模块（L220）、推理级监控（L265）**。
+
+→ 修正认知：用户选择的"含部署"方向**有充分宪法依据、是正确的**；但同时暴露 **spec.md 与 tasks.md 实质性缺失"推理部署"整块**，这不是措辞问题，是**功能规范的真实缺口（沉默缺口）**。已取证确认 spec **无任何 Out of Scope 声明**显式排除推理，故属疏漏而非有意排除。
+
+### 10.3 决策与待办
+
+| 项 | 用户裁决（2026-06-13） | 状态 |
+|----|----------------------|------|
+| I1/C1 推理部署缺口 | **本轮不动，只留诊断记录** | 📌 待办（见下） |
+| N1 spec 标题 | **保留「企业级AI训练平台」+ 划界** | 📌 待办（与 I1/C1 合并） |
+| 执行方式 | 原拟走 `/speckit-specify`，因其会**新建 002 feature 而非编辑 001**，不适配「给现有 spec 加章节」；**本轮暂不改 spec** | ⏸️ 留待专门一轮 |
+
+**📌 明确待办（留待后续专门处理）**：
+
+> 给 `specs/001-ai-training-platform/spec.md` 补一个 **「Out of Scope（本期不含）」** 章节，声明：
+> 1. 模型推理服务部署（HyperPod Inference Operator / `sagemaker.hyperpod.inference`）**不在 001 范围**；001 模型生命周期覆盖至 Model Registry 注册 + 部署状态标记为止。
+> 2. 推理端点创建、扩缩容、推理级监控规划于**后续独立 feature**。
+> 3. 此划界与宪法一致——宪法的推理部署能力是平台长期愿景，允许超前于单个 feature。
+>
+> **执行方式建议**：直接定向编辑 spec.md（加章节，不动现有 FR/标题）+ git 提交留痕，事后 `/speckit-analyze` 复检。**不要用 `/speckit-specify`**（会建新 feature）。此编辑无"问答澄清"环节，`/speckit-clarify` 亦不适配。
+
+> **再次说明**：本节为只读分析记录，未修改 spec/plan/tasks/constitution 任何一份 speckit 治理产物。
