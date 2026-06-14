@@ -1,5 +1,5 @@
 # CI/CD 部署流水线
-# 完整流程: build → test → push image → update Git manifest → ArgoCD auto-sync
+# 完整流程: test → build → push image → update Git manifest → kubectl apply → DB migrate → verify
 #
 # 触发条件:
 #   - main 分支 push (自动部署到 dev)
@@ -12,9 +12,11 @@
 #   - AWS_ROLE_ARN: GitHub Actions OIDC 角色 ARN
 #   - ECR_REGISTRY: ECR 仓库地址
 #
-# ArgoCD 自动同步:
-#   流水线更新 Kustomize overlay 中的镜像标签后，
-#   ArgoCD 检测 Git 变更并自动同步到集群。
+# 部署方式 (push-based):
+#   流水线更新 Kustomize overlay 镜像标签并提交回 Git 后，
+#   由 deploy 阶段用 `kubectl apply -k` 直接将清单同步到集群，
+#   再执行 `alembic upgrade head` 应用数据库迁移，最后做 fail-fast 验证。
+#   注意: 集群当前未部署 ArgoCD，部署不依赖 GitOps 拉取，由本流水线推送完成。
 
 name: Deploy AI Training Platform
 
@@ -242,7 +244,7 @@ jobs:
           echo "- 镜像: ${frontend_image}" >> "$GITHUB_STEP_SUMMARY"
 
   # ============================================================
-  # 4. 更新 Git Manifest (触发 ArgoCD 自动同步)
+  # 4. 更新 Git Manifest (镜像标签提交回 Git，作为部署的单一事实源)
   # ============================================================
   update-manifests:
     name: "更新 K8s 清单"
@@ -304,19 +306,26 @@ jobs:
           echo "## 清单更新" >> "$GITHUB_STEP_SUMMARY"
           echo "- 环境: ${ENVIRONMENT}" >> "$GITHUB_STEP_SUMMARY"
           echo "- 镜像标签: ${IMAGE_TAG}" >> "$GITHUB_STEP_SUMMARY"
-          echo "- ArgoCD 将自动检测变更并同步" >> "$GITHUB_STEP_SUMMARY"
+          echo "- 下一阶段将由 deploy 作业执行 kubectl apply 同步到集群" >> "$GITHUB_STEP_SUMMARY"
 
   # ============================================================
-  # 5. 部署验证
+  # 5. 部署到集群 + 数据库迁移 + 验证 (push-based, fail-fast)
   # ============================================================
-  verify-deployment:
-    name: "验证部署"
+  deploy-and-verify:
+    name: "部署到集群并验证"
     needs: [prepare, update-manifests]
     if: needs.update-manifests.result == 'success'
     runs-on: ubuntu-latest
     env:
       ENVIRONMENT: ${{ needs.prepare.outputs.environment }}
+      NAMESPACE: ai-platform
     steps:
+      # 检出最新 main —— 含 update-manifests 刚提交的镜像标签，作为部署单一事实源
+      - name: 检出最新清单
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref }}
+
       - name: 配置 AWS 凭证
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -329,53 +338,49 @@ jobs:
             --name ai-platform-${ENVIRONMENT}-eks \
             --region ${{ env.AWS_REGION }}
 
-      - name: 等待 ArgoCD 同步完成
+      # 真正把清单同步到集群 (替代缺失的 ArgoCD 拉取)
+      - name: 应用 K8s 清单 (kubectl apply -k)
         run: |
-          echo "等待 ArgoCD 检测变更并同步 (最多 5 分钟)..."
-          for i in $(seq 1 30); do
-            SYNC_STATUS=$(kubectl get application -n argocd \
-              -l environment=${ENVIRONMENT} \
-              -o jsonpath='{.items[*].status.sync.status}' 2>/dev/null || echo "Unknown")
+          OVERLAY_DIR="infrastructure/k8s/overlays/${ENVIRONMENT}"
+          echo "应用 overlay: ${OVERLAY_DIR}"
+          kubectl apply -k "${OVERLAY_DIR}"
 
-            HEALTH_STATUS=$(kubectl get application -n argocd \
-              -l environment=${ENVIRONMENT} \
-              -o jsonpath='{.items[*].status.health.status}' 2>/dev/null || echo "Unknown")
+      # 等待滚动完成 —— 失败即红 (fail-fast, 不再 continue-on-error)
+      - name: 等待 Deployment 滚动完成
+        run: |
+          echo "等待 backend / frontend 滚动更新..."
+          kubectl rollout status deployment/backend -n "${NAMESPACE}" --timeout=300s
+          kubectl rollout status deployment/frontend -n "${NAMESPACE}" --timeout=300s
 
-            echo "同步状态: ${SYNC_STATUS} | 健康状态: ${HEALTH_STATUS}"
+      # 应用数据库迁移 —— 治理迁移漂移 (复用已就绪的 backend 镜像, 保证代码与 schema 同版本)
+      - name: 数据库迁移 (alembic upgrade head)
+        run: |
+          echo "在 backend pod 内执行 alembic upgrade head..."
+          kubectl exec -n "${NAMESPACE}" deploy/backend -- alembic upgrade head
 
-            if [[ "${SYNC_STATUS}" == *"Synced"* ]] && [[ "${HEALTH_STATUS}" == *"Healthy"* ]]; then
-              echo "部署同步成功"
-              exit 0
-            fi
-            sleep 10
-          done
-          echo "警告: ArgoCD 同步超时，请手动检查"
-          exit 1
-        continue-on-error: true
-
-      - name: 验证 Pod 状态
+      - name: 验证集群状态
         run: |
           echo "--- Pod 状态 ---"
-          kubectl get pods -n ai-platform -o wide
-          echo ""
+          kubectl get pods -n "${NAMESPACE}" -o wide
           echo "--- Service 状态 ---"
-          kubectl get svc -n ai-platform
-          echo ""
-          echo "--- HPA 状态 ---"
-          kubectl get hpa -n ai-platform
+          kubectl get svc -n "${NAMESPACE}"
 
-      - name: 健康检查
+      # 真实健康检查 —— 失败即红
+      - name: 健康检查 (fail-fast)
         run: |
-          # 检查后端健康
-          kubectl exec -n ai-platform deploy/backend -- \
-            curl -sf http://localhost:8000/health || echo "后端健康检查失败"
-        continue-on-error: true
+          echo "调用 backend /health ..."
+          kubectl exec -n "${NAMESPACE}" deploy/backend -- \
+            python -c "import urllib.request,sys; r=urllib.request.urlopen('http://localhost:8000/health',timeout=10); sys.exit(0 if r.status==200 else 1)"
+          echo "健康检查通过"
 
       - name: 部署总结
+        if: always()
         run: |
           echo "## 部署验证" >> "$GITHUB_STEP_SUMMARY"
           echo "- 环境: ${ENVIRONMENT}" >> "$GITHUB_STEP_SUMMARY"
-          echo "- 时间: $(date -u '+%Y-%m-%d %H:%M:%S UTC')" >> "$GITHUB_STEP_SUMMARY"
+          echo "- 镜像标签: ${{ needs.prepare.outputs.image_tag }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- 部署方式: kubectl apply -k + alembic upgrade (push-based)" >> "$GITHUB_STEP_SUMMARY"
+          echo "- 结果: ${{ job.status }}" >> "$GITHUB_STEP_SUMMARY"
 
   # ============================================================
   # 6. 生产环境审批门控 (仅 prod)
