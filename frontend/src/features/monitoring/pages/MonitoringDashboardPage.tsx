@@ -526,7 +526,7 @@ export function MonitoringDashboardPage() {
   // 不再塌缩为裸 Container（F-008）。
   if (clustersError) {
     return (
-      <PageLayout title="集群监控" breadcrumbs={BREADCRUMBS}>
+      <PageLayout title="资源监控" breadcrumbs={BREADCRUMBS}>
         <InlineErrorState
           message={clustersError.message}
           onRetry={() => refetch()}
@@ -542,7 +542,7 @@ export function MonitoringDashboardPage() {
   // === 渲染 ===
   return (
     <PageLayout
-      title="集群监控"
+      title="资源监控"
       description="实时监控集群状态、资源利用率和告警信息"
       breadcrumbs={BREADCRUMBS}
       actions={
@@ -556,11 +556,25 @@ export function MonitoringDashboardPage() {
     >
     <SpaceBetween size="l" data-testid="monitoring-dashboard">
       {isLoading ? (
-        <Container>
-          <Box textAlign="center" padding="l">
-            <StatusIndicator type="loading">加载中...</StatusIndicator>
-          </Box>
-        </Container>
+        // 分区骨架占位：保留各 Container 标题外壳（概览/资源利用率），
+        // 内部局部 Spinner，避免整页塌缩为单一居中 Spinner 致加载完成时布局跳变（F-050）。
+        <SpaceBetween size="l">
+          <Container header={<Header variant="h2">集群概览</Header>}>
+            <Box textAlign="center" padding="l">
+              <StatusIndicator type="loading">加载中...</StatusIndicator>
+            </Box>
+          </Container>
+          <Container header={<Header variant="h2">资源利用率</Header>}>
+            <Box textAlign="center" padding="l">
+              <StatusIndicator type="loading">加载中...</StatusIndicator>
+            </Box>
+          </Container>
+          <Container header={<Header variant="h2">当前告警</Header>}>
+            <Box textAlign="center" padding="l">
+              <StatusIndicator type="loading">加载中...</StatusIndicator>
+            </Box>
+          </Container>
+        </SpaceBetween>
       ) : (
         <Tabs
           activeTabId={activeTabId}

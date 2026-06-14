@@ -56,7 +56,7 @@ const baseItems: SideNavigationProps.Item[] = [
     title: '开发空间',
     items: [
       { type: 'link', text: '我的空间', href: ROUTES.SPACES },
-      { type: 'link', text: '在线 IDE', href: ROUTES.IDE },
+      { type: 'link', text: '交互式开发', href: ROUTES.IDE },
     ],
   },
   {

@@ -268,7 +268,7 @@ export function SpaceListPage() {
   return (
     <PageLayout
       title="在线开发环境"
-      description="管理交互式开发空间（在线 IDE / Notebook）"
+      description="管理交互式开发空间（JupyterLab / Notebook）"
       counter={data ? `(${data.total})` : undefined}
       breadcrumbs={BREADCRUMBS}
       actions={
