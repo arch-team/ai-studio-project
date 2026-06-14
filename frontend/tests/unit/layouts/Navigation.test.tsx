@@ -157,8 +157,8 @@ describe('Navigation', () => {
           <Navigation />
         </BrowserRouter>
       );
-      // 补全后的核心模块入口
-      const expectedItems = ['模型管理', '检查点', '我的空间', '在线 IDE', '资源监控'];
+      // 补全后的核心模块入口（「在线 IDE」按术语规范改为「交互式开发」，避免 IDE 措辞）
+      const expectedItems = ['模型管理', '检查点', '我的空间', '交互式开发', '资源监控'];
       expectedItems.forEach((item) => {
         expect(screen.getByText(item)).toBeInTheDocument();
       });

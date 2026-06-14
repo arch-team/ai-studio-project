@@ -97,7 +97,7 @@ interface QuickAction {
 const QUICK_ACTIONS: QuickAction[] = [
   { name: '创建训练任务', description: '提交分布式训练任务（DDP / FSDP / DeepSpeed）', href: '/training-jobs/create', iconName: 'gen-ai', primary: true },
   { name: '上传数据集', description: '注册并管理训练数据集与版本', href: '/datasets/create', iconName: 'upload' },
-  { name: '打开开发空间', description: '启动在线 IDE 进行交互式开发', href: '/spaces', iconName: 'command-prompt' },
+  { name: '打开开发空间', description: '启动 JupyterLab 进行交互式开发', href: '/spaces', iconName: 'command-prompt' },
   { name: '查看资源监控', description: '实时查看 GPU / 节点资源使用情况', href: '/monitoring', iconName: 'multiscreen' },
 ];
 

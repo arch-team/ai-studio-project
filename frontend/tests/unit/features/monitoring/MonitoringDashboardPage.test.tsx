@@ -139,7 +139,8 @@ describe('MonitoringDashboardPage', () => {
   describe('基本渲染', () => {
     it('should render page header with title', () => {
       renderWithProviders(<MonitoringDashboardPage />);
-      expect(screen.getByRole('heading', { name: /集群监控/i })).toBeInTheDocument();
+      // 命名统一：侧栏/面包屑/标题均用「资源监控」（消除同页「集群监控」vs「资源监控」冲突）
+      expect(screen.getByRole('heading', { name: /资源监控/i })).toBeInTheDocument();
     });
 
     it('should render dashboard container', () => {
@@ -233,6 +234,22 @@ describe('MonitoringDashboardPage', () => {
       renderWithProviders(<MonitoringDashboardPage />);
       expect(screen.getAllByText(/加载中/i).length).toBeGreaterThan(0);
     });
+
+    // F-050 残留：loading 态须保留页面骨架（标题/dashboard 结构），
+    // 不整页塌缩为孤立 Spinner，避免加载完成时布局跳变；与 error 态骨架范围一致。
+    it('loading 态保留 PageLayout 骨架（标题与 dashboard 结构不塌缩）', () => {
+      mockUseClusters.mockReturnValue({ data: undefined, isLoading: true, error: null });
+      mockUseResourceUtilization.mockReturnValue({ data: undefined, isLoading: true, error: null });
+      mockUseAlerts.mockReturnValue({ data: undefined, isLoading: true, error: null });
+      mockUseMetricSeries.mockReturnValue({ data: undefined, isLoading: true, error: null });
+
+      renderWithProviders(<MonitoringDashboardPage />);
+      // 骨架保留：标题「资源监控」与 dashboard 容器在 loading 态仍渲染
+      expect(screen.getByRole('heading', { name: /资源监控/i })).toBeInTheDocument();
+      expect(screen.getByTestId('monitoring-dashboard')).toBeInTheDocument();
+      // 分区骨架：概览/资源利用率等区块标题保留（不是单一居中 Spinner）
+      expect(screen.getByText('集群概览')).toBeInTheDocument();
+    });
   });
 
   describe('错误处理', () => {
@@ -269,9 +286,9 @@ describe('MonitoringDashboardPage', () => {
       await userEvent.click(retryButton);
       expect(refetch).toHaveBeenCalledTimes(1);
 
-      // 骨架保留：PageLayout Header 渲染"集群监控"标题
+      // 骨架保留：PageLayout Header 渲染"资源监控"标题
       expect(
-        screen.getByRole('heading', { name: /集群监控/i }),
+        screen.getByRole('heading', { name: /资源监控/i }),
       ).toBeInTheDocument();
     });
   });

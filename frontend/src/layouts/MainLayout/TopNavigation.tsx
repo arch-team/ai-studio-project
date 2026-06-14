@@ -52,7 +52,7 @@ const SEARCH_DESTINATIONS: SearchDestination[] = [
   { value: ROUTES.MODELS, label: '模型管理', description: '模型注册与版本', tags: ['model'] },
   { value: ROUTES.CHECKPOINTS, label: '检查点', description: '训练检查点管理', tags: ['checkpoint'] },
   { value: ROUTES.DATASETS, label: '数据集', description: '数据集与版本管理', tags: ['dataset', 'data'] },
-  { value: ROUTES.SPACES, label: '开发空间', description: '在线 IDE 与交互式开发', tags: ['space', 'ide'] },
+  { value: ROUTES.SPACES, label: '开发空间', description: 'JupyterLab 交互式开发', tags: ['space', 'ide'] },
   { value: ROUTES.RESOURCE_QUOTAS, label: '配额管理', description: '团队资源配额', tags: ['quota'] },
   { value: ROUTES.MONITORING, label: '资源监控', description: 'GPU / 节点实时监控', tags: ['monitor', 'gpu'] },
   { value: ROUTES.REPORTS, label: '报表概览', description: '使用与成本报表', tags: ['report'], roles: ['admin', 'team_lead'] },

@@ -144,7 +144,7 @@ export function CreateSpacePage() {
   return (
     <PageLayout
       title="创建开发空间"
-      description="启动交互式在线 IDE，支持 JupyterLab / Code Editor"
+      description="启动交互式开发空间，支持 JupyterLab / Code Editor"
       breadcrumbs={BREADCRUMBS}
     >
     <SpaceBetween size="l">
