@@ -268,10 +268,14 @@ export function UserManagementPage({ embedded = false }: UserManagementPageProps
           </Header>
         }
         empty={
+          // F-033：空态自带"新建用户"CTA，embedded 模式（无页头按钮）下也保证引导不断裂
           <Box textAlign="center" color="inherit" padding="xl">
             <SpaceBetween size="m">
               <b>暂无用户</b>
               <Box color="text-body-secondary">尚未创建任何用户</Box>
+              <Button variant="primary" iconName="add-plus" onClick={handleCreate}>
+                新建用户
+              </Button>
             </SpaceBetween>
           </Box>
         }

@@ -405,8 +405,14 @@ function AlertsPanel({ alerts }: { alerts: AlertData[] }) {
       id: "status",
       header: "状态",
       cell: (item: AlertData) => (
+        // F-036：触发中/已确认的图标颜色随告警级别联动（critical 红 / warning 黄 / info 蓝），
+        // 与"级别"列语义呼应，不再对所有未解决告警一律黄色 warning 图标
         <StatusIndicator
-          type={item.status === "resolved" ? "success" : "warning"}
+          type={
+            item.status === "resolved"
+              ? "success"
+              : ALERT_SEVERITY_COLORS[item.severity]
+          }
         >
           {item.status === "firing"
             ? "触发中"

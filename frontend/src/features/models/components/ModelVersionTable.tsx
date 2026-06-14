@@ -12,7 +12,8 @@ import {
   StatusIndicator,
   Table,
 } from '@cloudscape-design/components';
-import type { ModelVersionSummary } from '../types';
+import type { ModelVersionSummary, ModelStatus } from '../types';
+import { MODEL_STATUS_LABELS } from '../types';
 
 interface ModelVersionTableProps {
   versions: ModelVersionSummary[];
@@ -98,9 +99,12 @@ export function ModelVersionTable({
           archived: 'stopped',
           failed: 'error',
         };
+        // F-031：状态文案走 MODEL_STATUS_LABELS 中文映射，不裸渲染英文枚举
+        const label =
+          MODEL_STATUS_LABELS[item.status as ModelStatus] ?? item.status;
         return (
           <StatusIndicator type={statusMap[item.status] || 'info'}>
-            {item.status}
+            {label}
           </StatusIndicator>
         );
       },

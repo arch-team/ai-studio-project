@@ -154,6 +154,15 @@ describe("ModelVersionsPage", () => {
       expect(screen.getByText("v2.0.0")).toBeInTheDocument();
     });
 
+    // F-031：状态走 MODEL_STATUS_LABELS 中文映射，不裸渲染英文枚举
+    it("状态列应显示中文标签而非英文枚举", () => {
+      renderWithProviders(<ModelVersionsPage />);
+      // mock 数据 status=registered，应显示中文"已注册"
+      expect(screen.getAllByText("已注册").length).toBeGreaterThan(0);
+      // 不应出现英文枚举原值
+      expect(screen.queryByText("registered")).not.toBeInTheDocument();
+    });
+
     it("应该显示对比按钮（默认禁用）", () => {
       renderWithProviders(<ModelVersionsPage />);
       const compareButton = screen.getByRole("button", { name: /对比版本/ });
