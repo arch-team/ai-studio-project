@@ -11,7 +11,7 @@ labels:
 images:
 - name: '*-backend*'
   newName: 897473508751.dkr.ecr.us-east-1.amazonaws.com/ai-platform-dev-backend
-  newTag: v20260613.12
+  newTag: v20260614.13
 - name: '*-frontend*'
   newName: 897473508751.dkr.ecr.us-east-1.amazonaws.com/ai-platform-dev-frontend
-  newTag: v20260613.12
+  newTag: v20260614.13
