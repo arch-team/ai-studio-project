@@ -1,5 +1,5 @@
 # CI/CD 部署流水线
-# 完整流程: test → build → push image → update Git manifest → kubectl apply → DB migrate → verify
+# 完整流程: test → build → push image → update Git manifest → kubectl set image → DB migrate → verify
 #
 # 触发条件:
 #   - main 分支 push (自动部署到 dev)
@@ -14,9 +14,11 @@
 #
 # 部署方式 (push-based):
 #   流水线更新 Kustomize overlay 镜像标签并提交回 Git 后，
-#   由 deploy 阶段用 `kubectl apply -k` 直接将清单同步到集群，
+#   由 deploy 阶段用 `kubectl set image` 更新应用 Deployment 镜像，
 #   再执行 `alembic upgrade head` 应用数据库迁移，最后做 fail-fast 验证。
 #   注意: 集群当前未部署 ArgoCD，部署不依赖 GitOps 拉取，由本流水线推送完成。
+#   只更新应用工作负载 (Deployment)，不 apply 集群级/跨 ns 基础设施 (Namespace/
+#   StorageClass/ClusterRole 等)，因部署角色仅有 ai-platform namespace 权限。
 
 name: Deploy AI Training Platform
 
@@ -306,7 +308,7 @@ jobs:
           echo "## 清单更新" >> "$GITHUB_STEP_SUMMARY"
           echo "- 环境: ${ENVIRONMENT}" >> "$GITHUB_STEP_SUMMARY"
           echo "- 镜像标签: ${IMAGE_TAG}" >> "$GITHUB_STEP_SUMMARY"
-          echo "- 下一阶段将由 deploy 作业执行 kubectl apply 同步到集群" >> "$GITHUB_STEP_SUMMARY"
+          echo "- 下一阶段将由 deploy 作业执行 kubectl set image 同步到集群" >> "$GITHUB_STEP_SUMMARY"
 
   # ============================================================
   # 5. 部署到集群 + 数据库迁移 + 验证 (push-based, fail-fast)
@@ -319,13 +321,10 @@ jobs:
     env:
       ENVIRONMENT: ${{ needs.prepare.outputs.environment }}
       NAMESPACE: ai-platform
+      IMAGE_TAG: ${{ needs.prepare.outputs.image_tag }}
+      RESOURCE_PREFIX: ${{ needs.prepare.outputs.resource_prefix }}
+      COMPONENT: ${{ needs.prepare.outputs.component }}
     steps:
-      # 检出最新 main —— 含 update-manifests 刚提交的镜像标签，作为部署单一事实源
-      - name: 检出最新清单
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ github.ref }}
-
       - name: 配置 AWS 凭证
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -338,22 +337,39 @@ jobs:
             --name ai-platform-${ENVIRONMENT}-eks \
             --region ${{ env.AWS_REGION }}
 
-      # 真正把清单同步到集群 (替代缺失的 ArgoCD 拉取)
-      - name: 应用 K8s 清单 (kubectl apply -k)
+      # 只更新应用工作负载的镜像 (CI 角色仅有 ai-platform namespace 权限)。
+      # 不用 `kubectl apply -k`: overlay 含 Namespace/StorageClass/ClusterRole 等
+      # 集群级与跨 namespace 资源，部署角色无权限且这些底座本不应由应用流水线反复 apply。
+      # 镜像标签与 update-manifests 写入 kustomization 的同一 IMAGE_TAG 保持一致。
+      - name: 更新应用镜像 (kubectl set image)
         run: |
-          OVERLAY_DIR="infrastructure/k8s/overlays/${ENVIRONMENT}"
-          echo "应用 overlay: ${OVERLAY_DIR}"
-          kubectl apply -k "${OVERLAY_DIR}"
+          if [ "${COMPONENT}" = "all" ] || [ "${COMPONENT}" = "backend" ]; then
+            BACKEND_IMAGE="${ECR_REGISTRY}/${RESOURCE_PREFIX}-backend:${IMAGE_TAG}"
+            echo "更新 backend → ${BACKEND_IMAGE}"
+            kubectl set image deployment/backend -n "${NAMESPACE}" "backend=${BACKEND_IMAGE}"
+          fi
+          if [ "${COMPONENT}" = "all" ] || [ "${COMPONENT}" = "frontend" ]; then
+            FRONTEND_IMAGE="${ECR_REGISTRY}/${RESOURCE_PREFIX}-frontend:${IMAGE_TAG}"
+            echo "更新 frontend → ${FRONTEND_IMAGE}"
+            kubectl set image deployment/frontend -n "${NAMESPACE}" "frontend=${FRONTEND_IMAGE}"
+          fi
 
       # 等待滚动完成 —— 失败即红 (fail-fast, 不再 continue-on-error)
       - name: 等待 Deployment 滚动完成
         run: |
-          echo "等待 backend / frontend 滚动更新..."
-          kubectl rollout status deployment/backend -n "${NAMESPACE}" --timeout=300s
-          kubectl rollout status deployment/frontend -n "${NAMESPACE}" --timeout=300s
+          if [ "${COMPONENT}" = "all" ] || [ "${COMPONENT}" = "backend" ]; then
+            echo "等待 backend 滚动更新..."
+            kubectl rollout status deployment/backend -n "${NAMESPACE}" --timeout=300s
+          fi
+          if [ "${COMPONENT}" = "all" ] || [ "${COMPONENT}" = "frontend" ]; then
+            echo "等待 frontend 滚动更新..."
+            kubectl rollout status deployment/frontend -n "${NAMESPACE}" --timeout=300s
+          fi
 
       # 应用数据库迁移 —— 治理迁移漂移 (复用已就绪的 backend 镜像, 保证代码与 schema 同版本)
+      # 仅在部署 backend 时执行 (迁移随后端代码走)。
       - name: 数据库迁移 (alembic upgrade head)
+        if: env.COMPONENT == 'all' || env.COMPONENT == 'backend'
         run: |
           echo "在 backend pod 内执行 alembic upgrade head..."
           kubectl exec -n "${NAMESPACE}" deploy/backend -- alembic upgrade head
@@ -365,8 +381,9 @@ jobs:
           echo "--- Service 状态 ---"
           kubectl get svc -n "${NAMESPACE}"
 
-      # 真实健康检查 —— 失败即红
+      # 真实健康检查 —— 失败即红 (仅部署 backend 时)
       - name: 健康检查 (fail-fast)
+        if: env.COMPONENT == 'all' || env.COMPONENT == 'backend'
         run: |
           echo "调用 backend /health ..."
           kubectl exec -n "${NAMESPACE}" deploy/backend -- \
@@ -378,8 +395,8 @@ jobs:
         run: |
           echo "## 部署验证" >> "$GITHUB_STEP_SUMMARY"
           echo "- 环境: ${ENVIRONMENT}" >> "$GITHUB_STEP_SUMMARY"
-          echo "- 镜像标签: ${{ needs.prepare.outputs.image_tag }}" >> "$GITHUB_STEP_SUMMARY"
-          echo "- 部署方式: kubectl apply -k + alembic upgrade (push-based)" >> "$GITHUB_STEP_SUMMARY"
+          echo "- 镜像标签: ${IMAGE_TAG}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- 部署方式: kubectl set image + alembic upgrade (push-based, 仅应用工作负载)" >> "$GITHUB_STEP_SUMMARY"
           echo "- 结果: ${{ job.status }}" >> "$GITHUB_STEP_SUMMARY"
 
   # ============================================================
