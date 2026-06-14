@@ -50,7 +50,7 @@ export function ResourceQuotasPage() {
   const [configToDelete, setConfigToDelete] = useState<ResourceLimitConfig | null>(null);
 
   // 数据查询
-  const { data, isLoading, error } = useResourceLimitConfigs({
+  const { data, isLoading, error, refetch } = useResourceLimitConfigs({
     page: currentPage,
     page_size: pageSize,
   });
@@ -195,7 +195,11 @@ export function ResourceQuotasPage() {
     >
     <SpaceBetween size="l">
       {error && (
-        <Alert type="error" header="加载失败">
+        <Alert
+          type="error"
+          header="加载失败"
+          action={<Button onClick={() => refetch()}>重试</Button>}
+        >
           {error.message}
         </Alert>
       )}
@@ -213,12 +217,20 @@ export function ResourceQuotasPage() {
           </Header>
         }
         empty={
-          <Box textAlign="center" color="inherit" padding="xl">
-            <SpaceBetween size="m">
-              <b>暂无配置</b>
-              <Box color="text-body-secondary">尚未创建任何资源限制配置</Box>
-            </SpaceBetween>
-          </Box>
+          // error 态抑制 empty 正向语义：失败时只显示中性占位（顶部 Alert 已说明并提供重试），
+          // 不渲染"暂无配置/尚未创建"误导用户（interaction-states.md §1 R3 / F-028）
+          error ? (
+            <Box textAlign="center" color="text-body-secondary" padding="xl">
+              无法显示配置列表
+            </Box>
+          ) : (
+            <Box textAlign="center" color="inherit" padding="xl">
+              <SpaceBetween size="m">
+                <b>暂无配置</b>
+                <Box color="text-body-secondary">尚未创建任何资源限制配置</Box>
+              </SpaceBetween>
+            </Box>
+          )
         }
         pagination={
           data && data.total_pages > 1 ? (

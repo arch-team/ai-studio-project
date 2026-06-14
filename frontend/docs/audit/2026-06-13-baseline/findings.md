@@ -11,17 +11,17 @@
 | F-001 | dashboard/home | IX | error 态把加载失败静默降级为指标"0"+图表空态"暂无任务数据"+系统状态全绿"运行正常"，无 Flashbar/Alert/重试，将故障伪装成"平台健康且无数据"，严重误导用户判断 | home--error--light/dark.png |
 | F-002 | spaces/ide | IA | "在线 IDE"页与 space-list 渲染几乎完全相同的空间列表，仅导航高亮不同；作为 special 类型未提供 IDE 工作区/会话启动器，两个导航项指向同一内容，用户点击认知落空 | ide--default--light.png vs space-list--default--light.png |
 | F-003 | spaces/ide | IX | "在线 IDE"页无任何 IDE 特有交互（会话启动/终端/连接状态/未运行引导），核心交互闭环缺失，导航项缺乏独立功能价值 | ide--default--light.png |
-| F-004 | spaces/space-list | IX | error 态下 Alert"加载失败"与表格内 empty 态"暂无开发空间/创建开发空间"同屏并存，语义矛盾，失败时不应提供"创建"引导 | space-list--error--light/dark.png |
-| F-005 | models/model-detail | IX | error 态（资源不存在）为死胡同：无面包屑/标题/图标/恢复操作（重试或返回列表），用户无法继续，远低于同模块 list 错误态水准 | model-detail--error--light/dark.png |
-| F-006 | models/model-versions | IX | error 态与 empty 态渲染完全一致（均"暂无版本历史"空表格），加载失败被错误降级为"无数据"，无 Alert/重试，掩盖故障并误导用户 | model-versions--error--light/dark.png |
-| F-007 | audit/audit-logs | IX | error 态整页塌缩为裸容器，丢失标题/面包屑/筛选区，仅一行红色裸文本，无图标/Alert/重试，破坏审计页可信度 | audit-logs--error--light/dark.png |
+| F-004 | spaces/space-list | IX | ✅ **已修复（2026-06-14 batch-2）**。原：error Alert 与表格 empty"暂无开发空间/创建开发空间"CTA 同屏。修复：error 时 Table empty 槽改为中性占位"无法显示开发空间列表"，抑制"创建"CTA（R3）。 | space-list--error--light/dark.png |
+| F-005 | models/model-detail | IX | ✅ **已修复**（InlineErrorState）。error/!model 保留 PageLayout 骨架（标题+面包屑）+ InlineErrorState + 重试/返回，符合范式 A（R1/R4）。 | model-detail--error--light/dark.png |
+| F-006 | models/model-versions | IX | ✅ **已修复**。主资源 !model 保留骨架报错；子资源 versionsError 显式 InlineErrorState 报错，不静默降级为空表（R2）。 | model-versions--error--light/dark.png |
+| F-007 | audit/audit-logs | IX | ✅ **已修复**。error 保留 PageLayout 骨架（标题"审计日志"+面包屑）+ InlineErrorState + 重试（R1/R4）。 | audit-logs--error--light/dark.png |
 | F-008 | audit/audit-logs | CONS | error 态与本模块 loading/empty 态（均保留页面 chrome）实现完全不一致，亦与 resource-quotas 的 Alert 式 error 态不一致，缺乏统一错误呈现组件 | audit-logs--error--dark.png |
 | F-009 | monitoring/monitoring | VIS | ✅ **已修复（2026-06-14）**。原：「资源使用对比」堆叠柱状图量纲混用，百分比指标与存储绝对值（50 万级）共用单一 Y 轴，前三组柱贴地不可见。修复：柱状图改为各资源利用率对比（CPU/内存/GPU/存储 统一 0–100% 量纲，`formatUtilizationBarData`），四柱可读可比。回归确认 VIS 4.5。 | monitoring--default--light/dark.png |
 | F-010 | monitoring/monitoring | VIS | ✅ **已修复（2026-06-14）**。原：「资源分布」环形图把三个百分比与存储绝对值放入同一维度求占比，存储独占整环 95%+。修复：异量纲不可求占比，移除该饼图（`formatUtilizationCompareData` 改为同量纲利用率对比柱状图），消除冗余与失真。回归确认。 | monitoring--default--light/dark.png |
-| F-011 | reports/resource-usage、cost-analysis | CONS | error 态丢失整个页面骨架（顶栏/面包屑/Header/操作按钮消失），仅剩孤立错误容器，与 default/loading 态外壳不一致（两页一致地错，走了独立渲染分支未复用骨架） | resource-usage--error--light.png, cost-analysis--error--light.png |
+| F-011 | reports/resource-usage、cost-analysis | CONS | ✅ **已修复**。两页 error 均保留 PageLayout 骨架（标题+面包屑）+ InlineErrorState + 重试（R1）。 | resource-usage--error--light.png, cost-analysis--error--light.png |
 | F-012 | reports/cost-analysis | VIS | ✅ **已修复（2026-06-14）**。原：成本趋势折线图把"总计"聚合值与各分项同图，总计与计算重叠、小项贴底。修复：移除"总计"折线（`buildCostTrendSeries` 仅画分项），总成本由顶部 KPI 卡单独承载。回归确认。 | cost-analysis--default--light.png |
 | F-013 | reports/cost-analysis | CONS | ✅ **已修复（2026-06-14）**。原：折线图与环形图同色不同义（蓝=总计/蓝=计算）、同义不同色。修复：两图均删除硬编码 hex，走 Cloudscape 分类色板 token（`colorChartsPaletteCategorical*`，品牌青打头），分项顺序一致，同类别跨图自动同色。回归确认 CONS 4.5。 | cost-analysis--default--light/dark.png |
-| F-014 | admin/user-management | IX | error 态整页框架塌缩：加载失败时 Header/面包屑/标题/筛选器全部消失，仅剩孤立红字错误框，无重试按钮、无导航出口，用户陷入死胡同 | user-management--error--light/dark.png |
+| F-014 | admin/user-management | IX | ✅ **已修复**。error 保留 PageLayout 骨架（标题"用户管理"+面包屑）+ InlineErrorState + 重试（R1/R4）。 | user-management--error--light/dark.png |
 
 ## P1 — 明显不专业（跨模块高频）
 
@@ -35,16 +35,16 @@
 
 | 编号 | 模块/页面 | 维度 | 问题描述 | 截图 |
 |------|----------|------|---------|------|
-| F-021 | training/training-detail | IX/CONS | error 态为裸红字"资源不存在"，缺错误图标/返回/重试按钮，与 list 页 error 态（Alert+重试）模式不统一 | training-detail--error--light/dark.png |
-| F-022 | training/training-list | IX | error 态下方表格叠加渲染 empty 态文案"暂无训练任务/尚未创建任何训练任务"，错误与空状态逻辑冲突 | training-list--error--light/dark.png |
-| F-023 | datasets/dataset-detail | IX/CONS | loading/error 态丢失页面 Header 与面包屑，整页塌缩为单个空 Container，error 时无上下文也无"返回列表"出口 | dataset-detail--error--light.png, dataset-detail--loading--light.png |
-| F-024 | datasets/dataset-versions | IX/CONS | error 态与 empty 态视觉完全相同（均"暂无版本记录"+"创建第一个版本"），未区分"加载失败"与"无数据"语义 | dataset-versions--error--light.png |
-| F-025 | templates/template-detail | IX/CONS | loading 态为孤立居中 spinner 无骨架/无面包屑；error 态用纯红字非 Cloudscape Alert，丢失页面头部；与 list 页错误态不一致 | template-detail--loading--light.png, template-detail--error--light.png |
+| F-021 | training/training-detail | IX/CONS | ✅ **已修复**。error/!job 保留 PageLayout 骨架 + InlineErrorState（title 区分"加载失败"/"任务不存在"）+ 条件重试，与 list 页范式统一。 | training-detail--error--light/dark.png |
+| F-022 | training/training-list | IX | ✅ **已修复（2026-06-14 batch-2）**。TrainingJobTable 新增 `hasError` prop，error 时 empty 槽改为中性占位"无法显示训练任务列表"，不与"加载失败"同屏（R3）。 | training-list--error--light/dark.png |
+| F-023 | datasets/dataset-detail | IX/CONS | ✅ **已修复（2026-06-14 batch-2）**。loading 改骨架内 Spinner；error/!dataset 改为 PageLayout 骨架 + InlineErrorState（title 区分"加载失败"/"数据集不存在"）+ 条件重试（R1/R4）。 | dataset-detail--error--light.png, dataset-detail--loading--light.png |
+| F-024 | datasets/dataset-versions | IX/CONS | ✅ **已修复（2026-06-14 batch-2）**。!dataset 改 PageLayout 骨架 + InlineErrorState；版本子资源 error 显式报错 + error 时抑制"创建第一个版本"empty CTA（R1/R2/R3/R4）。 | dataset-versions--error--light.png |
+| F-025 | templates/template-detail | IX/CONS | ✅ **已修复（2026-06-14 batch-2）**。loading 改骨架内 Spinner；error/!template 改为 PageLayout 骨架 + InlineErrorState + 条件重试，复用既有 breadcrumbs（R1/R4）。 | template-detail--loading--light.png, template-detail--error--light.png |
 | F-026 | templates/template-list | IX | empty 态自相矛盾：表格显示"暂无模板(0)"但"热门模板"区仍满载 5 张卡片；loading 态同样仅表格显示加载、卡片已满载，加载范围不一致；error 态缺重试按钮 | template-list--empty--light.png, template-list--loading--light.png, template-list--error--light.png |
-| F-027 | monitoring/monitoring | IX | error 态仅"加载失败"纯红色文案，无重试/图标/引导，未用 Cloudscape Alert+action 模式，用户无恢复路径 | monitoring--error--light/dark.png |
-| F-028 | resource-quotas/resource-quotas | IX | error 态 Alert 缺重试按钮，且 Alert 下方表格仍渲染"暂无配置"空态，错误与空态语义叠加 | resource-quotas--error--light/dark.png |
+| F-027 | monitoring/monitoring | IX | ✅ **已修复**。error 保留 PageLayout 骨架（标题"资源监控"+面包屑）+ InlineErrorState + 重试（R1/R4）。 | monitoring--error--light/dark.png |
+| F-028 | resource-quotas/resource-quotas | IX | ✅ **已修复（2026-06-14 batch-2）**。hook 解构 refetch，error Alert 补"重试"按钮；error 时 Table empty 槽改中性占位，抑制"暂无配置"空态（R2/R3/R4）。 | resource-quotas--error--light/dark.png |
 | F-029 | spaces/space-detail | CONS | loading 态标题为泛化"空间详情"，default 态为实体名"running-jupyter-space"，加载前后标题跳变 | space-detail--loading--light.png |
-| F-030 | dashboard/home | IX | error 态"系统状态"面板在数据获取失败时仍显示全绿"运行正常/就绪/无"，与页头 pill 叠加放大"一切正常"的错误信号，应降级为"未知/无法获取" | home--error--dark.png |
+| F-030 | dashboard/home | IX | ✅ **已修复（2026-06-14 batch-2 完整收口）**。原"平台服务"已早先降级；本次补齐"调度器"（→"未知"）、"失败任务"/"暂停任务"计数（→"无法获取"）在 error 时一并降级，系统状态面板不再有任何子项伪装全绿（R2）。 | home--error--dark.png |
 
 ### 术语/文案/CTA 一致性
 

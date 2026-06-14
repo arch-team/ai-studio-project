@@ -97,10 +97,25 @@ describe('HomePage', () => {
     it('系统状态面板应降级为「无法获取」而非伪装健康', () => {
       renderWithProviders(<HomePage />);
 
-      // 系统状态面板降级文案
-      expect(screen.getByText('无法获取')).toBeInTheDocument();
+      // 系统状态面板降级文案（平台服务/失败任务/暂停任务多处降级，故用 getAllByText）
+      expect(screen.getAllByText('无法获取').length).toBeGreaterThan(0);
       // 不再硬编码「运行正常」
       expect(screen.queryByText('运行正常')).not.toBeInTheDocument();
+    });
+
+    // F-030：调度器子项不得在 error 时硬编码全绿「就绪」伪装健康
+    it('调度器状态在 error 时不应伪装为「就绪」', () => {
+      renderWithProviders(<HomePage />);
+
+      // jobsError 时调度器状态不可信，不应显示断言性的「就绪」
+      expect(screen.queryByText('就绪')).not.toBeInTheDocument();
+    });
+
+    it('失败/暂停任务计数在 error 时不应伪装为「无」', () => {
+      renderWithProviders(<HomePage />);
+
+      // 数据源失败时计数不可信，不应显示绿色「无」伪装健康
+      expect(screen.queryByText('无')).not.toBeInTheDocument();
     });
 
     it('Hero 标识应降级为「平台状态无法获取」', () => {

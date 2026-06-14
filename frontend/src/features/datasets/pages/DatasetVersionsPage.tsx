@@ -17,7 +17,7 @@ import {
 } from '@cloudscape-design/components';
 import { useMemo, useState, useCallback } from 'react';
 import { useParams } from 'react-router-dom';
-import { PageLayout } from '@shared/components';
+import { PageLayout, InlineErrorState } from '@shared/components';
 import { useDataset, useDatasetVersions, useCreateDatasetVersion } from '../api';
 import type { DatasetVersion } from '../types';
 
@@ -62,12 +62,18 @@ export function DatasetVersionsPage() {
   const [showCreateModal, setShowCreateModal] = useState(false);
 
   // 获取数据集详情
-  const { data: dataset, isLoading: datasetLoading } = useDataset(datasetId);
+  const {
+    data: dataset,
+    isLoading: datasetLoading,
+    error: datasetError,
+    refetch: refetchDataset,
+  } = useDataset(datasetId);
 
   // 获取版本列表
   const {
     data: versionsData,
     isLoading: versionsLoading,
+    isError: versionsError,
     refetch,
   } = useDatasetVersions(datasetId);
 
@@ -150,14 +156,19 @@ export function DatasetVersionsPage() {
     );
   }
 
-  // 错误状态 - 数据集不存在
-  if (!dataset) {
+  // 错误状态：保留 PageLayout 骨架（固定标题 + 面包屑返回出口），不裸 Container 塌缩
+  // 区分"加载失败"（带重试）与"数据集不存在"（无重试，仅给返回出口）
+  if (datasetError || !dataset) {
     return (
-      <Container>
-        <Box textAlign="center" color="text-status-error" padding="xl">
-          数据集不存在
-        </Box>
-      </Container>
+      <PageLayout title="数据集版本历史" breadcrumbs={breadcrumbs}>
+        <InlineErrorState
+          title={datasetError ? '加载失败' : '数据集不存在'}
+          message={
+            datasetError?.message ?? '未找到该数据集，它可能已被删除。'
+          }
+          onRetry={datasetError ? () => refetchDataset() : undefined}
+        />
+      </PageLayout>
     );
   }
 
@@ -178,6 +189,14 @@ export function DatasetVersionsPage() {
       }
     >
     <SpaceBetween size="l">
+      {/* 版本列表加载失败：显式报错，不静默降级为空表（F-024） */}
+      {versionsError && (
+        <InlineErrorState
+          message="版本列表加载失败。"
+          onRetry={() => refetch()}
+        />
+      )}
+
       {/* 版本列表 */}
       <Container
         header={
@@ -194,14 +213,18 @@ export function DatasetVersionsPage() {
           items={versionsData?.items ?? []}
           columnDefinitions={columnDefinitions}
           empty={
-            <Box textAlign="center" padding="l">
-              <SpaceBetween size="m">
-                <Box variant="p" color="text-body-secondary">
-                  暂无版本记录
-                </Box>
-                <Button onClick={handleOpenCreateModal}>创建第一个版本</Button>
-              </SpaceBetween>
-            </Box>
+            // error 态抑制 empty：失败时由上方 InlineErrorState 统一报错，
+            // 不再渲染"暂无版本记录"占位或"创建第一个版本" CTA，避免语义矛盾
+            versionsError ? null : (
+              <Box textAlign="center" padding="l">
+                <SpaceBetween size="m">
+                  <Box variant="p" color="text-body-secondary">
+                    暂无版本记录
+                  </Box>
+                  <Button onClick={handleOpenCreateModal}>创建第一个版本</Button>
+                </SpaceBetween>
+              </Box>
+            )
           }
           loadingText="加载版本列表中..."
           trackBy="id"

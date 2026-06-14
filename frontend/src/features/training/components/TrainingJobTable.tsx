@@ -27,6 +27,8 @@ interface TrainingJobTableProps {
   selectable?: boolean;
   selectedItems?: TrainingJobSummary[];
   onSelectionChange?: (items: TrainingJobSummary[]) => void;
+  /** 列表加载失败时为 true：抑制 empty 空态文案，避免与错误提示同屏（F-022） */
+  hasError?: boolean;
 }
 
 // 优先级颜色映射
@@ -65,6 +67,7 @@ export function TrainingJobTable({
   selectable = false,
   selectedItems = [],
   onSelectionChange,
+  hasError = false,
 }: TrainingJobTableProps) {
   const columnDefinitions = [
     {
@@ -147,12 +150,19 @@ export function TrainingJobTable({
         </Header>
       }
       empty={
-        <Box textAlign="center" color="inherit" padding="xl">
-          <SpaceBetween size="m">
-            <b>暂无训练任务</b>
-            <Box color="text-body-secondary">尚未创建任何训练任务</Box>
-          </SpaceBetween>
-        </Box>
+        // error 态抑制 empty 文案（F-022）：失败时仅中性占位，不与"加载失败"提示同屏矛盾
+        hasError ? (
+          <Box textAlign="center" color="text-body-secondary" padding="xl">
+            无法显示训练任务列表
+          </Box>
+        ) : (
+          <Box textAlign="center" color="inherit" padding="xl">
+            <SpaceBetween size="m">
+              <b>暂无训练任务</b>
+              <Box color="text-body-secondary">尚未创建任何训练任务</Box>
+            </SpaceBetween>
+          </Box>
+        )
       }
       pagination={
         totalPages > 1 ? (

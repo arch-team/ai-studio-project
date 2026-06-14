@@ -224,6 +224,20 @@ describe("SpaceListPage", () => {
       renderWithProviders(<SpaceListPage />);
       expect(screen.getByText(/加载失败/)).toBeInTheDocument();
     });
+
+    // F-004：error 态必须抑制 empty 槽，不与"暂无开发空间/创建"CTA 同屏
+    it("加载失败时不应同屏显示 empty 态的'暂无开发空间'引导", () => {
+      mockUseSpaces.mockReturnValue({
+        data: undefined,
+        isLoading: false,
+        error: { message: "服务器错误" },
+        refetch: vi.fn(),
+      });
+
+      renderWithProviders(<SpaceListPage />);
+      // error 与 empty 不得同屏：失败时不应出现"暂无开发空间"空态文案
+      expect(screen.queryByText("暂无开发空间")).not.toBeInTheDocument();
+    });
   });
 
   describe("导航操作", () => {

@@ -163,6 +163,7 @@ export function TrainingJobListPage() {
           totalPages={data?.total_pages || 1}
           onPageChange={handlePageChange}
           onJobClick={handleJobClick}
+          hasError={!!error}
         />
       </SpaceBetween>
     </PageLayout>

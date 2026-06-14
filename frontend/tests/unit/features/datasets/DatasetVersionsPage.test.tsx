@@ -258,8 +258,8 @@ describe("DatasetVersionsPage", () => {
     });
   });
 
-  describe("数据集不存在", () => {
-    it("数据集不存在时应显示错误提示", async () => {
+  describe("数据集加载失败", () => {
+    it("数据集加载失败时应显示错误提示", async () => {
       (fetchDataset as ReturnType<typeof vi.fn>).mockRejectedValue(
         new Error("数据集不存在"),
       );
@@ -268,6 +268,60 @@ describe("DatasetVersionsPage", () => {
 
       await waitFor(() => {
         expect(screen.getByText("数据集不存在")).toBeInTheDocument();
+      });
+    });
+
+    it("数据集加载失败时应渲染 InlineErrorState（标题+重试），而非裸文本块", async () => {
+      // fetchDataset 拒绝 → datasetError 为真 → "加载失败"态（带重试）
+      (fetchDataset as ReturnType<typeof vi.fn>).mockRejectedValue(
+        new Error("数据集不存在"),
+      );
+
+      renderWithProviders(<DatasetVersionsPage />);
+
+      // InlineErrorState 标题"加载失败" + 错误消息 + 重试按钮（裸 Box 路径无重试）
+      await waitFor(() => {
+        expect(screen.getByText("加载失败")).toBeInTheDocument();
+        expect(screen.getByText("数据集不存在")).toBeInTheDocument();
+        expect(screen.getByText("重试")).toBeInTheDocument();
+      });
+      // 仍保留页面骨架（面包屑出口同步到 UI Store），不裸 Container 塌缩
+      expect(useUIStore.getState().breadcrumbs.length).toBeGreaterThan(0);
+    });
+  });
+
+  describe("版本列表加载失败", () => {
+    it("版本列表加载失败时应显式报错并提供重试，而非静默降级为空表", async () => {
+      // 主资源（数据集）正常，仅子资源（版本列表）加载失败
+      (fetchDatasetVersions as ReturnType<typeof vi.fn>).mockRejectedValue(
+        new Error("网络错误"),
+      );
+
+      renderWithProviders(<DatasetVersionsPage />);
+
+      await waitFor(() => {
+        // 显式错误提示（InlineErrorState message）
+        expect(screen.getByText("版本列表加载失败。")).toBeInTheDocument();
+        // 提供重试入口
+        expect(screen.getByText("重试")).toBeInTheDocument();
+      });
+
+      // 错误态必须抑制 empty 态：不得出现"暂无版本记录"+"创建第一个版本" CTA
+      expect(screen.queryByText("暂无版本记录")).not.toBeInTheDocument();
+      expect(screen.queryByText("创建第一个版本")).not.toBeInTheDocument();
+    });
+
+    it("版本列表加载失败时仍保留页面骨架（标题与刷新按钮）", async () => {
+      (fetchDatasetVersions as ReturnType<typeof vi.fn>).mockRejectedValue(
+        new Error("网络错误"),
+      );
+
+      renderWithProviders(<DatasetVersionsPage />);
+
+      await waitFor(() => {
+        // 数据集加载成功 → 标题正常渲染，错误只发生在版本子资源
+        expect(screen.getByText("测试数据集 - 版本历史")).toBeInTheDocument();
+        expect(screen.getByText("刷新")).toBeInTheDocument();
       });
     });
   });
