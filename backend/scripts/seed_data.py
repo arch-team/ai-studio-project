@@ -24,11 +24,13 @@ async def seed_admin_user(session: AsyncSession) -> None:
         return
 
     # Create admin user
+    # status/role/auth_type 使用小写 enum .value，与 ORM lowercase_enum 列对齐；
+    # 切勿写大写(如 'ACTIVE')，否则读回会抛 LookupError 导致登录 500。
     password_hash = bcrypt.hashpw(b"Admin123!", bcrypt.gensalt()).decode()
     await session.execute(
         text("""
             INSERT INTO users (username, email, password_hash, status, role, auth_type, created_at, updated_at)
-            VALUES ('admin', 'admin@example.com', :password_hash, 'ACTIVE', 'ADMIN', 'LOCAL', NOW(), NOW())
+            VALUES ('admin', 'admin@example.com', :password_hash, 'active', 'admin', 'local', NOW(), NOW())
         """),
         {"password_hash": password_hash},
     )
@@ -58,8 +60,8 @@ async def seed_resource_quotas(session: AsyncSession) -> None:
                 status, created_by, created_at, updated_at
             ) VALUES (
                 'default-quota', 'Default resource quota for development',
-                'USER', 32, 0, 8, 0, 128, 0, 1000, 5, 2,
-                'ACTIVE', :created_by, NOW(), NOW()
+                'user', 32, 0, 8, 0, 128, 0, 1000, 5, 2,
+                'active', :created_by, NOW(), NOW()
             )
         """),
         {"created_by": admin_id},
