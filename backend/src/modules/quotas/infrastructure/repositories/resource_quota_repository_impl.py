@@ -4,7 +4,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.shared.infrastructure import PydanticRepository
-from src.shared.utils import utc_now
+from src.shared.utils import calculate_offset, utc_now
 
 from ...domain.entities import ResourceQuota
 from ...domain.repositories import IResourceQuotaRepository
@@ -82,7 +82,7 @@ class ResourceQuotaRepository(PydanticRepository[ResourceQuota, ResourceQuotaMod
             stmt = stmt.order_by(sort_column.desc())
 
         # Apply pagination
-        offset = (page - 1) * page_size
+        offset = calculate_offset(page, page_size)
         stmt = stmt.offset(offset).limit(page_size)
 
         # Execute query

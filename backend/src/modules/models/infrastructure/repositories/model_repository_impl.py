@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from src.shared.infrastructure import PydanticRepository
-from src.shared.utils import utc_now
+from src.shared.utils import calculate_offset, utc_now
 
 from ...domain.entities import Model
 from ...domain.repositories import IModelRepository
@@ -150,7 +150,7 @@ class ModelRepository(PydanticRepository[Model, ModelModel, int], IModelReposito
 
     def _apply_pagination(self, query: Select[Any], page: int, page_size: int) -> Select[Any]:
         """应用分页."""
-        offset = (page - 1) * page_size
+        offset = calculate_offset(page, page_size)
         return query.offset(offset).limit(page_size)
 
     async def _execute_model_query(self, query: Select[Any]) -> Sequence[Any]:

@@ -1,7 +1,7 @@
 """User Service - User management operations (CRUD)."""
 
 from src.shared.domain.exceptions import DuplicateEntityError
-from src.shared.utils import utc_now
+from src.shared.utils import calculate_offset, utc_now
 
 from ...domain.entities import User
 from ...domain.exceptions import UserNotFoundError
@@ -29,7 +29,7 @@ class UserService:
         Returns:
             Tuple of (users, total_count)
         """
-        offset = (page - 1) * page_size
+        offset = calculate_offset(page, page_size)
         users = await self._user_repository.list_users(
             offset=offset,
             limit=page_size,

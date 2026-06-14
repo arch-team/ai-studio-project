@@ -4,6 +4,7 @@ from sqlalchemy import ColumnElement, and_, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.shared.infrastructure import PydanticRepository
+from src.shared.utils import calculate_offset
 
 from ...domain.entities import ResourceLimitConfig
 from ...domain.repositories import IResourceLimitConfigRepository
@@ -95,7 +96,7 @@ class ResourceLimitConfigRepository(
             query = query.order_by(sort_column.asc())
 
         # Apply pagination
-        offset = (page - 1) * page_size
+        offset = calculate_offset(page, page_size)
         query = query.offset(offset).limit(page_size)
 
         # Execute query

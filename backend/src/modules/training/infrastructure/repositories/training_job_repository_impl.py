@@ -8,6 +8,7 @@ from sqlalchemy import Select, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.shared.infrastructure import PydanticRepository
+from src.shared.utils import calculate_offset
 
 from ...domain.entities import TrainingJob
 from ...domain.repositories import ITrainingJobRepository
@@ -140,7 +141,7 @@ class TrainingJobRepository(PydanticRepository[TrainingJob, TrainingJobModel, in
 
     def _apply_job_pagination(self, query: Select[Any], page: int, page_size: int) -> Select[Any]:
         """应用分页."""
-        offset = (page - 1) * page_size
+        offset = calculate_offset(page, page_size)
         return query.offset(offset).limit(page_size)
 
     async def _execute_job_query(self, query: Select[Any]) -> Sequence[Any]:

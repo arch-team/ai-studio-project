@@ -6,7 +6,7 @@ from sqlalchemy import Select, and_, func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.shared.infrastructure import PydanticRepository
-from src.shared.utils import utc_now
+from src.shared.utils import calculate_offset, utc_now
 
 from ...domain.entities import JobTemplate
 from ...domain.repositories import IJobTemplateRepository
@@ -163,7 +163,7 @@ class JobTemplateRepository(
         query = query.order_by(sort_column.desc() if sort_order.lower() == "desc" else sort_column.asc())
 
         # 应用分页
-        offset = (page - 1) * page_size
+        offset = calculate_offset(page, page_size)
         query = query.offset(offset).limit(page_size)
 
         # 执行查询
