@@ -158,6 +158,20 @@ describe("TrainingJobListPage", () => {
 
       expect(screen.getByText(/加载失败/)).toBeInTheDocument();
     });
+
+    // F-022：error 态须抑制 empty 文案，不与"加载失败"同屏矛盾
+    it("加载失败时不应同屏显示 empty 态的'暂无训练任务'文案", () => {
+      mockUseTrainingJobs.mockReturnValue({
+        data: undefined,
+        isLoading: false,
+        error: { message: "服务器错误" },
+        refetch: mockRefetch,
+      });
+
+      renderWithProviders(<TrainingJobListPage />);
+
+      expect(screen.queryByText("暂无训练任务")).not.toBeInTheDocument();
+    });
   });
 
   describe("空列表", () => {

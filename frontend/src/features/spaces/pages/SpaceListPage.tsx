@@ -325,12 +325,19 @@ export function SpaceListPage() {
         items={data?.items ?? []}
         columnDefinitions={columnDefinitions}
         empty={
-          <Box textAlign="center" padding="xl" color="text-body-secondary">
-            <SpaceBetween size="m">
-              <Box>暂无开发空间</Box>
-              <Button onClick={handleCreateClick}>创建开发空间</Button>
-            </SpaceBetween>
-          </Box>
+          // error 态抑制 empty CTA（F-004）：失败时仅显示中性占位，不引导"创建"
+          error ? (
+            <Box textAlign="center" padding="xl" color="text-body-secondary">
+              无法显示开发空间列表
+            </Box>
+          ) : (
+            <Box textAlign="center" padding="xl" color="text-body-secondary">
+              <SpaceBetween size="m">
+                <Box>暂无开发空间</Box>
+                <Button onClick={handleCreateClick}>创建开发空间</Button>
+              </SpaceBetween>
+            </Box>
+          )
         }
         pagination={
           <Pagination

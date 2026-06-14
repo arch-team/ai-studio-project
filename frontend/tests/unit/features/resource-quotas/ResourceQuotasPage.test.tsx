@@ -56,6 +56,7 @@ const mockUseResourceLimitConfigs = vi.fn();
 const mockUseCreateResourceLimitConfig = vi.fn();
 const mockUseUpdateResourceLimitConfig = vi.fn();
 const mockUseDeleteResourceLimitConfig = vi.fn();
+const mockRefetch = vi.fn();
 
 vi.mock('@features/resource-quotas/api', () => ({
   useResourceLimitConfigs: () => mockUseResourceLimitConfigs(),
@@ -73,6 +74,7 @@ describe('ResourceQuotasPage', () => {
       data: mockListResponse,
       isLoading: false,
       error: null,
+      refetch: mockRefetch,
     });
 
     mockUseCreateResourceLimitConfig.mockReturnValue({
@@ -166,6 +168,7 @@ describe('ResourceQuotasPage', () => {
         data: undefined,
         isLoading: true,
         error: null,
+        refetch: mockRefetch,
       });
 
       renderWithProviders(<ResourceQuotasPage />);
@@ -179,10 +182,45 @@ describe('ResourceQuotasPage', () => {
         data: undefined,
         isLoading: false,
         error: new Error('Network error'),
+        refetch: mockRefetch,
       });
 
       renderWithProviders(<ResourceQuotasPage />);
       expect(screen.getByText(/加载失败/i)).toBeInTheDocument();
+    });
+
+    it('should render a retry button in error alert and call refetch on click (F-028 R4)', () => {
+      mockUseResourceLimitConfigs.mockReturnValue({
+        data: undefined,
+        isLoading: false,
+        error: new Error('Network error'),
+        refetch: mockRefetch,
+      });
+
+      renderWithProviders(<ResourceQuotasPage />);
+
+      const retryButton = screen.getByRole('button', { name: /重试/i });
+      expect(retryButton).toBeInTheDocument();
+
+      fireEvent.click(retryButton);
+      expect(mockRefetch).toHaveBeenCalledTimes(1);
+    });
+
+    it('should NOT show empty-state CTA while in error state (F-028 R3)', () => {
+      mockUseResourceLimitConfigs.mockReturnValue({
+        data: undefined,
+        isLoading: false,
+        error: new Error('Network error'),
+        refetch: mockRefetch,
+      });
+
+      renderWithProviders(<ResourceQuotasPage />);
+
+      // error 态必须抑制 empty："暂无配置"与"尚未创建任何资源限制配置"不得与"加载失败"同屏
+      expect(screen.queryByText('暂无配置')).not.toBeInTheDocument();
+      expect(
+        screen.queryByText('尚未创建任何资源限制配置')
+      ).not.toBeInTheDocument();
     });
   });
 
@@ -198,6 +236,7 @@ describe('ResourceQuotasPage', () => {
         },
         isLoading: false,
         error: null,
+        refetch: mockRefetch,
       });
 
       renderWithProviders(<ResourceQuotasPage />);
@@ -345,6 +384,7 @@ describe('ResourceQuotasPage', () => {
         },
         isLoading: false,
         error: null,
+        refetch: mockRefetch,
       });
 
       renderWithProviders(<ResourceQuotasPage />);

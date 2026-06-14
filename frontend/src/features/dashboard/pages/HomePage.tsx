@@ -254,12 +254,18 @@ export function HomePage() {
                 </SpaceBetween>
                 <SpaceBetween size="xxs">
                   <Box variant="awsui-key-label">调度器</Box>
-                  <StatusIndicator type="success">就绪</StatusIndicator>
+                  {/* error 时调度器状态不可信，降级为"未知"而非伪装"就绪"（F-030/R2） */}
+                  <StatusIndicator type={hasError ? 'warning' : 'success'}>
+                    {hasError ? '未知' : '就绪'}
+                  </StatusIndicator>
                 </SpaceBetween>
                 <SpaceBetween size="xxs">
                   <Box variant="awsui-key-label">失败任务</Box>
                   <Box>
-                    {(failedJobs?.total ?? 0) > 0 ? (
+                    {/* error 时计数不可信，显示"无法获取"而非绿色"无"（F-030/R2） */}
+                    {hasError ? (
+                      <StatusIndicator type="warning">无法获取</StatusIndicator>
+                    ) : (failedJobs?.total ?? 0) > 0 ? (
                       <Badge color="red">{failedJobs?.total}</Badge>
                     ) : (
                       <StatusIndicator type="success">无</StatusIndicator>
@@ -269,7 +275,9 @@ export function HomePage() {
                 <SpaceBetween size="xxs">
                   <Box variant="awsui-key-label">暂停任务</Box>
                   <Box>
-                    {(pausedJobs?.total ?? 0) > 0 ? (
+                    {hasError ? (
+                      <StatusIndicator type="warning">无法获取</StatusIndicator>
+                    ) : (pausedJobs?.total ?? 0) > 0 ? (
                       <Badge color="grey">{pausedJobs?.total}</Badge>
                     ) : (
                       <StatusIndicator type="success">无</StatusIndicator>

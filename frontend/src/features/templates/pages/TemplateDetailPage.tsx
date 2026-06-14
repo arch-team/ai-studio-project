@@ -17,7 +17,7 @@ import {
 } from '@cloudscape-design/components';
 import { useCallback, useMemo } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { PageLayout } from '@shared/components';
+import { InlineErrorState, PageLayout } from '@shared/components';
 import { useDeleteJobTemplate, useJobTemplate } from '../api';
 import {
   DISTRIBUTION_STRATEGY_LABELS,
@@ -33,7 +33,7 @@ export function TemplateDetailPage() {
   const { id } = useParams<{ id: string }>();
   const templateId = id ? parseInt(id, 10) : undefined;
 
-  const { data: template, isLoading, error } = useJobTemplate(templateId);
+  const { data: template, isLoading, error, refetch } = useJobTemplate(templateId);
 
   // 面包屑（模板名加载后更新）
   const breadcrumbs = useMemo(
@@ -73,24 +73,26 @@ export function TemplateDetailPage() {
     navigate('/job-templates');
   }, [navigate]);
 
+  // 加载态：保留稳定居中 Spinner + 文案，避免整页塌缩
   if (isLoading) {
     return (
-      <Box textAlign="center" padding="xl">
+      <Box textAlign="center" padding="xxl">
         <Spinner size="large" />
+        <Box margin={{ top: 'm' }}>加载中...</Box>
       </Box>
     );
   }
 
+  // 错误 或 !template 态：保留 PageLayout 骨架（标题/面包屑），内放 InlineErrorState
   if (error || !template) {
     return (
-      <Container>
-        <Box textAlign="center" color="text-status-error" padding="xl">
-          {error ? `加载失败: ${error.message}` : '模板不存在'}
-        </Box>
-        <Box textAlign="center">
-          <Button onClick={handleBack}>返回列表</Button>
-        </Box>
-      </Container>
+      <PageLayout title="模板详情" breadcrumbs={breadcrumbs}>
+        <InlineErrorState
+          title={error ? '加载失败' : '模板不存在'}
+          message={error?.message ?? '未找到该模板，它可能已被删除。'}
+          onRetry={error ? () => refetch() : undefined}
+        />
+      </PageLayout>
     );
   }
 

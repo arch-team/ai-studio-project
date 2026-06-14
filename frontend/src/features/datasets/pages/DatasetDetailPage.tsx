@@ -13,12 +13,13 @@ import {
   KeyValuePairs,
   Pagination,
   SpaceBetween,
+  Spinner,
   StatusIndicator,
   Table,
 } from '@cloudscape-design/components';
 import { useCallback, useMemo, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { PageLayout } from '@shared/components';
+import { PageLayout, InlineErrorState } from '@shared/components';
 import { useDataset, useDatasetVersions } from '../api';
 import { formatDateTime } from '@shared/utils';
 import {
@@ -60,7 +61,7 @@ export function DatasetDetailPage() {
   const navigate = useNavigate();
   const datasetId = id ? Number(id) : undefined;
 
-  const { data: dataset, isLoading, error } = useDataset(datasetId);
+  const { data: dataset, isLoading, error, refetch } = useDataset(datasetId);
   const { data: versions, isLoading: loadingVersions } = useDatasetVersions(datasetId);
 
   // 面包屑（数据集名加载后更新）
@@ -122,36 +123,26 @@ export function DatasetDetailPage() {
     },
   ];
 
-  // 加载状态
+  // 加载状态：首屏未返回时整页居中 Spinner（标题稳定由 error/default 分支承载）
   if (isLoading) {
     return (
-      <Container>
-        <Box textAlign="center" padding="xl">
-          <StatusIndicator type="loading">加载中...</StatusIndicator>
-        </Box>
-      </Container>
+      <Box textAlign="center" padding="xxl">
+        <Spinner size="large" />
+        <Box margin={{ top: 'm' }}>加载中...</Box>
+      </Box>
     );
   }
 
-  // 错误状态
-  if (error) {
+  // 错误或数据集不存在：保留 PageLayout 骨架（固定标题 + 面包屑）+ InlineErrorState
+  if (error || !dataset) {
     return (
-      <Container>
-        <Box textAlign="center" color="text-status-error" padding="xl">
-          加载失败: {error.message}
-        </Box>
-      </Container>
-    );
-  }
-
-  // 数据集不存在
-  if (!dataset) {
-    return (
-      <Container>
-        <Box textAlign="center" padding="xl">
-          数据集不存在
-        </Box>
-      </Container>
+      <PageLayout title="数据集详情" breadcrumbs={breadcrumbs}>
+        <InlineErrorState
+          title={error ? '加载失败' : '数据集不存在'}
+          message={error?.message ?? '未找到该数据集，它可能已被删除。'}
+          onRetry={error ? () => refetch() : undefined}
+        />
+      </PageLayout>
     );
   }
 
