@@ -6,7 +6,7 @@
 
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
-import { CostTrendChart } from '@features/reports';
+import { CostTrendChart, buildCostTrendSeries } from '@features/reports';
 import type { DailyCost } from '@features/reports';
 
 // 测试数据
@@ -129,6 +129,37 @@ describe('CostTrendChart', () => {
       render(<CostTrendChart data={mockDailyCosts} />);
       // 组件应该渲染成功
       expect(screen.getByTestId('cost-trend-chart')).toBeInTheDocument();
+    });
+  });
+
+  // === F-012/F-013 图表严谨性回归 ===
+  // baseline 审计：折线图把「总计」聚合值与计算/存储/网络/其他分项画同图，
+  // 总计与最大分项重叠、小分项贴底不可读（F-012）；且硬编码 hex 与饼图同色不同义（F-013）。
+  describe('图表严谨性 (F-012/F-013)', () => {
+    it('折线图剔除「总计」聚合值，只画分项（F-012）', () => {
+      const series = buildCostTrendSeries(mockDailyCosts);
+      const titles = series.map((s) => s.title);
+      // 总计已在上方 KPI 卡展示，不得再混入分项折线图
+      expect(titles).not.toContain('总计');
+      // 分项保留（按数据非零情况）
+      expect(titles).toContain('计算');
+      expect(titles).toContain('存储');
+    });
+
+    it('配色不硬编码 hex：series 不含 color 字段，交由分类色 token 注入（F-013）', () => {
+      const series = buildCostTrendSeries(mockDailyCosts);
+      const serialized = JSON.stringify(series);
+      expect(serialized).not.toMatch(/#[0-9a-fA-F]{6}/);
+      // 显式确认每个 series 都没有 color 属性
+      for (const s of series) {
+        expect(s).not.toHaveProperty('color');
+      }
+    });
+
+    it('分项顺序固定（compute→storage→network→other），保证与饼图跨图同色同义（F-013）', () => {
+      const series = buildCostTrendSeries(mockDailyCosts);
+      // 全分项非零数据下，顺序应稳定，确保 Cloudscape 分类色板按序分配后跨图一致
+      expect(series.map((s) => s.title)).toEqual(['计算', '存储', '网络', '其他']);
     });
   });
 

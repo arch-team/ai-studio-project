@@ -9,6 +9,10 @@ import { describe, it, expect } from 'vitest';
 import { screen } from '@testing-library/react';
 import { renderWithProviders } from '@tests/__utils__/test-utils';
 import { MetricsCharts } from '@features/monitoring';
+import {
+  formatUtilizationBarData,
+  formatUtilizationCompareData,
+} from '@features/monitoring';
 import type { MetricSeries, ResourceUtilization } from '@features/monitoring';
 
 // Mock data - 时间序列数据
@@ -166,6 +170,57 @@ describe('MetricsCharts', () => {
         />
       );
       expect(screen.getByTestId('metrics-chart')).toBeInTheDocument();
+    });
+  });
+
+  // === F-009/F-010 量纲严谨性回归 ===
+  // baseline 审计：柱状图/饼图把百分比指标与存储绝对字节数（量级悬殊）混入同一坐标轴/同一占比维度，
+  // 导致 CPU/内存/GPU 柱贴地不可见、存储独占整环。修复后所有资源统一走 0-100% 利用率量纲。
+  describe('量纲严谨性 (F-009/F-010)', () => {
+    // 含量级悬殊数据：CPU 用 650 核、存储用 50 万 GB 绝对值，旧实现会让百分比柱贴地
+    const mixedScaleUtilization: ResourceUtilization[] = [
+      { resource_type: 'cpu', total: 1000, used: 650, available: 350, utilization_percentage: 65, unit: 'cores' },
+      { resource_type: 'memory', total: 2048, used: 983, available: 1065, utilization_percentage: 48, unit: 'GB' },
+      { resource_type: 'gpu', total: 64, used: 56, available: 8, utilization_percentage: 87, unit: 'cards' },
+      { resource_type: 'storage', total: 500000, used: 355000, available: 145000, utilization_percentage: 71, unit: 'GB' },
+    ];
+
+    it('柱状图：所有资源统一走 0-100% 利用率量纲，不再使用裸绝对值 (F-009)', () => {
+      const series = formatUtilizationBarData(mixedScaleUtilization);
+      // 单一系列（利用率），不再是"已使用/可用"双系列的绝对值堆叠
+      expect(series).toHaveLength(1);
+      const allY = series.flatMap((s) => s.data.map((d) => d.y));
+      // 关键断言：每个 y 都是百分比（0-100），存储不会因 50 万的绝对值压垮其它资源
+      for (const y of allY) {
+        expect(y).toBeGreaterThanOrEqual(0);
+        expect(y).toBeLessThanOrEqual(100);
+      }
+      // 四种资源都在同一张图，按利用率可直接对比
+      expect(allY).toEqual([65, 48, 87, 71]);
+    });
+
+    it('饼图替代为利用率对比：所有 y 同为 0-100% 量纲，不再对异量纲求占比 (F-010)', () => {
+      const series = formatUtilizationCompareData(mixedScaleUtilization);
+      const allY = series.flatMap((s) => s.data.map((d) => d.y));
+      for (const y of allY) {
+        expect(y).toBeGreaterThanOrEqual(0);
+        expect(y).toBeLessThanOrEqual(100);
+      }
+      expect(allY).toEqual([65, 48, 87, 71]);
+    });
+
+    it('配色不硬编码 hex：转换函数不返回任何 color 字段，交由 Cloudscape 分类色 token 注入 (F-013 同源)', () => {
+      const barSeries = formatUtilizationBarData(mixedScaleUtilization);
+      const compareSeries = formatUtilizationCompareData(mixedScaleUtilization);
+      const serialized = JSON.stringify([barSeries, compareSeries]);
+      // 不得出现硬编码 hex 色值（如 #0972d3）
+      expect(serialized).not.toMatch(/#[0-9a-fA-F]{6}/);
+    });
+
+    it('x 轴用资源中文名，承载利用率对比语义', () => {
+      const series = formatUtilizationBarData(mixedScaleUtilization);
+      const allX = series.flatMap((s) => s.data.map((d) => d.x));
+      expect(allX).toEqual(['CPU', '内存', 'GPU', '存储']);
     });
   });
 });
