@@ -83,11 +83,13 @@ function CostSummaryCards({
   networkCost: number;
   loading: boolean;
 }) {
+  // 注：不再为 KPI 数值硬编码颜色（F-034）。数值用默认文字色，与 reports-home 一致；
+  // 颜色区分交由下方图表的分类色板承载，KPI 卡保持中性专业。
   const costCards = [
-    { label: "总成本", value: formatCurrency(totalCost), color: "#0073bb" },
-    { label: "计算成本", value: formatCurrency(computeCost), color: "#3184c2" },
-    { label: "存储成本", value: formatCurrency(storageCost), color: "#1d8102" },
-    { label: "网络成本", value: formatCurrency(networkCost), color: "#9469d6" },
+    { label: "总成本", value: formatCurrency(totalCost) },
+    { label: "计算成本", value: formatCurrency(computeCost) },
+    { label: "存储成本", value: formatCurrency(storageCost) },
+    { label: "网络成本", value: formatCurrency(networkCost) },
   ];
 
   if (loading) {
@@ -113,7 +115,7 @@ function CostSummaryCards({
         <Container key={card.label}>
           <Box textAlign="center">
             <Box variant="awsui-key-label">{card.label}</Box>
-            <Box variant="awsui-value-large" color="text-status-info">
+            <Box variant="awsui-value-large">
               {card.value}
             </Box>
           </Box>

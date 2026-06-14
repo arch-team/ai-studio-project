@@ -212,6 +212,22 @@ describe('UserManagementPage', () => {
       renderWithProviders(<UserManagementPage />);
       expect(screen.getByText(/暂无用户/i)).toBeInTheDocument();
     });
+
+    // F-033：embedded 模式（admin dashboard Tab 内）无外层 PageLayout 创建按钮，
+    // 空态须自带"新建用户"CTA，避免空态引导断裂
+    it('embedded 模式空态应提供"新建用户"CTA', () => {
+      mockUseUsers.mockReturnValue({
+        data: { items: [], total: 0, page: 1, page_size: 20, total_pages: 0 },
+        isLoading: false,
+        error: null,
+      });
+
+      renderWithProviders(<UserManagementPage embedded />);
+      // embedded 时无页头按钮，空态内必须有创建引导
+      expect(
+        screen.getByRole('button', { name: /新建用户/i }),
+      ).toBeInTheDocument();
+    });
   });
 
   describe('创建用户 Modal', () => {

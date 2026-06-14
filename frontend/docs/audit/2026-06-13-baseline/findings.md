@@ -50,12 +50,12 @@
 
 | 编号 | 模块/页面 | 维度 | 问题描述 | 截图 |
 |------|----------|------|---------|------|
-| F-031 | models/model-versions | CONS | 状态枚举中英不一致：versions 页用英文 deployed/registered/archived/failed，list/detail 页用中文已部署/已注册/已归档/已失效，同一术语跨页混用 | model-versions--default--light.png |
-| F-032 | datasets/dataset-create、space-create | IX | 必填字段缺少显式视觉强标记（红色 `*`），仅靠"必填"文字提示，校验前用户难以快速识别必填项 | dataset-create--default--light.png, space-create--default--light.png |
-| F-033 | admin/admin-home | IX | 管理后台 dashboard 空列表态缺少"新建用户"主操作 CTA，与 user-management 独立页（右上角有"+新建用户"）不一致，空态下引导断裂 | admin-home--default--light/dark.png |
-| F-034 | reports/cost-analysis | CONS | 分类口径不一致：折线图无"数据传输"系列，但环形图与明细表含"数据传输"独立类别，维度对不上；KPI 数值用高饱和蓝色偏离 Cloudscape 中性色且与 reports-home 不一致 | cost-analysis--default--light.png |
+| F-031 | models/model-versions | CONS | ✅ **已修复（2026-06-14 P1）**。ModelVersionTable 状态列原裸渲染英文枚举 `{item.status}`，改为走 `MODEL_STATUS_LABELS` 中文映射（已注册/已部署/已归档/已失效），与 list/detail 页一致。 | model-versions--default--light.png |
+| ~~F-032~~ | datasets/dataset-create、space-create | IX | ❌ **误判（2026-06-14 P1 关闭）**。"必填字段红色 `*`"与项目规范冲突：ux-writing.md §2.4 与 page-templates.md §3.3 约定必填字段以 Cloudscape `FormField constraintText="必填"` 标注，且 design-tokens/component-design 严禁内联样式（零自定义 CSS 铁律），红星实现需 `<span style>` 违规。当前 `constraintText="必填"` 写法**符合规范**，非缺陷。如需视觉红星须先升级设计规范。 | dataset-create--default--light.png, space-create--default--light.png |
+| F-033 | admin/admin-home | IX | ✅ **已修复（2026-06-14 P1）**。UserManagementPage 空态（含 embedded 模式，admin dashboard Tab 内无页头按钮）Table empty 槽补"新建用户"主操作 CTA，空态引导不再断裂。 | admin-home--default--light/dark.png |
+| F-034 | reports/cost-analysis | CONS | ⚠️ **部分修复（2026-06-14 P1）**。KPI 数值颜色已修：移除 `color="text-status-info"`（高饱和蓝）改用默认中性文字色，与 reports-home 一致，并清除 costCards 死代码硬编码 hex。**剩余**：折线图缺"数据传输"系列与环形图/明细表分类口径不一致，属后端字段缺口 F-070（移交后端），前端不伪造。 | cost-analysis--default--light.png |
 | F-035 | shared/not-found、unauthorized | IA | 内容顶部对齐而非视口垂直居中，下方大片空白，页面重心失衡，呈"未完成布局"观感 | not-found--default--light/dark.png, unauthorized--default--light/dark.png |
-| F-036 | monitoring/monitoring | CONS | 告警表"状态"列对严重/警告/信息三种级别一律显示相同"⚠️ 触发中"黄色图标，状态指示与级别列语义割裂 | monitoring--default--light.png |
+| F-036 | monitoring/monitoring | CONS | ✅ **已修复（2026-06-14 P1）**。AlertsPanel 状态列原对所有未解决告警一律 `type="warning"`（黄图标），改为 resolved→success、其余按 `ALERT_SEVERITY_COLORS[severity]` 联动（critical 红/warning 黄/info 蓝），与"级别"列语义呼应。 | monitoring--default--light.png |
 
 ## P2 — 打磨项（节选高价值项）
 
@@ -65,7 +65,7 @@
 | F-041 | datasets/dataset-list | IX | empty 态仅有文案缺引导主操作按钮（如"注册第一个数据集"），与 versions 页 empty 有 CTA 不一致 | dataset-list--empty--light.png |
 | F-042 | models/model-versions | IA | 关键指标列为纯文本，未高亮最优值或迷你可视化，横向对比效率有提升空间 | model-versions--default--light.png |
 | F-043 | datasets/dataset-versions | IA | 版本表未对最新/当前版本做视觉强调（无 latest/当前徽标），用户难一眼识别活跃版本 | dataset-versions--default--light.png |
-| F-044 | training/training-list | VIS | "运行中"状态图标语义偏弱（灰色样式），与其他状态明确色彩图标不协调 | training-list--default--light.png |
+| F-044 | training/training-list | VIS | ✅ **已修复（2026-06-14 P1 核实确认）**。TrainingStatusBadge 中 `running` 已映射为 Cloudscape `in-progress` 类型（蓝色旋转动画），语义明确，与 pending/stopped 等弱语义灰图标区分清晰。 | training-list--default--light.png |
 | F-045 | spaces/space-detail | VIS | SageMaker ARN 长字符串在 KeyValuePairs 第三列折行 3 行，与同行其他字段行底不对齐 | space-detail--default--dark.png |
 | F-046 | admin/user-management | VIS | 截图视口不一致：admin-home 与空/加载/错误态约 1440px，user-management--default 约 720px（疑为截图流水线视口设置，建议核查，非 UI 缺陷） | user-management--default--light.png |
 | F-047 | auth/login | IX | 密码字段无显隐切换图标、无"忘记密码/联系管理员"辅助入口（视产品定位） | login--default--light.png |
